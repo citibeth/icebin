@@ -3,7 +3,7 @@
 #include <vector>
 #include <blitz/array.h>
 
-namespace giss {
+namespace glint2 {
 
 /** Closure used to determine the elevation class of each GCM grid cell, based on its elevation.
 
@@ -17,7 +17,7 @@ Typically, this class is used as a temporary decorator to a HeightMaxArray insta
 */
 class HeightClassifier {
 public :
-	HeightClassifier(blitz::Array<double,1> *_hcmax) : hcmax(_hcmax) {}
+	HeightClassifier(blitz::Array<double,1> *_hcmax);
 
 	/** Determines the elevation class of a grid cell.
 	@param index Index of the grid cell (base=0) to determine elevation class.
@@ -25,6 +25,8 @@ public :
 	int operator()(double elevation);
 
 	double operator[](int ix) { return (*hcmax)(ix); }
+
+	int nhc() { return hcmax->extent(0); }
 
 private:
 	blitz::Array<double,1> *hcmax;

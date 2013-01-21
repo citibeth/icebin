@@ -1,4 +1,9 @@
+#include <cstdio>
+#include <giss/Proj.hpp>
 #include <glint2/matrix_ops.hpp>
+#include <glint2/util.hpp>
+#include <glint2/HCIndex.hpp>
+#include <giss/constant.hpp>
 
 namespace glint2 {
 
@@ -6,26 +11,27 @@ namespace glint2 {
 // Height Classes
 
 /** @param overlap [n1 x n2] sparse matrix */
-std::unique_ptr<VectorSparseMatrix> height_classify(
-VectorSparseMatrix const &overlap,
+std::unique_ptr<giss::VectorSparseMatrix> height_classify(
+giss::VectorSparseMatrix const &overlap,
 blitz::Array<double,1> const &elev2,
 HeightClassifier &height_classifier)
 {
-	int n1 = overlap.nrow;
+	HCIndex hc_index(overlap.nrow);
 	int n2 = overlap.ncol;
-	int nhc = height_classifier.nhc;
+	int nhc = height_classifier.nhc();
 
 	// Check consistency on array sizes
 	gassert(elev2.extent(0) == n2);
 
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(nhc * n1, n2)));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
+		giss::SparseDescr(nhc * hc_index.n1, n2)));
 
-	for (ii = overlap->begin(); ii != overlap->end(); ++ii) {
-		int i1 = ii->row();
-		int i2 = ii->col();
-		int hc = height_classifier.get_hc(elev2(i2));
-		ret->add(nc * n1 + i1, i2, ii->val());
+	for (auto ii = overlap.begin(); ii != overlap.end(); ++ii) {
+		int i1 = ii.row();
+		int i2 = ii.col();
+		int hc = height_classifier(elev2(i2));
+		int index = hc_index.ik_to_index(i1, hc);
+		ret->add(index, i2, ii.val());
 	}
 
 	return ret;
@@ -35,10 +41,10 @@ HeightClassifier &height_classifier)
 // Masking: Remove overlap entries for grid cells that are masked out
 
 /** @param overlap [n1 x n2] sparse matrix
-@param mask1 Row Mask: TRUE if we DON'T want to include it (same sense as numpy.ma)*/
-@param mask1 Column Mask: TRUE if we DON'T want to include it (same sense as numpy.ma)*/
-std::unique_ptr<VectorSparseMatrix> mask_out(
-VectorSparseMatrix const &overlap,
+@param mask1 Row Mask: TRUE if we DON'T want to include it (same sense as numpy.ma)
+@param mask2 Column Mask: TRUE if we DON'T want to include it (same sense as numpy.ma)*/
+std::unique_ptr<giss::VectorSparseMatrix> mask_out(
+giss::VectorSparseMatrix const &overlap,
 blitz::Array<bool,1> const *mask1,
 blitz::Array<bool,1> const *mask2)
 {
@@ -49,17 +55,17 @@ blitz::Array<bool,1> const *mask2)
 	gassert(mask1->extent(0) == n1);
 	gassert(mask2->extent(0) == n2);
 
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(n1, n2)));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
+		giss::SparseDescr(n1, n2)));
 
-	for (ii = overlap->begin(); ii != overlap->end(); ++ii) {
-		int i1 = ii->row();
-		if (mask1 && (*mask1)[i1]) continue;
+	for (auto ii = overlap.begin(); ii != overlap.end(); ++ii) {
+		int i1 = ii.row();
+		if (mask1 && (*mask1)(i1)) continue;
 
-		int i2 = ii->col();
-		if (mask2 && (*mask2)[i2]) continue;
+		int i2 = ii.col();
+		if (mask2 && (*mask2)(i2)) continue;
 
-		ret->add(i1, i2, ii->val());
+		ret->add(i1, i2, ii.val());
 	}
 
 	return ret;
@@ -70,8 +76,8 @@ blitz::Array<bool,1> const *mask2)
 
 /** Upgrids from grid2 (ice grid) to grid1 (grid1-projected, or grid1hc-projected)
 Transformation: [n2] --> [n1] */
-std::unique_ptr<VectorSparseMatrix> grid2_to_grid1(
-VectorSparseMatrix const &overlap)
+std::unique_ptr<giss::VectorSparseMatrix> grid2_to_grid1(
+giss::VectorSparseMatrix const &overlap)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
@@ -79,21 +85,21 @@ VectorSparseMatrix const &overlap)
 	std::vector<double> area1(overlap.sum_per_row());
 	std::vector<double> area2(overlap.sum_per_col());
 
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(n1, n2)));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
+		giss::SparseDescr(n1, n2)));
 
-	for (ii = overlap->begin(); ii != overlap->end(); ++ii) {
-		int i1 = ii->row();
-		int i2 = ii->col();
+	for (auto ii = overlap.begin(); ii != overlap.end(); ++ii) {
+		int i1 = ii.row();
+		int i2 = ii.col();
 
-		ret->add(i1, i2, ii->val() * area2[i2] / area1[i1]);
+		ret->add(i1, i2, ii.val() * area2[i2] / area1[i1]);
 	}
 
 	return ret;
 }
 
-std::unique_ptr<VectorSparseMatrix> grid1_to_grid2(
-VectorSparseMatrix const &overlap)
+std::unique_ptr<giss::VectorSparseMatrix> grid1_to_grid2(
+giss::VectorSparseMatrix const &overlap)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
@@ -101,14 +107,14 @@ VectorSparseMatrix const &overlap)
 	std::vector<double> area1(overlap.sum_per_row());
 	std::vector<double> area2(overlap.sum_per_col());
 
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(n2, n1)));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
+		giss::SparseDescr(n2, n1)));
 
-	for (ii = overlap->begin(); ii != overlap->end(); ++ii) {
-		int i1 = ii->row();
-		int i2 = ii->col();
+	for (auto ii = overlap.begin(); ii != overlap.end(); ++ii) {
+		int i1 = ii.row();
+		int i2 = ii.col();
 
-		ret->add(i2, i1, ii->val() * area1[i1] / area2[i2]);
+		ret->add(i2, i1, ii.val() * area1[i1] / area2[i2]);
 	}
 
 	return ret;
@@ -120,43 +126,43 @@ VectorSparseMatrix const &overlap)
 // ---------------------------------------------------------------
 /** Converts from values for projected grid1 to values for native grid1.
 Diagonal matrix. */
-void proj_to_native(Grid &grid1, VectorSparseMatrix &ret)
+extern void proj_to_native(Grid &grid1, giss::VectorSparseMatrix &mat)
 {
 	// Set up the diagonal matrix
-	std::vector<double> factors(grid1.size(), 0.0);
-	for (auto cell = grid1.cells_begin(); cell != cells_end(); ++cell)
-		factors.at(cell->index) = cell->proj_area / cell->native_area;
+	std::vector<double> factors(grid1.ncells_full, 0.0);
+	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell)
+		factors.at(cell->index) = cell->proj_area() / cell->native_area();
 
 	// Multiply by it
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
-		ii->val() *= factors.at(ii->row());
+		ii.val() *= factors.at(ii.row());
 }
 
-void native_to_proj(Grid &grid1, VectorSparseMatrix &ret)
+extern void native_to_proj(Grid &grid1, giss::VectorSparseMatrix &mat)
 {
 	// Set up the diagonal matrix
-	std::vector<double> factors(grid1.size(), 0.0);
-	for (auto cell = grid1.cells_begin(); cell != cells_end(); ++cell)
-		factors.at(cell->index) = cell->native_area / cell->proj_area;
+	std::vector<double> factors(grid1.ncells_full, 0.0);
+	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell)
+		factors.at(cell->index) = cell->native_area() / cell->proj_area();
 
 	// Multiply by it
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
-		ii->val() *= factors.at(ii->row());
+		ii.val() *= factors.at(ii.row());
 }
 
 // ---------------------------------------------------------------
 
 /** Converts from values for projected grid1 to values for native grid1.
 Diagonal matrix. */
-std::unique_ptr<VectorSparseMatrix> proj_to_native(Grid &grid1)
+std::unique_ptr<giss::VectorSparseMatrix> proj_to_native(Grid &grid1)
 {
 	int n1 = grid1.ncells_full;
 
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(n1, n1)));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
+		giss::SparseDescr(n1, n1)));
 
-	for (auto cell = grid1.cells_begin(); cell != cells_end(); ++cell) {
-		ret->add(n1, n1, cell->proj_area / cell->native_area);
+	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
+		ret->add(n1, n1, cell->proj_area() / cell->native_area());
 	}
 
 	return ret;
@@ -164,15 +170,15 @@ std::unique_ptr<VectorSparseMatrix> proj_to_native(Grid &grid1)
 
 /** Converts from values for projected grid1 to values for native grid1.
 Diagonal matrix. */
-std::unique_ptr<VectorSparseMatrix> native_to_proj(Grid &grid1)
+std::unique_ptr<giss::VectorSparseMatrix> native_to_proj(Grid &grid1)
 {
 	int n1 = grid1.ncells_full;
 
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(n1, n1)));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
+		giss::SparseDescr(n1, n1)));
 
-	for (auto cell = grid1.cells_begin(); cell != cells_end(); ++cell) {
-		ret->add(n1, n1, cell->native_area / cell->proj_area);
+	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
+		ret->add(n1, n1, cell->native_area() / cell->proj_area());
 	}
 
 	return ret;
@@ -201,7 +207,7 @@ static void linterp_1d(
 	int i0 = i1-1;
 	indices[0] = i0;
 	indices[1] = i1;
-	double ratio = (x - xpoints[i0]) / (xpoints[i1] - xpoints[i0]);
+	double ratio = (xx - xpoints[i0]) / (xpoints[i1] - xpoints[i0]);
 	weights[0] = (1.0 - ratio);
 	weights[1] = ratio;
 }
@@ -225,14 +231,14 @@ static void linterp_1d(
 			NOTE: The sense of this mask is SAME that used in numpy.ma (true = masked out)
 
 */
-std::unique_ptr<VectorSparseMatrix> 
-hc_interp(VectorSparseMatrix const &overlap,
+std::unique_ptr<giss::VectorSparseMatrix> 
+hc_interp(giss::VectorSparseMatrix const &overlap,
 std::vector<double> const &hpdefs,
 blitz::Array<double,1> elev2)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
-	int nhc = hpdefs.extent(0);
+	int nhc = hpdefs.size();
 
 	// Check consistency on array sizes
 	gassert(elev2.extent(0) == n2);
@@ -241,14 +247,14 @@ blitz::Array<double,1> elev2)
 	//std::vector<double> area1(overlap.sum_per_row());
 	std::vector<double> area2(overlap.sum_per_col());
 
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(n2, n1 * nhc)));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
+		giss::SparseDescr(n2, n1 * nhc)));
 
-	for (ii = overlap->begin(); ii != overlap->end(); ++ii) {
-		int i1 = ii->row();
-		int i2 = ii->col();
+	for (auto ii = overlap.begin(); ii != overlap.end(); ++ii) {
+		int i1 = ii.row();
+		int i2 = ii.col();
 
-		double overlap_ratio = ii->val() / area2[i2];
+		double overlap_ratio = ii.val() / area2[i2];
 		double elevation = std::max(elev2(i2), 0.0);
 
 		// Interpolate in height points
@@ -276,62 +282,58 @@ std::vector<double> const &boundaries)
 	return centers;
 }
 
-
-
-
-/** Gives weights for linear interpolation with a bunch of points.
-If our point is off the end of the range, just continue the slope in extrapolation. */
-static void indices_1d(
-	std::vector<double> const &xpoints,
-	double xx,
-	int *indices)	// Size-2 arrays
-{
-	int n = xpoints.size();
-
-	// This is the point ABOVE our value.
-	// (i0 = i1 - 1, xpoints[i0] < xx <= xpoints[i1])
-	// See: http://www.cplusplus.com/reference/algorithm/lower_bound/
-	int i1 = lower_bound(xpoints.begin(), xpoints.end(), xx) - xpoints.begin();
-
-	if (i1 <= 0) i1 = 1;
-	if (i1 >= n) i1 = n-1;
-
-	int i0 = i1-1;
-	indices[0] = i0;
-	indices[1] = i1;
-	double ratio = (x - xpoints[i0]) / (xpoints[i1] - xpoints[i0]);
-	weights[0] = (1.0 - ratio);
-	weights[1] = ratio;
-}
-
 // -----------------------------------------------------------------
 
-struct {
+
+// =====================================================================
+struct InterpWeight {
 	int i;
 	int j;
 	double weight;
 
-	InterpWeight(_i, _j) : i(_i), j(_j), weight(1.0) {}
-} InterpWeight;
+	InterpWeight(int _i, int _j) : i(_i), j(_j), weight(1.0) {}
+};
 
-void add_weights(VectorSparseMatrix &M, double factor, std::vector<InterpWeights> const &weight_vec, int ihp)
+// A little helper class.
+class IJMatrixMaker
 {
-	n1 = grid1.ncells_full;
-	for (auto ii = weight_vec.begin(); ii != weight_vec.end(); ++ii) {
-		int i1 = grid1.ij_to_index(ii->i, ii->j);
-		int i1h = ihp * n1 + i1;
+public:
+	Grid const *grid1;
+	int i2;
+	std::unique_ptr<giss::VectorSparseMatrix> M;
 
-		M.add(i2, i1h, factor * ii->weight);
+	IJMatrixMaker(giss::SparseDescr const &descr) :
+		M(new giss::VectorSparseMatrix(descr)) {}
+
+	void add_weights(
+		double factor,
+		std::vector<InterpWeight> const &weight_vec,
+		int ihp);
+
+};	// IJMatrixMaker
+
+void IJMatrixMaker::add_weights(
+	double factor,
+	std::vector<InterpWeight> const &weight_vec,
+	int ihp)
+{
+	HCIndex hc_index(grid1->ncells_full);
+	for (auto ii = weight_vec.begin(); ii != weight_vec.end(); ++ii) {
+		int i1 = grid1->ij_to_index(ii->i, ii->j);
+		int i1h = hc_index.ik_to_index(i1, ihp);
+
+		M->add(i2, i1h, factor * ii->weight);
 	}
 }
-
+// =====================================================================
 /** We only really expect this to work for Greenland.  Don't worry
 about south pole in lon/lat coordinates and Antarctica.
 [n2 x (nhc * n1)] sparse matrix */
+std::unique_ptr<giss::VectorSparseMatrix> 
 bilin_interp(
 Grid_LonLat const &grid1,
 Grid_XY const &grid2,
-Proj const &proj,
+giss::Proj const &proj,
 std::vector<double> const &hpdefs,
 blitz::Array<double,1> const &elev2,
 blitz::Array<bool,1> const &mask1,		// [n1] Shows where we will / will not expect landice
@@ -348,13 +350,17 @@ blitz::Array<bool,1> const &mask2)
 	// --------- Compute Cell centers
 	std::vector<double> lon1c(boundaries_to_centers(grid1.lonb));
 	std::vector<double> lat1c(boundaries_to_centers(grid1.latb));
-	std::vector<double> x2c(boundaries_to_centers(grid2.x_boundaries));
-	std::vector<double> y2c(boundaries_to_centers(grid2.y_boundaries));
+	std::vector<double> x2c(boundaries_to_centers(grid2.xb));
+	std::vector<double> y2c(boundaries_to_centers(grid2.yb));
 
 	std::vector<int> ilats, ilons;
 	ilats.reserve(2);
 	ilons.reserve(2);
 
+	giss::Proj llproj(proj.latlong_from_proj());
+
+	IJMatrixMaker mmat(giss::SparseDescr(n2, nhc*n1));
+	mmat.grid1 = &grid1;
 	for (auto cell = grid2.cells_begin(); cell != grid2.cells_end(); ++cell) {
 		int i2 = cell->index;
 
@@ -363,8 +369,8 @@ blitz::Array<bool,1> const &mask2)
 		transform(proj, llproj,
 			x2c[cell->i], y2c[cell->j],
 			lon2c_rad, lat2c_rad);
-		double lon2c = lon2c_rad * R2D;
-		double lat2c = lat2c_rad * R2D;
+		double lon2c = lon2c_rad * giss::R2D;
+		double lat2c = lat2c_rad * giss::R2D;
 
 		// ---------- Find indices of nearest gridcells in lon direction
 		// Note that indices may be out of range here (that's OK).
@@ -377,7 +383,7 @@ blitz::Array<bool,1> const &mask2)
 		nearest_i[0] = nearest_i[1] - 1;
 
 		// ----------- Find indices of nearest gridcells in lat direction
-		nlat = lat1c.size();
+		int nlat = lat1c.size();
 		int nearest_j[2];
 		nearest_j[1] = std::lower_bound(lat1c.begin(), lat1c.end(), lat2c) - lat1c.begin();
 		nearest_j[0] = nearest_j[1] - 1;
@@ -389,26 +395,27 @@ blitz::Array<bool,1> const &mask2)
 		std::vector<InterpWeight> nearest_weights[2][2];
 		for (int di=0; di<2; ++di) {
 		for (int dj=0; dj<2; ++dj) {
-			i = nearest_i[di];
-			j = nearest_j[dj];
-			if (i < 0 || i >= im || j < 0 || j >= jm || mask1xy(i,j)) {
+			int i = nearest_i[di];
+			int j = nearest_j[dj];
+			int index1 = grid1.ij_to_index(i, j);
+			if (i < 0 || i >= nlon || j < 0 || j >= nlat || mask1(index1)) {
 				// This point is invalid.  Look for valid points among neighbors.
-				nvalid = 0;
-				for (ii = i-1; ii <= ii+1; ++i) {
-				for (jj = j-1; jj <= jj+1; ++jj) {
-					if (ii < 0) ii = im-1;
-					else if (ii >= im) ii = 0;
+				int nvalid = 0;
+				for (int ii = i-1; ii <= i+1; ++ii) {
+				for (int jj = j-1; jj <= j+1; ++jj) {
+					if (ii < 0) ii = nlon-1;
+					else if (ii >= nlon) ii = 0;
 					if (jj < 0) continue;
-					else if (jj >= jm) continue;
-					if (mask1xy(i,j)) continue;
+					else if (jj >= nlat) continue;
+					if (mask1(index1)) continue;
 
 					// Found a valid cell: average it.
 					++nvalid;
-					nearest[di][dj].push_back(InterpWeight(ii,jj));
+					nearest_weights[di][dj].push_back(InterpWeight(ii,jj));
 				}}
 
 				if (nvalid == 0) {
-					fprintf("No valid neighbors for GCM grid cell (%d, %d).  "
+					fprintf(stderr, "No valid neighbors for GCM grid cell (%d, %d).  "
 						"Ice grid cell %d (%d,%d,%d) out of range",
 						i, j, i2, cell->i, cell->j, cell->k);
 					throw std::exception();
@@ -416,10 +423,10 @@ blitz::Array<bool,1> const &mask2)
 
 				// Divide by nvalid
 				double nvalid_inv = 1.0 / (double)nvalid;
-				for (auto ii = nearest[di][dj].begin(); ii = nearest[di][dj].end(); ++ii)
+				for (auto ii = nearest_weights[di][dj].begin(); ii != nearest_weights[di][dj].end(); ++ii)
 					ii->weight *= nvalid_inv;
 			} else {		// It's valid: just use the point
-				nearest[di][dj].push_back(InterpWeight(i,j));
+				nearest_weights[di][dj].push_back(InterpWeight(i,j));
 			}
 		}}
 
@@ -445,7 +452,7 @@ blitz::Array<bool,1> const &mask2)
 				nearest_lat[k] = 2. * lat1c[0] - lat1c[1];
 			} else if (nearest_j[k] >= nlat) {
 				// project even spacing one gridcell beyond
-				nearest_lat[k] = 2. * latc[nlat-1] - latc[nlat-2];
+				nearest_lat[k] = 2. * lat1c[nlat-1] - lat1c[nlat-2];
 			} else {
 				nearest_lat[k] = lat1c[nearest_j[k]];
 			}
@@ -454,18 +461,21 @@ blitz::Array<bool,1> const &mask2)
 
 		// ------------ Interpolate in height classes
 		int ihp[2];
-		int whp[2];
+		double whp[2];
 		linterp_1d(hpdefs, elev2(i2), ihp, whp);
 
 		// ------------ Assemble the interpolation
-		std::vector<InterpWeight> weights;
+		int n1 = grid1.ncells_full;
+		mmat.i2 = i2;
 		for (int k=0; k<2; ++k) {		// HP dimension
-			add_weights(weights, whp[k] * (1.-ratio_i) * (1.-ratio_j), nearest_weights[0][0], ihp[k]);
-			add_weights(weights, whp[k] * (1.-ratio_i) * (   ratio_j), nearest_weights[0][1], ihp[k]);
-			add_weights(weights, whp[k] * (   ratio_i) * (1.-ratio_j), nearest_weights[1][0], ihp[k]);
-			add_weights(weights, whp[k] * (   ratio_i) * (   ratio_j), nearest_weights[1][0], ihp[k]);
+			mmat.add_weights(whp[k] * (1.-ratio_i) * (1.-ratio_j), nearest_weights[0][0], ihp[k]);
+			mmat.add_weights(whp[k] * (1.-ratio_i) * (   ratio_j), nearest_weights[0][1], ihp[k]);
+			mmat.add_weights(whp[k] * (   ratio_i) * (1.-ratio_j), nearest_weights[1][0], ihp[k]);
+			mmat.add_weights(whp[k] * (   ratio_i) * (   ratio_j), nearest_weights[1][0], ihp[k]);
 		}
 	}
+
+	return std::move(mmat.M);
 }
 
 

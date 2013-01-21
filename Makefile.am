@@ -8,7 +8,7 @@ SUBDIRS = 	\
 			pyext
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = snowdrift.pc
+pkgconfig_DATA = glint2.pc
 
 include am_doxygen.am
 

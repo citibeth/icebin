@@ -1,13 +1,14 @@
 #include <boost/bind.hpp>
+#include <giss/geodesy.hpp>
 #include <glint2/Grid_LonLat.hpp>
-#include <snowdrift/geodesy.hpp>
-#include <snowdrift/clippers.hpp>
-#include <snowdrift/maputils.hpp>
+//#include <glint2/clippers.hpp>
+//#include <snowdrift/maputils.hpp>
+#include <glint2/gridutil.hpp>
+#include <giss/ncutil.hpp>
+#include <giss/constant.hpp>
 
 namespace glint2 {
 
-const double D2R = M_PI / 180.0;
-const double R2D = 180.0 / M_PI;
 
 template <typename T>
 inline int sgn(T val) {
@@ -21,7 +22,8 @@ surface of the sphere.
 <b>NOTES:</b>
 <ol><li>lon0 must be numerically less than lon1.</li>
 <li>lat0 and lat1 cannot cross the equator.</li></ol> */
-inline double graticule_area_exact(double lat0_deg, double lat1_deg,
+inline double graticule_area_exact(Grid_LonLat const &grid,
+	double lat0_deg, double lat1_deg,
 	double lon0_deg, double lon1_deg)
 {
 	double delta_lon_deg = lon1_deg - lon0_deg;
@@ -29,26 +31,35 @@ inline double graticule_area_exact(double lat0_deg, double lat1_deg,
 
 //printf("delta_lon_deg=%f\n", delta_lon_deg);
 
-	double lat0 = lat0_deg * D2R;
-	double lat1 = lat1_deg * D2R;
-	double delta_lon = delta_lon_deg * D2R;
+	double lat0 = lat0_deg * giss::D2R;
+	double lat1 = lat1_deg * giss::D2R;
+	double delta_lon = delta_lon_deg * giss::D2R;
 
 //printf("lat1=%f, abs(lat1)=%f\n",lat1,std::abs(lat1));
-	return delta_lon * (EQ_RAD*EQ_RAD) * (sin(lat1) - sin(lat0));
+	return delta_lon * (grid.eq_rad*grid.eq_rad) * (sin(lat1) - sin(lat0));
 }
 
 /** The polar graticule is a (latitudinal) circle centered on the pole.
 This computes its area. */
-inline double polar_graticule_area_exact(double radius_deg)
+inline double polar_graticule_area_exact(Grid_LonLat const &grid,
+	double radius_deg)
 {
 	// See http://en.wikipedia.org/wiki/Spherical_cap
-	double theta = radius_deg * D2R;
-	return 2.0 * M_PI * (EQ_RAD * EQ_RAD) * (1.0 - cos(theta));
+	double theta = radius_deg * giss::D2R;
+	return 2.0 * M_PI * (grid.eq_rad * grid.eq_rad) * (1.0 - cos(theta));
 }
 
 // ---------------------------------------------------------
-void Grid_LonLat::set_lonlatb(std::vector<double> const &&lonb, std::vector<double> const &&latb)
+/** Set up a Grid_LonLat with a given specification.
+@param euclidian_clip Only realize grid cells that pass this test (after projection).
+@param spherical_clip Only realize grid cells that pass this test (before projection).
+@see EuclidianClip, SphericalClip
+*/
+void Grid_LonLat::realize_grid(
+	boost::function<bool(double, double, double, double)> const &spherical_clip,
+	boost::function<bool(Cell const &)> const &euclidian_clip)
 {
+	// Error-check the input parameters
 	if (south_pole && latb[0] == -90.0) {
 		std::cerr << "latb[] cannot include -90.0 if you're including the south pole cap" << std::endl;
 		throw std::exception();
@@ -58,23 +69,10 @@ void Grid_LonLat::set_lonlatb(std::vector<double> const &&lonb, std::vector<doub
 		throw std::exception();
 	}
 
-	lonb = std::move(lonb);
-	latb = std::move(latb);
-}
-// ---------------------------------------------------------
-/** Set up a Grid_LonLat with a given specification.
-@param euclidian_clip Only realize grid cells that pass this test (after projection).
-@param spherical_clip Only realize grid cells that pass this test (before projection).
-@see EuclidianClip, SphericalClip
-*/
-void Grid_LonLat::realize_grid(
-	boost::function<bool(double, double, double, double)> const &spherical_clip,
-	boost::function<bool(gc::Polygon_2 const &)> const &euclidian_clip)
-{
 	clear();
 
 	// Set up to project lines on sphere (and eliminate duplicate vertices)	
-	VertexCache vcache(*this);
+	VertexCache vcache(this);
 	LineProjector projector(proj, &vcache);
 	printf("Using projection: \"%s\"\n", projector.proj.get_def().c_str());
 	printf("Using lat-lon projection: \"%s\"\n", projector.llproj.get_def().c_str());
@@ -83,8 +81,10 @@ void Grid_LonLat::realize_grid(
 	const int south_pole_offset = (south_pole ? 1 : 0);
 	const int north_pole_offset = (north_pole ? 1 : 0);
 
-	_nlon = lonb.size() - 1;
-	_nlat = latb.size() - 1 + south_pole_offset + north_pole_offset;
+	ncells_full = nlon() * nlat();
+
+//	_nlon = lonb.size() - 1;
+//	_nlat = latb.size() - 1 + south_pole_offset + north_pole_offset;
 
 	// Get a bunch of points.  (i,j) is gridcell's index in canonical grid
 	for (int ilat=0; ilat < latb.size()-1; ++ilat) {
@@ -113,9 +113,9 @@ void Grid_LonLat::realize_grid(
 			cell.j = ilat + south_pole_offset;	// 0-based 2-D index
 			cell.i = ilon;
 			cell.index = (cell.j * nlon() + cell.i);
-			cell.native_area = graticule_area_exact(lat0,lat1,lon0,lon1);
+			cell._native_area = graticule_area_exact(*this, lat0,lat1,lon0,lon1);
 
-			add_cell(cell);
+			add_cell(std::move(cell));
 		}
 	}
 
@@ -134,16 +134,16 @@ void Grid_LonLat::realize_grid(
 			pole.i = nlon()-1;
 			pole.j = nlat();
 			pole.index = (pole.j * nlon() + pole.i);
-			pole.native_area = polar_graticule_area_exact(90.0 - lat);
+			pole._native_area = polar_graticule_area_exact(*this, 90.0 - lat);
 
-			add_cell(pole);
+			add_cell(std::move(pole));
 		}
 	}
 
 	// South Pole cap
 	lat = latb[0];
 	if (south_pole && spherical_clip(0, -90, 360, lat)) {
-		gc::Polygon_2 pole;
+		Cell pole;
 		for (int ilon=lonb.size()-1; ilon >= 1; --ilon) {
 			double lon0 = lonb[ilon];		// Make the circle counter-clockwise
 			double lon1 = lonb[ilon-1];
@@ -153,9 +153,9 @@ void Grid_LonLat::realize_grid(
 			pole.i = 0;
 			pole.j = 0;
 			pole.index = 0;
-			pole.native_area = polar_graticule_area_exact(90.0 + lat);
+			pole._native_area = polar_graticule_area_exact(*this, 90.0 + lat);
 
-			add_cell(pole);
+			add_cell(std::move(pole));
 		}
 	}
 }
@@ -198,8 +198,8 @@ boost::function<void ()> Grid_LonLat::netcdf_define(NcFile &nc, std::string cons
 	info_var->add_att("south_pole_cap", south_pole ? 1 : 0);
 	info_var->add_att("points_in_side", points_in_side);
 	info_var->add_att("projection", proj.get_def().c_str());
-	info_var->add_att("nlon", _nlon);
-	info_var->add_att("nlat", _nlat);
+	info_var->add_att("nlon", nlon());
+	info_var->add_att("nlat", nlat());
 
 	return boost::bind(&Grid_LonLat_netcdf_write, parent, &nc, this, vname);
 }
@@ -213,12 +213,12 @@ void Grid_LonLat::read_from_netcdf(NcFile &nc, std::string const &vname)
 	north_pole = (info_var->get_att("north_pole_cap")->as_int(0) != 0);
 	south_pole = (info_var->get_att("south_pole_cap")->as_int(0) != 0);
 	points_in_side = info_var->get_att("points_in_side")->as_int(0);
-	proj = Proj(info_var->get_att("projection")->as_string(0)
-	_nlon = info_var->get_att("nlon")->as_int(0);
-	_nlat = info_var->get_att("nlat")->as_int(0);
+	proj = giss::Proj(info_var->get_att("projection")->as_string(0));
+//	_nlon = info_var->get_att("nlon")->as_int(0);
+//	_nlat = info_var->get_att("nlat")->as_int(0);
 
-	lonb = read_double_vector(nc, vname + ".lon_boundaries");
-	latb = read_double_vector(nc, vname + ".lat_boundaries");
+	lonb = giss::read_double_vector(nc, vname + ".lon_boundaries");
+	latb = giss::read_double_vector(nc, vname + ".lat_boundaries");
 }
 
 

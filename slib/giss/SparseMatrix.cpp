@@ -1,5 +1,5 @@
 #include <netcdfcpp.h>
-#include <gissutil/SparseMatrix.hpp>
+#include <giss/SparseMatrix.hpp>
 
 namespace giss {
 

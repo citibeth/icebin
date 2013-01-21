@@ -17,7 +17,7 @@ This file is in the public domain.
 #define PROJPP_HPP
 
 #include <proj_api.h>
-
+#include <string>
 
 #if 0
 class ProjContext;

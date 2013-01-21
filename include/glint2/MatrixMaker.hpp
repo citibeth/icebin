@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <glint2/Grid.hpp>
+#include <glint2/matrix_ops.hpp>
+
 /*
 Height Points (HP) [nhc*n1] --A--> Ice [n2] --B--> Height Classes (HC) [nhc*n1] --C--> GCM
 
@@ -12,17 +16,19 @@ C: See get_fhc() below, then multiply by FHC in ModelE code.
 namespace glint2 {
 
 /** Generates the matrices required in the GCM */
-struct MatrixMakerData {
+class MatrixMaker {
+
+public:
 	/** These are all left public because someone will probably want
 	to look at / use them. */
 
 	// ------------ Stuff we're passed in
-//	std::shared_ptr<glint2::Grid> grid1;		/// GCM Grid
+	std::shared_ptr<glint2::Grid> grid1;		/// GCM Grid
 	std::shared_ptr<glint2::Grid> grid2;		/// Ice Grid
 	std::shared_ptr<glint2::Grid> exgrid;	/// Exchange grid (between GCM and Ice)
 
 	std::shared_ptr<blitz::Array<bool,1>> mask1;
-	std::shared_ptr<blitz::Arraybool,1>> mask2;
+	std::shared_ptr<blitz::Array<bool,1>> mask2;
 
 	/** Elevation of each cell Ma(L0) or vertex (L1) in the ice model */
 	blitz::Array<double,1> elev2;	// [n2]
@@ -44,12 +50,10 @@ struct MatrixMakerData {
 
 	/** Masked with mask1 and mask2. */
 	std::unique_ptr<giss::VectorSparseMatrix> overlap_m;
-};
-// ------------------------------------------------------
-class MatrixMaker : public MatrixMakerData {
-public :
 
-	virtual MatrixMaker(MatrixMakerData &&data);
+	// ------------------------------------------------
+
+	void realize();
 	virtual ~MatrixMaker() {}
 
 	// ------------------------------------------------

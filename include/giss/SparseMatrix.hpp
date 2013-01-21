@@ -88,7 +88,7 @@ public:
 	virtual ~SparseMatrix() {}
 
 	/** Returns the number of non-zero elements in the SparseMatrix. */
-	virtual size_t size() = 0;
+	virtual size_t size() const = 0;
 
 	/** Removes all elements from the matrix. */
 	virtual void clear() = 0;
@@ -115,7 +115,7 @@ public:
 	@param nc NetCDF file to write
 	@param vname Variable name to use in writing this sparse matrix.
 	@return Function to call later to write the data. */
-	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) = 0;
+	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const = 0;
 
 	/** Multiply this matrix A by a vector.
 	Computes y = A * x
@@ -133,19 +133,19 @@ public:
 
 	/** Computes the sum of each row of this matrix.
 	@return Vector[nrow], each element containing the sum of the respective row from the matrix. */
-	virtual std::vector<double> sum_per_row() = 0;
+	virtual std::vector<double> sum_per_row() const = 0;
 
 	/** Computes the sum of each column of this matrix.
 	@return Vector[ncol], each element containing the sum of the respective column from the matrix. */
-	virtual std::vector<double> sum_per_col() = 0;
+	virtual std::vector<double> sum_per_col() const = 0;
 
 	/** Computes the sum of each row of this matrix.
 	@return A map, providing a value only for rows with at least one element. */
-	virtual std::map<int,double> sum_per_row_map() = 0;
+	virtual std::map<int,double> sum_per_row_map() const = 0;
 
 	/** Computes the sum of each column of this matrix.
 	@return A map, providing a value only for columns with at least one element. */
-	virtual std::map<int,double> sum_per_col_map() = 0;
+	virtual std::map<int,double> sum_per_col_map() const = 0;
 
 };
 
@@ -161,17 +161,17 @@ protected:
 		SparseMatrix0T(descr) {}
 public:
 	void set(int row, int col, double const val, SparseMatrix::DuplicatePolicy dups = SparseMatrix::DuplicatePolicy::REPLACE);
-	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname);
+	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 
 	void multiply(double const * x, double *y, bool clear_y = true);
 	void multiplyT(double const * x, double *y, bool clear_y = true);
-	std::vector<double> sum_per_row();
-	std::vector<double> sum_per_col();
-	std::map<int,double> sum_per_row_map();
-	std::map<int,double> sum_per_col_map();
+	std::vector<double> sum_per_row() const;
+	std::vector<double> sum_per_col() const;
+	std::map<int,double> sum_per_row_map() const;
+	std::map<int,double> sum_per_col_map() const;
 
 private:
-	void netcdf_write(NcFile *nc, std::string const &vname);
+	void netcdf_write(NcFile *nc, std::string const &vname) const;
 };
 
 
@@ -207,13 +207,13 @@ void SparseMatrix1<SparseMatrix0T>::set(int row, int col, double const val, Spar
 
 
 template<class SparseMatrix0T>
-void SparseMatrix1<SparseMatrix0T>::netcdf_write(NcFile *nc, std::string const &vname)
+void SparseMatrix1<SparseMatrix0T>::netcdf_write(NcFile *nc, std::string const &vname) const
 {
 	NcVar *grid_indexVar = nc->get_var((vname + ".index").c_str());
 	NcVar *areaVar = nc->get_var((vname + ".val").c_str());
 
 	int i=0;
-	for (typename SparseMatrix1<SparseMatrix0T>::iterator ov = this->begin(); ov != this->end(); ++ov) {
+	for (auto ov = this->begin(); ov != this->end(); ++ov) {
 		grid_indexVar->set_cur(i,0);
 		int index[2] = {ov.row() + this->index_base, ov.col() + this->index_base};
 		grid_indexVar->put(index, 1,2);
@@ -228,7 +228,7 @@ void SparseMatrix1<SparseMatrix0T>::netcdf_write(NcFile *nc, std::string const &
 
 template<class SparseMatrix0T>
 boost::function<void ()> SparseMatrix1<SparseMatrix0T>::netcdf_define(
-	NcFile &nc, std::string const &vname)
+	NcFile &nc, std::string const &vname) const
 {
 	auto lenDim = nc.add_dim((vname + ".num_elements").c_str(), this->size());
 	auto num_gridsDim = nc.add_dim((vname + ".rank").c_str(), 2);
@@ -280,7 +280,7 @@ void SparseMatrix1<SparseMatrix0T>::multiplyT(double const * x, double *y, bool 
 
 // ------------------------------------------------------------
 template<class SparseMatrix0T>
-std::vector<double> SparseMatrix1<SparseMatrix0T>::sum_per_row() {
+std::vector<double> SparseMatrix1<SparseMatrix0T>::sum_per_row() const {
 	std::vector<double> ret(this->nrow);
 	for (auto ii = this->begin(); ii != this->end(); ++ii) {
 		ret[ii.row()] += ii.val();
@@ -289,7 +289,7 @@ std::vector<double> SparseMatrix1<SparseMatrix0T>::sum_per_row() {
 }
 
 template<class SparseMatrix0T>
-std::vector<double> SparseMatrix1<SparseMatrix0T>::sum_per_col() {
+std::vector<double> SparseMatrix1<SparseMatrix0T>::sum_per_col() const {
 	std::vector<double> ret(this->ncol);
 	for (auto ii = this->begin(); ii != this->end(); ++ii) {
 		ret[ii.col()] += ii.val();
@@ -299,7 +299,7 @@ std::vector<double> SparseMatrix1<SparseMatrix0T>::sum_per_col() {
 
 
 template<class SparseMatrix0T>
-std::map<int,double> SparseMatrix1<SparseMatrix0T>::sum_per_row_map() {
+std::map<int,double> SparseMatrix1<SparseMatrix0T>::sum_per_row_map() const {
 	std::map<int,double> ret;
 	for (auto ii = this->begin(); ii != this->end(); ++ii) {
 		auto f = ret.find(ii.row());
@@ -313,7 +313,7 @@ std::map<int,double> SparseMatrix1<SparseMatrix0T>::sum_per_row_map() {
 }
 
 template<class SparseMatrix0T>
-std::map<int,double> SparseMatrix1<SparseMatrix0T>::sum_per_col_map() {
+std::map<int,double> SparseMatrix1<SparseMatrix0T>::sum_per_col_map() const {
 	std::map<int,double> ret;
 	for (auto ii = this->begin(); ii != this->end(); ++ii) {
 		auto f = ret.find(ii.col());
@@ -349,7 +349,7 @@ protected:
 	ZD11SparseMatrix0(SparseDescr const &descr) : SparseMatrix(descr) {}
 public:
 
-	ZD11 &zd11() { return *_zd11; }
+	ZD11 &zd11() const { return *_zd11; }
 
 	// --------------------------------------------------
 	/** Standard STL-type iterator for iterating through a ZD11SparseMatrix. */
@@ -370,12 +370,31 @@ public:
 	iterator begin() { return iterator(this, 0); }
 	iterator end() { return iterator(this, _nnz_cur); }
 	// --------------------------------------------------
+	// --------------------------------------------------
+	/** Standard STL-type const_iterator for iterating through a ZD11SparseMatrix. */
+	class const_iterator {
+	protected:
+		ZD11SparseMatrix0 const *parent;
+		int i;
+	public:
+		const_iterator(ZD11SparseMatrix0 const *z, int _i) : parent(z), i(_i) {}
+		bool operator==(const_iterator const &rhs) { return i == rhs.i; }
+		bool operator!=(const_iterator const &rhs) { return i != rhs.i; }
+		void operator++() { ++i; }
+		int row() { return parent->zd11().row[i] - parent->index_base; }
+		int col() { return parent->zd11().col[i] - parent->index_base; }
+		double const &val() { return parent->zd11().val[i]; }
+		double const &value() { return val(); }
+	};
+	const_iterator begin() const { return const_iterator(this, 0); }
+	const_iterator end() const { return const_iterator(this, _nnz_cur); }
+	// --------------------------------------------------
 
 	void clear() { _nnz_cur = 0; }
 
 	bool is_complete() { return _nnz_cur == zd11().ne; }
 
-	size_t size() { return _nnz_cur; }
+	size_t size() const { return _nnz_cur; }
 
 protected:
 	/** Internal set() function without any error checking or adjustments for index_base. */
@@ -440,18 +459,37 @@ public:
 		VectorSparseMatrix0 *parent;
 		int i;
 	public:
-		int position() { return i; }
+		int position() const { return i; }
 		iterator(VectorSparseMatrix0 *p, int _i) : parent(p), i(_i) {}
-		bool operator==(iterator const &rhs) { return i == rhs.i; }
-		bool operator!=(iterator const &rhs) { return i != rhs.i; }
+		bool operator==(iterator const &rhs) const { return i == rhs.i; }
+		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
 		void operator++() { ++i; }
-		int row() { return parent->indx[i] - parent->index_base; }
-		int col() { return parent->jndx[i] - parent->index_base; }
+		int row() const { return parent->indx[i] - parent->index_base; }
+		int col() const { return parent->jndx[i] - parent->index_base; }
 		double &val() { return parent->val[i]; }
 		double &value() { return val(); }
 	};
 	iterator begin() { return iterator(this, 0); }
 	iterator end() { return iterator(this, val.size()); }
+	// --------------------------------------------------
+	class const_iterator {
+	protected:
+		VectorSparseMatrix0 const *parent;
+		int i;
+	public:
+		int position() const { return i; }
+		const_iterator(VectorSparseMatrix0 const *p, int _i) : parent(p), i(_i) {}
+		bool operator==(const_iterator const &rhs) const { return i == rhs.i; }
+		bool operator!=(const_iterator const &rhs) const { return i != rhs.i; }
+		void operator++() { ++i; }
+		int row() const { return parent->indx[i] - parent->index_base; }
+		int col() const { return parent->jndx[i] - parent->index_base; }
+		double const &val() { return parent->val[i]; }
+		double const &value() { return val(); }
+	};
+	const_iterator begin() const { return const_iterator(this, 0); }
+	const_iterator end() const { return const_iterator(this, val.size()); }
+
 	// --------------------------------------------------
 
 	void clear() {
@@ -464,7 +502,7 @@ public:
 		jndx.reserve(n);
 		val.reserve(n);
 	}
-	size_t size() { return val.size(); }
+	size_t size() const { return val.size(); }
 
 protected :
 	/** Internal set() function without any error checking or adjustments for index_base. */
@@ -526,6 +564,7 @@ class MapSparseMatrix0 : public SparseMatrix {
 protected :
 	std::map<std::pair<int,int>, double> _cells;
 	typedef std::map<std::pair<int,int>, double>::iterator ParentIterator;
+	typedef std::map<std::pair<int,int>, double>::const_iterator const_ParentIterator;
 	MapSparseMatrix0(SparseDescr const &descr) : SparseMatrix(descr) {}
 
 public:
@@ -549,10 +588,28 @@ public:
 	iterator begin() { return iterator(_cells.begin(), this); }
 	iterator end() { return iterator(_cells.end(), this); }
 	// --------------------------------------------------
+	/** Standard STL-type const_iterator for iterating through a MapSparseMatrix. */
+	class const_iterator {
+		const_ParentIterator ii;
+		MapSparseMatrix0 const *parent;
+	public:
+
+		const_iterator(const_ParentIterator const &_i, MapSparseMatrix0 const *p) : ii(_i), parent(p) {}
+		bool operator==(const_iterator const &rhs) { return ii == rhs.ii; }
+		bool operator!=(const_iterator const &rhs) { return ii != rhs.ii; }
+		void operator++() { ++ii; }
+		int row() { return ii->first.first - parent->index_base; }
+		int col() { return ii->first.second - parent->index_base; }
+		double const &val() { return ii->second; }
+		double const &value() { return val(); }
+	};
+	const_iterator begin() const { return const_iterator(_cells.begin(), this); }
+	const_iterator end() const { return const_iterator(_cells.end(), this); }
+	// --------------------------------------------------
 
 	void clear() { _cells.clear(); }
 
-	size_t size() { return _cells.size(); }
+	size_t size() const { return _cells.size(); }
 
 protected :
 	/** Internal set() function without any error checking or adjustments for index_base. */

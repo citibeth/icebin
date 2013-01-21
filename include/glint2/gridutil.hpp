@@ -1,7 +1,28 @@
 #pragma once
 
-#include "geometry.hpp"
-#include "Proj.hpp"
+#include <unordered_map>
+
+//#include "geometry.hpp"
+#include <boost/function.hpp>
+#include <boost/functional/hash.hpp>
+
+#include <giss/Proj.hpp>
+#include <glint2/Grid.hpp>
+
+// See: http://stackoverflow.com/questions/7222143/unordered-map-hash-function-c
+namespace std
+{
+  template<typename S, typename T> struct hash<pair<S, T>>
+  {
+    inline size_t operator()(const pair<S, T> & v) const
+    {
+      size_t seed = 0;
+      boost::hash_combine(seed, v.first);
+      boost::hash_combine(seed, v.second);
+      return seed;
+    }
+  };
+}
 
 namespace glint2 {
 
@@ -11,50 +32,30 @@ namespace glint2 {
 class VertexCache {
 	std::unordered_map<std::pair<double,double>, Vertex *> _vertices;
 public:
-	Grid const *grid;
+	Grid *grid;
 	VertexCache(Grid *_grid) : grid(_grid) {}
 
-	Vertex *add_vertex(double x, double y) {
-		auto ii = _vertices.find(std::make_pair(x,y));
-		if (ii != _vertices.end()) {	// Found in cache
-			return ii->second;
-		} else {
-			return grid->add_vertex(Vertex(x,y));
-		}
-	}
-
-	Vertex *add_vertex(Cell &cell, double x, double y)
-	{
-		Vertex *v = add_vertex(x,y);	// Add to the Grid
-		cell.add_vertex(v);
-		return v;
-	}
-
+	Vertex *add_vertex(double x, double y);
+	Vertex *add_vertex(Cell &cell, double x, double y);
 };
-
 
 
 /** A helper class */
 class LineProjector {
 
 public :
-	Proj const &proj;
-	Proj const &llproj;
+	giss::Proj const proj;
+	giss::Proj const llproj;
 private:
-	boost::function<double, double> _add_vertex;
+	/** Function to add a vertex to the grid (but not a cell) */
+	boost::function<Vertex *(double, double)> _add_vertex;
 
 public :
-	LineProjector(Proj const &_proj, Proj const &_llproj,
-		boost::function<double, double> _add_vertex) :
-		proj(_proj), llproj(_llproj), _add_vertex(add_vertex)
-	{}
+	LineProjector(giss::Proj const &_proj, giss::Proj const &_llproj,
+		boost::function<Vertex *(double, double)> const &add_vertex);
 
 	/** Convenience constructor. */
-	LineProjector(Proj const &_proj, VertexCache *vcache) :
-		proj(_proj),
-		llproj(proj.latlong_from_proj()),
-		_add_vertex(boost::bind(&VertexCache::add_vertex, vcache, _1, _2))
-	{}
+	LineProjector(giss::Proj const &_proj, VertexCache *vcache);
 
 	/** Project a latitude line segment
 	n >=1, number of points to add to polygoon.  Don't add (lat,lon1). */

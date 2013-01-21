@@ -5,7 +5,7 @@ NUMPY_CFLAGS = $(shell $(PYTHON) -c "import numpy; print '-I' + numpy.get_includ
 # additional include pathes necessary to compile the C++ programs
 AM_CXXFLAGS = -std=c++11 -I$(top_srcdir)/include \
 	@NETCDF_CFLAGS@ @PROJ_CFLAGS@ @GMP_CFLAGS@ @BLITZ_CFLAGS@ \
-	@CGAL_CPPFLAGS@ @MPFR_CFLAGS@ \
+	@EIGEN_CFLAGS@ @CGAL_CPPFLAGS@ @MPFR_CFLAGS@ \
 	@BOOST_CPPFLAGS@ \
 	@AM_CXXFLAGS@
 
@@ -17,7 +17,7 @@ AM_LDFLAGS = \
 	@BOOST_SYSTEM_LDFLAGS@ @BOOST_THREAD_LIBS@ \
 	@AM_LDFLAGS@ -lgfortran
 
-if HAVE_GALAHAD
-AM_LDFLAGS += -L@GALAHAD_LIB_DIR@ -lgalahad -lgalahad_hsl -lgalahad_pardiso -lgalahad_wsmp -lgalahad_metis -lgalahad_lapack -lgalahad_blas -lgomp
-AM_FCFLAGS += -I @GALAHAD_INC_DIR@ @NETCDFF_CFLAGS@
-endif
+# if HAVE_GALAHAD
+# AM_LDFLAGS += -L@GALAHAD_LIB_DIR@ -lgalahad -lgalahad_hsl -lgalahad_pardiso -lgalahad_wsmp -lgalahad_metis -lgalahad_lapack -lgalahad_blas -lgomp
+# AM_FCFLAGS += -I @GALAHAD_INC_DIR@ @NETCDFF_CFLAGS@
+# endif

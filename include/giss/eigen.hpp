@@ -1,6 +1,8 @@
 #pragma once
 
+#include <memory>
 #include <Eigen/Sparse>
+#include <giss/SparseMatrix.hpp>
 
 // ========================================================
 
@@ -20,7 +22,7 @@ std::unique_ptr<giss::VectorSparseMatrix> Eigen_to_giss(
 	Eigen::SparseMatrix<double> const &mat)
 {
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
-		new giss::VectorSparseMatrix(giss:SparseDescr(
+		new giss::VectorSparseMatrix(giss::SparseDescr(
 		mat.rows(), mat.cols())));
 
 	int nz = mat.nonZeros();
@@ -28,7 +30,7 @@ std::unique_ptr<giss::VectorSparseMatrix> Eigen_to_giss(
 
 	for (int k=0; k<mat.outerSize(); ++k) {
 	for (Eigen::SparseMatrix<double>::InnerIterator it(mat,k); it; ++it) {
-		ret->set(it.row(), it.col(), it.value(), giss::DuplicatePolicy::ADD);
+		ret->set(it.row(), it.col(), it.value(), SparseMatrix::DuplicatePolicy::ADD);
 	}}
 
 	return ret;

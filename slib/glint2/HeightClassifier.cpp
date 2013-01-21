@@ -1,20 +1,22 @@
-#include <snowdrift/HeightClassifier.hpp>
+#include <glint2/HeightClassifier.hpp>
 #include <algorithm>
 
-namespace giss {
+namespace glint2 {
 
 HeightClassifier::HeightClassifier(
-	std::vector<blitz::Array<double,1>> *_height_max) :
-height_max(_height_max) {}
+	blitz::Array<double,1> *_hcmax) :
+	hcmax(_hcmax) {}
 
 int HeightClassifier::operator()(double elevation)
 {
-	auto begin(hcmax.begin());
-	auto end(hcmax.end());
-	end -= 1;		// Last height class always ends at infinity
-	iterator top(std::upper_bound(begin, end, elevation));
+//	end = hcmax.extent(0) - 1;	// Last height class always ends at infinity
 
-	int hc = top - begin;
+	auto begin(hcmax->begin());
+	auto end(hcmax->end());
+	--end;		// Last height class always ends at infinity
+	auto top(std::upper_bound(begin, end, elevation));
+
+	int hc = top.position()[0] - begin.position()[0];
 	return hc;
 }
 

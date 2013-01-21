@@ -1,7 +1,69 @@
+#include <glint2/Grid.hpp>
+#include <giss/ncutil.hpp>
+#include <boost/bind.hpp>
+
 namespace glint2 {
 
 
-static void Grid_netcdf_write(Grid const &grid, NcFile *nc, std::string const &vname) const
+
+/** See Surveyor's Formula: http://www.maa.org/pubs/Calc_articles/ma063.pdf */
+double area_of_polygon(Cell const &cell)
+{
+	double ret = 0;
+	auto it0 = cell.begin();
+	auto it1(it0); ++it1;
+	for(; it1 != cell.end(); it0=it1, it1 += 1) {
+		ret += (it0->x * it1->y) - (it1->x * it0->y);
+	}
+	it1 = cell.begin();
+	ret += (it0->x * it1->y) - (it1->x * it0->y);
+	ret *= .5;
+	return ret;
+}
+// ------------------------------------------------------------
+Grid::Grid(std::string const &_stype) : stype(_stype) {}
+
+void Grid::clear()
+{
+	_vertices.clear();
+	_cells.clear();
+}
+
+Cell *Grid::add_cell(Cell &&cell) {
+	// If we never specify our indices, things will "just work"
+	if (cell.index == -1) cell.index = _cells.size();
+
+
+	auto ret = _cells.insert(cell.index, std::move(cell));
+	Cell *valp = ret.first;
+	bool inserted = ret.second;
+
+	if (!inserted) {		// Key already existed
+		fprintf(stderr, "Error adding repeat cell index=%d.  "
+			"Cells must have unique indices.", cell.index);
+		throw std::exception();
+	}
+	return valp;
+}
+
+Vertex *Grid::add_vertex(Vertex &&vertex) {
+	// If we never specify our indices, things will "just work"
+	if (vertex.index == -1) vertex.index = _vertices.size();
+
+	auto ret = _vertices.insert(vertex.index, std::move(vertex));
+	Vertex *valp = ret.first;
+	bool inserted = ret.second;
+
+	if (!inserted) {		// Key already existed
+		fprintf(stderr, "Error adding repeat vertex index=%d.  "
+			"Vertices must have unique indices.", vertex.index);
+		throw std::exception();
+	}
+	return valp;
+}
+
+// ------------------------------------------------------------
+void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 {
 	// ---------- Write out the vertices
 	NcVar *vertices_index_var = nc->get_var((vname + ".vertices.index").c_str());
@@ -9,13 +71,11 @@ static void Grid_netcdf_write(Grid const &grid, NcFile *nc, std::string const &v
 
 	std::vector<Vertex *> vertices(_vertices.sorted());
 	int i=0;
-	for (int i=0, auto ii = _vertices.begin(); ii != _vertices.end(); ++i, ++ii) {
-		Vertex const *v = *ii;
-
+	for (auto vertex = vertices_begin(); vertex != vertices_end(); ++i, ++vertex) {
 		vertices_index_var->set_cur(i);
-		vertices_index_var->put(&v->index, 1);
+		vertices_index_var->put(&vertex->index, 1);
 
-		double point[2] = {v->x, v->y};
+		double point[2] = {vertex->x, vertex->y};
 		vertices_xy_var->set_cur(i, 0);
 		vertices_xy_var->put(point, 1, 2);
 	}
@@ -33,8 +93,7 @@ static void Grid_netcdf_write(Grid const &grid, NcFile *nc, std::string const &v
 
 	int ivref = 0;
 	i=0;
-	for (auto ii = _cells.begin(); ii != _cells.end(); ++i, ++ii) {
-		Cell const *cell = *ii;
+	for (auto cell = cells_begin(); cell != cells_end(); ++i, ++cell) {
 
 		// Write general cell contents
 		cells_index_var->set_cur(i);
@@ -50,10 +109,12 @@ static void Grid_netcdf_write(Grid const &grid, NcFile *nc, std::string const &v
 		cells_k_var->put(&cell->k, 1);
 
 		cells_native_area_var->set_cur(i);
-		cells_native_area_var->put(&cell->native_area, 1);
+		double native_area = cell->native_area();
+		cells_native_area_var->put(&native_area, 1);
 
 		cells_proj_area_var->set_cur(i);
-		cells_proj_area_var->put(&cell->proj_area, 1);
+		double proj_area = cell->proj_area();
+		cells_proj_area_var->put(&proj_area, 1);
 
 		// Write vertex indices for this cell
 		cells_vertex_refs_start_var->set_cur(i);
@@ -74,24 +135,28 @@ static void Grid_netcdf_write(Grid const &grid, NcFile *nc, std::string const &v
 boost::function<void ()> Grid::netcdf_define(NcFile &nc, std::string const &vname) const
 {
 	// ------ Attributes
-	auto one_dim = get_or_add_dim(nc, "one", 1);
+	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
 		info_var->add_att("name", name.c_str());
 		info_var->add_att("type", stype.c_str());
-		info_var->add_att("cells.num_full", ncells());
-		info_var->add_att("vertices.num_full", nvertices());
+		info_var->add_att("cells.num_full", ncells_full);
+		info_var->add_att("vertices.num_full", nvertices_full);
 
 	// ------- Dimensions
 	// Count the number of times a vertex (any vertex) is referenced.
 	int nvref = 0;
-	for (auto ii = cells_begin(); ii != cells_end(); ++ii)
-		nvref += ii->size();
+	for (auto cell = cells_begin(); cell != cells_end(); ++cell)
+		nvref += cell->size();
 
-	NcDim *nvertices_dim = nc.add_dim((vname + ".vertices.num_realized").c_str(), nvertices_realized());
-	NcDim *ncells_dim = nc.add_dim((vname + ".cells.num_realized").c_str(), ncells_realized());
-	NcDim *ncells_plus_1_dim = nc.add_dim((vname + ".cells.num_realized_plus1").c_str(), ncells() + 1);
-	NcDim *nvrefs_dim = nc.add_dim((vname + ".cells.num_vertex_refs").c_str(), nvref);
-	NcDim *two_dim = get_or_add_dim(nc, "two", 2);
+	NcDim *nvertices_dim = nc.add_dim(
+		(vname + ".vertices.num_realized").c_str(), nvertices_realized());
+	NcDim *ncells_dim = nc.add_dim(
+		(vname + ".cells.num_realized").c_str(), ncells_realized());
+	NcDim *ncells_plus_1_dim = nc.add_dim(
+		(vname + ".cells.num_realized_plus1").c_str(), ncells_realized() + 1);
+	NcDim *nvrefs_dim = nc.add_dim(
+		(vname + ".cells.num_vertex_refs").c_str(), nvref);
+	NcDim *two_dim = giss::get_or_add_dim(nc, "two", 2);
 
 	// --------- Variables
 	nc.add_var((vname + ".vertices.index").c_str(), ncInt, nvertices_dim);
@@ -107,7 +172,7 @@ boost::function<void ()> Grid::netcdf_define(NcFile &nc, std::string const &vnam
 	nc.add_var((vname + ".cells.vertex_refs").c_str(), ncInt, nvrefs_dim);
 	nc.add_var((vname + ".cells.vertex_refs_start").c_str(), ncInt, ncells_plus_1_dim);
 
-	return boost::bind(&Grid_netcdf_write, this, &nc, vname);
+	return boost::bind(&Grid::netcdf_write, this, &nc, vname);
 }
 
 /** @param fname Name of file to load from (eg, an overlap matrix file)
@@ -122,12 +187,13 @@ std::string const &vname)
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 		name = std::string(info_var->get_att("name")->as_string(0));
 		stype = std::string(info_var->get_att("type")->as_string(0));
-		_ncells_full = info_var->get_att("cells.num_full")->as_int(0);
-		_nvertices_full = info_var->get_att("vertices.num_full")->as_int(0);
+		ncells_full = info_var->get_att("cells.num_full")->as_int(0);
+		nvertices_full = info_var->get_att("vertices.num_full")->as_int(0);
 
 	// ---------- Read the Vertices
 	// Basic Info
-	std::vector<int> vertices_index(read_int_vector(nc, vname + ".vertices.index"));
+	std::vector<int> vertices_index(
+		giss::read_int_vector(nc, vname + ".vertices.index"));
 
 	// Read points 2-d array as single vector (double)
 	NcVar *vertices_xy_var = nc.get_var((vname + ".vertices.xy").c_str());
@@ -144,15 +210,15 @@ std::string const &vname)
 	}
 
 	// ---------- Read the Cells
-	std::vector<int> cells_index(read_int_vector(nc, vname + ".cells.index"));
-	std::vector<int> cells_i(read_int_vector(nc, vname + ".cells.i"));
-	std::vector<int> cells_j(read_int_vector(nc, vname + ".cells.j"));
-	std::vector<int> cells_k(read_int_vector(nc, vname + ".cells.k"));
-	std::vector<double> cells_native_area(read_double_vector(nc, vname + ".cells.native_area"));
-	std::vector<double> cells_proj_area(read_double_vector(nc, vname + ".cells.proj_area"));
+	std::vector<int> cells_index(giss::read_int_vector(nc, vname + ".cells.index"));
+	std::vector<int> cells_i(giss::read_int_vector(nc, vname + ".cells.i"));
+	std::vector<int> cells_j(giss::read_int_vector(nc, vname + ".cells.j"));
+	std::vector<int> cells_k(giss::read_int_vector(nc, vname + ".cells.k"));
+	std::vector<double> cells_native_area(giss::read_double_vector(nc, vname + ".cells.native_area"));
+	std::vector<double> cells_proj_area(giss::read_double_vector(nc, vname + ".cells.proj_area"));
 
-	std::vector<int> vrefs(read_int_vector(nc, vname + ".cells.vertex_refs"));
-	std::vector<int> vrefs_start(read_int_vector(nc, vname + ".cells.vertex_refs_start"));
+	std::vector<int> vrefs(giss::read_int_vector(nc, vname + ".cells.vertex_refs"));
+	std::vector<int> vrefs_start(giss::read_int_vector(nc, vname + ".cells.vertex_refs_start"));
 
 	// Assemble into Cells
 	for (size_t i=0; i < cells_index.size(); ++i) {
@@ -163,8 +229,8 @@ std::string const &vname)
 		cell.i = cells_i[i];
 		cell.j = cells_j[i];
 		cell.k = cells_k[i];
-		cell.native_area = cells_native_area[i];
-		cell.proj_area = cells_proj_area[i];
+		cell._native_area = cells_native_area[i];
+		cell._proj_area = cells_proj_area[i];
 
 		// Add the vertices
 		cell.reserve(vrefs_start[i+1] - vrefs_start[i]);
@@ -177,28 +243,5 @@ std::string const &vname)
 }
 
 // ---------------------------------------------------
-/** @param fname Name of file to load from (eg, an overlap matrix file)
-@param vname Eg: "grid1" or "grid2" */
-std::unique_ptr<Grid> Grid::netcdf_read(NcFile &nc, std::string const &vname)
-{
-	auto info_var = nc.get_var((vname + ".info").c_str());
-	std::string stype(info_var->get_att("type")->as_string(0));
-
-	std::unique_ptr<Grid> grid;
-	if (stype == "xy") {
-		grid.reset(new Grid_XY(name, index_base, max_index));
-	} else if (stype == "lonlat") {
-		grid.reset(new Grid_LatLon(name, index_base, max_index));
-	} else {
-		grid.reset(new Grid("generic", name, index_base, max_index));
-	}
-
-
-	grid->read_from_netcdf(nc, vname);
-	return grid;
-}
-
-
-
 
 }	// namespace
