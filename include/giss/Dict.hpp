@@ -27,6 +27,21 @@ public:
 };
 
 
+
+/** An iterator that derferences its result one more time.
+Useful to iterate through colletions of unique_ptr as if
+they're plain values. */
+template<class IterT>
+class RerefIterator : public IterT {
+public:
+	RerefIterator(IterT const &ii) : IterT(ii) {}
+
+	IterT &operator*() { return *this; }
+	IterT *operator->() { return this; }
+};
+
+
+
 // template<class ValT>
 // class DerefCmp {
 // 	bool operator<(ValT const *rhs) const {
@@ -108,7 +123,7 @@ struct Dict : public std::unordered_map<KeyT, std::unique_ptr<ValT>>
 
 private :
 	struct CmpPointers {
-		bool operator()(ValT *a, ValT *b) { return *a < *b; }
+		bool operator()(ValT const *a, ValT const *b) { return *a < *b; }
 	};
 
 public :

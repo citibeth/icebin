@@ -161,6 +161,8 @@ protected:
 public:
 	virtual boost::function<void()> netcdf_define(NcFile &nc, std::string const &vname) const;
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname);
+
+	void to_netcdf(std::string const &fname);
 };
 
 std::unique_ptr<Grid> read_grid(NcFile &nc, std::string const &vname);

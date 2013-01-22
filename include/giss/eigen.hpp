@@ -3,22 +3,25 @@
 #include <memory>
 #include <Eigen/Sparse>
 #include <giss/SparseMatrix.hpp>
+#include <giss/Dict.hpp>
 
 // ========================================================
 
 namespace giss {
 
 template<class SparseMatrixT>
-std::unique_ptr<Eigen::SparseMatrix<double>> giss_to_Eigen(SparseMatrixT const &mat, int Options = 0)
+std::unique_ptr<Eigen::SparseMatrix<double>> giss_to_Eigen(SparseMatrixT const &mat)
 {
 	typedef Eigen::SparseMatrix<double> EigenSM;
-	std::unique_ptr<EigenSM> ret(new EigenSM(mat.nrow, mat.ncol, Options));
-	ret->setFromTriplets(mat.begin(), mat.end());
+	std::unique_ptr<EigenSM> ret(new EigenSM(mat.nrow, mat.ncol));
+	ret->setFromTriplets(
+		giss::RerefIterator<decltype(mat.begin())>(mat.begin()),
+		giss::RerefIterator<decltype(mat.end())>(mat.end()));
 	return ret;
 }	// namespace giss
 
 
-std::unique_ptr<giss::VectorSparseMatrix> Eigen_to_giss(
+inline std::unique_ptr<giss::VectorSparseMatrix> Eigen_to_giss(
 	Eigen::SparseMatrix<double> const &mat)
 {
 	std::unique_ptr<giss::VectorSparseMatrix> ret(

@@ -13,8 +13,9 @@ void set_xy_boundaries(Grid_XY &grid,
 	// Set up x coordinates
 	grid.xb.clear();
 	int nx = (int)(.5 + (x1 - x0) / dx);	// Round to nearest integer
+//printf("nxxxx: %g, %g, %g, %d\n", x1, x0, dx, nx);
 	double nx_inv = 1.0 / (double)nx;
-	for (int i=0; i<nx; ++i) {
+	for (int i=0; i<=nx; ++i) {
 		double x = x0 + (x1-x0) * (double)i * nx_inv;
 		grid.xb.push_back(x);
 	}
@@ -23,7 +24,7 @@ void set_xy_boundaries(Grid_XY &grid,
 	grid.yb.clear();
 	int ny = (int)(.5 + (y1 - y0) / dy);	// Round to nearest integer
 	double ny_inv = 1.0 / (double)ny;
-	for (int i=0; i<ny; ++i) {
+	for (int i=0; i<=ny; ++i) {
 		double y = y0 + (y1-y0) * (double)i * ny_inv;
 		grid.yb.push_back(y);
 	}
@@ -40,7 +41,7 @@ void set_xy_centers(Grid_XY &grid,
 }
 
 
-void Grid_XY::realize_grid(
+void Grid_XY::realize(
 boost::function<bool(Cell const &)> const &euclidian_clip)
 {
 	ncells_full = nx() * ny();
@@ -48,7 +49,7 @@ boost::function<bool(Cell const &)> const &euclidian_clip)
 
 	// Set up the main grid
 	VertexCache vcache(this);
-	int index = 1;
+	int index = 0;
 	for (int iy = 0; iy < yb.size()-1; ++iy) {
 		double y0 = yb[iy];
 		double y1 = yb[iy+1];
@@ -60,6 +61,12 @@ boost::function<bool(Cell const &)> const &euclidian_clip)
 //			grid->x_centers.push_back(.5*(x0+x1));
 
 			Cell cell;
+#if 0
+printf("add_vertex(%f, %f)\n", x0, y0);
+printf("add_vertex(%f, %f)\n", x1, y0);
+printf("add_vertex(%f, %f)\n", x1, y1);
+printf("add_vertex(%f, %f)\n", x0, y1);
+#endif
 			vcache.add_vertex(cell, x0, y0);
 			vcache.add_vertex(cell, x1, y0);
 			vcache.add_vertex(cell, x1, y1);

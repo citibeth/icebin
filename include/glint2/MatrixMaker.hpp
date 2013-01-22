@@ -40,7 +40,7 @@ public:
 	int get_hc(int index1, double elev);
 
 	/** Position of height points in elevation space (same for all GCM grid cells) */
-	blitz::Array<double,1> hpdefs;	// [nhc]
+	std::vector<double> hpdefs;	// [nhc]
 
 	int nhc() { return hpdefs.size(); }
 
@@ -53,15 +53,15 @@ public:
 
 	// ------------------------------------------------
 
-	void realize();
+	virtual void realize();
 	virtual ~MatrixMaker() {}
 
 	// ------------------------------------------------
 
 	virtual void compute_fhc(
-		blitz::Array<double,2> &fhc1h,
-		blitz::Array<double,2> &elev1h,
-		blitz::Array<double,1> &fgice1) = 0;	// Portion of gridcell covered in ground ice (from landmask)
+		blitz::Array<double,2> *fhc1h,
+		blitz::Array<double,2> *elev1h,
+		blitz::Array<double,1> *fgice1) = 0;	// Portion of gridcell covered in ground ice (from landmask)
 
 	/** Make matrix to go from
 		height points [nhc*n1] to ice grid [n2].

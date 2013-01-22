@@ -27,7 +27,7 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
 	auto e_ret((*e_ice_to_hc) * (*e_hp_to_ice));
 
 	// Convert back to GISS format sparse matrices
-	return Eigen_to_giss(e_ret);
+	return giss::Eigen_to_giss(e_ret);
 }
 
 

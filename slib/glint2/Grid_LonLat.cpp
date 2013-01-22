@@ -55,7 +55,7 @@ inline double polar_graticule_area_exact(Grid_LonLat const &grid,
 @param spherical_clip Only realize grid cells that pass this test (before projection).
 @see EuclidianClip, SphericalClip
 */
-void Grid_LonLat::realize_grid(
+void Grid_LonLat::realize(
 	boost::function<bool(double, double, double, double)> const &spherical_clip,
 	boost::function<bool(Cell const &)> const &euclidian_clip)
 {

@@ -1,7 +1,7 @@
 #include <glint2/clippers.hpp>
 #include <giss/geodesy.hpp>
 
-namespace giss {
+namespace glint2 {
 
 // We use lon0...lat1 as a poor man's substute for real CG on a spherical surface
 
@@ -11,14 +11,14 @@ double lon0, double lat0, double lon1, double lat1)
 {
 
 
-//printf("distance=%g, clip_distance=%g\n", haversine_distance(center_lon, center_lat, lon0, lat0), clip_distance_deg);
+//printf("distance=%g, clip_distance=%g\n", giss::haversine_distance(center_lon, center_lat, lon0, lat0), clip_distance_deg);
 
 	// This avoids projection-caused grid cell degeneracy
 	// far away from the central area we're interested in
-	if (haversine_distance(center_lon, center_lat, lon0, lat0) <= clip_distance_deg) return true;
-	if (haversine_distance(center_lon, center_lat, lon1, lat0) <= clip_distance_deg) return true;
-	if (haversine_distance(center_lon, center_lat, lon1, lat1) <= clip_distance_deg) return true;
-	if (haversine_distance(center_lon, center_lat, lon0, lat1) <= clip_distance_deg) return true;
+	if (giss::haversine_distance(center_lon, center_lat, lon0, lat0) <= clip_distance_deg) return true;
+	if (giss::haversine_distance(center_lon, center_lat, lon1, lat0) <= clip_distance_deg) return true;
+	if (giss::haversine_distance(center_lon, center_lat, lon1, lat1) <= clip_distance_deg) return true;
+	if (giss::haversine_distance(center_lon, center_lat, lon0, lat1) <= clip_distance_deg) return true;
 	return false;
 }
 
@@ -40,7 +40,7 @@ double lon0, double lat0, double lon1, double lat1)
 
 // =============================================================
 /** @param clip_poly Only realize grid cells that intersect with this polygon (on the map) */
-bool EuclidianClip::poly(gc::Polygon_2 &clip_poly,
+bool EuclidianClip::poly(gc::Polygon_2 const &clip_poly,
 		Cell const &grid_cell)
 {
 	auto cell_poly = Cell_to_Polygon_2(grid_cell);

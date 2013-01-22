@@ -7,16 +7,20 @@ namespace glint2 {
 class MatrixMaker_L0 : public MatrixMaker
 {		// For ice model with level-value grid cells
 public:
-	/** Masked and then height classified */
-	std::unique_ptr<VectorSparseMatrix> overlap_m_hc;
+	virtual void realize();
 
-	virtual MatrixMaker_L0(MatrixMakerData &&data);
+	/** Masked and then height classified */
+	std::unique_ptr<giss::VectorSparseMatrix> overlap_m_hc;
 
 	/** Uses: elev2, hpdefs, overlap */
-	virtual std::unique_ptr<VectorSparseMatrix> hp_to_ice();
+	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice();
 
 	/** Uses: elev2, hcmax, overlap */
-	virtual std::unique_ptr<VectorSparseMatrix> ice_to_hc();
+	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc();
+
+	virtual void compute_fhc(
+		blitz::Array<double,2> *fhc1h,
+		blitz::Array<double,1> *fgice1);	// Portion of gridcell covered in ground ice (from landmask)
 
 };
 

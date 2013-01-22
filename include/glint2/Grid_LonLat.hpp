@@ -108,7 +108,7 @@ public :
 	@param spherical_clip Only realize grid cells that pass this test (before projection).
 	@see EuclidianClip, SphericalClip
 	*/
-	void realize_grid(
+	void realize(
 		boost::function<bool(double, double, double, double)> const &spherical_clip,
 		boost::function<bool(Cell const &)> const &euclidian_clip);
 

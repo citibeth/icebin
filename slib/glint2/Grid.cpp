@@ -50,6 +50,8 @@ Vertex *Grid::add_vertex(Vertex &&vertex) {
 	// If we never specify our indices, things will "just work"
 	if (vertex.index == -1) vertex.index = _vertices.size();
 
+//printf("add_vertex(%d, %f, %f)\n", vertex.index, vertex.x, vertex.y);
+
 	auto ret = _vertices.insert(vertex.index, std::move(vertex));
 	Vertex *valp = ret.first;
 	bool inserted = ret.second;
@@ -71,42 +73,50 @@ void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 
 	std::vector<Vertex *> vertices(_vertices.sorted());
 	int i=0;
-	for (auto vertex = vertices_begin(); vertex != vertices_end(); ++i, ++vertex) {
+	for (auto vertex = vertices.begin(); vertex != vertices.end(); ++i, ++vertex) {
 		vertices_index_var->set_cur(i);
-		vertices_index_var->put(&vertex->index, 1);
+		vertices_index_var->put(&(*vertex)->index, 1);
 
-		double point[2] = {vertex->x, vertex->y};
+		double point[2] = {(*vertex)->x, (*vertex)->y};
 		vertices_xy_var->set_cur(i, 0);
 		vertices_xy_var->put(point, 1, 2);
 	}
 
 	// -------- Write out the cells (and vertex references)
 	NcVar *cells_index_var = nc->get_var((vname + ".cells.index").c_str());
-	NcVar *cells_i_var = nc->get_var((vname + ".cells.i").c_str());
-	NcVar *cells_j_var = nc->get_var((vname + ".cells.j").c_str());
-	NcVar *cells_k_var = nc->get_var((vname + ".cells.k").c_str());
+//	NcVar *cells_i_var = nc->get_var((vname + ".cells.i").c_str());
+//	NcVar *cells_j_var = nc->get_var((vname + ".cells.j").c_str());
+//	NcVar *cells_k_var = nc->get_var((vname + ".cells.k").c_str());
+	NcVar *cells_ijk_var = nc->get_var((vname + ".cells.ijk").c_str());
 	NcVar *cells_native_area_var = nc->get_var((vname + ".cells.native_area").c_str());
 	NcVar *cells_proj_area_var = nc->get_var((vname + ".cells.proj_area").c_str());
 
 	NcVar *cells_vertex_refs_var = nc->get_var((vname + ".cells.vertex_refs").c_str());
 	NcVar *cells_vertex_refs_start_var = nc->get_var((vname + ".cells.vertex_refs_start").c_str());
 
+	std::vector<Cell *> cells(_cells.sorted());
 	int ivref = 0;
 	i=0;
-	for (auto cell = cells_begin(); cell != cells_end(); ++i, ++cell) {
+	for (auto celli = cells.begin(); celli != cells.end(); ++i, ++celli) {
+		Cell *cell(*celli);
 
 		// Write general cell contents
 		cells_index_var->set_cur(i);
 		cells_index_var->put(&cell->index, 1);
 
-		cells_i_var->set_cur(i);
-		cells_i_var->put(&cell->i, 1);
+// 		cells_i_var->set_cur(i);
+// 		cells_i_var->put(&cell->i, 1);
+// 
+// 		cells_j_var->set_cur(i);
+// 		cells_j_var->put(&cell->j, 1);
+// 
+// 		cells_k_var->set_cur(i);
+// 		cells_k_var->put(&cell->k, 1);
 
-		cells_j_var->set_cur(i);
-		cells_j_var->put(&cell->j, 1);
+		int ijk[3] = {cell->i, cell->j, cell->k};
+		cells_ijk_var->set_cur(i, 0);
+		cells_ijk_var->put(ijk, 1, 3);
 
-		cells_k_var->set_cur(i);
-		cells_k_var->put(&cell->k, 1);
 
 		cells_native_area_var->set_cur(i);
 		double native_area = cell->native_area();
@@ -122,6 +132,7 @@ void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 		for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex) {
 			cells_vertex_refs_var->set_cur(ivref);
 			cells_vertex_refs_var->put(&vertex->index, 1);
+			++ivref;
 		}
 	}
 
@@ -157,15 +168,17 @@ boost::function<void ()> Grid::netcdf_define(NcFile &nc, std::string const &vnam
 	NcDim *nvrefs_dim = nc.add_dim(
 		(vname + ".cells.num_vertex_refs").c_str(), nvref);
 	NcDim *two_dim = giss::get_or_add_dim(nc, "two", 2);
+	NcDim *three_dim = giss::get_or_add_dim(nc, "three", 3);
 
 	// --------- Variables
 	nc.add_var((vname + ".vertices.index").c_str(), ncInt, nvertices_dim);
 	nc.add_var((vname + ".vertices.xy").c_str(), ncDouble, nvertices_dim, two_dim);
 
 	nc.add_var((vname + ".cells.index").c_str(), ncInt, ncells_dim);
-	nc.add_var((vname + ".cells.i").c_str(), ncInt, ncells_dim);
-	nc.add_var((vname + ".cells.j").c_str(), ncInt, ncells_dim);
-	nc.add_var((vname + ".cells.k").c_str(), ncInt, ncells_dim);
+	nc.add_var((vname + ".cells.ijk").c_str(), ncInt, ncells_dim, three_dim);
+//	nc.add_var((vname + ".cells.i").c_str(), ncInt, ncells_dim);
+//	nc.add_var((vname + ".cells.j").c_str(), ncInt, ncells_dim);
+//	nc.add_var((vname + ".cells.k").c_str(), ncInt, ncells_dim);
 	nc.add_var((vname + ".cells.native_area").c_str(), ncDouble, ncells_dim);
 	nc.add_var((vname + ".cells.proj_area").c_str(), ncDouble, ncells_dim);
 
@@ -211,9 +224,15 @@ std::string const &vname)
 
 	// ---------- Read the Cells
 	std::vector<int> cells_index(giss::read_int_vector(nc, vname + ".cells.index"));
-	std::vector<int> cells_i(giss::read_int_vector(nc, vname + ".cells.i"));
-	std::vector<int> cells_j(giss::read_int_vector(nc, vname + ".cells.j"));
-	std::vector<int> cells_k(giss::read_int_vector(nc, vname + ".cells.k"));
+
+	NcVar *cells_ijk_var = nc.get_var((vname + ".cells.ijk").c_str());
+	long ncells = cells_ijk_var->get_dim(0)->size();
+	std::vector<int> cells_ijk(ncells*3);
+	cells_ijk_var->get(&cells_ijk[0], npoints, 2);
+
+//	std::vector<int> cells_i(giss::read_int_vector(nc, vname + ".cells.i"));
+//	std::vector<int> cells_j(giss::read_int_vector(nc, vname + ".cells.j"));
+//	std::vector<int> cells_k(giss::read_int_vector(nc, vname + ".cells.k"));
 	std::vector<double> cells_native_area(giss::read_double_vector(nc, vname + ".cells.native_area"));
 	std::vector<double> cells_proj_area(giss::read_double_vector(nc, vname + ".cells.proj_area"));
 
@@ -226,9 +245,13 @@ std::string const &vname)
 
 		Cell cell;
 		cell.index = cells_index[i];
-		cell.i = cells_i[i];
-		cell.j = cells_j[i];
-		cell.k = cells_k[i];
+		cell.i = cells_ijk[i*3 + 0];
+		cell.j = cells_ijk[i*3 + 1];
+		cell.k = cells_ijk[i*3 + 2];
+
+//		cell.i = cells_i[i];
+//		cell.j = cells_j[i];
+//		cell.k = cells_k[i];
 		cell._native_area = cells_native_area[i];
 		cell._proj_area = cells_proj_area[i];
 
@@ -240,6 +263,19 @@ std::string const &vname)
 		// Add thecell to the grid
 		add_cell(std::move(cell));
 	}
+}
+
+void Grid::to_netcdf(std::string const &fname)
+{
+	NcFile nc(fname.c_str(), NcFile::Replace);
+
+	// Define stuff in NetCDF file
+	auto gridd = netcdf_define(nc, "grid");
+
+	// Write stuff in NetCDF file
+	gridd();
+
+	nc.close();
 }
 
 // ---------------------------------------------------

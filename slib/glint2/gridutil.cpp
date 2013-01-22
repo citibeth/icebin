@@ -12,7 +12,10 @@ Vertex *VertexCache::add_vertex(double x, double y) {
 	if (ii != _vertices.end()) {	// Found in cache
 		return ii->second;
 	} else {
-		return grid->add_vertex(Vertex(x,y));
+		Vertex *vertex = grid->add_vertex(Vertex(x,y));
+		_vertices.insert(std::make_pair(
+			std::make_pair(x,y), vertex));
+		return vertex;
 	}
 }
 

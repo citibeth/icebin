@@ -64,7 +64,7 @@ public:
 	with this polygon (on the map)
 	@param grid_cell Free parameter, not to be bound by boost::bind().
 	@return True if this grid cell should be kept. */
-	static bool poly(gc::Poly_2 const &clip_poly,
+	static bool poly(gc::Polygon_2 const &clip_poly,
 		Cell const &grid_cell);
 
 	/** Keeps all grid cells, clips nothing.

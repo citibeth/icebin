@@ -46,7 +46,7 @@ public:
 	@return The newly created Grid_XY.
 	@see EuclidianClip
 	*/
-	void realize_grid(boost::function<bool(Cell const &)> const &euclidian_clip);
+	void realize(boost::function<bool(Cell const &)> const &euclidian_clip);
 
 	// ------------------------------------------------
 
@@ -78,11 +78,11 @@ public:
 @return The newly created Grid_XY.
 @see EuclidianClip
 */
-void set_xy_boundaries(
+void set_xy_boundaries(Grid_XY &grid,
 	double x0, double x1, double dx,
 	double y0, double y1, double dy);
 
-void set_xy_centers(
+void set_xy_centers(Grid_XY &grid,
 	double x0, double x1, double dx,
 	double y0, double y1, double dy);
 

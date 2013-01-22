@@ -24,7 +24,8 @@ libglint2_la_SOURCES = \
 	glint2/matrix_ops.cpp \
 	glint2/MatrixMaker.cpp \
 	glint2/MatrixMaker_L0.cpp \
-	glint2/exchange_grid.cpp
+	glint2/exchange_grid.cpp \
+	glint2/clippers.cpp
 
 # # ------------------------------------------------------
 # if HAVE_GALAHAD
