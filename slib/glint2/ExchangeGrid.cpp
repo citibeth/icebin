@@ -6,8 +6,9 @@
 #include <CGAL/bounding_box.h>
 
 #include <giss/RTree.hpp>
+#include <giss/Proj2.hpp>
 
-#include <glint2/exchange_grid.hpp>
+#include <glint2/ExchangeGrid.hpp>
 #include <glint2/gridutil.hpp>
 
 #include <glint2/cgal.hpp>
@@ -17,7 +18,7 @@ namespace glint2 {
 // Some Supporting Classes
 // =======================================================================
 struct OCell {
-	Cell *cell;
+	Cell const *cell;
 
 	/** The polygon representing the grid cell (on the map).
 	Vertices in this polygon are always counter-clockwise and have positive area. */
@@ -26,14 +27,17 @@ struct OCell {
 	/** Bounding box of the polygon, used for search/overlap algorithms. */
 	gc::Iso_rectangle_2 bounding_box;
 
-	OCell(Cell *_cell);
+	OCell(Cell const *_cell, giss::Proj2 const &proj);
 };
 
-OCell::OCell(Cell *_cell) : cell(_cell)
+OCell::OCell(Cell const *_cell, giss::Proj2 const &proj) : cell(_cell)
 {
 	// Copy the vertices
-	for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex)
+	for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex) {
+		double x, y;
+		proj.transform(vertex->x, vertex->y, x, y);
 		poly.push_back(gc::Point_2(vertex->x, vertex->y));
+	}
 
 	// Compute the bounding box
 	bounding_box = CGAL::bounding_box(poly.vertices_begin(), poly.vertices_end());
@@ -42,7 +46,7 @@ OCell::OCell(Cell *_cell) : cell(_cell)
 // =======================================================================
 
 struct OGrid {
-	Grid *grid;
+	Grid const *grid;
 
 	/** CGAL polygon for each grid cell */
 	std::unordered_map<int, OCell> ocells;
@@ -61,12 +65,12 @@ struct OGrid {
 
 	// -------------------------------------------
 
-	OGrid(Grid *_grid);
+	OGrid(Grid const *_grid, giss::Proj2 const &proj);
 
 	void realize_rtree();
 };		// struct OGrid
 
-OGrid::OGrid(Grid *_grid) : grid(_grid) {
+OGrid::OGrid(Grid const *_grid, giss::Proj2 const &proj) : grid(_grid) {
 
 	// Compute bounding box too
 	// Be lazy, base bounding box on minimum and maximum values in points
@@ -80,7 +84,7 @@ OGrid::OGrid(Grid *_grid) : grid(_grid) {
 	// Compute Simple Bounding Box for overall grid
 	for (auto cell = grid->cells_begin(); cell != grid->cells_end(); ++cell) {
 		// Convert and copy to the OGrid data structure
-		OCell ocell(&*cell);
+		OCell ocell(&*cell, proj);
 		ocells.insert(std::make_pair(cell->index, ocell));
 
 		for (auto vertex = ocell.poly.vertices_begin(); vertex != ocell.poly.vertices_end(); ++vertex) {
@@ -162,23 +166,33 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_full_nvertices,
 		exvcache->add_vertex(excell, x, y);
 	}
 
+	// Compute its area
+	excell.area = area_of_polygon(excell);
+
 	// Add it to the grid
 	exvcache->grid->add_cell(std::move(excell));
 }
 // --------------------------------------------------------------------
 
 /** @param grid2 Put in an RTree */
-std::unique_ptr<Grid> compute_exchange_grid(Grid &grid1, Grid &grid2)
+//std::unique_ptr<Grid> compute_exchange_grid
+ExchangeGrid::ExchangeGrid(
+	Grid const &grid1, giss::Proj2 const &_proj1,
+	Grid const &grid2, giss::Proj2 const &_proj2)
+: Grid("exchange"),
+proj1(_proj1), proj2(_proj2)
 {
+	scoord = "xy";
+	Grid *exgrid = this;
+
 	/** Initialize the new grid */
-	std::unique_ptr<Grid> exgrid(new Grid("exchange"));
 	exgrid->name = grid1.name + '-' + grid2.name;
 	exgrid->ncells_full = grid1.ncells_full * grid2.ncells_full;
 	exgrid->nvertices_full = -1;	// Not specified
-	VertexCache exvcache(VertexCache(exgrid.get()));
+	VertexCache exvcache(exgrid);
 
-	OGrid ogrid1(&grid1);
-	OGrid ogrid2(&grid2);
+	OGrid ogrid1(&grid1, proj1);
+	OGrid ogrid2(&grid2, proj2);
 	ogrid2.realize_rtree();
 
 	OCell const *ocell1;
@@ -206,8 +220,28 @@ std::unique_ptr<Grid> compute_exchange_grid(Grid &grid1, Grid &grid2)
 				nprocessed+1, ogrid1.ocells.size(), exgrid->ncells_realized());
 		}
 	}
-
-	return exgrid;	
 }
+
+// ---------------------------------------------------------------
+boost::function<void ()> ExchangeGrid::netcdf_define(NcFile &nc, std::string const &vname) const
+{
+	auto parent = Grid::netcdf_define(nc, vname);
+
+	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+	proj1.netcdf_define(nc, info_var, "proj1");
+	proj2.netcdf_define(nc, info_var, "proj2");
+
+	return parent;
+}
+
+void ExchangeGrid::read_from_netcdf(NcFile &nc, std::string const &vname)
+{
+	Grid::read_from_netcdf(nc, vname);
+
+	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+	proj1.read_from_netcdf(nc, info_var, "proj1");
+	proj2.read_from_netcdf(nc, info_var, "proj2");
+}
+
 
 };	// namespace glint2

@@ -53,6 +53,8 @@ class Proj {
 public:
     Proj() : pj(0) {}
 
+	bool is_valid() const { return (pj != 0); }
+
     friend int transform(Proj const &src, Proj const &dest,
         long point_count, int point_offset,
         double *x, double *y, double *z);
@@ -76,9 +78,15 @@ public:
         pj = pj_init_plus(definition);
     }
 
+	void clear() {
+		if (pj) pj_free(pj);
+		pj = 0;
+	}
+
+
     ~Proj()
     {
-        pj_free(pj);
+        if (pj) pj_free(pj);
         // if (pj_def) pj_dalloc(pj_def);
     }
 

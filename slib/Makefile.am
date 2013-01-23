@@ -14,6 +14,7 @@ libglint2_la_SOURCES = \
 	giss/SparseMatrix.cpp \
 	giss/hsl_zd11_x.cpp giss/ncutil.cpp giss/IndexTranslator.cpp \
 	giss/geodesy.cpp \
+	giss/Proj2.cpp \
 	glint2/Grid.cpp \
 	glint2/Grid_LonLat.cpp \
 	glint2/Grid_XY.cpp \
@@ -24,7 +25,7 @@ libglint2_la_SOURCES = \
 	glint2/matrix_ops.cpp \
 	glint2/MatrixMaker.cpp \
 	glint2/MatrixMaker_L0.cpp \
-	glint2/exchange_grid.cpp \
+	glint2/ExchangeGrid.cpp \
 	glint2/clippers.cpp
 
 # # ------------------------------------------------------

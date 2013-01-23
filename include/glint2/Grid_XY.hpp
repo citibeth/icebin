@@ -26,7 +26,9 @@ public:
 	int ny() const { return yb.size() - 1; }
 
 	// -----------------------------------------
-	Grid_XY() : Grid("xy") {}
+	Grid_XY() : Grid("xy") {
+		scoord = "xy";
+	}
 
 	virtual int ij_to_index(int i, int j) const
 		{ return j * nx() + i; }

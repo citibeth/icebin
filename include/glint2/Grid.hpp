@@ -5,13 +5,16 @@
 #include <netcdfcpp.h>
 #include <boost/function.hpp>
 #include <giss/Dict.hpp>
+#include <giss/Proj2.hpp>
 
 namespace glint2 {
 
 class Cell;
 
-/** See Surveyor's Formula: http://www.maa.org/pubs/Calc_articles/ma063.pdf */
+/** See Surveyor's Formula: http://www.maa.org/pubs/Calc_articles/ma063.pdf*/
 extern double area_of_polygon(Cell const &cell);
+/** @param proj[2] */
+extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj);
 
 // --------------------------------------------------
 
@@ -49,20 +52,23 @@ public:
 	For grids with 2-D indexing, tells the i and j index of the cell (0-based). */
 	int i, j, k;
 
+	/** Area of this grid cell, whether it is a Cartesian or lat/lon cell. */
+	double area;
+
 	/** Area of this grid cel in its native coordinate system (if it's
 	been projected) */
-	double _native_area;
-	double _proj_area;
-
-	double native_area() const { return _native_area; }
-	double proj_area() const {	// Lazy evaluation here
-		if (_proj_area >= 0) { return _proj_area; }
-
-		// We allow a const_cast here becuase _proj_area is used for
-		// caching values ONLY.
-		const_cast<Cell *>(this)->_proj_area = area_of_polygon(*this);
-		return _proj_area;
-	}
+//	double _native_area;
+//	double _proj_area;
+//
+//	double native_area() const { return _native_area; }
+//	double proj_area() const {	// Lazy evaluation here
+//		if (_proj_area >= 0) { return _proj_area; }
+//
+//		// We allow a const_cast here becuase _proj_area is used for
+//		// caching values ONLY.
+//		const_cast<Cell *>(this)->_proj_area = area_of_polygon(*this);
+//		return _proj_area;
+//	}
 
 
 
@@ -80,8 +86,9 @@ public:
 		i = -1;
 		j = -1;
 		k = -1;
-		_native_area = -1;
-		_proj_area = -1;
+		area = -1;
+//		_native_area = -1;
+//		_proj_area = -1;
 	}
 
 	Cell() { clear(); }
@@ -93,10 +100,18 @@ class Grid {
 
 public:
 	std::string stype;
+	/** Tells whether vertex coordinates are in x/y on a plane or lon/lat on a sphere. */
+	std::string scoord;		// xy or lonlat
 	std::string name;
 
 	long ncells_full;		// Maximum possible index (-1)
 	long nvertices_full;	// Maximum possible index (-1)
+
+	/** Projection, if any, used to transform this grid from its
+	"native" form to the one it's currently in.
+	Does transform(proj[0], proj[1]).
+	sproj[0] == sproj[1] == "" if no projection used. */
+//	std::string srpoj[2];
 
 	Grid(std::string const &_stype);
 
@@ -110,20 +125,11 @@ public:
 	virtual void index_to_ij(int index, int &i, int &j) const { }
 
 	// ========= Cell Collection Operators
-	// typedef DerefIterator<giss::Dict<int, Cell>> cell_iterator;
 	auto cells_begin() -> decltype(_cells.begin()) { return _cells.begin(); }
 	auto cells_end() -> decltype(_cells.end()) { return _cells.end(); }
 
 	auto cells_begin() const -> decltype(_cells.begin()) { return _cells.begin(); }
 	auto cells_end() const -> decltype(_cells.end()) { return _cells.end(); }
-
-
-
-#if 0
-	typedef giss::Dict<int, Vertex>::ValIterator cell_iterator;
-	cell_iterator cells_begin() { return cell_iterator(_cells.begin()); }
-	cell_iterator cells_end() { return cell_iterator(_cells.end()); }
-#endif
 
 	Cell *get_cell(int index) { return _cells[index]; }
 	long ncells_realized() const { return _cells.size(); }
@@ -139,12 +145,6 @@ public:
 		{ return _vertices.begin(); }
 	auto vertices_end() const -> decltype(_vertices.end())
 		{ return _vertices.end(); }
-
-#if 0
-	typedef giss::Dict<int, Cell>::ValIterator vertex_iterator;
-	vertex_iterator vertices_begin() { return vertex_iterator(_vertices.begin()); }
-	vertex_iterator vertices_end() { return vertex_iterator(_vertices.end()); }
-#endif
 
 	Vertex *get_vertex(int index) { return _vertices[index]; }
 

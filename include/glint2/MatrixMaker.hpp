@@ -3,6 +3,7 @@
 #include <memory>
 #include <glint2/Grid.hpp>
 #include <glint2/matrix_ops.hpp>
+#include <giss/Proj2.hpp>
 
 /*
 Height Points (HP) [nhc*n1] --A--> Ice [n2] --B--> Height Classes (HC) [nhc*n1] --C--> GCM
@@ -25,6 +26,7 @@ public:
 	// ------------ Stuff we're passed in
 	std::shared_ptr<glint2::Grid> grid1;		/// GCM Grid
 	std::shared_ptr<glint2::Grid> grid2;		/// Ice Grid
+	giss::Proj2 proj;							/// GCM -> Ice Projection
 	std::shared_ptr<glint2::Grid> exgrid;	/// Exchange grid (between GCM and Ice)
 
 	std::shared_ptr<blitz::Array<bool,1>> mask1;

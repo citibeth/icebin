@@ -78,8 +78,7 @@ printf("add_vertex(%f, %f)\n", x0, y1);
 			cell.index = index;
 			cell.i = ix;
 			cell.j = iy;
-			cell._native_area = area_of_polygon(cell);
-			cell._proj_area = cell._native_area;
+			cell.area = area_of_polygon(cell);
 
 			add_cell(std::move(cell));
 		}

@@ -125,65 +125,43 @@ giss::VectorSparseMatrix const &overlap)
 
 // ---------------------------------------------------------------
 /** Converts from values for projected grid1 to values for native grid1.
-Diagonal matrix. */
-extern void proj_to_native(Grid &grid1, giss::VectorSparseMatrix &mat)
+Diagonal matrix.
+@param proj proj[0] --> proj[1] converts from native to projected space. */
+extern std::vector<double> proj_to_native(Grid &grid1, giss::Proj2 const &proj,
+giss::VectorSparseMatrix &mat)
 {
 	// Set up the diagonal matrix
 	std::vector<double> factors(grid1.ncells_full, 0.0);
-	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell)
-		factors.at(cell->index) = cell->proj_area() / cell->native_area();
+	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
+		double proj_area = area_of_proj_polygon(*cell, proj);
+		factors.at(cell->index) = proj_area / cell->area;
+	}
 
 	// Multiply by it
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
 		ii.val() *= factors.at(ii.row());
+
+	return factors;
 }
 
-extern void native_to_proj(Grid &grid1, giss::VectorSparseMatrix &mat)
+extern std::vector<double> native_to_proj(Grid &grid1, giss::Proj2 const &proj,
+giss::VectorSparseMatrix &mat)
 {
 	// Set up the diagonal matrix
 	std::vector<double> factors(grid1.ncells_full, 0.0);
-	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell)
-		factors.at(cell->index) = cell->native_area() / cell->proj_area();
+	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
+		double proj_area = area_of_proj_polygon(*cell, proj);
+		factors.at(cell->index) = cell->area / proj_area;
+	}
 
 	// Multiply by it
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
 		ii.val() *= factors.at(ii.row());
+
+	return factors;
 }
 
 // ---------------------------------------------------------------
-
-/** Converts from values for projected grid1 to values for native grid1.
-Diagonal matrix. */
-std::unique_ptr<giss::VectorSparseMatrix> proj_to_native(Grid &grid1)
-{
-	int n1 = grid1.ncells_full;
-
-	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
-		giss::SparseDescr(n1, n1)));
-
-	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
-		ret->add(n1, n1, cell->proj_area() / cell->native_area());
-	}
-
-	return ret;
-}
-
-/** Converts from values for projected grid1 to values for native grid1.
-Diagonal matrix. */
-std::unique_ptr<giss::VectorSparseMatrix> native_to_proj(Grid &grid1)
-{
-	int n1 = grid1.ncells_full;
-
-	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
-		giss::SparseDescr(n1, n1)));
-
-	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
-		ret->add(n1, n1, cell->native_area() / cell->proj_area());
-	}
-
-	return ret;
-}
-
 // ==================================================================
 // Interpolate Height Points in Height Space Only: (nhc, n1) --> (n2)
 
@@ -333,7 +311,7 @@ std::unique_ptr<giss::VectorSparseMatrix>
 bilin_interp(
 Grid_LonLat const &grid1,
 Grid_XY const &grid2,
-giss::Proj const &proj,
+giss::Proj2 const &proj,	// Projects XY to the Sphere
 std::vector<double> const &hpdefs,
 blitz::Array<double,1> const &elev2,
 blitz::Array<bool,1> const &mask1,		// [n1] Shows where we will / will not expect landice
@@ -357,8 +335,6 @@ blitz::Array<bool,1> const &mask2)
 	ilats.reserve(2);
 	ilons.reserve(2);
 
-	giss::Proj llproj(proj.latlong_from_proj());
-
 	IJMatrixMaker mmat(giss::SparseDescr(n2, nhc*n1));
 	mmat.grid1 = &grid1;
 	for (auto cell = grid2.cells_begin(); cell != grid2.cells_end(); ++cell) {
@@ -366,7 +342,7 @@ blitz::Array<bool,1> const &mask2)
 
 		// ---------- Project Cartesian cell center to sphere
 		double lon2c_rad, lat2c_rad;
-		transform(proj, llproj,
+		proj.xy2ll(
 			x2c[cell->i], y2c[cell->j],
 			lon2c_rad, lat2c_rad);
 		double lon2c = lon2c_rad * giss::R2D;

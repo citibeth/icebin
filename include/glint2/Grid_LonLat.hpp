@@ -31,7 +31,6 @@ public:
 	If not, then many triangular grid cells will meet at the north pole. */
 	bool north_pole;
 
-#if 1
 	/** Number of grid cell indices in longitude dimension */
 	int nlon() const { return lonb.size() - 1; }
 
@@ -41,34 +40,8 @@ public:
 		const int north_pole_offset = (north_pole ? 1 : 0);
 		return latb.size() - 1 + south_pole_offset + north_pole_offset;
 	}
-#endif
 
 	// ------------------------------------------------------
-
-#if 0
-	/** Longitude centers of grid cells */
-	std::vector<double> lonc;
-	std::vector<double> latc;
-
-	/** Number of grid cell indices in longitude dimension */
-	int nlon() { return lonc.size(); }
-
-	/** Number of grid cell indices in latitude dimension */
-	int nlat() { return latc.size(); }
-#endif
-
-#if 0
-protected :
-	int _nlon;
-	int _nlat;
-
-public :
-	/** Number of grid cell indices in longitude dimension */
-	int nlon() { return _nlon; }
-
-	/** Number of grid cell indices in latitude dimension */
-	int nlat() { return _nlat; }
-#endif
 
 	// ------------------------------------------------------
 
@@ -77,19 +50,13 @@ public :
 	expense of computation time for the overlap matrix. */
 	int points_in_side;
 
-	/** Projection used to make this grid.
-	The projection is used to transform (spherical) lat-lon grid cells into Cartesian grid cells in the plane that can be represented with Cartesian polygons.
-	<b>NOTE:</b> For best accuracy in Snowdrift, this should be an
-		equal-area projection (eg: Lambert Azimuthal Equal Area). */
-	giss::Proj proj;							// Projection used to create this grid
-
 	/** Radius of Earth (m), or whatever planet you're looking at.
 	Used to compute theoretical exact areas of graticules. That's different
 	from the radius (or elliptical shape) used in the projection. */
 	double eq_rad;
 
 	// ---------------------------------
-	Grid_LonLat() : Grid("lonlat") {}
+	Grid_LonLat() : Grid("lonlat") { scoord = "lonlat"; }
 
 	/** This is the indexing scheme used in ModelE. */
 	virtual int ij_to_index(int i, int j) const

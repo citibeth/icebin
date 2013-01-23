@@ -43,18 +43,13 @@ giss::VectorSparseMatrix const &overlap);
 // ==================================================================
 // Geometric and Projection Error in Spherical/Cartesian Grids
 
-void proj_to_native(Grid const &grid1, giss::VectorSparseMatrix &ret);
-void native_to_proj(Grid const &grid1, giss::VectorSparseMatrix &ret);
-
-
-
 /** Converts from values for projected grid1 to values for native grid1.
-Diagonal matrix. */
-void proj_to_native(Grid &grid1, giss::VectorSparseMatrix &mat);
+Diagonal matrix.
+@param proj Translate from native to projected coordinates. */
+std::vector<double> proj_to_native(Grid const &grid1, giss::Proj2 const &proj, giss::VectorSparseMatrix &ret);
+std::vector<double> native_to_proj(Grid const &grid1, giss::Proj2 const &proj, giss::VectorSparseMatrix &ret);
 
-/** Converts from values for projected grid1 to values for native grid1.
-Diagonal matrix. */
-void native_to_proj(Grid &grid1, giss::VectorSparseMatrix &mat);
+
 
 // ==================================================================
 // Interpolate Height Points in Height Space Only: (nhc, n1) --> (n2)
@@ -111,7 +106,7 @@ std::unique_ptr<giss::VectorSparseMatrix>
 bilin_interp(
 Grid_LonLat const &grid1,
 Grid_XY const &grid2,
-giss::Proj const &proj,
+giss::Proj2 const &proj,
 std::vector<double> const &hpdefs,
 blitz::Array<double,1> const &elev2,
 blitz::Array<bool,1> const &mask1,		// [n1] Shows where we will / will not expect landice

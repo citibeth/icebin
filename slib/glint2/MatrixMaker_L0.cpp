@@ -26,7 +26,7 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker_L0::ice_to_hc()
 {
 	// Just area-weighted remap from ice back to hc grid
 	auto g2_to_g1(grid2_to_grid1(*overlap_m_hc));
-	proj_to_native(*grid1, *g2_to_g1);
+	proj_to_native(*grid1, proj, *g2_to_g1);
 
 	return g2_to_g1;
 }

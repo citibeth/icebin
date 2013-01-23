@@ -15,26 +15,12 @@ int main(int argc, char **argv)
 	printf("// ------------- Set up the local ice grid\n");
 
 	Grid_XY grid;
-	grid.name = "searise";
+	grid.name = "test2";
 
 
 	set_xy_boundaries(grid,
-		0., 10., 5.,
-		0., 10., 5.);
-
-#if 0
-#if 1
-	// The true exact SeaRISE grid
-	set_xy_boundaries(grid,
-		(- 800.0 - 2.5)*km, (- 800.0 + 300.0*5 + 2.5)*km,   5*km,
-		(-3400.0 - 2.5)*km, (-3400.0 + 560.0*5 + 2.5)*km,   5*km);
-#else
-	// Approximate 50km SeaRISE-like grid
-	set_xy_boundaries(grid,
-		(-800)*km, (-800 + 300*5)*km,     50*km,
-		(-3400)*km, (-3400 + 560*5)*km,   50*km);
-#endif
-#endif
+		3., 13., 5.,
+		3., 13., 5.);
 
 	grid.realize(boost::bind(&EuclidianClip::keep_all, _1));
 
@@ -45,5 +31,5 @@ int main(int argc, char **argv)
 	printf("// ------------- Write it out to NetCDF\n");
 	boost::filesystem::path exe_path(argv[0]);
 //	grid.to_netcdf(exe_path.stem().string() + ".nc");
-	grid.to_netcdf("searise.nc");
+	grid.to_netcdf("test2.nc");
 }

@@ -51,7 +51,6 @@ inline double polar_graticule_area_exact(Grid_LonLat const &grid,
 
 // ---------------------------------------------------------
 /** Set up a Grid_LonLat with a given specification.
-@param euclidian_clip Only realize grid cells that pass this test (after projection).
 @param spherical_clip Only realize grid cells that pass this test (before projection).
 @see EuclidianClip, SphericalClip
 */
@@ -73,9 +72,9 @@ void Grid_LonLat::realize(
 
 	// Set up to project lines on sphere (and eliminate duplicate vertices)	
 	VertexCache vcache(this);
-	LineProjector projector(proj, &vcache);
-	printf("Using projection: \"%s\"\n", projector.proj.get_def().c_str());
-	printf("Using lat-lon projection: \"%s\"\n", projector.llproj.get_def().c_str());
+//	LineProjector projector(proj, &vcache);
+//	printf("Using projection: \"%s\"\n", projector.proj.get_def().c_str());
+//	printf("Using lat-lon projection: \"%s\"\n", projector.llproj.get_def().c_str());
 
 	// ------------------- Set up the GCM Grid
 	const int south_pole_offset = (south_pole ? 1 : 0);
@@ -102,18 +101,30 @@ void Grid_LonLat::realize(
 			if (!spherical_clip(lon0, lat0, lon1, lat1)) continue;
 
 			// Project the grid cell boundary to a planar polygon
-			projector.proj_latitude(cell, points_in_side, lon0,lon1, lat0);
-			projector.proj_meridian(cell, points_in_side, lon1, lat0,lat1);
-			projector.proj_latitude(cell, points_in_side, lon1,lon0, lat1);
-			projector.proj_meridian(cell, points_in_side, lon0, lat1,lat0);
-
-			if (!euclidian_clip(cell)) continue;
+			int n = points_in_side;
+			for (int i=0; i<n; ++i) {
+				double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
+				cell.add_vertex(vcache.add_vertex(lon, lat0));
+			}
+			for (int i=0; i<n; ++i) {
+				double lat = lat0 + (lat1-lat0) * ((double)i/(double)n);
+				cell.add_vertex(vcache.add_vertex(lon1, lat));
+			}
+			// Try to keep calculations EXACTLY the same for VertexCache
+			for (int i=n; i>0; --i) {
+				double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
+				cell.add_vertex(vcache.add_vertex(lon, lat1));
+			}
+			for (int i=n; i>0; --i) {
+				double lat = lat0 + (lat1-lat0) * ((double)i/(double)n);
+				cell.add_vertex(vcache.add_vertex(lon1, lat));
+			}
 
 			// Figure out how to number this grid cell
 			cell.j = ilat + south_pole_offset;	// 0-based 2-D index
 			cell.i = ilon;
 			cell.index = (cell.j * nlon() + cell.i);
-			cell._native_area = graticule_area_exact(*this, lat0,lat1,lon0,lon1);
+			cell.area = graticule_area_exact(*this, lat0,lat1,lon0,lon1);
 
 			add_cell(std::move(cell));
 		}
@@ -128,16 +139,20 @@ void Grid_LonLat::realize(
 		for (int ilon=0; ilon< lonb.size()-1; ++ilon) {
 			double lon0 = lonb[ilon];
 			double lon1 = lonb[ilon+1];
-			projector.proj_latitude(pole, points_in_side, lon0,lon1, lat);
-		}
-		if (euclidian_clip(pole)) {
-			pole.i = nlon()-1;
-			pole.j = nlat();
-			pole.index = (pole.j * nlon() + pole.i);
-			pole._native_area = polar_graticule_area_exact(*this, 90.0 - lat);
 
-			add_cell(std::move(pole));
+			int n = points_in_side;
+			for (int i=0; i<n; ++i) {
+				double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
+				pole.add_vertex(vcache.add_vertex(lon, lat));
+			}
 		}
+
+		pole.i = nlon()-1;
+		pole.j = nlat();
+		pole.index = (pole.j * nlon() + pole.i);
+		pole.area = polar_graticule_area_exact(*this, 90.0 - lat);
+
+		add_cell(std::move(pole));
 	}
 
 	// South Pole cap
@@ -147,16 +162,19 @@ void Grid_LonLat::realize(
 		for (int ilon=lonb.size()-1; ilon >= 1; --ilon) {
 			double lon0 = lonb[ilon];		// Make the circle counter-clockwise
 			double lon1 = lonb[ilon-1];
-			projector.proj_latitude(pole, points_in_side, lon0,lon1, lat);
-		}
-		if (euclidian_clip(pole)) {
-			pole.i = 0;
-			pole.j = 0;
-			pole.index = 0;
-			pole._native_area = polar_graticule_area_exact(*this, 90.0 + lat);
 
-			add_cell(std::move(pole));
+			int n = points_in_side;
+			for (int i=0; i<n; ++i) {
+				double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
+				pole.add_vertex(vcache.add_vertex(lon, lat));
+			}
 		}
+		pole.i = 0;
+		pole.j = 0;
+		pole.index = 0;
+		pole.area = polar_graticule_area_exact(*this, 90.0 + lat);
+
+		add_cell(std::move(pole));
 	}
 }
 
@@ -197,7 +215,6 @@ boost::function<void ()> Grid_LonLat::netcdf_define(NcFile &nc, std::string cons
 	info_var->add_att("north_pole_cap", north_pole ? 1 : 0);
 	info_var->add_att("south_pole_cap", south_pole ? 1 : 0);
 	info_var->add_att("points_in_side", points_in_side);
-	info_var->add_att("projection", proj.get_def().c_str());
 	info_var->add_att("nlon", nlon());
 	info_var->add_att("nlat", nlat());
 
@@ -213,7 +230,6 @@ void Grid_LonLat::read_from_netcdf(NcFile &nc, std::string const &vname)
 	north_pole = (info_var->get_att("north_pole_cap")->as_int(0) != 0);
 	south_pole = (info_var->get_att("south_pole_cap")->as_int(0) != 0);
 	points_in_side = info_var->get_att("points_in_side")->as_int(0);
-	proj = giss::Proj(info_var->get_att("projection")->as_string(0));
 //	_nlon = info_var->get_att("nlon")->as_int(0);
 //	_nlat = info_var->get_att("nlat")->as_int(0);
 
