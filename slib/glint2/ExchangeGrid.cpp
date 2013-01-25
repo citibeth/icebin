@@ -36,7 +36,7 @@ OCell::OCell(Cell const *_cell, giss::Proj2 const &proj) : cell(_cell)
 	for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex) {
 		double x, y;
 		proj.transform(vertex->x, vertex->y, x, y);
-		poly.push_back(gc::Point_2(vertex->x, vertex->y));
+		poly.push_back(gc::Point_2(x, y));
 	}
 
 	// Compute the bounding box
@@ -176,14 +176,45 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_full_nvertices,
 
 /** @param grid2 Put in an RTree */
 //std::unique_ptr<Grid> compute_exchange_grid
-ExchangeGrid::ExchangeGrid(
-	Grid const &grid1, giss::Proj2 const &_proj1,
-	Grid const &grid2, giss::Proj2 const &_proj2)
-: Grid("exchange"),
-proj1(_proj1), proj2(_proj2)
+ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string const &_sproj)
+: Grid("exchange")
 {
 	scoord = "xy";
 	Grid *exgrid = this;
+
+printf("ExchangeGrid 1\n");
+
+	/** Suss out projections */
+printf("grid1.scoord = %s, grid2.scoord = %s\n", grid1.scoord.c_str(), grid2.scoord.c_str());
+printf("grid1.sproj = %s, grid2.sproj = %s\n", grid1.sproj.c_str(), grid2.sproj.c_str());
+
+	if (grid1.scoord == "xy") {
+		if (grid2.scoord == "xy") {
+			// No projections needed
+			if (grid1.sproj != grid2.sproj) {
+				fprintf(stderr, "Two XY grids must have the same projection\n");
+				throw std::exception();
+			}
+		} else {
+			// grid1=xy, grid2=ll: Project from grid 2 to grid1's xy
+			proj2.init(grid1.sproj, giss::Proj2::Direction::LL2XY);
+			sproj = (_sproj == "" ? std::string(grid1.sproj.c_str()) : _sproj);
+		}
+	} else {
+		if (grid2.scoord == "xy") {
+			// grid1=ll, grid2=xy: Project from grid 1 to grid2's xy
+			proj1.init(grid2.sproj, giss::Proj2::Direction::LL2XY);
+			sproj = (_sproj == "" ? std::string(grid2.sproj.c_str()) : _sproj);
+		} else {
+			// Both in Lat/Lon: Project them both to XY for overlap computation
+			// BUT... since we don't have a projection, we must throw
+			// up our hands!
+			fprintf(stderr, "Program isn't currently equipped to overlap two grids on the sphere.\n");
+			throw std::exception();
+		}
+	}
+
+printf("ExchangeGrid 2\n");
 
 	/** Initialize the new grid */
 	exgrid->name = grid1.name + '-' + grid2.name;
@@ -205,6 +236,8 @@ proj1(_proj1), proj2(_proj2)
 
 		double min[2];
 		double max[2];
+
+printf("grid1[%d]: x in (%f - %f), y in (%f - %f)\n", ocell1->cell->index, min[0], max[0], min[1], max[1]);
 
 		min[0] = CGAL::to_double(ocell1->bounding_box.xmin());
 		min[1] = CGAL::to_double(ocell1->bounding_box.ymin());

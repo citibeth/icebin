@@ -178,20 +178,30 @@ void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 
 boost::function<void ()> Grid::netcdf_define(NcFile &nc, std::string const &vname) const
 {
+printf("netcdf_define(%s)\n", vname.c_str());
+
 	// ------ Attributes
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
 		info_var->add_att("name", name.c_str());
 		info_var->add_att("type", stype.c_str());
 		info_var->add_att("coordinates", scoord.c_str());
+		if (scoord == "xy") {
+			info_var->add_att("projection", sproj.c_str());
+//			giss::Proj proj(sproj);
+//			giss::Proj llproj(proj.latlong_from_proj());
+//			info_var->add_att("llprojection", llproj.get_def().c_str());
+		}
 		info_var->add_att("cells.num_full", ncells_full);
 		info_var->add_att("vertices.num_full", nvertices_full);
 
 	// ------- Dimensions
 	// Count the number of times a vertex (any vertex) is referenced.
 	int nvref = 0;
-	for (auto cell = cells_begin(); cell != cells_end(); ++cell)
+	for (auto cell = cells_begin(); cell != cells_end(); ++cell) {
+//printf("Found cell %d (size=%d)\n", cell->index, cell->size());
 		nvref += cell->size();
+	}
 
 	NcDim *nvertices_dim = nc.add_dim(
 		(vname + ".vertices.num_realized").c_str(), nvertices_realized());
@@ -231,16 +241,23 @@ std::string const &vname)
 {
 	clear();
 
-//printf("Grid::read_from_netcdf 1");
+	printf("Grid::read_from_netcdf(%s)\n", vname.c_str());
 	// ---------- Read the Basic Info
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+printf("AA\n");
 		name = std::string(info_var->get_att("name")->as_string(0));
 		stype = std::string(info_var->get_att("type")->as_string(0));
 		scoord = std::string(info_var->get_att("coordinates")->as_string(0));
+printf("AA\n");
+		if (scoord == "xy")
+			sproj = std::string(info_var->get_att("projection")->as_string(0));
+		else
+			sproj = "";
 		ncells_full = info_var->get_att("cells.num_full")->as_int(0);
 		nvertices_full = info_var->get_att("vertices.num_full")->as_int(0);
+printf("AA\n");
 
-//printf("Grid::read_from_netcdf 2");
+printf("Grid::read_from_netcdf 2");
 	// ---------- Read the Vertices
 	// Basic Info
 	std::vector<int> vertices_index(
@@ -305,7 +322,7 @@ std::string const &vname)
 		// Add thecell to the grid
 		add_cell(std::move(cell));
 	}
-//printf("Grid::read_from_netcdf 5\n");
+printf("Grid::read_from_netcdf 5\n");
 }
 
 void Grid::to_netcdf(std::string const &fname)
@@ -313,9 +330,11 @@ void Grid::to_netcdf(std::string const &fname)
 	NcFile nc(fname.c_str(), NcFile::Replace);
 
 	// Define stuff in NetCDF file
+	printf("Defining netCDF file %s\n", fname.c_str());
 	auto gridd = netcdf_define(nc, "grid");
 
 	// Write stuff in NetCDF file
+	printf("Writing ot netCDF file\n");
 	gridd();
 
 	nc.close();

@@ -74,7 +74,7 @@ std::vector<double> native_to_proj(Grid const &grid1, giss::Proj2 const &proj, g
 
 */
 std::unique_ptr<giss::VectorSparseMatrix> 
-hc_interp(giss::VectorSparseMatrix const &overlap,
+hp_interp(giss::VectorSparseMatrix const &overlap,
 std::vector<double> const &hpdefs,
 blitz::Array<double,1> elev2);
 

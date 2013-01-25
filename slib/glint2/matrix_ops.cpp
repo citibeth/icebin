@@ -210,7 +210,7 @@ static void linterp_1d(
 
 */
 std::unique_ptr<giss::VectorSparseMatrix> 
-hc_interp(giss::VectorSparseMatrix const &overlap,
+hp_interp(giss::VectorSparseMatrix const &overlap,
 std::vector<double> const &hpdefs,
 blitz::Array<double,1> elev2)
 {

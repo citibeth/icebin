@@ -56,7 +56,10 @@ public:
 	double eq_rad;
 
 	// ---------------------------------
-	Grid_LonLat() : Grid("lonlat") { scoord = "lonlat"; }
+	Grid_LonLat() : Grid("lonlat") {
+		scoord = "lonlat";
+		points_in_side = 1;
+	}
 
 	/** This is the indexing scheme used in ModelE. */
 	virtual int ij_to_index(int i, int j) const
@@ -76,8 +79,8 @@ public:
 	@see EuclidianClip, SphericalClip
 	*/
 	void realize(
-		boost::function<bool(double, double, double, double)> const &spherical_clip,
-		boost::function<bool(Cell const &)> const &euclidian_clip);
+		boost::function<bool(double, double, double, double)> const &spherical_clip);
+//		boost::function<bool(Cell const &)> const &euclidian_clip);
 
 	virtual boost::function<void()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

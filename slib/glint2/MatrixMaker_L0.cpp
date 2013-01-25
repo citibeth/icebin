@@ -18,7 +18,7 @@ Uses: elev2, hpdefs, overlap */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker_L0::hp_to_ice()
 {
 	// Interpolate (for now) in height points but not X/Y
-	return hc_interp(*overlap_m, hpdefs, elev2);
+	return hp_interp(*overlap_m, hpdefs, elev2);
 }
 
 /** Uses: elev2, hcmax, overlap */

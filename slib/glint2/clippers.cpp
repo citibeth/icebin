@@ -22,12 +22,30 @@ double lon0, double lat0, double lon1, double lat1)
 	return false;
 }
 
-bool SphericalClip::latlon(
+/** Tells if one point lies within a longitude range */
+inline bool in_lon(double min_lon, double max_lon, double x)
+{
+	while (x > max_lon) x -= 360.;
+	while (x < min_lon) x += 360.;
+	bool ret = (x <= max_lon);
+//printf("%f %s (%f, %f)\n", x, ret ? "in" : "out", min_lon, max_lon);
+	return ret;
+}
+
+/** Tells if two longitude ranges intersect. */
+inline bool lon_intersect(double min0, double max0, double min1, double max1)
+{
+	return in_lon(min0, max0, min1) || in_lon(min0, max0, max1)
+		|| in_lon(min1, max1, min0) || in_lon(min1, max1, max0);
+}
+
+bool SphericalClip::lonlat(
 double min_lon, double min_lat, double max_lon, double max_lat,
 double lon0, double lat0, double lon1, double lat1)
 {
-	if (lon0 < min_lon && lon1 < min_lon) return false;
-	if (lon0 > max_lon && lon1 > max_lon) return false;
+//printf("--------------\n");
+	if (!lon_intersect(lon0, lon1, min_lon, max_lon)) return false;
+
 	if (lat0 < min_lat && lat1 < min_lat) return false;
 	if (lat0 > max_lat && lat1 > max_lat) return false;
 	return true;

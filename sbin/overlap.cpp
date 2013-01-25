@@ -28,19 +28,14 @@ int main(int argc, char **argv)
 	NcFile nc1(fname1.c_str());
 	auto grid1(glint2::read_grid(nc1, "grid"));
 	nc1.close();
-	// Project GCM grid to Cartesian space in computing overlap matrix.
-//	giss::Proj2 proj1(sproj, giss::Proj2::Direction::LL2XY);
-	giss::Proj2 proj1;
-	// TODO: Make sure grid1 has type "ll"
 
 	printf("------------- Read grid2\n");
 	NcFile nc2(fname2.c_str());
 	auto grid2(glint2::read_grid(nc2, "grid"));
 	nc2.close();
-	giss::Proj2 proj2;	// No projection needed for grid2 -> Cartesian space
 
 	printf("--------------- Overlapping\n");
-	ExchangeGrid exch(*grid1, proj1, *grid2, proj2);
+	ExchangeGrid exch(*grid1, *grid2);
 
 	printf("--------------- Writing Out\n");
 	std::string fname = grid1->name + "-" + grid2->name + ".nc";

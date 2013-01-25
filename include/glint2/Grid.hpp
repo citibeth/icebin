@@ -113,6 +113,10 @@ public:
 	sproj[0] == sproj[1] == "" if no projection used. */
 //	std::string srpoj[2];
 
+	/** If scoord == "xy": The projection that relates x,y coordinates
+	here to a specific point on the globe (as a Proj.4 String). */
+	std::string sproj;
+
 	Grid(std::string const &_stype);
 
 	virtual void clear();

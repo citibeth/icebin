@@ -11,9 +11,9 @@ public :
 	/** Transformation to get from local Grid coords to Exchange Grid coords */
 	giss::Proj2 proj1, proj2;
 
-	ExchangeGrid(
-		Grid const &grid1, giss::Proj2 const &_proj1,
-		Grid const &grid2, giss::Proj2 const &_proj2);
+	/** @param proj Projection to use to project Lon/Lat grids to XY,
+	if no projection is found in the XY-type grid. */
+	ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string const &_sproj="");
 
 	virtual boost::function<void()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

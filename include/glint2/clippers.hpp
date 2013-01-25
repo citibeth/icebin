@@ -38,7 +38,7 @@ public:
 	@param lon1 Free parameter, not to be bound by bost::bind().
 	@param lat0 Free parameter, not to be bound by bost::bind().
 	@param lat1 Free parameter, not to be bound by bost::bind(). */
-	static bool latlon(
+	static bool lonlat(
 		double min_lon, double min_lat, double max_lon, double max_lat,
 		double lon0, double lat0, double lon1, double lat1);
 

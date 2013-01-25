@@ -55,8 +55,8 @@ inline double polar_graticule_area_exact(Grid_LonLat const &grid,
 @see EuclidianClip, SphericalClip
 */
 void Grid_LonLat::realize(
-	boost::function<bool(double, double, double, double)> const &spherical_clip,
-	boost::function<bool(Cell const &)> const &euclidian_clip)
+	boost::function<bool(double, double, double, double)> const &spherical_clip)
+//	boost::function<bool(Cell const &)> const &euclidian_clip
 {
 	// Error-check the input parameters
 	if (south_pole && latb[0] == -90.0) {
@@ -81,6 +81,7 @@ void Grid_LonLat::realize(
 	const int north_pole_offset = (north_pole ? 1 : 0);
 
 	ncells_full = nlon() * nlat();
+	nvertices_full = -1;	// We don't care for L0 grid
 
 //	_nlon = lonb.size() - 1;
 //	_nlat = latb.size() - 1 + south_pole_offset + north_pole_offset;
@@ -95,30 +96,38 @@ void Grid_LonLat::realize(
 			double lon0 = lonb[ilon];
 			double lon1 = lonb[ilon+1];
 
-//printf("(ilon, ilat) = (%d, %d)\n", lon0, lat0);
+//printf("(ilon, ilat) = (%d, %d)\n", ilon, ilat);
 //printf("values = %f %f %f %f\n", lon0, lat0, lon1, lat1);
 
 			if (!spherical_clip(lon0, lat0, lon1, lat1)) continue;
 
 			// Project the grid cell boundary to a planar polygon
 			int n = points_in_side;
-			for (int i=0; i<n; ++i) {
-				double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
-				cell.add_vertex(vcache.add_vertex(lon, lat0));
-			}
-			for (int i=0; i<n; ++i) {
-				double lat = lat0 + (lat1-lat0) * ((double)i/(double)n);
-				cell.add_vertex(vcache.add_vertex(lon1, lat));
-			}
+
+			// Pre-compute our points so we use exact same ones each time.
+			std::vector<double> lons;
+			lons.reserve(n+1);
+			for (int i=0; i<=n; ++i)
+				lons.push_back(lon0 + (lon1-lon0) * ((double)i/(double)n));
+
+			std::vector<double> lats;
+			lats.reserve(n+1);
+			for (int i=0; i<=n; ++i)
+				lats.push_back(lat0 + (lat1-lat0) * ((double)i/(double)n));
+
+			// Build a square out of them (in lon/lat space)
+			for (int i=0; i<n; ++i)
+				vcache.add_vertex(cell, lons[i], lat0);
+
+			for (int i=0; i<n; ++i)
+				vcache.add_vertex(cell, lon1, lats[i]);
+
 			// Try to keep calculations EXACTLY the same for VertexCache
-			for (int i=n; i>0; --i) {
-				double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
-				cell.add_vertex(vcache.add_vertex(lon, lat1));
-			}
-			for (int i=n; i>0; --i) {
-				double lat = lat0 + (lat1-lat0) * ((double)i/(double)n);
-				cell.add_vertex(vcache.add_vertex(lon1, lat));
-			}
+			for (int i=n; i>0; --i)
+				vcache.add_vertex(cell, lons[i], lat1);
+
+			for (int i=n; i>0; --i)
+				vcache.add_vertex(cell, lon0, lats[i]);
 
 			// Figure out how to number this grid cell
 			cell.j = ilat + south_pole_offset;	// 0-based 2-D index
@@ -126,6 +135,7 @@ void Grid_LonLat::realize(
 			cell.index = (cell.j * nlon() + cell.i);
 			cell.area = graticule_area_exact(*this, lat0,lat1,lon0,lon1);
 
+//printf("Adding lon/lat cell %d (%d, %d)\n", cell.index, cell.i, cell.j);
 			add_cell(std::move(cell));
 		}
 	}
@@ -186,6 +196,7 @@ static void Grid_LonLat_netcdf_write(
 {
 	parent();
 
+#if 0
 	if (grid->lonb.size() > 0) {
 		NcVar *lonb_var = nc->get_var((vname + ".lon_boundaries").c_str());
 		lonb_var->put(&grid->lonb[0], grid->lonb.size());
@@ -195,6 +206,8 @@ static void Grid_LonLat_netcdf_write(
 		NcVar *latb_var = nc->get_var((vname + ".lat_boundaries").c_str());
 		latb_var->put(&grid->latb[0], grid->latb.size());
 	}
+#endif
+
 }
 
 boost::function<void ()> Grid_LonLat::netcdf_define(NcFile &nc, std::string const &vname) const

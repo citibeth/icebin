@@ -35,6 +35,13 @@ public:
 		sproj(rhs.sproj), direction(_direction)
 		{ realize(); }
 
+	void init(std::string const &_sproj, Direction _direction)
+	{
+		sproj = _sproj;
+		direction = _direction;
+		realize();
+	}
+
 
 	int ll2xy(double lon0, double lat0, double &x1, double &y1) const
 	{

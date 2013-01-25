@@ -1,7 +1,7 @@
 #include <glint2/Grid_LonLat.hpp>
 
 namespace glint2 {
-namespace giss {
+namespace modele {
 
 /** @param lons As read out of ModelE netCDF file */
 void set_lonlat_centers_giss(glint2::Grid_LonLat &grid,

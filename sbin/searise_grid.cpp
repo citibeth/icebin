@@ -11,29 +11,32 @@ using namespace glint2;
 
 int main(int argc, char **argv)
 {
-	// ------------- Set up the local ice grid
-	printf("// ------------- Set up the local ice grid\n");
+	printf("------------- Set up the local ice grid\n");
 
 	Grid_XY grid;
 	grid.name = "searise";
+	grid.sproj = "+proj=stere +lon_0=-39 +lat_0=90 +lat_ts=71.0 +ellps=WGS84";
 
+#define CHOICE 3
 
+#if CHOICE==1
 	set_xy_boundaries(grid,
 		0., 10., 5.,
 		0., 10., 5.);
+#endif
 
-#if 0
-#if 1
+#if CHOICE==2
 	// The true exact SeaRISE grid
 	set_xy_boundaries(grid,
 		(- 800.0 - 2.5)*km, (- 800.0 + 300.0*5 + 2.5)*km,   5*km,
 		(-3400.0 - 2.5)*km, (-3400.0 + 560.0*5 + 2.5)*km,   5*km);
-#else
+#endif
+
+#if CHOICE==3
 	// Approximate 50km SeaRISE-like grid
 	set_xy_boundaries(grid,
 		(-800)*km, (-800 + 300*5)*km,     50*km,
 		(-3400)*km, (-3400 + 560*5)*km,   50*km);
-#endif
 #endif
 
 	grid.realize(boost::bind(&EuclidianClip::keep_all, _1));
