@@ -127,7 +127,7 @@ giss::VectorSparseMatrix const &overlap)
 /** Converts from values for projected grid1 to values for native grid1.
 Diagonal matrix.
 @param proj proj[0] --> proj[1] converts from native to projected space. */
-extern std::vector<double> proj_to_native(Grid &grid1, giss::Proj2 const &proj,
+extern std::vector<double> proj_to_native(Grid const &grid1, giss::Proj2 const &proj,
 giss::VectorSparseMatrix &mat)
 {
 	// Set up the diagonal matrix

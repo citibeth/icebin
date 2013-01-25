@@ -452,6 +452,10 @@ protected:
 
 public:
 
+	std::vector<int> const &rows() const { return indx; }
+	std::vector<int> const &cols() const { return jndx; }
+	std::vector<double> const &vals() const { return val; }
+
 	// --------------------------------------------------
 	/** Standard STL-type iterator for iterating through a ZD11SparseMatrix. */
 	class iterator {

@@ -15,6 +15,7 @@ libglint2_la_SOURCES = \
 	giss/hsl_zd11_x.cpp giss/ncutil.cpp giss/IndexTranslator.cpp \
 	giss/geodesy.cpp \
 	giss/Proj2.cpp \
+	giss/pyutil.cpp \
 	glint2/Grid.cpp \
 	glint2/Grid_LonLat.cpp \
 	glint2/Grid_XY.cpp \
