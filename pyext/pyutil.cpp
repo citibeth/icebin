@@ -187,5 +187,44 @@ printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, n
 }
 
 
+giss::BlitzSparseMatrix py_to_BlitzSparseMatrix(PyObject *m_tuple, std::string const &vname)
+{
+//printf("py_to_BlitzSparseMatrix()\n"); fflush(stdout);
+
+	// Get Arguments
+	int nrow;
+	int ncol;
+	PyObject *rows_py;
+	PyObject *cols_py;
+	PyObject *data_py;
+	if (!PyArg_ParseTuple(m_tuple, "iiOOO",
+		&nrow, &ncol,
+		&rows_py, &cols_py, &data_py))
+	{
+ 		char buf[200 + vname.size()];
+		sprintf(buf, "py_to_BlitzSparseMatrix(%s): Trouble parsing tuples", vname.c_str());
+		PyErr_SetString(PyExc_ValueError, buf);
+
+		throw std::exception();
+	}
+printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, ncol, rows_py, cols_py, data_py);
+
+	// Check arrays and copy to std::vector
+	int dims[1] = {-1};
+	auto rows(py_to_blitz<int,1>(rows_py, "rows", 1, dims));
+	dims[0] = rows.size();
+	auto cols(py_to_blitz<int,1>(cols_py, "cols", 1, dims));
+	auto data(py_to_blitz<double,1>(data_py, "data", 1, dims));
+
+printf("py_to_blitz stuff: nnz = %d\n", dims[0]);
+
+	return giss::BlitzSparseMatrix(SparseDescr(nrow, ncol),
+		rows, cols, data);
+}
+
+
+
+
+
 
 }

@@ -112,6 +112,8 @@ int const *dims)
 		// Python/Numpy strides are in bytes, Blitz++ in sizeof(T) units.
         strides[i] = arr_strides[i]/T_size;
     }
+printf("py_to_blitz: vec->data = %p\n", vec->data);
+
     return blitz::Array<T,N>((T*) vec->data,shape,strides,
 		blitz::neverDeleteData);
 }
@@ -121,8 +123,7 @@ blitz::Array<T,N> py_to_blitz(
 PyObject *ovec,
 std::string const &vname,
 std::vector<int> const &dims)
-	{ return py_to_blitz<T,N>(ovec, vname, dims.size(),
-		(int)dims.size(), &dims[0]);
+	{ return py_to_blitz<T,N>(ovec, vname, dims.size(), &dims[0]);
 	}
 
 // ======================================================================
@@ -168,5 +169,8 @@ PyObject *vector_to_py(std::vector<T> const &vec)
 PyObject *VectorSparseMatrix_to_py(giss::VectorSparseMatrix const &mat);
 
 VectorSparseMatrix py_to_VectorSparseMatrix(PyObject *m_tuple, std::string const &vname);
+
+giss::BlitzSparseMatrix py_to_BlitzSparseMatrix(PyObject *m_tuple, std::string const &vname);
+
 
 }	// namespace giss

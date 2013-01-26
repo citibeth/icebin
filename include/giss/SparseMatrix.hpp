@@ -6,6 +6,7 @@
 #include "hsl_zd11_x.hpp"
 #include "ncutil.hpp"
 #include "IndexTranslator.hpp"
+#include <blitz/array.h>
 
 class NcFile;
 
@@ -562,6 +563,159 @@ public:
 
 };
 // ====================================================================
+
+class BlitzSparseMatrix0 : public SparseMatrix
+{
+protected:
+	// Current number of elements in matrix.  Matrix is not
+	// valid until this equals zd11.ne
+	int _nnz_cur;
+
+	blitz::Array<int,1> indx;
+	blitz::Array<int,1> jndx;
+	blitz::Array<double,1> val;
+
+	BlitzSparseMatrix0(SparseDescr const &descr) : SparseMatrix(descr) {}
+
+
+public:
+#if 0
+	/** NOTE: The "copy" constructor below actually creates references
+	to existing Blitz data. */
+	BlitzSparseMatrix0(SparseDescr const &descr,
+		blitz::Array<int,1> &_rows,
+		blitz::Array<int,1> &_cols,
+		blitz::Array<double,1> &_vals,
+		int nnz_cur = -1)
+	: SparseMatrix(descr), indx(_rows), jndx(_cols), val(_vals)
+	{
+		_nnz_cur = (nnz_cur < 0 ? vals().size() : nnz_cur);
+	}
+#endif
+
+//	size_t size() const { return vals.extent(0); }
+
+	blitz::Array<int,1> const &rows() const { return indx; }
+	blitz::Array<int,1> const &cols() const { return jndx; }
+	blitz::Array<double,1> const &vals() const { return val; }
+
+
+	// --------------------------------------------------
+	/** Standard STL-type iterator for iterating through a ZD11SparseMatrix. */
+	class iterator {
+	protected:
+		BlitzSparseMatrix0 *parent;
+		int i;
+	public:
+		int position() const { return i; }
+		iterator(BlitzSparseMatrix0 *p, int _i) : parent(p), i(_i) {}
+		bool operator==(iterator const &rhs) const { return i == rhs.i; }
+		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
+		void operator++() { ++i; }
+		int row() const { return parent->indx(i) - parent->index_base; }
+		int col() const { return parent->jndx(i) - parent->index_base; }
+		double &val() { return parent->val(i); }
+		double &value() { return val(); }
+	};
+	iterator begin() { return iterator(this, 0); }
+	iterator end() { return iterator(this, val.size()); }
+	// --------------------------------------------------
+	class const_iterator {
+	protected:
+		BlitzSparseMatrix0 const *parent;
+		int i;
+	public:
+		int position() const { return i; }
+		const_iterator(BlitzSparseMatrix0 const *p, int _i) : parent(p), i(_i) {}
+		bool operator==(const_iterator const &rhs) const { return i == rhs.i; }
+		bool operator!=(const_iterator const &rhs) const { return i != rhs.i; }
+		void operator++() { ++i; }
+		int row() const { return parent->indx(i) - parent->index_base; }
+		int col() const { return parent->jndx(i) - parent->index_base; }
+		double const &val() { return parent->val(i); }
+		double const &value() { return val(); }
+	};
+	const_iterator begin() const { return const_iterator(this, 0); }
+	const_iterator end() const { return const_iterator(this, val.size()); }
+
+	// --------------------------------------------------
+
+	void clear() { _nnz_cur = 0; }
+
+	bool is_complete() { return _nnz_cur == vals().size(); }
+
+	size_t size() const { return _nnz_cur; }
+
+
+protected :
+	/** Internal set() function without any error checking or adjustments for index_base. */
+	void _set(int row, int col, double const val, DuplicatePolicy dups)
+	{
+		if (_nnz_cur >= vals().size()) {
+			fprintf(stderr, "ZD11SparseMatrix is full with %d elements\n", vals().size());
+			throw std::exception();
+		}
+		indx(_nnz_cur) = row;
+		jndx(_nnz_cur) = col;
+		this->val(_nnz_cur) = val;
+		++_nnz_cur;
+	}
+};
+
+/** A SparseMatrix type made out of std::vector.  This is good when you don't
+know how many elements you will have in the matrix in the end. */
+class BlitzSparseMatrix : public SparseMatrix1<BlitzSparseMatrix0>
+{
+public:
+	/** Construct a new sparse matrix to the given specifications.
+	Memory will be allocated later as elements are added. */
+	explicit BlitzSparseMatrix(SparseDescr const &descr) :
+	SparseMatrix1<BlitzSparseMatrix0>(descr)
+	{
+		_nnz_cur = 0;
+	}
+
+
+	/** Construct from existing vectors.
+	(For example, when read from a netCDF file).
+	@param descr Specifications for the matrix.
+	@param _indx The row of each non-zero element (base via index_base).
+	@param _jndx The column of each non-zero element (base via index_base).
+	@param _val The value of each non-zero element. */
+	BlitzSparseMatrix(SparseDescr const &descr,
+		blitz::Array<int,1> &_rows,
+		blitz::Array<int,1> &_cols,
+		blitz::Array<double,1> &_vals,
+		int nnz_cur = -1)
+	: SparseMatrix1<BlitzSparseMatrix0>(descr)
+	{
+		indx.reference(_rows);
+		jndx.reference(_cols);
+		val.reference(_vals);
+		_nnz_cur = (nnz_cur < 0 ? val.extent(0) : nnz_cur);
+printf("Constructed nnz = %d (%d %d)\n", _nnz_cur, val.extent(0), _vals.extent(0));
+	}
+
+#if 0
+//	/** Sorts the elements in the sparse matrix by index.
+//	@param sort_order Sort to ROW_MAJOR or COLUMN_MAJOR ordering. */
+//	void sort(SparseMatrix::SortOrder sort_order = SortOrder::ROW_MAJOR);
+
+//	/** Sums together items in the matrix with duplicate (row, col) */
+//	void sum_duplicates();
+
+	/** Construct a BlitzSparseMatrix based on arrays in a netCDF file.
+	@param nc The netCDF file
+	@param vname Name of the variable in the netCDF file.
+	(will be base name of the arrays needed to store the sparse matrix). */
+	static std::unique_ptr<BlitzSparseMatrix> netcdf_read(NcFile &nc, std::string const &vname);
+#endif
+
+};
+// ====================================================================
+
+
+
 // ----------------------------------------------------------
 /** Mix-in, not part of the API. */
 class MapSparseMatrix0 : public SparseMatrix {

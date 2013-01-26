@@ -83,7 +83,6 @@ giss::VectorSparseMatrix const &overlap)
 	int n2 = overlap.ncol;
 
 	std::vector<double> area1(overlap.sum_per_row());
-	std::vector<double> area2(overlap.sum_per_col());
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
 		giss::SparseDescr(n1, n2)));
@@ -92,7 +91,7 @@ giss::VectorSparseMatrix const &overlap)
 		int i1 = ii.row();
 		int i2 = ii.col();
 
-		ret->add(i1, i2, ii.val() * area2[i2] / area1[i1]);
+		ret->add(i1, i2, ii.val() / area1[i1]);
 	}
 
 	return ret;
@@ -104,7 +103,6 @@ giss::VectorSparseMatrix const &overlap)
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
 
-	std::vector<double> area1(overlap.sum_per_row());
 	std::vector<double> area2(overlap.sum_per_col());
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
@@ -114,7 +112,7 @@ giss::VectorSparseMatrix const &overlap)
 		int i1 = ii.row();
 		int i2 = ii.col();
 
-		ret->add(i2, i1, ii.val() * area1[i1] / area2[i2]);
+		ret->add(i2, i1, ii.val() / area2[i2]);
 	}
 
 	return ret;
@@ -453,6 +451,8 @@ blitz::Array<bool,1> const &mask2)
 
 	return std::move(mmat.M);
 }
+// =====================================================================
+
 
 
 } // namespace glint2

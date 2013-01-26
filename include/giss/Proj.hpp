@@ -103,6 +103,7 @@ public:
         if (pj) pj_free(pj);
         pj = h.pj;
         h.pj = 0;
+		return *this;
     }
 
     /** Copy constructor */
