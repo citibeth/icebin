@@ -26,7 +26,7 @@ public:
 	// ------------ Stuff we're passed in
 	std::shared_ptr<glint2::Grid> grid1;		/// GCM Grid
 	std::shared_ptr<glint2::Grid> grid2;		/// Ice Grid
-	giss::Proj2 proj;							/// GCM -> Ice Projection
+//	giss::Proj2 proj;							/// GCM -> Ice Projection
 	std::shared_ptr<glint2::Grid> exgrid;	/// Exchange grid (between GCM and Ice)
 
 	std::shared_ptr<blitz::Array<bool,1>> mask1;
@@ -77,7 +77,10 @@ public:
 	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc() = 0;
 
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc();
-};
+
+	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
+
+};	// class MatrixMaker
 
 }	// namespace glint2
 

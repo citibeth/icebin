@@ -1,8 +1,10 @@
-#include <Python.h>
-#include <numpy/arrayobject.h>
+#define NO_IMPORT_ARRAY
+#include "_glint2_module.hpp"
+
 #include <vector>
 #include <string>
-#include <giss/pyutil.hpp>
+#include "pyutil.hpp"
+#include <cstdio>
 
 namespace giss {
 
@@ -155,6 +157,8 @@ PyObject *VectorSparseMatrix_to_py(VectorSparseMatrix const &mat)
 
 VectorSparseMatrix py_to_VectorSparseMatrix(PyObject *m_tuple, std::string const &vname)
 {
+//printf("py_to_VectorSparseMatrix()\n"); fflush(stdout);
+
 	// Get Arguments
 	int nrow;
 	int ncol;
@@ -166,11 +170,12 @@ VectorSparseMatrix py_to_VectorSparseMatrix(PyObject *m_tuple, std::string const
 		&rows_py, &cols_py, &data_py))
 	{
  		char buf[200 + vname.size()];
-		sprintf(buf, "py_to_vectorSparsematrix(%s): Trouble parsing tuples", vname.c_str());
+		sprintf(buf, "py_to_vectorSparseMatrix(%s): Trouble parsing tuples", vname.c_str());
 		PyErr_SetString(PyExc_ValueError, buf);
 
 		throw std::exception();
 	}
+printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, ncol, rows_py, cols_py, data_py);
 
 	// Check arrays and copy to std::vector
 	auto rows(py_to_vector<int>(rows_py, "rows"));

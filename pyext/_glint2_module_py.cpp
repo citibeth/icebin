@@ -1,8 +1,8 @@
+#include "_glint2_module.hpp"
+
 #include <vector>
-#include <Python.h>
-#include <numpy/arrayobject.h>
 #include <cmath>
-#include <giss/pyutil.hpp>
+#include "pyutil.hpp"
 
 // ============================================================
 // Type definitions for the Python classes this module defines
@@ -27,9 +27,22 @@ static PyTypeObject *glint2_types[] = {
 // ===========================================================================
 
 extern "C"
-void initglint2(void)
+void init_glint2(void)
 {
 	giss::init_module("_glint2",
 		"Interface to C++ GLINT2 Library",
 		glint2_function_sets, glint2_types);
+
+
+	/* See http://dsnra.jpl.nasa.gov/software/Python/numpydoc/numpy-13.html
+
+	In addition to including arrayobject.h , the extension must call
+	import_array() in its initialization function, after the call to
+	Py_InitModule() . This call makes sure that the module which
+	implements the array type has been imported, and initializes a pointer
+	array through which the NumPy functions are called. If you forget this
+	call, your extension module will crash on the first call to a NumPy
+	function. */
+
+	import_array();
 }

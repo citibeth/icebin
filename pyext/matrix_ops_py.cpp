@@ -1,6 +1,7 @@
-#include <Python.h>
-#include <numpy/arrayobject.h>
-#include <giss/pyutil.hpp>
+#define NO_IMPORT_ARRAY
+#include "_glint2_module.hpp"
+
+#include "pyutil.hpp"
 #include <glint2/matrix_ops.hpp>
 
 /*
@@ -34,10 +35,11 @@ PyObject *grid1_to_grid2_py(PyObject *self, PyObject *args)
 
 		// Do the call
 		std::unique_ptr<giss::VectorSparseMatrix> ret_c(
-			glint2::grid2_to_grid1(overlap));
+			glint2::grid1_to_grid2(overlap));
 
 		// Create an output tuple of Numpy arrays
 		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
+		return ret_py;
 	} catch(...) {
 		if (ret_py) Py_DECREF(ret_py);
 		return NULL;

@@ -8,7 +8,8 @@ AM_LDFLAGS += @BOOST_FILESYSTEM_LIBS@
 # THE PROGRAMS TO BUILD
 ###############################################################################
 
-AM_LDFLAGS += $(top_builddir)/slib/libglint2.la
+AM_LDFLAGS += $(top_builddir)/slib/libglint2.la \
+	$(PYTHON_LDFLAGS) $(NUMPY_LDFLAGS)
 
 # the program to build (the names of the final binaries)
 bin_PROGRAMS = searise_grid overlap test_grid1 test_grid2 greenland_4x5

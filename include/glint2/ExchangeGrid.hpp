@@ -11,6 +11,10 @@ public :
 	/** Transformation to get from local Grid coords to Exchange Grid coords */
 	giss::Proj2 proj1, proj2;
 
+	/** Keep track of the "full" indexing space for the Overlap Matrix. */
+	int grid1_ncells_full;
+	int grid2_ncells_full;
+
 	/** @param proj Projection to use to project Lon/Lat grids to XY,
 	if no projection is found in the XY-type grid. */
 	ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string const &_sproj="");

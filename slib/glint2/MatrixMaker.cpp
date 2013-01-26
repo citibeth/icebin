@@ -29,6 +29,32 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
 	// Convert back to GISS format sparse matrices
 	return giss::Eigen_to_giss(e_ret);
 }
+// ==============================================================
+// Write out the parts that this class computed --- so we can test/check them
+
+static void MatrixMaker_netcdf_write(// NcFile *nc, std::string const &vname,
+boost::function<void ()> const &fn1,
+boost::function<void ()> const &fn2)
+{
+	fn1();
+	fn2();
+}
+
+
+boost::function<void ()> MatrixMaker::netcdf_define(NcFile &nc, std::string const &vname) const
+{
+	// ------ Attributes
+	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
+	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
+		info_var->add_att("grid1.name", grid1->name.c_str());
+		info_var->add_att("grid2.name", grid2->name.c_str());
+		info_var->add_att("exgrid.name", exgrid->name.c_str());
+
+	return boost::bind(&MatrixMaker_netcdf_write, // this, &nc, vname,
+		overlap_raw->netcdf_define(nc, vname + ".overlap_raw"),
+		overlap_m->netcdf_define(nc, vname + ".overlap_m"));
+}
+
 
 
 

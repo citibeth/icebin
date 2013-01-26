@@ -171,6 +171,8 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_full_nvertices,
 
 	// Add it to the grid
 	exvcache->grid->add_cell(std::move(excell));
+
+	return true;
 }
 // --------------------------------------------------------------------
 
@@ -180,7 +182,7 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 : Grid("exchange")
 {
 	scoord = "xy";
-	Grid *exgrid = this;
+	ExchangeGrid *exgrid = this;
 
 printf("ExchangeGrid 1\n");
 
@@ -218,6 +220,8 @@ printf("ExchangeGrid 2\n");
 
 	/** Initialize the new grid */
 	exgrid->name = grid1.name + '-' + grid2.name;
+	exgrid->grid1_ncells_full = grid1.ncells_full;
+	exgrid->grid2_ncells_full = grid2.ncells_full;
 	exgrid->ncells_full = grid1.ncells_full * grid2.ncells_full;
 	exgrid->nvertices_full = -1;	// Not specified
 	VertexCache exvcache(exgrid);
@@ -261,6 +265,8 @@ boost::function<void ()> ExchangeGrid::netcdf_define(NcFile &nc, std::string con
 	auto parent = Grid::netcdf_define(nc, vname);
 
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+	info_var->add_att("grid1.ncells_full", grid1_ncells_full);
+	info_var->add_att("grid2.ncells_full", grid2_ncells_full);
 	proj1.netcdf_define(nc, info_var, "proj1");
 	proj2.netcdf_define(nc, info_var, "proj2");
 
@@ -272,6 +278,8 @@ void ExchangeGrid::read_from_netcdf(NcFile &nc, std::string const &vname)
 	Grid::read_from_netcdf(nc, vname);
 
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+	grid1_ncells_full = info_var->get_att("grid1.ncells_full")->as_int(0);
+	grid2_ncells_full = info_var->get_att("grid2.ncells_full")->as_int(0);
 	proj1.read_from_netcdf(nc, info_var, "proj1");
 	proj2.read_from_netcdf(nc, info_var, "proj2");
 }
