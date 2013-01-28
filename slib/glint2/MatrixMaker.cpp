@@ -14,7 +14,8 @@ void MatrixMaker::realize()
 		overlap_raw->add(cell->i, cell->j, area_of_polygon(*cell));
 
 	// Mask out unused cells
-	overlap_m = mask_out(*overlap_raw, mask1.get(), mask2.get());
+	overlap_m = mask_out(
+		giss::BlitzSparseMatrix(*overlap_raw), mask1.get(), mask2.get());
 }
 
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()

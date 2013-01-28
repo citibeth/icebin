@@ -112,7 +112,7 @@ int const *dims)
 		// Python/Numpy strides are in bytes, Blitz++ in sizeof(T) units.
         strides[i] = arr_strides[i]/T_size;
     }
-printf("py_to_blitz: vec->data = %p\n", vec->data);
+//printf("py_to_blitz: vec->data = %p\n", vec->data);
 
     return blitz::Array<T,N>((T*) vec->data,shape,strides,
 		blitz::neverDeleteData);

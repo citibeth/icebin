@@ -10,7 +10,8 @@ void MatrixMaker_L0::realize()
 
 	// Mask out unused GCM and ice grid cells
 	HeightClassifier hc = HeightClassifier(&hcmax);
-	overlap_m_hc = height_classify(*overlap_m, elev2, hc);
+	overlap_m_hc = height_classify(
+		giss::BlitzSparseMatrix(*overlap_m), elev2, hc);
 }
 
 /** Height Points to ice.
@@ -18,14 +19,16 @@ Uses: elev2, hpdefs, overlap */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker_L0::hp_to_ice()
 {
 	// Interpolate (for now) in height points but not X/Y
-	return hp_interp(*overlap_m, hpdefs, elev2);
+	return hp_interp(
+		giss::BlitzSparseMatrix(*overlap_m), hpdefs, elev2);
 }
 
 /** Uses: elev2, hcmax, overlap */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker_L0::ice_to_hc()
 {
 	// Just area-weighted remap from ice back to hc grid
-	auto g2_to_g1(grid2_to_grid1(*overlap_m_hc));
+	auto g2_to_g1(grid2_to_grid1(
+		giss::BlitzSparseMatrix(*overlap_m_hc)));
 // TODO: Fix up projection stuff, then un-comment line below.
 //	proj_to_native(*grid1, proj, *g2_to_g1);
 

@@ -196,7 +196,6 @@ static void Grid_LonLat_netcdf_write(
 {
 	parent();
 
-#if 0
 	if (grid->lonb.size() > 0) {
 		NcVar *lonb_var = nc->get_var((vname + ".lon_boundaries").c_str());
 		lonb_var->put(&grid->lonb[0], grid->lonb.size());
@@ -206,8 +205,6 @@ static void Grid_LonLat_netcdf_write(
 		NcVar *latb_var = nc->get_var((vname + ".lat_boundaries").c_str());
 		latb_var->put(&grid->latb[0], grid->latb.size());
 	}
-#endif
-
 }
 
 boost::function<void ()> Grid_LonLat::netcdf_define(NcFile &nc, std::string const &vname) const

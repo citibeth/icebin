@@ -29,8 +29,8 @@ public:
 //	giss::Proj2 proj;							/// GCM -> Ice Projection
 	std::shared_ptr<glint2::Grid> exgrid;	/// Exchange grid (between GCM and Ice)
 
-	std::shared_ptr<blitz::Array<bool,1>> mask1;
-	std::shared_ptr<blitz::Array<bool,1>> mask2;
+	std::shared_ptr<blitz::Array<int,1>> mask1;
+	std::shared_ptr<blitz::Array<int,1>> mask2;
 
 	/** Elevation of each cell Ma(L0) or vertex (L1) in the ice model */
 	blitz::Array<double,1> elev2;	// [n2]

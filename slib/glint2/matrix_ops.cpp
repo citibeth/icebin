@@ -12,7 +12,7 @@ namespace glint2 {
 
 /** @param overlap [n1 x n2] sparse matrix */
 std::unique_ptr<giss::VectorSparseMatrix> height_classify(
-giss::VectorSparseMatrix const &overlap,
+giss::BlitzSparseMatrix const &overlap,
 blitz::Array<double,1> const &elev2,
 HeightClassifier &height_classifier)
 {
@@ -44,16 +44,16 @@ HeightClassifier &height_classifier)
 @param mask1 Row Mask: TRUE if we DON'T want to include it (same sense as numpy.ma)
 @param mask2 Column Mask: TRUE if we DON'T want to include it (same sense as numpy.ma)*/
 std::unique_ptr<giss::VectorSparseMatrix> mask_out(
-giss::VectorSparseMatrix const &overlap,
-blitz::Array<bool,1> const *mask1,
-blitz::Array<bool,1> const *mask2)
+giss::BlitzSparseMatrix const &overlap,
+blitz::Array<int,1> const *mask1,
+blitz::Array<int,1> const *mask2)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
 
 	// Check consistency on array sizes
-	gassert(mask1->extent(0) == n1);
-	gassert(mask2->extent(0) == n2);
+	if (mask1) gassert(mask1->extent(0) == n1);
+	if (mask2) gassert(mask2->extent(0) == n2);
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
 		giss::SparseDescr(n1, n2)));
@@ -77,7 +77,7 @@ blitz::Array<bool,1> const *mask2)
 /** Upgrids from grid2 (ice grid) to grid1 (grid1-projected, or grid1hc-projected)
 Transformation: [n2] --> [n1] */
 std::unique_ptr<giss::VectorSparseMatrix> grid2_to_grid1(
-giss::VectorSparseMatrix const &overlap)
+giss::BlitzSparseMatrix const &overlap)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
@@ -98,7 +98,7 @@ giss::VectorSparseMatrix const &overlap)
 }
 
 std::unique_ptr<giss::VectorSparseMatrix> grid1_to_grid2(
-giss::VectorSparseMatrix const &overlap)
+giss::BlitzSparseMatrix const &overlap)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
@@ -124,37 +124,20 @@ giss::VectorSparseMatrix const &overlap)
 // ---------------------------------------------------------------
 /** Converts from values for projected grid1 to values for native grid1.
 Diagonal matrix.
-@param proj proj[0] --> proj[1] converts from native to projected space. */
-extern std::vector<double> proj_to_native(Grid const &grid1, giss::Proj2 const &proj,
-giss::VectorSparseMatrix &mat)
+@param proj proj[0] --> proj[1] converts from native to projected space.
+@param sdir Should be "p2n" or "n2p" */
+extern std::vector<double> proj_native_area_correct(Grid const &grid1, giss::Proj2 const &proj, std::string const &sdir)
 {
+	bool p2n = (sdir == "p2n");
+
 	// Set up the diagonal matrix
 	std::vector<double> factors(grid1.ncells_full, 0.0);
 	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
 		double proj_area = area_of_proj_polygon(*cell, proj);
-		factors.at(cell->index) = proj_area / cell->area;
+		factors.at(cell->index) = (p2n ?
+			proj_area / cell->area :
+			cell->area / proj_area);
 	}
-
-	// Multiply by it
-	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
-		ii.val() *= factors.at(ii.row());
-
-	return factors;
-}
-
-extern std::vector<double> native_to_proj(Grid &grid1, giss::Proj2 const &proj,
-giss::VectorSparseMatrix &mat)
-{
-	// Set up the diagonal matrix
-	std::vector<double> factors(grid1.ncells_full, 0.0);
-	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
-		double proj_area = area_of_proj_polygon(*cell, proj);
-		factors.at(cell->index) = cell->area / proj_area;
-	}
-
-	// Multiply by it
-	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
-		ii.val() *= factors.at(ii.row());
 
 	return factors;
 }
@@ -164,7 +147,8 @@ giss::VectorSparseMatrix &mat)
 // Interpolate Height Points in Height Space Only: (nhc, n1) --> (n2)
 
 /** Gives weights for linear interpolation with a bunch of points.
-If our point is off the end of the range, just continue the slope in extrapolation. */
+If our point is off the end of the range, just continue the slope in extrapolation.
+@param xpoints This is not blitz::Array<double,1> because Blitz++ does not (yet) implement STL-compatible iterators. */
 static void linterp_1d(
 	std::vector<double> const &xpoints,
 	double xx,
@@ -208,9 +192,10 @@ static void linterp_1d(
 
 */
 std::unique_ptr<giss::VectorSparseMatrix> 
-hp_interp(giss::VectorSparseMatrix const &overlap,
+hp_interp(
+giss::BlitzSparseMatrix const &overlap,
 std::vector<double> const &hpdefs,
-blitz::Array<double,1> elev2)
+blitz::Array<double,1> const &elev2)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;

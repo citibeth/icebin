@@ -216,7 +216,7 @@ printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, n
 	auto cols(py_to_blitz<int,1>(cols_py, "cols", 1, dims));
 	auto data(py_to_blitz<double,1>(data_py, "data", 1, dims));
 
-printf("py_to_blitz stuff: nnz = %d\n", dims[0]);
+//printf("py_to_blitz stuff: nnz = %d\n", dims[0]);
 
 	return giss::BlitzSparseMatrix(SparseDescr(nrow, ncol),
 		rows, cols, data);

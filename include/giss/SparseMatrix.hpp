@@ -6,7 +6,7 @@
 #include "hsl_zd11_x.hpp"
 #include "ncutil.hpp"
 #include "IndexTranslator.hpp"
-#include <blitz/array.h>
+#include <giss/blitz.hpp>
 
 class NcFile;
 
@@ -64,6 +64,8 @@ enum class SortOrder {ROW_MAJOR, COLUMN_MAJOR};
 	/** Number of columns in the matrix. */
 	int const ncol;
 	// int const nnz;
+
+	SparseDescr &descr() { return *this; }
 
 	/** Construct a sparse matrix header. */
 	SparseDescr(
@@ -123,14 +125,14 @@ public:
 	@param x IN: A vector of length ncol
 	@param y OUT: A vector of length nrow
 	@param clear_y If true, y = Ax.  Otherwise, y += Ax. */
-	virtual void multiply(double const * x, double *y, bool clear_y = true) = 0;
+	virtual void multiply(double const * x, double *y, bool clear_y = true) const = 0;
 
 	/** Multiply transpose of this matrix A by a vector.
 	Computes y = A^T * x
 	@param x IN: A vector of length nrow
 	@param y OUT: A vector of length ncol
 	@param clear_y If true, y = A^T x.  Otherwise, y += A^T x. */
-	virtual void multiplyT(double const * x, double *y, bool clear_y = true) = 0;
+	virtual void multiplyT(double const * x, double *y, bool clear_y = true) const = 0;
 
 	/** Computes the sum of each row of this matrix.
 	@return Vector[nrow], each element containing the sum of the respective row from the matrix. */
@@ -164,8 +166,10 @@ public:
 	void set(int row, int col, double const val, SparseMatrix::DuplicatePolicy dups = SparseMatrix::DuplicatePolicy::REPLACE);
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 
-	void multiply(double const * x, double *y, bool clear_y = true);
-	void multiplyT(double const * x, double *y, bool clear_y = true);
+	void multiply(double const * x, double *y, bool clear_y = true) const;
+	void multiplyT(double const * x, double *y, bool clear_y = true) const;
+	void multiply_bydiag_left(blitz::Array<double,1> const &diag);
+	void multiply_bydiag_right(blitz::Array<double,1> const &diag);
 	std::vector<double> sum_per_row() const;
 	std::vector<double> sum_per_col() const;
 	std::map<int,double> sum_per_row_map() const;
@@ -251,7 +255,7 @@ boost::function<void ()> SparseMatrix1<SparseMatrix0T>::netcdf_define(
 
 /// Computes y = A * x
 template<class SparseMatrix0T>
-void SparseMatrix1<SparseMatrix0T>::multiply(double const * x, double *y, bool clear_y)
+void SparseMatrix1<SparseMatrix0T>::multiply(double const * x, double *y, bool clear_y) const
 {
 	int nx = this->ncol;
 	int ny = this->nrow;
@@ -265,7 +269,7 @@ void SparseMatrix1<SparseMatrix0T>::multiply(double const * x, double *y, bool c
 
 /// Computes y = A^T * x
 template<class SparseMatrix0T>
-void SparseMatrix1<SparseMatrix0T>::multiplyT(double const * x, double *y, bool clear_y)
+void SparseMatrix1<SparseMatrix0T>::multiplyT(double const * x, double *y, bool clear_y) const
 {
 	int nx = this->nrow;
 	int ny = this->ncol;
@@ -276,8 +280,6 @@ void SparseMatrix1<SparseMatrix0T>::multiplyT(double const * x, double *y, bool 
 		y[iy] += ii.val() * x[ix];
 	}
 }
-
-
 
 // ------------------------------------------------------------
 template<class SparseMatrix0T>
@@ -444,6 +446,7 @@ public:
 /** Mix-in, not part of the API. */
 class VectorSparseMatrix0 : public SparseMatrix
 {
+friend class BlitzSparseMatrix;
 protected:
 	std::vector<int> indx;
 	std::vector<int> jndx;
@@ -563,10 +566,14 @@ public:
 
 };
 // ====================================================================
+class VectorSparseMatrix;
 
 class BlitzSparseMatrix0 : public SparseMatrix
 {
 protected:
+//	// Hold a pointer to previous SparseMatrix, in case we're wrapping one.
+//	std::unique_ptr<VectorSparseMatrix> wrapped;
+
 	// Current number of elements in matrix.  Matrix is not
 	// valid until this equals zd11.ne
 	int _nnz_cur;
@@ -576,7 +583,6 @@ protected:
 	blitz::Array<double,1> val;
 
 	BlitzSparseMatrix0(SparseDescr const &descr) : SparseMatrix(descr) {}
-
 
 public:
 #if 0
@@ -618,7 +624,7 @@ public:
 		double &value() { return val(); }
 	};
 	iterator begin() { return iterator(this, 0); }
-	iterator end() { return iterator(this, val.size()); }
+	iterator end() { return iterator(this, _nnz_cur); }
 	// --------------------------------------------------
 	class const_iterator {
 	protected:
@@ -636,7 +642,7 @@ public:
 		double const &value() { return val(); }
 	};
 	const_iterator begin() const { return const_iterator(this, 0); }
-	const_iterator end() const { return const_iterator(this, val.size()); }
+	const_iterator end() const { return const_iterator(this, _nnz_cur); }
 
 	// --------------------------------------------------
 
@@ -655,8 +661,8 @@ protected :
 			fprintf(stderr, "ZD11SparseMatrix is full with %d elements\n", vals().size());
 			throw std::exception();
 		}
-		indx(_nnz_cur) = row;
-		jndx(_nnz_cur) = col;
+		this->indx(_nnz_cur) = row;
+		this->jndx(_nnz_cur) = col;
 		this->val(_nnz_cur) = val;
 		++_nnz_cur;
 	}
@@ -669,11 +675,44 @@ class BlitzSparseMatrix : public SparseMatrix1<BlitzSparseMatrix0>
 public:
 	/** Construct a new sparse matrix to the given specifications.
 	Memory will be allocated later as elements are added. */
-	explicit BlitzSparseMatrix(SparseDescr const &descr) :
+	explicit BlitzSparseMatrix(SparseDescr const &descr, int nnz_max) :
 	SparseMatrix1<BlitzSparseMatrix0>(descr)
 	{
-		_nnz_cur = 0;
+		this->_nnz_cur = 0;
+		this->indx.reference(blitz::Array<int,1>(nnz_max));
+		this->jndx.reference(blitz::Array<int,1>(nnz_max));
+		this->val.reference(blitz::Array<double,1>(nnz_max));
 	}
+
+	explicit BlitzSparseMatrix(VectorSparseMatrix &mat) :
+	SparseMatrix1<BlitzSparseMatrix0>(mat.descr())
+	{
+		this->_nnz_cur = mat.size();
+		this->indx.reference(vector_to_blitz(mat.indx));
+		this->jndx.reference(vector_to_blitz(mat.jndx));
+		this->val.reference(vector_to_blitz(mat.val));
+	}
+
+#if 0
+	BlitzSparseMatrix(BlitzSparseMatrix &mat) :
+	SparseMatrix1<BlitzSparseMatrix0>(mat.descr())
+	{
+		this->_nnz_cur = mat.size();
+		this->indx.reference(mat.indx);
+		this->jndx.reference(mat.jndx);
+		this->val.reference(mat.val);
+	}
+
+	explicit BlitzSparseMatrix(std::unique_ptr<VectorSparseMatrix> &&mat) :
+	SparseMatrix1<BlitzSparseMatrix0>(*mat)
+	{
+		this->wrapped = std::move(mat);
+		this->_nnz_cur = mat->size();
+		this->indx.reference(vector_to_blitz(mat->indx));
+		this->jndx.reference(vector_to_blitz(mat->jndx));
+		this->val.reference(vector_to_blitz(mat->val));
+	}
+#endif
 
 
 	/** Construct from existing vectors.
@@ -695,6 +734,7 @@ public:
 		_nnz_cur = (nnz_cur < 0 ? val.extent(0) : nnz_cur);
 printf("Constructed nnz = %d (%d %d)\n", _nnz_cur, val.extent(0), _vals.extent(0));
 	}
+
 
 #if 0
 //	/** Sorts the elements in the sparse matrix by index.
@@ -893,5 +933,49 @@ SparseMatrix::DuplicatePolicy dups = SparseMatrix::DuplicatePolicy::REPLACE)
 	}
 }
 // ----------------------------------------------------
+
+// =============================================================
+
+/** Computes M * diag and stores back in M
+@param diag [ncol] Elements of the diagonal of the matrix
+*/
+template<class SparseMatrixT>
+inline void multiply_bydiag(SparseMatrixT &mat,
+blitz::Array<double,1> const &diag)
+{
+	int ndiag = diag.extent(0);
+	if (ndiag != mat.ncol) {
+		fprintf(stderr, "Matrix-diagonal multiply with mismatched dimensions %d vs %d", ndiag, mat.ncol);
+		throw std::exception();
+	}
+
+	// Multiply by it
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
+		ii.val() *= diag(ii.col());
+	}
+}
+
+/** Computes diag * M, stores back in M
+@param diag [nrow] Elements of the diagonal of the matrix
+*/
+template<class SparseMatrixT>
+inline void multiply_bydiag(
+blitz::Array<double,1> const &diag,
+SparseMatrixT &mat)
+{
+	int ndiag = diag.extent(0);
+	if (ndiag != mat.nrow) {
+		fprintf(stderr, "Matrix-diagonal multiply with mismatched dimensions %d vs %d", ndiag, mat.nrow);
+		throw std::exception();
+	}
+
+	// Multiply by it
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
+		ii.val() *= diag(ii.row());
+}
+
+
+
+
 
 }	// namespace giss
