@@ -1,0 +1,28 @@
+import netCDF4
+import giss.basemap
+import giss.modele
+import matplotlib.pyplot
+import glint2
+import sys
+
+#fname = '../searise.nc'
+#fname = '../greenland_4x5.nc'
+fname = sys.argv[1]
+
+nc = netCDF4.Dataset(fname)
+grid = glint2.Grid(nc, 'grid')
+nc.close()
+
+# Plot multiple plots on one page
+figure = matplotlib.pyplot.figure(figsize=(8.5,11))
+ax = figure.add_subplot(111)
+
+mymap = giss.basemap.greenland_laea(ax)
+#mymap = giss.basemap.north_laea(ax)
+grid.plot(mymap)
+mymap.drawcoastlines()
+
+# Also show on screen
+matplotlib.pyplot.show()
+
+
