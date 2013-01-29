@@ -43,12 +43,13 @@ giss::BlitzSparseMatrix const &overlap);
 // ==================================================================
 // Geometric and Projection Error in Spherical/Cartesian Grids
 
+extern std::vector<double> get_proj_area(Grid const &grid1, giss::Proj2 const &proj);
+
 /** Converts from values for projected grid1 to values for native grid1.
 Diagonal matrix.
 @param proj Translate from native to projected coordinates.
 @return Vector of the diagonals of the returned matrix. */
-extern std::vector<double> proj_native_area_correct(
-	Grid const &grid1, giss::Proj2 const &proj, std::string const &sdir);
+extern std::vector<double> proj_native_area_correct(Grid const &grid1, std::string const &sproj, std::string const &sdir);
 
 
 

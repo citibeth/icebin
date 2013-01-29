@@ -36,6 +36,7 @@ inline double graticule_area_exact(Grid_LonLat const &grid,
 	double delta_lon = delta_lon_deg * giss::D2R;
 
 //printf("lat1=%f, abs(lat1)=%f\n",lat1,std::abs(lat1));
+//printf("%f %f %f %f %f %f\n", delta_lon, grid.eq_rad, lat1, lat0, sin(lat1), sin(lat0));
 	return delta_lon * (grid.eq_rad*grid.eq_rad) * (sin(lat1) - sin(lat0));
 }
 
@@ -135,7 +136,7 @@ void Grid_LonLat::realize(
 			cell.index = (cell.j * nlon() + cell.i);
 			cell.area = graticule_area_exact(*this, lat0,lat1,lon0,lon1);
 
-//printf("Adding lon/lat cell %d (%d, %d)\n", cell.index, cell.i, cell.j);
+printf("Adding lon/lat cell %d (%d, %d) area=%f\n", cell.index, cell.i, cell.j, cell.area);
 			add_cell(std::move(cell));
 		}
 	}

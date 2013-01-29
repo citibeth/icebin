@@ -99,6 +99,7 @@ class Grid {
 	giss::Dict<int, Cell> _cells;
 
 public:
+
 	std::string stype;
 	/** Tells whether vertex coordinates are in x/y on a plane or lon/lat on a sphere. */
 	std::string scoord;		// xy or lonlat
@@ -118,9 +119,9 @@ public:
 	std::string sproj;
 
 	Grid(std::string const &_stype);
+	virtual ~Grid() {}
 
 	virtual void clear();
-
 
 	/** For regularly spaced grids: converts 2D (or 3D in some cases) indexing to 1-D.
 	The index will be a Cell index for L0 grids, or a Vertex index for L1 */
@@ -157,6 +158,10 @@ public:
 	Vertex *add_vertex(Vertex &&vertex);
 
 	// ========================================
+
+	std::vector<double> get_proj_area(std::string const &sproj) const;
+	std::vector<double> get_native_area() const;
+
 
 
 protected:

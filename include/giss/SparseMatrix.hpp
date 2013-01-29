@@ -168,8 +168,6 @@ public:
 
 	void multiply(double const * x, double *y, bool clear_y = true) const;
 	void multiplyT(double const * x, double *y, bool clear_y = true) const;
-	void multiply_bydiag_left(blitz::Array<double,1> const &diag);
-	void multiply_bydiag_right(blitz::Array<double,1> const &diag);
 	std::vector<double> sum_per_row() const;
 	std::vector<double> sum_per_col() const;
 	std::map<int,double> sum_per_row_map() const;
@@ -940,7 +938,7 @@ SparseMatrix::DuplicatePolicy dups = SparseMatrix::DuplicatePolicy::REPLACE)
 @param diag [ncol] Elements of the diagonal of the matrix
 */
 template<class SparseMatrixT>
-inline void multiply_bydiag(SparseMatrixT &mat,
+void multiply_bydiag(SparseMatrixT &mat,
 blitz::Array<double,1> const &diag)
 {
 	int ndiag = diag.extent(0);
@@ -959,7 +957,7 @@ blitz::Array<double,1> const &diag)
 @param diag [nrow] Elements of the diagonal of the matrix
 */
 template<class SparseMatrixT>
-inline void multiply_bydiag(
+void multiply_bydiag(
 blitz::Array<double,1> const &diag,
 SparseMatrixT &mat)
 {

@@ -4,6 +4,7 @@
 #include "pyutil.hpp"
 #include <glint2/matrix_ops.hpp>
 #include <giss/SparseMatrix.hpp>
+#include "Grid_py.hpp"
 
 /*
  * http://dsnra.jpl.nasa.gov/software/Python/numpydoc/numpy-14.html
@@ -169,36 +170,65 @@ PyObject *proj_native_area_correct_py(PyObject *self, PyObject *args)
 	PyObject *ret_py = NULL;
 	try {
 		// Get Arguments
-		char *grid_fname_py;
+		PyGrid *grid_py;
 		char *sproj_py;
 		char *sdir_py;
-		if (!PyArg_ParseTuple(args, "sss",
-			&grid_fname_py, &sproj_py, &sdir_py))
+		if (!PyArg_ParseTuple(args, "Oss",
+			&grid_py, &sproj_py, &sdir_py))
 		{ return NULL; }
 
-		// Load the grid from the file
-		// (so we don't have to wrap the Grid class in Python for now)
-		NcFile nc(grid_fname_py);
-		std::unique_ptr<glint2::Grid> grid(glint2::read_grid(nc, "grid"));
-		nc.close();
-
-		// Set up the projection
-		std::string sproj(sproj_py);
-		giss::Proj2 proj;
-		if (grid->scoord == "lonlat") {
-			proj.init(sproj, giss::Proj2::Direction::LL2XY);
-		} else {
-			fprintf(stderr, "proj_to_native() only makes sense for grids in Lon/Lat Coordinates!");
-			throw std::exception();
-		}
+		glint2::Grid &grid(*grid_py->grid);
 
 		// Do the call
 		std::vector<double> ret(proj_native_area_correct(
-			*grid, proj, std::string(sdir_py)));
+			grid, std::string(sproj_py), std::string(sdir_py)));
 
 		// Create an output tuple of Numpy arrays
 		ret_py = giss::vector_to_py(ret);
 		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		return NULL;
+	}
+}
+
+PyObject *multiply_bydiag_py(PyObject *self, PyObject *args)
+{
+	PyObject *ret_py = NULL;
+	try {
+		// Get Arguments
+		PyObject *arg1_py;
+		PyObject *arg2_py;
+		if (!PyArg_ParseTuple(args, "OO",
+			&arg1_py, &arg2_py))
+		{ return NULL; }
+printf("arg1=%p, arg2=%p\n", arg1_py, arg2_py);
+
+		// Figure whether we're doing (A * diag) or (diag * A)
+		PyObject *mat_py;
+		PyObject *diag_py;
+		bool right_mul = PyTuple_Check(arg1_py);
+printf("right_mul = %d\n", right_mul);
+		if (right_mul) {	// A * diag
+			mat_py = arg1_py;
+			diag_py = arg2_py;
+		} else {
+			mat_py = arg2_py;
+			diag_py = arg1_py;
+		}
+printf("mat=%p, diag=%p\n", arg1_py, arg2_py);
+
+		// Check arrays and copy to giss::VectorSparseMatrix
+		auto mat(giss::py_to_BlitzSparseMatrix(mat_py, "mat"));
+
+		int dims[1] = {right_mul ? mat.ncol : mat.nrow};
+		auto diag(giss::py_to_blitz<double,1>(diag_py, "diag", 1, dims));
+
+		// Do the call
+		if (right_mul) multiply_bydiag(mat, diag);
+		else multiply_bydiag(diag, mat);
+
+		return Py_None;
 	} catch(...) {
 		if (ret_py) Py_DECREF(ret_py);
 		return NULL;
@@ -210,7 +240,7 @@ PyObject *proj_native_area_correct_py(PyObject *self, PyObject *args)
 
 PyMethodDef matrix_ops_functions[] = {
 	{"coo_matvec", (PyCFunction)coo_matvec_py, METH_VARARGS,
-		""},
+		"Compute M*x, taking care with unspecified elements in M"},
 	{"grid1_to_grid2", (PyCFunction)grid1_to_grid2_py, METH_VARARGS,
 		""},
 	{"grid2_to_grid1", (PyCFunction)grid1_to_grid2_py, METH_VARARGS,
@@ -218,6 +248,8 @@ PyMethodDef matrix_ops_functions[] = {
 	{"mask_out", (PyCFunction)mask_out_py, METH_VARARGS,
 		""},
 	{"proj_native_area_correct", (PyCFunction)proj_native_area_correct_py, METH_VARARGS,
+		""},
+	{"multiply_bydiag", (PyCFunction)multiply_bydiag_py, METH_VARARGS,
 		""},
 
 	{NULL}     /* Sentinel - marks the end of this structure */

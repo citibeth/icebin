@@ -24,23 +24,25 @@ extern double area_of_polygon(Cell const &cell)
 
 /** Computes area of the cell's polygon after it's projected
 (for cells in lon/lat coordinates)
-See Surveyor's Formula: http://www.maa.org/pubs/Calc_articles/ma063.pdf */
+See Surveyor's`g Formula: http://www.maa.org/pubs/Calc_articles/ma063.pdf */
 extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 {
 	double ret = 0;
-	auto it0 = cell.begin();
-	auto it1(it0); ++it1;
-
 	double x00, y00;
+	auto it0 = cell.begin();
 	proj.transform(it0->x, it0->y, x00, y00);
+
+//printf("(%f, %f) --> (%f, %f)\n", it0->x, it0->y, x00, y00);
 
 	double x0, y0, x1, y1;
 	x0 = x00; y0 = y00;
-	for(; it1 != cell.end(); it0=it1, it1 += 1) {
+	for(++it0; it0 != cell.end(); ++it0) {
 		double x1, y1;
-		proj.transform(it1->x, it1->y, x1, y1);
+		proj.transform(it0->x, it0->y, x1, y1);
 
 		ret += (x0 * y1) - (x1 * y0);
+		x0 = x1;
+		y0 = y1;
 	}
 
 	x1 = x00;
@@ -244,20 +246,16 @@ std::string const &vname)
 	printf("Grid::read_from_netcdf(%s)\n", vname.c_str());
 	// ---------- Read the Basic Info
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
-printf("AA\n");
 		name = std::string(info_var->get_att("name")->as_string(0));
 		stype = std::string(info_var->get_att("type")->as_string(0));
 		scoord = std::string(info_var->get_att("coordinates")->as_string(0));
-printf("AA\n");
 		if (scoord == "xy")
 			sproj = std::string(info_var->get_att("projection")->as_string(0));
 		else
 			sproj = "";
 		ncells_full = info_var->get_att("cells.num_full")->as_int(0);
 		nvertices_full = info_var->get_att("vertices.num_full")->as_int(0);
-printf("AA\n");
 
-printf("Grid::read_from_netcdf 2");
 	// ---------- Read the Vertices
 	// Basic Info
 	std::vector<int> vertices_index(
@@ -277,7 +275,6 @@ printf("Grid::read_from_netcdf 2");
 		add_vertex(Vertex(x, y, index));
 	}
 
-//printf("Grid::read_from_netcdf 3\n");
 	// ---------- Read the Cells
 	std::vector<int> cells_index(giss::read_int_vector(nc, vname + ".cells.index"));
 
@@ -296,7 +293,6 @@ printf("Grid::read_from_netcdf 2");
 	std::vector<int> vrefs(giss::read_int_vector(nc, vname + ".cells.vertex_refs"));
 	std::vector<int> vrefs_start(giss::read_int_vector(nc, vname + ".cells.vertex_refs_start"));
 
-//printf("Grid::read_from_netcdf 4");
 	// Assemble into Cells
 	for (size_t i=0; i < cells_index.size(); ++i) {
 		int index = cells_index[i];
@@ -322,7 +318,6 @@ printf("Grid::read_from_netcdf 2");
 		// Add thecell to the grid
 		add_cell(std::move(cell));
 	}
-printf("Grid::read_from_netcdf 5\n");
 }
 
 void Grid::to_netcdf(std::string const &fname)
@@ -340,6 +335,39 @@ void Grid::to_netcdf(std::string const &fname)
 	nc.close();
 }
 
+// ---------------------------------------------------
+static double const nan = std::numeric_limits<double>::quiet_NaN();
+
+std::vector<double> Grid::get_native_area() const
+{
+	// Get the cell areas
+	std::vector<double> area(this->ncells_full, nan);
+	for (auto cell = this->cells_begin(); cell != this->cells_end(); ++cell) {
+		area.at(cell->index) = cell->area;
+	}
+
+	return area;
+}
+
+std::vector<double> Grid::get_proj_area(std::string const &sproj) const
+{
+	// Set up the projection
+	giss::Proj2 proj;
+	if (this->scoord == "lonlat") {
+		proj.init(sproj, giss::Proj2::Direction::LL2XY);
+	} else {
+		fprintf(stderr, "proj_to_native() only makes sense for grids in Lon/Lat Coordinates!");
+		throw std::exception();
+	}
+
+	// Get the projected cell areas
+	std::vector<double> area(this->ncells_full, nan);
+	for (auto cell = this->cells_begin(); cell != this->cells_end(); ++cell) {
+		area.at(cell->index) = area_of_proj_polygon(*cell, proj);
+	}
+
+	return area;
+}
 // ---------------------------------------------------
 
 }	// namespace

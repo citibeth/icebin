@@ -126,20 +126,29 @@ giss::BlitzSparseMatrix const &overlap)
 Diagonal matrix.
 @param proj proj[0] --> proj[1] converts from native to projected space.
 @param sdir Should be "p2n" or "n2p" */
-extern std::vector<double> proj_native_area_correct(Grid const &grid1, giss::Proj2 const &proj, std::string const &sdir)
+extern std::vector<double> proj_native_area_correct(Grid const &grid1, std::string const &sproj, std::string const &sdir)
 {
 	bool p2n = (sdir == "p2n");
 
-	// Set up the diagonal matrix
-	std::vector<double> factors(grid1.ncells_full, 0.0);
-	for (auto cell = grid1.cells_begin(); cell != grid1.cells_end(); ++cell) {
-		double proj_area = area_of_proj_polygon(*cell, proj);
-		factors.at(cell->index) = (p2n ?
-			proj_area / cell->area :
-			cell->area / proj_area);
+	auto proj_area(grid1.get_proj_area(sproj));
+	auto native_area(grid1.get_native_area());
+
+	std::vector<double> num;
+	std::vector<double> denom;
+
+	if (p2n) {
+		num = std::move(proj_area);
+		denom = std::move(native_area);
+	} else {
+		denom = std::move(proj_area);
+		num = std::move(native_area);
 	}
 
-	return factors;
+	for (int i=0; i<num.size(); ++i) {
+		num[i] = num[i] / denom[i];
+	}
+
+	return num;
 }
 
 // ---------------------------------------------------------------
