@@ -14,8 +14,9 @@ namespace glint2 {
 std::unique_ptr<giss::VectorSparseMatrix> height_classify(
 giss::BlitzSparseMatrix const &overlap,
 blitz::Array<double,1> const &elev2,
-HeightClassifier &height_classifier)
+blitz::Array<double,1> const &hcmax)
 {
+	HeightClassifier height_classifier(&hcmax);
 	HCIndex hc_index(overlap.nrow);
 	int n2 = overlap.ncol;
 	int nhc = height_classifier.nhc();
@@ -203,8 +204,8 @@ static void linterp_1d(
 std::unique_ptr<giss::VectorSparseMatrix> 
 hp_interp(
 giss::BlitzSparseMatrix const &overlap,
-std::vector<double> const &hpdefs,
-blitz::Array<double,1> const &elev2)
+blitz::Array<double,1> const &elev2,
+std::vector<double> const &hpdefs)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
@@ -218,7 +219,7 @@ blitz::Array<double,1> const &elev2)
 	std::vector<double> area2(overlap.sum_per_col());
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
-		giss::SparseDescr(n2, n1 * nhc)));
+		giss::SparseDescr(n2, nhc * n1)));
 
 	for (auto ii = overlap.begin(); ii != overlap.end(); ++ii) {
 		int i1 = ii.row();
@@ -231,6 +232,7 @@ blitz::Array<double,1> const &elev2)
 		int ihps[2];
 		double whps[2];	
 		linterp_1d(hpdefs, elevation, ihps, whps);
+//		printf("%d %f %f (%d : %f), (%d : %f)\n", i2, elev2(i2), overlap_ratio, ihps[0], whps[0], ihps[1], whps[1]);
 		ret->add(i2, ihps[0]*n1 + i1, overlap_ratio * whps[0]);
 		ret->add(i2, ihps[1]*n1 + i1, overlap_ratio * whps[1]);
 	}

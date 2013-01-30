@@ -4,10 +4,10 @@
 namespace glint2 {
 
 HeightClassifier::HeightClassifier(
-	blitz::Array<double,1> *_hcmax) :
+	blitz::Array<double,1> const *_hcmax) :
 	hcmax(_hcmax) {}
 
-int HeightClassifier::operator()(double elevation)
+int HeightClassifier::operator()(double elevation) const
 {
 //	end = hcmax.extent(0) - 1;	// Last height class always ends at infinity
 

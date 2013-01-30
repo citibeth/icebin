@@ -9,9 +9,9 @@ void MatrixMaker_L0::realize()
 	MatrixMaker::realize();
 
 	// Mask out unused GCM and ice grid cells
-	HeightClassifier hc = HeightClassifier(&hcmax);
+//	HeightClassifier hc = HeightClassifier(&hcmax);
 	overlap_m_hc = height_classify(
-		giss::BlitzSparseMatrix(*overlap_m), elev2, hc);
+		giss::BlitzSparseMatrix(*overlap_m), elev2, hcmax);
 }
 
 /** Height Points to ice.
@@ -20,7 +20,7 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker_L0::hp_to_ice()
 {
 	// Interpolate (for now) in height points but not X/Y
 	return hp_interp(
-		giss::BlitzSparseMatrix(*overlap_m), hpdefs, elev2);
+		giss::BlitzSparseMatrix(*overlap_m), elev2, hpdefs);
 }
 
 /** Uses: elev2, hcmax, overlap */

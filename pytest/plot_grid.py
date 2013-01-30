@@ -10,7 +10,7 @@ import sys
 fname = sys.argv[1]
 
 nc = netCDF4.Dataset(fname)
-grid = glint2.Grid(nc, 'grid')
+grid = glint2.pyGrid(nc, 'grid')
 nc.close()
 
 # Plot multiple plots on one page

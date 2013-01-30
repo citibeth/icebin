@@ -10,6 +10,12 @@
 
 using namespace glint2;
 
+#define RETURN_INVALID_ARGUMENTS(fname) {\
+	fprintf(stderr, fname "(): invalid arguments.\n"); \
+	PyErr_SetString(PyExc_ValueError, fname "(): invalid arguments."); \
+	return NULL; }
+
+
 // ========================================================================
 
 void PyGrid::init(std::unique_ptr<glint2::Grid> &&_grid)
@@ -63,6 +69,7 @@ static void Grid_dealloc(PyGrid *self)
 //static PyMemberDef Grid_members[] = {{NULL}};
 
 // -----------------------------------------------------------
+
 static PyObject * Grid_get_proj_area(PyGrid *self_py, PyObject *args)
 {
 	PyObject *ret_py = NULL;
@@ -71,15 +78,19 @@ static PyObject * Grid_get_proj_area(PyGrid *self_py, PyObject *args)
 		char *sproj_py;
 		if (!PyArg_ParseTuple(args, "s",
 			&sproj_py))
-		{ return NULL; }
+		{
+			RETURN_INVALID_ARGUMENTS();
+		}
 
 		// Do the call
 		auto ret(self_py->grid->get_proj_area(std::string(sproj_py)));
 
 		// Convert to Python format
 		ret_py = giss::vector_to_py(ret);
+//printf("Grid_get_proj_area() finished OK, ret_py = %p\n", ret_py);
 		return ret_py;
 	} catch(...) {
+		printf("Grid_get_proj_area() encountered an exception...\n");
 		if (ret_py) Py_DECREF(ret_py);
 		return NULL;
 	}

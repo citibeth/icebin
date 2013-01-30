@@ -16,7 +16,7 @@ namespace glint2 {
 std::unique_ptr<giss::VectorSparseMatrix> height_classify(
 giss::BlitzSparseMatrix const &overlap,
 blitz::Array<double,1> const &elev2,
-HeightClassifier &height_classifier);
+blitz::Array<double,1> const &hcmax);
 
 // ==================================================================
 // Masking: Remove overlap entries for grid cells that are masked out
@@ -78,8 +78,8 @@ extern std::vector<double> proj_native_area_correct(Grid const &grid1, std::stri
 std::unique_ptr<giss::VectorSparseMatrix> 
 hp_interp(
 giss::BlitzSparseMatrix const &overlap,
-std::vector<double> const &hpdefs,
-blitz::Array<double,1> const &elev2);
+blitz::Array<double,1> const &elev2,
+std::vector<double> const &hpdefs);
 
 // ===================================================================
 // CESM-Style Bi-linear Interpolation

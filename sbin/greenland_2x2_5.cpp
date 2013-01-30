@@ -9,6 +9,9 @@ static const double km = 1000.0;
 
 using namespace glint2;
 
+const double EQ_RAD = 6.371e6; /// Radius of the Earth (same as in ModelE)
+//const double EQ_RAD = 6370997; /// Radius of the Earth (same as in proj.4, see src/pj_ellps.c)
+
 int main(int argc, char **argv)
 {
 	printf("------------- Set up GCM Grid\n");
@@ -17,6 +20,7 @@ int main(int argc, char **argv)
 	glint2::modele::set_lonlat_2x2_5(grid);
 	grid.name = "greenland_2x2_5";
 	grid.points_in_side = 4;
+	grid.eq_rad = EQ_RAD;
 	grid.realize(boost::bind(
 		&SphericalClip::lonlat, -74., 59., -10., 87.5,
 		_1, _2, _3, _4));

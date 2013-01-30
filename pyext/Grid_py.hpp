@@ -9,7 +9,7 @@ struct PyGrid {
 	std::unique_ptr<glint2::Grid> grid;	// The grid, in C++
 
 	// Values copied out of grid
-	int ncells_full;
+	long ncells_full;
 
 	void init(std::unique_ptr<glint2::Grid> &&_grid);
 //	PyGrid() {}

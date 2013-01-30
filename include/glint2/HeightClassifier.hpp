@@ -17,19 +17,19 @@ Typically, this class is used as a temporary decorator to a HeightMaxArray insta
 */
 class HeightClassifier {
 public :
-	HeightClassifier(blitz::Array<double,1> *_hcmax);
+	HeightClassifier(blitz::Array<double,1> const *_hcmax);
 
 	/** Determines the elevation class of a grid cell.
 	@param index Index of the grid cell (base=0) to determine elevation class.
 	@param elevation Elevation of that grid cell. */
-	int operator()(double elevation);
+	int operator()(double elevation) const;
 
-	double operator[](int ix) { return (*hcmax)(ix); }
+	double operator[](int ix) const { return (*hcmax)(ix); }
 
-	int nhc() { return hcmax->extent(0); }
+	int nhc() const { return hcmax->extent(0); }
 
 private:
-	blitz::Array<double,1> *hcmax;
+	blitz::Array<double,1> const *hcmax;
 
 };	// class HeightClassifier
 

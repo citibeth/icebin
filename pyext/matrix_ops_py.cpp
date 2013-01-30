@@ -22,6 +22,38 @@
 
 //static double const nan = std::numeric_limits<double>::quiet_NaN();
 
+PyObject *height_classify_py(PyObject *self, PyObject *args)
+{
+	PyObject *ret_py = NULL;
+	try {
+		// Get Arguments
+		PyObject *overlap_py;
+		PyObject *elev2_py;
+		PyObject *hcmax_py;
+		if (!PyArg_ParseTuple(args, "OOO",
+			&overlap_py, &elev2_py, &hcmax_py))
+		{ return NULL; }
+
+		// Check arrays and copy to giss::VectorSparseMatrix
+		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
+		int dims[1] = {overlap.ncol};	// |grid2|
+		auto elev2(giss::py_to_blitz<double,1>(elev2_py, "elev2", 1, dims));
+		dims[0] = -1;
+		auto hcmax(giss::py_to_blitz<double,1>(hcmax_py, "hcmax", 1, dims));
+
+		// Do the call
+		std::unique_ptr<giss::VectorSparseMatrix> ret_c(
+			glint2::height_classify(overlap, elev2, hcmax));
+
+		// Create an output tuple of Numpy arrays
+		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		return NULL;
+	}
+}
+
 PyObject *coo_matvec_py(PyObject *self, PyObject *args)
 {
 	try {
@@ -235,21 +267,56 @@ printf("mat=%p, diag=%p\n", arg1_py, arg2_py);
 	}
 }
 
+PyObject *hp_interp_py(PyObject *self, PyObject *args)
+{
+	PyObject *ret_py = NULL;
+	try {
+		// Get Arguments
+		PyObject *overlap_py;
+		PyObject *elev2_py;
+		PyObject *hpdefs_py;
+		if (!PyArg_ParseTuple(args, "OOO",
+			&overlap_py, &elev2_py, &hpdefs_py))
+		{ return NULL; }
+
+		// Check arrays and copy to giss::VectorSparseMatrix
+		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
+		int dims[1] = {overlap.ncol};	// |grid2|
+		auto elev2(giss::py_to_blitz<double,1>(elev2_py, "elev2", 1, dims));
+		auto hpdefs(giss::py_to_vector<double>(hpdefs_py, "hpdefs", -1));
+
+		// Do the call
+		std::unique_ptr<giss::VectorSparseMatrix> ret_c(
+			glint2::hp_interp(overlap, elev2, hpdefs));
+
+		// Create an output tuple of Numpy arrays
+		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		return NULL;
+	}
+}
+
 
 
 
 PyMethodDef matrix_ops_functions[] = {
+	{"height_classify", (PyCFunction)height_classify_py, METH_VARARGS,
+		""},
 	{"coo_matvec", (PyCFunction)coo_matvec_py, METH_VARARGS,
 		"Compute M*x, taking care with unspecified elements in M"},
 	{"grid1_to_grid2", (PyCFunction)grid1_to_grid2_py, METH_VARARGS,
 		""},
-	{"grid2_to_grid1", (PyCFunction)grid1_to_grid2_py, METH_VARARGS,
+	{"grid2_to_grid1", (PyCFunction)grid2_to_grid1_py, METH_VARARGS,
 		""},
 	{"mask_out", (PyCFunction)mask_out_py, METH_VARARGS,
 		""},
 	{"proj_native_area_correct", (PyCFunction)proj_native_area_correct_py, METH_VARARGS,
 		""},
 	{"multiply_bydiag", (PyCFunction)multiply_bydiag_py, METH_VARARGS,
+		""},
+	{"hp_interp", (PyCFunction)hp_interp_py, METH_VARARGS,
 		""},
 
 	{NULL}     /* Sentinel - marks the end of this structure */

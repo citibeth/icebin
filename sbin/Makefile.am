@@ -12,13 +12,18 @@ AM_LDFLAGS += $(top_builddir)/slib/libglint2.la \
 	$(PYTHON_LDFLAGS) $(NUMPY_LDFLAGS)
 
 # the program to build (the names of the final binaries)
-bin_PROGRAMS = searise_grid overlap test_grid1 test_grid2 greenland_4x5
+bin_PROGRAMS = \
+	searise searise50 \
+	greenland_4x5 greenland_2x2_5 \
+	overlap
 
-searise_grid_SOURCES = searise_grid.cpp
-
-overlap_SOURCES = overlap.cpp
+searise_SOURCES = searise.cpp
+searise50_SOURCES = searise50.cpp
 
 greenland_4x5_SOURCES = greenland_4x5.cpp
+greenland_2x2_5_SOURCES = greenland_2x2_5.cpp
+
+overlap_SOURCES = overlap.cpp
 
 test_grid2_SOURCES = test_grid2.cpp
 test_grid1_SOURCES = test_grid1.cpp

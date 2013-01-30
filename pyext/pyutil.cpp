@@ -208,7 +208,7 @@ giss::BlitzSparseMatrix py_to_BlitzSparseMatrix(PyObject *m_tuple, std::string c
 
 		throw std::exception();
 	}
-printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, ncol, rows_py, cols_py, data_py);
+//printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, ncol, rows_py, cols_py, data_py);
 
 	// Check arrays and copy to std::vector
 	int dims[1] = {-1};

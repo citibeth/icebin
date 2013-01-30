@@ -184,11 +184,11 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 	scoord = "xy";
 	ExchangeGrid *exgrid = this;
 
-printf("ExchangeGrid 1\n");
+//printf("ExchangeGrid 1\n");
 
 	/** Suss out projections */
-printf("grid1.scoord = %s, grid2.scoord = %s\n", grid1.scoord.c_str(), grid2.scoord.c_str());
-printf("grid1.sproj = %s, grid2.sproj = %s\n", grid1.sproj.c_str(), grid2.sproj.c_str());
+//printf("grid1.scoord = %s, grid2.scoord = %s\n", grid1.scoord.c_str(), grid2.scoord.c_str());
+//printf("grid1.sproj = %s, grid2.sproj = %s\n", grid1.sproj.c_str(), grid2.sproj.c_str());
 
 	if (grid1.scoord == "xy") {
 		if (grid2.scoord == "xy") {
@@ -216,7 +216,7 @@ printf("grid1.sproj = %s, grid2.sproj = %s\n", grid1.sproj.c_str(), grid2.sproj.
 		}
 	}
 
-printf("ExchangeGrid 2\n");
+//printf("ExchangeGrid 2\n");
 
 	/** Initialize the new grid */
 	exgrid->name = grid1.name + '-' + grid2.name;
@@ -241,7 +241,7 @@ printf("ExchangeGrid 2\n");
 		double min[2];
 		double max[2];
 
-printf("grid1[%d]: x in (%f - %f), y in (%f - %f)\n", ocell1->cell->index, min[0], max[0], min[1], max[1]);
+//printf("grid1[%d]: x in (%f - %f), y in (%f - %f)\n", ocell1->cell->index, min[0], max[0], min[1], max[1]);
 
 		min[0] = CGAL::to_double(ocell1->bounding_box.xmin());
 		min[1] = CGAL::to_double(ocell1->bounding_box.ymin());
@@ -252,7 +252,7 @@ printf("grid1[%d]: x in (%f - %f), y in (%f - %f)\n", ocell1->cell->index, min[0
 
 		// Logging
 		++nprocessed;
-		if (nprocessed % 1000 == 0) {
+		if (nprocessed % 10 == 0) {
 			printf("Processed %d of %d from grid1, total overlaps = %d\n",
 				nprocessed+1, ogrid1.ocells.size(), exgrid->ncells_realized());
 		}

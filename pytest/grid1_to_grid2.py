@@ -11,10 +11,15 @@ import sys
 
 np.set_printoptions(threshold='nan')
 
-grid1_fname = '../greenland_4x5.nc'
+#grid1_fname = '../greenland_4x5.nc'
+#grid2_fname = '../searise50.nc'
+#exgrid_fname = '../greenland_4x5-searise50.nc'
+#data_fname = '../data/JUL1954.ijhcncar45.nc'
+
+grid1_fname = '../greenland_2x2_5.nc'
 grid2_fname = '../searise.nc'
-exgrid_fname = '../greenland_4x5-searise.nc'
-data_fname = '../data/JUL1954.ijhcncar45.nc'
+exgrid_fname = '../greenland_2x2_5-searise.nc'
+data_fname = '../data/JUL1954.ijhchctest225.nc'
 
 # ---------- Read from Exchange Grid
 nc = netCDF4.Dataset(exgrid_fname)

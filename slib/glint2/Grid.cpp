@@ -99,6 +99,7 @@ Vertex *Grid::add_vertex(Vertex &&vertex) {
 // ------------------------------------------------------------
 void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 {
+printf("Grid::netcdf_write() 1\n");
 	// ---------- Write out the vertices
 	NcVar *vertices_index_var = nc->get_var((vname + ".vertices.index").c_str());
 	NcVar *vertices_xy_var = nc->get_var((vname + ".vertices.xy").c_str());
@@ -114,6 +115,7 @@ void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 		vertices_xy_var->put(point, 1, 2);
 	}
 
+printf("Grid::netcdf_write() 2\n");
 	// -------- Write out the cells (and vertex references)
 	NcVar *cells_index_var = nc->get_var((vname + ".cells.index").c_str());
 //	NcVar *cells_i_var = nc->get_var((vname + ".cells.i").c_str());
@@ -127,6 +129,7 @@ void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 	NcVar *cells_vertex_refs_var = nc->get_var((vname + ".cells.vertex_refs").c_str());
 	NcVar *cells_vertex_refs_start_var = nc->get_var((vname + ".cells.vertex_refs_start").c_str());
 
+printf("Grid::netcdf_write() 3\n");
 	std::vector<Cell *> cells(_cells.sorted());
 	int ivref = 0;
 	i=0;
@@ -170,21 +173,24 @@ void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 			++ivref;
 		}
 	}
+printf("Grid::netcdf_write() 4\n");
 
 	// Write out a sentinel for polygon index bounds
 	cells_vertex_refs_start_var->set_cur(i);
 	cells_vertex_refs_start_var->put(&ivref, 1);
+printf("Grid::netcdf_write() 5\n");
 }
 
 
 
 boost::function<void ()> Grid::netcdf_define(NcFile &nc, std::string const &vname) const
 {
-printf("netcdf_define(%s)\n", vname.c_str());
+printf("netcdf_define(%s) 1\n", vname.c_str());
 
 	// ------ Attributes
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
+		info_var->add_att("version", 1);		// File format versioning
 		info_var->add_att("name", name.c_str());
 		info_var->add_att("type", stype.c_str());
 		info_var->add_att("coordinates", scoord.c_str());
@@ -194,9 +200,13 @@ printf("netcdf_define(%s)\n", vname.c_str());
 //			giss::Proj llproj(proj.latlong_from_proj());
 //			info_var->add_att("llprojection", llproj.get_def().c_str());
 		}
-		info_var->add_att("cells.num_full", ncells_full);
+
+		char buf[32];
+		sprintf(buf, "%ld", ncells_full);
+		info_var->add_att("cells.num_full", buf);
 		info_var->add_att("vertices.num_full", nvertices_full);
 
+printf("netcdf_define(%s) 2\n", vname.c_str());
 	// ------- Dimensions
 	// Count the number of times a vertex (any vertex) is referenced.
 	int nvref = 0;
@@ -216,6 +226,7 @@ printf("netcdf_define(%s)\n", vname.c_str());
 	NcDim *two_dim = giss::get_or_add_dim(nc, "two", 2);
 	NcDim *three_dim = giss::get_or_add_dim(nc, "three", 3);
 
+printf("netcdf_define(%s) 3\n", vname.c_str());
 	// --------- Variables
 	nc.add_var((vname + ".vertices.index").c_str(), ncInt, nvertices_dim);
 	nc.add_var((vname + ".vertices.xy").c_str(), ncDouble, nvertices_dim, two_dim);
@@ -232,6 +243,7 @@ printf("netcdf_define(%s)\n", vname.c_str());
 	nc.add_var((vname + ".cells.vertex_refs").c_str(), ncInt, nvrefs_dim);
 	nc.add_var((vname + ".cells.vertex_refs_start").c_str(), ncInt, ncells_plus_1_dim);
 
+printf("netcdf_define(%s) 4\n", vname.c_str());
 	return boost::bind(&Grid::netcdf_write, this, &nc, vname);
 }
 
@@ -253,7 +265,11 @@ std::string const &vname)
 			sproj = std::string(info_var->get_att("projection")->as_string(0));
 		else
 			sproj = "";
-		ncells_full = info_var->get_att("cells.num_full")->as_int(0);
+
+//		ncells_full = info_var->get_att("cells.num_full")->as_int(0);
+		char *sncells_full = info_var->get_att("cells.num_full")->as_string(0);
+		sscanf(sncells_full, "%ld", &ncells_full);
+
 		nvertices_full = info_var->get_att("vertices.num_full")->as_int(0);
 
 	// ---------- Read the Vertices
