@@ -345,7 +345,7 @@ void Grid::to_netcdf(std::string const &fname)
 	auto gridd = netcdf_define(nc, "grid");
 
 	// Write stuff in NetCDF file
-	printf("Writing ot netCDF file\n");
+	printf("Writing to netCDF file: %s\n", fname.c_str());
 	gridd();
 
 	nc.close();

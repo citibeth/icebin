@@ -20,12 +20,12 @@ class Glint2Tests(unittest.TestCase) :
 		self.assertTrue(abs(a - b) >= epsilon * abs(b))
 
 	def setUp(self) :
-		self.grid1_fname = '../greenland_2x2_5.nc'
-		self.grid2_fname = '../searise.nc'
-		self.exgrid_fname = '../greenland_2x2_5-searise.nc'
-		self.data_fname = '../data/JUL1950.ijhchc1k225.nc'#JUL1954.ijhchctest225.nc'
+		self.grid1_fname = 'greenland_2x2_5.nc'
+		self.grid2_fname = 'searise.nc'
+		self.exgrid_fname = 'greenland_2x2_5-searise.nc'
+		self.data_fname = 'data/JUL1950.ijhchc1k225.nc'
 		self.vname = 'impm_lndice'
-		self.searise_fname = '../data/Greenland_5km_v1.1.nc'
+		self.searise_fname = 'data/Greenland_5km_v1.1.nc'
 
 		# ---------- Read from Exchange Grid
 		nc = netCDF4.Dataset(self.exgrid_fname)

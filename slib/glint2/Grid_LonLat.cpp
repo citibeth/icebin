@@ -136,7 +136,7 @@ void Grid_LonLat::realize(
 			cell.index = (cell.j * nlon() + cell.i);
 			cell.area = graticule_area_exact(*this, lat0,lat1,lon0,lon1);
 
-printf("Adding lon/lat cell %d (%d, %d) area=%f\n", cell.index, cell.i, cell.j, cell.area);
+//printf("Adding lon/lat cell %d (%d, %d) area=%f\n", cell.index, cell.i, cell.j, cell.area);
 			add_cell(std::move(cell));
 		}
 	}
