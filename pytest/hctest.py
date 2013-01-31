@@ -115,7 +115,7 @@ mat_1p_to_2 = glint2.hp_interp(overlap_m, elev2, hpdefs)
 val2_hp = glint2.coo_multiply(mat_1p_to_2, val1h, fill=np.nan)
 
 val1hx = glint2.coo_multiply(mat_2_to_1h, val2_hp, fill=np.nan)
-val1hx_plt = glint2.coo_multiply(mat_1h_to_2, val1hx, fill=np.nan)
+#val1hx_plt = glint2.coo_multiply(mat_1h_to_2, val1hx, fill=np.nan)
 
 #print 'Computing AlmostI'
 #AlmostI = mat_2_to_1h * mat_1p_to_2
@@ -144,21 +144,24 @@ print 'total1hx      = %f' % np.nansum(area1hc * val1hx)
 # Plot multiple plots on one page
 figure = matplotlib.pyplot.figure(figsize=(8.5,11))
 
-# ---------- Plot field with height classes
+# ---------- Plot the ice grid (height point interpolation)
 ax = figure.add_subplot(121)
 plotter = glint2.Grid_read_plotter(grid2_fname, 'grid')
 mymap = giss.basemap.greenland_laea(ax)
 #mymap = giss.basemap.north_laea(ax)
-im = plotter.pcolormesh(mymap, val2_hc)
+im = plotter.pcolormesh(mymap, val2_hp)
 mymap.colorbar(im, "right", size='5%')
 mymap.drawcoastlines()
 
+
 # ---------- Plot with height classes, after going through ice grid
 ax = figure.add_subplot(122)
-plotter = glint2.Grid_read_plotter(grid2_fname, 'grid')
+plotter = glint2.Plotter_HC(
+	glint2.Grid_read_plotter(grid2_fname, 'grid'),
+	exgrid_fname, elev2, hcmax)
 mymap = giss.basemap.greenland_laea(ax)
 #mymap = giss.basemap.north_laea(ax)
-im = plotter.pcolormesh(mymap, val1hx_plt)
+im = plotter.pcolormesh(mymap, val1hx)
 mymap.colorbar(im, "right", size='5%')
 mymap.drawcoastlines()
 

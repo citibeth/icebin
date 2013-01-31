@@ -7,7 +7,6 @@ import giss.basemap
 import numpy.ma as ma
 import giss.util
 import giss.modele
-import sys
 
 np.set_printoptions(threshold='nan')
 

@@ -730,7 +730,7 @@ public:
 		jndx.reference(_cols);
 		val.reference(_vals);
 		_nnz_cur = (nnz_cur < 0 ? val.extent(0) : nnz_cur);
-printf("Constructed nnz = %d (%d %d)\n", _nnz_cur, val.extent(0), _vals.extent(0));
+//printf("Constructed nnz = %d (%d %d)\n", _nnz_cur, val.extent(0), _vals.extent(0));
 	}
 
 

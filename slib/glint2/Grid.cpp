@@ -255,7 +255,7 @@ std::string const &vname)
 {
 	clear();
 
-	printf("Grid::read_from_netcdf(%s)\n", vname.c_str());
+//	printf("Grid::read_from_netcdf(%s)\n", vname.c_str());
 	// ---------- Read the Basic Info
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 		name = std::string(info_var->get_att("name")->as_string(0));

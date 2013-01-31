@@ -50,7 +50,7 @@ PyTypeObject **types)			// NULL-terminated Array of type pointers
 
 		// Add the type to the module.
 		Py_INCREF(type);
-		printf("Adding type %s (%p) to module %p\n", type->tp_name, type, mod);
+//		printf("Adding type %s (%p) to module %p\n", type->tp_name, type, mod);
 		PyModule_AddObject(mod, type->tp_name, (PyObject*)type);
 	}
 

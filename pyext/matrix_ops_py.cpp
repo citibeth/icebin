@@ -166,8 +166,8 @@ PyObject *mask_out_py(PyObject *self, PyObject *args)
 
 		blitz::Array<int,1> mask1, mask2;
 
-		printf("mask1_py = %p\n", mask1_py);
-		printf("mask2_py = %p\n", mask2_py);
+//		printf("mask1_py = %p\n", mask1_py);
+//		printf("mask2_py = %p\n", mask2_py);
 
 		blitz::Array<int,1> *mask1p = NULL;
 		if (mask1_py != Py_None) {
@@ -182,10 +182,10 @@ PyObject *mask_out_py(PyObject *self, PyObject *args)
 		}
 
 		// Do the call
-printf("Calling mask_out()\n");
+//printf("Calling mask_out()\n");
 		std::unique_ptr<giss::VectorSparseMatrix> ret_c(
 			glint2::mask_out(overlap, mask1p, mask2p));
-printf("Done Calling mask_out()\n");
+//printf("Done Calling mask_out()\n");
 
 		// Create an output tuple of Numpy arrays
 		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
@@ -234,13 +234,13 @@ PyObject *multiply_bydiag_py(PyObject *self, PyObject *args)
 		if (!PyArg_ParseTuple(args, "OO",
 			&arg1_py, &arg2_py))
 		{ return NULL; }
-printf("arg1=%p, arg2=%p\n", arg1_py, arg2_py);
+//printf("arg1=%p, arg2=%p\n", arg1_py, arg2_py);
 
 		// Figure whether we're doing (A * diag) or (diag * A)
 		PyObject *mat_py;
 		PyObject *diag_py;
 		bool right_mul = PyTuple_Check(arg1_py);
-printf("right_mul = %d\n", right_mul);
+//printf("right_mul = %d\n", right_mul);
 		if (right_mul) {	// A * diag
 			mat_py = arg1_py;
 			diag_py = arg2_py;
@@ -248,7 +248,7 @@ printf("right_mul = %d\n", right_mul);
 			mat_py = arg2_py;
 			diag_py = arg1_py;
 		}
-printf("mat=%p, diag=%p\n", arg1_py, arg2_py);
+//printf("mat=%p, diag=%p\n", arg1_py, arg2_py);
 
 		// Check arrays and copy to giss::VectorSparseMatrix
 		auto mat(giss::py_to_BlitzSparseMatrix(mat_py, "mat"));

@@ -38,7 +38,7 @@ static PyObject *Grid_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 /** Read from a file */
 static int Grid__init(PyGrid *self, PyObject *args, PyObject *kwds)
 {
-printf("Grid__init() called\n");
+//printf("Grid__init() called\n");
 
 	// Get arguments
 	const char *fname;
