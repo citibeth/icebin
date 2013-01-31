@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Run this script to fetch the data required to run the tests.
+#
+
+# Download the data
+wget -r --no-parent --reject 'rfischer,index.html,robots.txt' http://www.giss.nasa.gov/staff/rfischer/glint2-data/
+
+# Clean it up
+rm -rf data
+mv www.giss.nasa.gov/staff/rfischer/glint2-data data
+rm -rf www.giss.nasa.gov
