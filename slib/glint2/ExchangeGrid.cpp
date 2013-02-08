@@ -183,6 +183,7 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 : Grid(Grid::Type::EXCHANGE)
 {
 	coordinates = Grid::Coordinates::XY;
+	parameterization = Grid::Parameterization::L0;	// Why not?
 	ExchangeGrid *exgrid = this;
 
 //printf("ExchangeGrid 1\n");

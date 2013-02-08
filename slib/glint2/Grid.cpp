@@ -53,7 +53,7 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 }
 
 // ------------------------------------------------------------
-Grid::Grid(Type _type) : type(_type) {}
+Grid::Grid(Type _type) : type(_type), coordinates(Grid::Coordinates::LONLAT), parameterization(Grid::Parameterization::L0) {}
 
 long Grid::ndata() const
 {
