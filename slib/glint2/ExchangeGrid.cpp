@@ -7,6 +7,7 @@
 
 #include <giss/RTree.hpp>
 #include <giss/Proj2.hpp>
+#include <giss/ncutil.hpp>
 
 #include <glint2/ExchangeGrid.hpp>
 #include <glint2/gridutil.hpp>
@@ -179,9 +180,9 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_full_nvertices,
 /** @param grid2 Put in an RTree */
 //std::unique_ptr<Grid> compute_exchange_grid
 ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string const &_sproj)
-: Grid("exchange")
+: Grid(Grid::Type::EXCHANGE)
 {
-	scoord = "xy";
+	coordinates = Grid::Coordinates::XY;
 	ExchangeGrid *exgrid = this;
 
 //printf("ExchangeGrid 1\n");
@@ -190,8 +191,8 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 //printf("grid1.scoord = %s, grid2.scoord = %s\n", grid1.scoord.c_str(), grid2.scoord.c_str());
 //printf("grid1.sproj = %s, grid2.sproj = %s\n", grid1.sproj.c_str(), grid2.sproj.c_str());
 
-	if (grid1.scoord == "xy") {
-		if (grid2.scoord == "xy") {
+	if (grid1.coordinates == Grid::Coordinates::XY) {
+		if (grid2.coordinates == Grid::Coordinates::XY) {
 			// No projections needed
 			if (grid1.sproj != grid2.sproj) {
 				fprintf(stderr, "Two XY grids must have the same projection\n");
@@ -203,7 +204,7 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 			sproj = (_sproj == "" ? std::string(grid1.sproj.c_str()) : _sproj);
 		}
 	} else {
-		if (grid2.scoord == "xy") {
+		if (grid2.coordinates == Grid::Coordinates::XY) {
 			// grid1=ll, grid2=xy: Project from grid 1 to grid2's xy
 			proj1.init(grid2.sproj, giss::Proj2::Direction::LL2XY);
 			sproj = (_sproj == "" ? std::string(grid2.sproj.c_str()) : _sproj);
@@ -278,8 +279,8 @@ void ExchangeGrid::read_from_netcdf(NcFile &nc, std::string const &vname)
 	Grid::read_from_netcdf(nc, vname);
 
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
-	grid1_ncells_full = info_var->get_att("grid1.ncells_full")->as_int(0);
-	grid2_ncells_full = info_var->get_att("grid2.ncells_full")->as_int(0);
+	grid1_ncells_full = giss::get_att(info_var, "grid1.ncells_full")->as_int(0);
+	grid2_ncells_full = giss::get_att(info_var, "grid2.ncells_full")->as_int(0);
 	proj1.read_from_netcdf(nc, info_var, "proj1");
 	proj2.read_from_netcdf(nc, info_var, "proj2");
 }

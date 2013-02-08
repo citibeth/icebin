@@ -1,5 +1,6 @@
 #include <memory>
 
+#include <giss/ncutil.hpp>
 #include <glint2/Grid.hpp>
 #include <glint2/Grid_XY.hpp>
 #include <glint2/Grid_LonLat.hpp>
@@ -11,15 +12,21 @@ namespace glint2 {
 std::unique_ptr<Grid> read_grid(NcFile &nc, std::string const &vname)
 {
 	auto info_var = nc.get_var((vname + ".info").c_str());
-	std::string stype(info_var->get_att("type")->as_string(0));
+
+	Grid::Type type = giss::parse_enum<Grid::Type>(
+		giss::get_att(info_var, "type")->as_string(0));
 
 	std::unique_ptr<Grid> grid;
-	if (stype == "xy") {
-		grid.reset(new Grid_XY());
-	} else if (stype == "lonlat") {
-		grid.reset(new Grid_LonLat());
-	} else {
-		grid.reset(new Grid("generic"));
+	switch(type.index()) {
+		case Grid::Type::XY :
+			grid.reset(new Grid_XY());
+			break;
+		case Grid::Type::LONLAT :
+			grid.reset(new Grid_LonLat());
+			break;
+		default :
+			grid.reset(new Grid(Grid::Type::GENERIC));
+			break;
 	}
 
 	grid->read_from_netcdf(nc, vname);

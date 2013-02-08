@@ -39,6 +39,7 @@ NcVar *get_var_safe(NcFile &nc, std::string const &var_name)
 	return NULL;
 }
 
+#if 0
 std::vector<double> read_double_vector(NcFile &nc, std::string const &var_name)
 {
 	// Read points vector
@@ -58,6 +59,11 @@ std::vector<int> read_int_vector(NcFile &nc, std::string const &var_name)
 	vpoints->get(&points[0], npoints);
 	return points;
 }
+#endif
 
+void netcdf_write_functions(std::vector<boost::function<void ()>> const &functions)
+{
+	for (auto fn = functions.begin(); fn != functions.end(); ++fn) (*fn)();
+}
 
 }

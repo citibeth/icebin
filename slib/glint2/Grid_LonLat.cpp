@@ -238,11 +238,11 @@ void Grid_LonLat::read_from_netcdf(NcFile &nc, std::string const &vname)
 	Grid::read_from_netcdf(nc, vname);
 
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
-	north_pole = (info_var->get_att("north_pole_cap")->as_int(0) != 0);
-	south_pole = (info_var->get_att("south_pole_cap")->as_int(0) != 0);
-	points_in_side = info_var->get_att("points_in_side")->as_int(0);
-//	_nlon = info_var->get_att("nlon")->as_int(0);
-//	_nlat = info_var->get_att("nlat")->as_int(0);
+	north_pole = (giss::get_att(info_var, "north_pole_cap")->as_int(0) != 0);
+	south_pole = (giss::get_att(info_var, "south_pole_cap")->as_int(0) != 0);
+	points_in_side = giss::get_att(info_var, "points_in_side")->as_int(0);
+//	_nlon = giss::get_att(info_var, "nlon")->as_int(0);
+//	_nlat = giss::get_att(info_var, "nlat")->as_int(0);
 
 	lonb = giss::read_double_vector(nc, vname + ".lon_boundaries");
 	latb = giss::read_double_vector(nc, vname + ".lat_boundaries");

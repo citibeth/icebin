@@ -53,7 +53,14 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 }
 
 // ------------------------------------------------------------
-Grid::Grid(std::string const &_stype) : stype(_stype) {}
+Grid::Grid(Type _type) : type(_type) {}
+
+long Grid::ndata() const
+{
+	if (parameterization == Parameterization::L1)
+		return nvertices_full;
+	return ncells_full;
+}
 
 void Grid::clear()
 {
@@ -192,9 +199,10 @@ printf("netcdf_define(%s) 1\n", vname.c_str());
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
 		info_var->add_att("version", 1);		// File format versioning
 		info_var->add_att("name", name.c_str());
-		info_var->add_att("type", stype.c_str());
-		info_var->add_att("coordinates", scoord.c_str());
-		if (scoord == "xy") {
+		info_var->add_att("type", type.str());
+		info_var->add_att("coordinates", coordinates.str());
+		info_var->add_att("parameterization", parameterization.str());
+		if (coordinates == Coordinates::XY) {
 			info_var->add_att("projection", sproj.c_str());
 //			giss::Proj proj(sproj);
 //			giss::Proj llproj(proj.latlong_from_proj());
@@ -258,19 +266,25 @@ std::string const &vname)
 //	printf("Grid::read_from_netcdf(%s)\n", vname.c_str());
 	// ---------- Read the Basic Info
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
-		name = std::string(info_var->get_att("name")->as_string(0));
-		stype = std::string(info_var->get_att("type")->as_string(0));
-		scoord = std::string(info_var->get_att("coordinates")->as_string(0));
-		if (scoord == "xy")
-			sproj = std::string(info_var->get_att("projection")->as_string(0));
+		name = std::string(giss::get_att(info_var, "name")->as_string(0));
+
+		type = giss::parse_enum<decltype(type)>(
+			giss::get_att(info_var, "type")->as_string(0));
+		coordinates = giss::parse_enum<decltype(coordinates)>(
+			giss::get_att(info_var, "coordinates")->as_string(0));
+		parameterization = giss::parse_enum<decltype(parameterization)>(
+			giss::get_att(info_var, "parameterization")->as_string(0));
+
+		if (coordinates == Coordinates::XY)
+			sproj = std::string(giss::get_att(info_var, "projection")->as_string(0));
 		else
 			sproj = "";
 
-//		ncells_full = info_var->get_att("cells.num_full")->as_int(0);
-		char *sncells_full = info_var->get_att("cells.num_full")->as_string(0);
+//		ncells_full = giss::get_att(info_var, "cells.num_full")->as_int(0);
+		char *sncells_full = giss::get_att(info_var, "cells.num_full")->as_string(0);
 		sscanf(sncells_full, "%ld", &ncells_full);
 
-		nvertices_full = info_var->get_att("vertices.num_full")->as_int(0);
+		nvertices_full = giss::get_att(info_var, "vertices.num_full")->as_int(0);
 
 	// ---------- Read the Vertices
 	// Basic Info
@@ -369,7 +383,7 @@ std::vector<double> Grid::get_proj_area(std::string const &sproj) const
 {
 	// Set up the projection
 	giss::Proj2 proj;
-	if (this->scoord == "lonlat") {
+	if (coordinates == Coordinates::LONLAT) {
 		proj.init(sproj, giss::Proj2::Direction::LL2XY);
 	} else {
 		fprintf(stderr, "proj_to_native() only makes sense for grids in Lon/Lat Coordinates!");

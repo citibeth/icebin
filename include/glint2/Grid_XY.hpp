@@ -26,8 +26,9 @@ public:
 	int ny() const { return yb.size() - 1; }
 
 	// -----------------------------------------
-	Grid_XY() : Grid("xy") {
-		scoord = "xy";
+	Grid_XY() : Grid(Grid::Type::XY) {
+		coordinates = Grid::Coordinates::XY;
+		parameterization = Grid::Parameterization::L0;
 	}
 
 	virtual int ij_to_index(int i, int j) const

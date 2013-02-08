@@ -1,4 +1,5 @@
 #include <giss/Proj2.hpp>
+#include <giss/ncutil.hpp>
 
 namespace giss {
 
@@ -71,11 +72,11 @@ NcFile &nc,
 NcVar *info_var,
 std::string const &vname)
 {
-	sproj = std::string(info_var->get_att(vname.c_str())->as_string(0));
+	sproj = std::string(get_att(info_var, vname.c_str())->as_string(0));
 	if (sproj == "") {
 		clear();
 	} else {
-		std::string sdir(std::string(info_var->get_att((vname + ".direction").c_str())->as_string(0)));
+		std::string sdir(std::string(get_att(info_var, (vname + ".direction").c_str())->as_string(0)));
 		if (sdir == "xy2ll") direction = Direction::XY2LL;
 		else if (sdir == "ll2xy") direction = Direction::LL2XY;
 		else throw std::exception();

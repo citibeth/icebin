@@ -23,8 +23,10 @@ libglint2_la_SOURCES = \
 	glint2/gridutil.cpp \
 	glint2/HeightClassifier.cpp \
 	glint2/matrix_ops.cpp \
+	glint2/IceSheet.cpp \
+	glint2/IceSheet_L0.cpp \
 	glint2/MatrixMaker.cpp \
-	glint2/MatrixMaker_L0.cpp \
+	glint2/read_matrixmaker.cpp \
 	glint2/ExchangeGrid.cpp \
 	glint2/clippers.cpp
 

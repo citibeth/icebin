@@ -6,6 +6,7 @@
 #include <boost/function.hpp>
 #include <giss/Dict.hpp>
 #include <giss/Proj2.hpp>
+#include <giss/enum.hpp>
 
 namespace glint2 {
 
@@ -99,10 +100,36 @@ class Grid {
 	giss::Dict<int, Cell> _cells;
 
 public:
+	// Corresponds to classes
+	BOOST_ENUM_VALUES( Type, int,
+		(GENERIC)		(0)		// Just use the Grid base class
+		(XY)			(1)		// Rectilinear X/Y grid
+		(LONLAT)		(2)		// Global lat-lon grid (maybe with polar caps)
+		(EXCHANGE)		(3)		// Exchange grid, from overlap of two other grids
+//		(CUBESPHERE)	(4)		// Global Cubed Sphere grid
+//		(MESH)			(5)		// Arbitrary mesh (could be global or on plane)
+	)
 
-	std::string stype;
+	BOOST_ENUM_VALUES( Coordinates, int,
+		(XY)			(0)		// Vertices in x/y coordinates on a plane
+		(LONLAT)		(1)		// Vertices in lon/lat coordinates on a sphere
+	)
+
+	BOOST_ENUM_VALUES( Parameterization, int,
+		(L0)			(0)		// Constant value in each grid cell
+		(L1)			(1)		// Value specified at each vertex, slope inbetween
+	)
+
+	Type type;
+	Coordinates coordinates;
+	Parameterization parameterization;
+
+#if 0
+	std::string stype;		// xy, lonlat, cs, mesh, etc
 	/** Tells whether vertex coordinates are in x/y on a plane or lon/lat on a sphere. */
 	std::string scoord;		// xy or lonlat
+#endif
+
 	std::string name;
 
 	long ncells_full;		// Maximum possible index (-1)
@@ -118,8 +145,11 @@ public:
 	here to a specific point on the globe (as a Proj.4 String). */
 	std::string sproj;
 
-	Grid(std::string const &_stype);
+	Grid(Type type);
 	virtual ~Grid() {}
+
+	/** @return ncells_full (for L0) or nvertices_full (for L1) */
+	long ndata() const;
 
 	virtual void clear();
 

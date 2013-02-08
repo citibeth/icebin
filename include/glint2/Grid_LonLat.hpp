@@ -56,8 +56,9 @@ public:
 	double eq_rad;
 
 	// ---------------------------------
-	Grid_LonLat() : Grid("lonlat") {
-		scoord = "lonlat";
+	Grid_LonLat() : Grid(Grid::Type::LONLAT) {
+		coordinates = Grid::Coordinates::LONLAT;
+		parameterization = Grid::Parameterization::L0;
 		points_in_side = 1;
 	}
 

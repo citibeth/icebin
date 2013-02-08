@@ -121,12 +121,12 @@ std::unique_ptr<VectorSparseMatrix> VectorSparseMatrix::netcdf_read(
 	// Read the descriptor
 	NcVar *descrVar = nc.get_var((vname + ".descr").c_str());
 	SparseDescr descr(
-		descrVar->get_att("nrow")->as_int(0),
-		descrVar->get_att("ncol")->as_int(0),
-		descrVar->get_att("index_base")->as_int(0),
-		(SparseMatrix::MatrixStructure)descrVar->get_att("matrix_structure")->as_int(0),
-		(SparseMatrix::TriangularType)descrVar->get_att("triangular_type")->as_int(0),
-		(SparseMatrix::MainDiagonalType)descrVar->get_att("main_diagonal_type")->as_int(0));
+		get_att(descrVar, "nrow")->as_int(0),
+		get_att(descrVar, "ncol")->as_int(0),
+		get_att(descrVar, "index_base")->as_int(0),
+		(SparseMatrix::MatrixStructure)get_att(descrVar, "matrix_structure")->as_int(0),
+		(SparseMatrix::TriangularType)get_att(descrVar, "triangular_type")->as_int(0),
+		(SparseMatrix::MainDiagonalType)get_att(descrVar, "main_diagonal_type")->as_int(0));
 
 #if 0
 // ********* TODO REMOVE ***************

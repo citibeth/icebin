@@ -14,7 +14,7 @@ AM_LDFLAGS += $(top_builddir)/slib/libglint2.la \
 # the program to build (the names of the final binaries)
 bin_PROGRAMS = \
 	hires \
-	searise searise50 \
+	searise searise50 searise100 \
 	greenland_4x5 greenland_2x2_5 \
 	overlap
 
@@ -22,6 +22,7 @@ hires_SOURCES = hires.cpp
 
 searise_SOURCES = searise.cpp
 searise50_SOURCES = searise50.cpp
+searise100_SOURCES = searise100.cpp
 
 greenland_4x5_SOURCES = greenland_4x5.cpp
 greenland_2x2_5_SOURCES = greenland_2x2_5.cpp

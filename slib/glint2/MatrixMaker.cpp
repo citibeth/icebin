@@ -1,62 +1,160 @@
 #include <glint2/MatrixMaker.hpp>
+#include <glint2/IceSheet_L0.hpp>
 #include <glint2/eigen.hpp>
+#include <giss/ncutil.hpp>
 
 namespace glint2 {
 
-/** Call this after you've set data members, to finish construction. */
-void MatrixMaker::realize()
+void MatrixMaker::clear()
 {
-
-	// Compute overlap matrix from exchange grid
-	overlap_raw.reset(new giss::VectorSparseMatrix(
-		giss::SparseDescr(grid1->ncells_full, grid2->ncells_full)));
-	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell)
-		overlap_raw->add(cell->i, cell->j, area_of_polygon(*cell));
-
-	// Mask out unused cells
-	overlap_m = mask_out(
-		giss::BlitzSparseMatrix(*overlap_raw), mask1.get(), mask2.get());
+	sheets.clear();
+	grid1.reset();
+	mask1.reset();
+	hpdefs.clear();
+	// hcmax.clear();
 }
 
-std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
-{
-	// Get two matrices and convert to Eigen format.
-	auto e_ice_to_hc(giss_to_Eigen(*ice_to_hc()));
-	auto e_hp_to_ice(giss_to_Eigen(*hp_to_ice()));	// TODO: Consider making this one column-major to ease multiplication below.
-
-	// Multiply the matices in Eigen format
-	auto e_ret((*e_ice_to_hc) * (*e_hp_to_ice));
-
-	// Convert back to GISS format sparse matrices
-	return giss::Eigen_to_giss(e_ret);
+void MatrixMaker::realize() {
+	for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
+		(*ii)->realize();
 }
+
+int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet) {
+	sheet->gcm = this;
+	int n = sheets.size();
+	sheets.push_back(std::move(sheet));
+	return n;
+}
+
+
+/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
+void MatrixMaker::compute_fhc(
+	blitz::Array<double,2> *fhc1h,	// OUT
+	blitz::Array<double,1> *fgice1)	// OUT: Portion of gridcell covered in ground ice (from landmask)
+{
+	// Zero it all out
+	int n1 = grid1->ndata();
+	if (fhc1h) {
+		for (int ihc=0; ihc<nhc(); ++ihc) {
+			for (int i1=0; i1<n1; ++i1) {
+				(*fhc1h)(ihc,i1) = 0.;
+			}
+		}
+	}
+
+	if (fgice1) {
+		for (int i1=0; i1<n1; ++i1) (*fgice1)(i1) = 0.;
+	}
+
+	// Add in for each ice sheet
+	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+		(*sheet)->compute_fhc(fhc1h, fgice1);
+	}
+}
+
 // ==============================================================
 // Write out the parts that this class computed --- so we can test/check them
 
-static void MatrixMaker_netcdf_write(// NcFile *nc, std::string const &vname,
-boost::function<void ()> const &fn1,
-boost::function<void ()> const &fn2)
-{
-	fn1();
-	fn2();
-}
-
-
 boost::function<void ()> MatrixMaker::netcdf_define(NcFile &nc, std::string const &vname) const
 {
+	std::vector<boost::function<void ()>> fns;
+	fns.reserve(sheets.size() + 1);
+
 	// ------ Attributes
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
-		info_var->add_att("grid1.name", grid1->name.c_str());
+
+	// Names of the ice sheets
+	std::string sheet_names = "";
+	for (auto sheetp = sheets.begin(); ; ) {
+		IceSheet &sheet = **sheetp;
+		sheet_names.append(vname + ".icesheets");
+		++sheetp;
+		if (sheetp == sheets.end()) break;
+		sheet_names.append(",");
+	}
+	info_var->add_att("sheetnames", sheet_names.c_str());
+#if 0
+		info_var->add_att("grid1.name", gcm->grid1->name.c_str());
 		info_var->add_att("grid2.name", grid2->name.c_str());
 		info_var->add_att("exgrid.name", exgrid->name.c_str());
+#endif
 
-	return boost::bind(&MatrixMaker_netcdf_write, // this, &nc, vname,
-		overlap_raw->netcdf_define(nc, vname + ".overlap_raw"),
-		overlap_m->netcdf_define(nc, vname + ".overlap_m"));
+	// Define the variables
+	fns.push_back(grid1->netcdf_define(nc, vname + ".grid1"));
+	if (mask1.get())
+		fns.push_back(giss::netcdf_define(nc, vname + "mask1", *mask1));
+	fns.push_back(giss::netcdf_define(nc, vname + "hpdefs", hpdefs));
+	fns.push_back(giss::netcdf_define(nc, vname + "hcmax", hcmax));
+	for (auto sheetp = sheets.begin(); sheetp != sheets.end(); ++sheetp) {
+		IceSheet &sheet = **sheetp;
+		fns.push_back(sheet.netcdf_define(nc, vname + "." + sheet.name()));
+	}
+
+
+	return boost::bind(&giss::netcdf_write_functions, fns);
+}
+// -------------------------------------------------------------
+static std::vector<std::string> parse_comma_list(std::string list)
+{
+	std::stringstream ss(list);
+	std::vector<std::string> result;
+
+	while( ss.good() ) {
+		std::string substr;
+		getline( ss, substr, ',' );
+		result.push_back( substr );
+	}
+	return result;
+}
+
+std::unique_ptr<IceSheet> read_ice_sheet(NcFile &nc, std::string const &vname)
+{
+	auto info_var = nc.get_var((vname + ".info").c_str());
+	std::string stype(giss::get_att(info_var, "parameterization")->as_string(0));
+
+	std::unique_ptr<IceSheet> sheet;
+	if (stype == "L0") {
+		sheet.reset(new IceSheet_L0);
+	}
+#if 0
+	else if (stype == "L1") {
+		sheet.reset(new IceSheet_L1);
+	}
+#endif
+
+	sheet->read_from_netcdf(nc, vname);
+	return sheet;
+
 }
 
 
+void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
+{
+	clear();
+
+	grid1.reset(read_grid(nc, vname + ".grid1").release());
+	if (giss::get_var_safe(nc, vname + ".mask1")) {
+		mask1.reset(new blitz::Array<int,1>(
+		giss::read_blitz<int,1>(nc, vname + ".mask1")));
+	}
+	hpdefs = giss::read_vector<double>(nc, vname + ".hpdefs");
+	hcmax = giss::read_blitz<double,1>(nc, vname + ".hcmax");
+
+//	grid2.reset(read_grid(nc, "grid2").release());
+//	exgrid.reset(read_grid(nc, "exgrid").release());
+
+	// Read list of ice sheets
+	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+	std::vector<std::string> sheet_names(parse_comma_list(std::string(
+		giss::get_att(info_var, "sheetnames")->as_string(0))));
+
+	for (auto sname = sheet_names.begin(); sname != sheet_names.end(); ++sname) {
+		sheets.push_back(read_ice_sheet(nc, vname + "." + *sname));
+	}
+
+
+}
 
 
 }

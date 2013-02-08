@@ -19,8 +19,9 @@ ax = figure.add_subplot(111)
 
 mymap = giss.basemap.greenland_laea(ax)
 #mymap = giss.basemap.north_laea(ax)
-grid.plot(mymap)
+grid.plot(mymap, linewidth=.5)
 mymap.drawcoastlines()
 
 # Also show on screen
+figure.savefig('x.pdf')
 matplotlib.pyplot.show()

@@ -26,9 +26,10 @@ blitz::Array<T,1> const vector_to_blitz(std::vector<T> const &vec)
 	shape[0] = vec.size();
 	strides[0] = 1;		// Blitz++ strides in sizeof(T) units
 
-    return blitz::Array<T,1>(&vec[0], shape, strides,
+	// const_cast because Blitz++ can't construct a const Array
+	T *vecp = const_cast<T *>(&vec[0]);
+    return blitz::Array<T,1>(vecp, shape, strides,
 		blitz::neverDeleteData);
 }
-
 
 }
