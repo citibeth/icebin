@@ -1,6 +1,7 @@
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet.hpp>
 #include <glint2/eigen.hpp>
+#include <giss/memory.hpp>
 
 namespace glint2 {
 
@@ -17,9 +18,36 @@ void IceSheet::clear()
 /** Call this after you've set data members, to finish construction. */
 void IceSheet::realize()
 {
+	// Check bounds, etc.
+	if (exgrid->grid1_ncells_full != gcm->grid1->ncells_full()) {
+		fprintf(stderr, "Exchange Grid for %s incompatible with GCM grid: ncells_full = %d (vs %d expected)\n",
+			name().c_str(), exgrid->grid1_ncells_full, gcm->grid1->ncells_full());
+		throw std::exception();
+	}
+
+	if (exgrid->grid2_ncells_full != grid2->ncells_full()) {
+		fprintf(stderr, "Exchange Grid for %s incompatible with Ice grid: ncells_full = %d (vs %d expected)\n",
+			name().c_str(), exgrid->grid2_ncells_full, grid2->ncells_full());
+		throw std::exception();
+	}
+
+	long n2 = grid2->ndata();
+	if (mask2.get() && mask2->extent(0) != n2) {
+		fprintf(stderr, "Mask2 for %s has wrong size: %ld (vs %ld expected)\n",
+			name().c_str(), mask2->extent(0), n2);
+		throw std::exception();
+	}
+
+	if (elev2.extent(0) != n2) {
+		fprintf(stderr, "Elev2 for %s has wrong size: %ld (vs %ld expected)\n",
+			name().c_str(), elev2.extent(0), n2);
+		throw std::exception();
+	}
+
+
 	// Compute overlap matrix from exchange grid
 	overlap_raw.reset(new giss::VectorSparseMatrix(
-		giss::SparseDescr(gcm->grid1->ncells_full, grid2->ncells_full)));
+		giss::SparseDescr(exgrid->grid1_ncells_full, exgrid->grid2_ncells_full)));
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell)
 		overlap_raw->add(cell->i, cell->j, area_of_polygon(*cell));
 
@@ -67,7 +95,7 @@ void IceSheet::read_from_netcdf(NcFile &nc, std::string const &vname)
 	clear();
 
 	grid2.reset(read_grid(nc, "grid2").release());
-	exgrid.reset(read_grid(nc, "exgrid").release());
+	exgrid = giss::shared_cast<ExchangeGrid,Grid>(read_grid(nc, "exgrid"));
 	if (giss::get_var_safe(nc, vname + ".mask2")) {
 		mask2.reset(new blitz::Array<int,1>(
 		giss::read_blitz<int,1>(nc, vname + ".mask2")));

@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 
 	grid.realize(boost::bind(&EuclidianClip::keep_all, _1));
 
-	printf("Ice grid has %ld cells\n", grid.ncells_full);
+	printf("Ice grid has %ld cells\n", grid.ncells_full());
 
 	// ------------- Write it out to NetCDF
 	fflush(stdout);

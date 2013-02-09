@@ -144,7 +144,7 @@ void OGrid::realize_rtree() {
 	vertices in grid1 or grid2.  No more than a "best effort" is
 	needed to eliminate duplicate vertices.
 @return Always returns true (tells RTree search algorithm to keep going) */
-static bool overlap_callback(VertexCache *exvcache, long grid2_full_nvertices,
+static bool overlap_callback(VertexCache *exvcache, long grid2_ndata,
 	OCell const **ocell1p, OCell const *ocell2)
 {
 	// Enable using same boost::function callback for many values of grid1
@@ -158,7 +158,7 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_full_nvertices,
 	Cell excell;	// Exchange Cell
 	excell.i = ocell1->cell->index;
 	excell.j = ocell2->cell->index;
-	excell.index = excell.i * grid2_full_nvertices + excell.j;	// guarantee unique
+	excell.index = excell.i * grid2_ndata + excell.j;	// guarantee unique
 
 	// Add the vertices of the polygon outline
 	for (auto vertex = expoly.vertices_begin(); vertex != expoly.vertices_end(); ++vertex) {
@@ -218,14 +218,14 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 		}
 	}
 
-//printf("ExchangeGrid 2\n");
-
 	/** Initialize the new grid */
 	exgrid->name = grid1.name + '-' + grid2.name;
-	exgrid->grid1_ncells_full = grid1.ncells_full;
-	exgrid->grid2_ncells_full = grid2.ncells_full;
-	exgrid->ncells_full = grid1.ncells_full * grid2.ncells_full;
-	exgrid->nvertices_full = -1;	// Not specified
+	long n1 = grid1.ncells_full();
+	long n2 = grid2.ncells_full();
+	exgrid->grid1_ncells_full = n1;
+	exgrid->grid2_ncells_full = n2;
+	exgrid->_ncells_full = n1 * n2;
+	exgrid->_nvertices_full = -1;	// Not specified
 	VertexCache exvcache(exgrid);
 
 	OGrid ogrid1(&grid1, proj1);
@@ -234,7 +234,7 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 
 	OCell const *ocell1;
 	auto callback(boost::bind(&overlap_callback, &exvcache,
-		grid2.nvertices_full, &ocell1, _1));
+		grid2.ndata(), &ocell1, _1));
 
 	int nprocessed=0;
 	for (auto ii1 = ogrid1.ocells.begin(); ii1 != ogrid1.ocells.end(); ++ii1) {

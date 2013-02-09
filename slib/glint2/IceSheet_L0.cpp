@@ -45,12 +45,12 @@ void IceSheet_L0::compute_fhc(
 blitz::Array<double,2> *fhc1h,
 blitz::Array<double,1> *fgice1)	// Portion of gridcell covered in ground ice (from landmask)
 {
-	int n1 = gcm->grid1->ncells_full;
 	std::vector<double> area1 = overlap_raw->sum_per_row();
 	std::vector<double> area1_m = overlap_m->sum_per_row();
 	std::vector<double> area1_m_hc = overlap_m_hc->sum_per_row();
 
 	// Allow us to only iterate over cells in grid1 that overlap grid2
+	int n1 = this->n1();
 	giss::IndexTranslator trans_1_1p;
 	giss::IndexTranslator trans_2_2p;
 	make_used_translators(*overlap_m, trans_1_1p, trans_2_2p);

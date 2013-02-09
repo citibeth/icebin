@@ -15,6 +15,23 @@ void MatrixMaker::clear()
 }
 
 void MatrixMaker::realize() {
+
+	// ---------- Check array bounds
+	long n1 = grid1->ndata();
+	if (mask1.get() && mask1->extent(0) != n1) {
+		fprintf(stderr, "mask1 for %s has wrong size: %d (vs %d expected)\n",
+			mask1->extent(0), n1);
+		throw std::exception();
+	}
+
+	long nhc = hpdefs.size();
+	if (hcmax.extent(0) != nhc-1) {
+		fprintf(stderr, "hcmax for %s has wrong size: %d (vs %d expected)\n",
+			mask1->extent(0), n1);
+		throw std::exception();
+	}
+
+	// ------------- Realize the ice sheets
 	for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
 		(*ii)->realize();
 }
@@ -154,6 +171,22 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 	}
 
 
+}
+
+std::unique_ptr<IceSheet> new_ice_sheet(Grid::Parameterization parameterization)
+{
+	switch(parameterization.index()) {
+		case Grid::Parameterization::L0 :
+			return std::unique_ptr<IceSheet>(new IceSheet_L0);
+		break;
+#if 0
+		case Grid::Parameterization::L1 :
+			return std::unique_ptr<IceSheet>(new IceSheet_L1);
+		break;
+#endif
+		default :
+			fprintf(stderr, "Unrecognized parameterization: %s\n", parameterization.str());
+	}
 }
 
 

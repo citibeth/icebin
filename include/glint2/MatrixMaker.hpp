@@ -70,5 +70,8 @@ public:
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname);
 };
 
+std::unique_ptr<IceSheet> new_ice_sheet(Grid::Parameterization parameterization);
+
+
 }	// namespace glint2
 

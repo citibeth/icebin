@@ -21,7 +21,7 @@ using namespace glint2;
 void PyGrid::init(std::unique_ptr<glint2::Grid> &&_grid)
 {
 	grid = std::move(_grid);
-	ncells_full = grid->ncells_full;
+//	ncells_full = grid->ncells_full();
 }
 
 // ========= class snowdrift.Grid :
@@ -128,7 +128,7 @@ static PyMethodDef Grid_methods[] = {
 };
 
 static PyMemberDef Grid_members[] = {
-	{"ncells_full", T_INT, offsetof(PyGrid, ncells_full)},
+//	{"ncells_full", T_INT, offsetof(PyGrid, ncells_full)},
 	{NULL}
 };
 

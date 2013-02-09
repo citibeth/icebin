@@ -44,8 +44,8 @@ void set_xy_centers(Grid_XY &grid,
 void Grid_XY::realize(
 boost::function<bool(Cell const &)> const &euclidian_clip)
 {
-	ncells_full = nx() * ny();
-	nvertices_full = xb.size() * yb.size();
+	_ncells_full = nx() * ny();
+	_nvertices_full = xb.size() * yb.size();
 
 	// Set up the main grid
 	VertexCache vcache(this);

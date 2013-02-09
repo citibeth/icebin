@@ -12,12 +12,14 @@ public :
 	giss::Proj2 proj1, proj2;
 
 	/** Keep track of the "full" indexing space for the Overlap Matrix. */
-	int grid1_ncells_full;
-	int grid2_ncells_full;
+	long grid1_ncells_full;
+	long grid2_ncells_full;
 
 	/** @param proj Projection to use to project Lon/Lat grids to XY,
 	if no projection is found in the XY-type grid. */
 	ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string const &_sproj="");
+
+	ExchangeGrid(): Grid(Grid::Type::EXCHANGE) {}
 
 	virtual boost::function<void()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

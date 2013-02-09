@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <glint2/Grid.hpp>
 #include <giss/ncutil.hpp>
 #include <boost/bind.hpp>
@@ -58,8 +59,8 @@ Grid::Grid(Type _type) : type(_type), coordinates(Grid::Coordinates::LONLAT), pa
 long Grid::ndata() const
 {
 	if (parameterization == Parameterization::L1)
-		return nvertices_full;
-	return ncells_full;
+		return nvertices_full();
+	return ncells_full();
 }
 
 void Grid::clear()
@@ -71,7 +72,7 @@ void Grid::clear()
 Cell *Grid::add_cell(Cell &&cell) {
 	// If we never specify our indices, things will "just work"
 	if (cell.index == -1) cell.index = _cells.size();
-
+	_max_realized_cell_index = std::max(_max_realized_cell_index, cell.index);
 
 	auto ret = _cells.insert(cell.index, std::move(cell));
 	Cell *valp = ret.first;
@@ -88,6 +89,7 @@ Cell *Grid::add_cell(Cell &&cell) {
 Vertex *Grid::add_vertex(Vertex &&vertex) {
 	// If we never specify our indices, things will "just work"
 	if (vertex.index == -1) vertex.index = _vertices.size();
+	_max_realized_vertex_index = std::max(_max_realized_vertex_index, vertex.index);
 
 //printf("add_vertex(%d, %f, %f)\n", vertex.index, vertex.x, vertex.y);
 
@@ -210,9 +212,9 @@ printf("netcdf_define(%s) 1\n", vname.c_str());
 		}
 
 		char buf[32];
-		sprintf(buf, "%ld", ncells_full);
+		sprintf(buf, "%ld", ncells_full());
 		info_var->add_att("cells.num_full", buf);
-		info_var->add_att("vertices.num_full", nvertices_full);
+		info_var->add_att("vertices.num_full", nvertices_full());
 
 printf("netcdf_define(%s) 2\n", vname.c_str());
 	// ------- Dimensions
@@ -280,11 +282,10 @@ std::string const &vname)
 		else
 			sproj = "";
 
-//		ncells_full = giss::get_att(info_var, "cells.num_full")->as_int(0);
 		char *sncells_full = giss::get_att(info_var, "cells.num_full")->as_string(0);
-		sscanf(sncells_full, "%ld", &ncells_full);
+		sscanf(sncells_full, "%ld", &_ncells_full);
 
-		nvertices_full = giss::get_att(info_var, "vertices.num_full")->as_int(0);
+		_nvertices_full = giss::get_att(info_var, "vertices.num_full")->as_int(0);
 
 	// ---------- Read the Vertices
 	// Basic Info
@@ -299,7 +300,7 @@ std::string const &vname)
 
 	// Assemble into vertices
 	for (size_t i=0; i < vertices_index.size(); ++i) {
-		int index = vertices_index[i];
+		long index = vertices_index[i];
 		double x = vertices_xy[i*2];
 		double y = vertices_xy[i*2 + 1];
 		add_vertex(Vertex(x, y, index));
@@ -325,7 +326,7 @@ std::string const &vname)
 
 	// Assemble into Cells
 	for (size_t i=0; i < cells_index.size(); ++i) {
-		int index = cells_index[i];
+		long index = cells_index[i];
 
 		Cell cell;
 		cell.index = cells_index[i];
@@ -371,7 +372,7 @@ static double const nan = std::numeric_limits<double>::quiet_NaN();
 std::vector<double> Grid::get_native_area() const
 {
 	// Get the cell areas
-	std::vector<double> area(this->ncells_full, nan);
+	std::vector<double> area(this->ncells_full(), nan);
 	for (auto cell = this->cells_begin(); cell != this->cells_end(); ++cell) {
 		area.at(cell->index) = cell->area;
 	}
@@ -391,7 +392,7 @@ std::vector<double> Grid::get_proj_area(std::string const &sproj) const
 	}
 
 	// Get the projected cell areas
-	std::vector<double> area(this->ncells_full, nan);
+	std::vector<double> area(this->ncells_full(), nan);
 	for (auto cell = this->cells_begin(); cell != this->cells_end(); ++cell) {
 		area.at(cell->index) = area_of_proj_polygon(*cell, proj);
 	}

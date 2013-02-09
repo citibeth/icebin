@@ -4,6 +4,7 @@
 #include <glint2/Grid.hpp>
 #include <glint2/Grid_XY.hpp>
 #include <glint2/Grid_LonLat.hpp>
+#include <glint2/ExchangeGrid.hpp>
 
 namespace glint2 {
 
@@ -24,8 +25,11 @@ std::unique_ptr<Grid> read_grid(NcFile &nc, std::string const &vname)
 		case Grid::Type::LONLAT :
 			grid.reset(new Grid_LonLat());
 			break;
+		case Grid::Type::EXCHANGE :
+			grid.reset(new ExchangeGrid());
+			break;
 		default :
-			grid.reset(new Grid(Grid::Type::GENERIC));
+			grid.reset(new Grid(type));
 			break;
 	}
 

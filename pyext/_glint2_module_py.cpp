@@ -20,10 +20,12 @@ static PyMethodDef *glint2_function_sets[] = {
 };
 
 extern PyTypeObject GridType;
+extern PyTypeObject MatrixMakerType;
 
 // All the classes (PyTypeObject) for the entire module
 static PyTypeObject *glint2_types[] = {
 	&GridType,
+	&MatrixMakerType,
 	NULL
 };
 

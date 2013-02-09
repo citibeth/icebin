@@ -20,7 +20,7 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj);
 // --------------------------------------------------
 
 struct Vertex {
-	int index;
+	long index;
 	double x;
 	double y;
 	Vertex(double _x, double _y, int _index=-1) : index(_index), x(_x), y(_y) {}
@@ -43,7 +43,7 @@ public:
 
 	/** For L0 formulations (constant value per grid cell):
 	Index of this grid cell in dense arrays (base=0) */
-	int index;
+	long index;
 
 	bool operator<(Cell const &rhs) const
 		{ return index < rhs.index; }
@@ -132,8 +132,19 @@ public:
 
 	std::string name;
 
-	long ncells_full;		// Maximum possible index (-1)
-	long nvertices_full;	// Maximum possible index (-1)
+protected :
+	long _ncells_full;		// Maximum possible index (-1)
+	long _nvertices_full;	// Maximum possible index (-1)
+
+	// These are kept in line, with add_cell() and add_vertex()
+	long _max_realized_cell_index;		// Maximum index of realized cells
+	long _max_realized_vertex_index;
+public:
+
+	long ncells_full() const
+		{ return _ncells_full >= 0 ? _ncells_full : _max_realized_cell_index; }
+	long nvertices_full() const
+		{ return _nvertices_full >= 0 ? _nvertices_full : _max_realized_vertex_index; }
 
 	/** Projection, if any, used to transform this grid from its
 	"native" form to the one it's currently in.
@@ -157,7 +168,7 @@ public:
 	The index will be a Cell index for L0 grids, or a Vertex index for L1 */
 	virtual int ij_to_index(int i, int j) const { return -1; }
 
-	virtual void index_to_ij(int index, int &i, int &j) const { }
+	virtual void index_to_ij(long index, int &i, int &j) const { }
 
 	// ========= Cell Collection Operators
 	auto cells_begin() -> decltype(_cells.begin()) { return _cells.begin(); }
@@ -166,7 +177,7 @@ public:
 	auto cells_begin() const -> decltype(_cells.begin()) { return _cells.begin(); }
 	auto cells_end() const -> decltype(_cells.end()) { return _cells.end(); }
 
-	Cell *get_cell(int index) { return _cells[index]; }
+	Cell *get_cell(long index) { return _cells[index]; }
 	long ncells_realized() const { return _cells.size(); }
 
 	Cell *add_cell(Cell &&cell);
@@ -181,7 +192,7 @@ public:
 	auto vertices_end() const -> decltype(_vertices.end())
 		{ return _vertices.end(); }
 
-	Vertex *get_vertex(int index) { return _vertices[index]; }
+	Vertex *get_vertex(long index) { return _vertices[index]; }
 
 	long nvertices_realized() const { return _vertices.size(); }
 

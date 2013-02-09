@@ -289,7 +289,7 @@ void IJMatrixMaker::add_weights(
 	std::vector<InterpWeight> const &weight_vec,
 	int ihp)
 {
-	HCIndex hc_index(grid1->ncells_full);
+	HCIndex hc_index(grid1->ncells_full());
 	for (auto ii = weight_vec.begin(); ii != weight_vec.end(); ++ii) {
 		int i1 = grid1->ij_to_index(ii->i, ii->j);
 		int i1h = hc_index.ik_to_index(i1, ihp);
@@ -312,7 +312,7 @@ blitz::Array<bool,1> const &mask1,		// [n1] Shows where we will / will not expec
 blitz::Array<bool,1> const &mask2)
 {
 	// ---------- Check Dimensions
-	int n1 = grid1.ncells_full;
+	long n1 = grid1.ncells_full();
 	int nhc = hpdefs.size();
 	int n2 = elev2.extent(0);
 
@@ -435,7 +435,7 @@ blitz::Array<bool,1> const &mask2)
 		linterp_1d(hpdefs, elev2(i2), ihp, whp);
 
 		// ------------ Assemble the interpolation
-		int n1 = grid1.ncells_full;
+		int n1 = grid1.ncells_full();
 		mmat.i2 = i2;
 		for (int k=0; k<2; ++k) {		// HP dimension
 			mmat.add_weights(whp[k] * (1.-ratio_i) * (1.-ratio_j), nearest_weights[0][0], ihp[k]);

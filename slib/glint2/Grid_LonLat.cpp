@@ -81,8 +81,8 @@ void Grid_LonLat::realize(
 	const int south_pole_offset = (south_pole ? 1 : 0);
 	const int north_pole_offset = (north_pole ? 1 : 0);
 
-	ncells_full = nlon() * nlat();
-	nvertices_full = -1;	// We don't care for L0 grid
+	_ncells_full = nlon() * nlat();
+	_nvertices_full = -1;	// We don't care for L0 grid
 
 //	_nlon = lonb.size() - 1;
 //	_nlat = latb.size() - 1 + south_pole_offset + north_pole_offset;
