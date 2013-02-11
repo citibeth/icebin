@@ -39,6 +39,22 @@ static PyObject *MatrixMaker_new(PyTypeObject *type, PyObject *args, PyObject *k
 static int MatrixMaker__init(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
 	try {
+		// Instantiate C++ Ice Maker
+		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker);
+
+		// Move it to Python MatrixMaker object.
+		self->init(std::move(maker));
+		return 0;
+	} catch(...) {
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker__init()");
+		return 0;
+	}
+}
+
+/** Read from a file */
+static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
+{
+	try {
 		// Get arguments
 		const char *grid1_fname_py = NULL;
 		PyObject *hpdefs_py = NULL;
@@ -78,6 +94,7 @@ static int MatrixMaker__init(PyMatrixMaker *self, PyObject *args, PyObject *kwds
 
 		// Move it to Python MatrixMaker object.
 		self->init(std::move(maker));
+		return Py_None;
 	} catch(...) {
 		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker__init()");
 		return 0;
@@ -92,14 +109,15 @@ static PyObject *MatrixMaker_add_ice_sheet(PyMatrixMaker *self, PyObject *args, 
 		const char *exgrid_fname_py;
 		PyObject *elev2_py = NULL;
 		PyObject *mask2_py = NULL;
+		const char *name_py = NULL;
 
-		static char const *keyword_list[] = {"grid2_fname", "exgrid_fname", "elev2", "mask2", NULL};
+		static char const *keyword_list[] = {"grid2_fname", "exgrid_fname", "elev2", "mask2", "name", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "ssO|O",
+			args, kwds, "ssO|Os",
 			const_cast<char **>(keyword_list),
 			&grid2_fname_py, &exgrid_fname_py,
-			&elev2_py, &mask2_py))
+			&elev2_py, &mask2_py, &name_py))
 		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
@@ -117,6 +135,7 @@ static PyObject *MatrixMaker_add_ice_sheet(PyMatrixMaker *self, PyObject *args, 
 			new_ice_sheet(grid2->parameterization));
 
 		// Fill it in...
+		if (name_py) sheet->name = name_py;
 		sheet->grid2 = std::move(grid2);
 		int n2 = sheet->grid2->ndata();
 
@@ -131,7 +150,6 @@ static PyObject *MatrixMaker_add_ice_sheet(PyMatrixMaker *self, PyObject *args, 
 
 		sheet->elev2.reference(giss::py_to_blitz<double,1>(elev2_py, "elev2", {n2}));
 		// ====================================================
-
 		int ice_sheet_num = self->maker->add_ice_sheet(std::move(sheet));
 		return PyInt_FromLong(ice_sheet_num);
 	} catch(...) {
@@ -160,6 +178,56 @@ static PyObject *MatrixMaker_realize(PyMatrixMaker *self, PyObject *args)
 	}
 }
 
+/** Read from a file */
+static PyObject *MatrixMaker_save(PyMatrixMaker *self, PyObject *args)
+{
+	try {
+		// Get arguments
+		char *fname_py = NULL;
+		char *vname_py = NULL;
+		if (!PyArg_ParseTuple(args, "ss", &fname_py, &vname_py)) {
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"Bad arguments to MatrixMaker_save().");
+			return 0;
+		}
+
+		NcFile nc(fname_py, NcFile::Replace);
+		self->maker->netcdf_define(nc, std::string(vname_py))();
+		nc.close();
+
+		return Py_None;
+	} catch(...) {
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_save()");
+		return 0;
+	}
+}
+
+/** Read from a file */
+static PyObject *MatrixMaker_load(PyMatrixMaker *self, PyObject *args)
+{
+	try {
+		// Get arguments
+		char *fname_py = NULL;
+		char *vname_py = NULL;
+		if (!PyArg_ParseTuple(args, "ss", &fname_py, &vname_py)) {
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"Bad arguments to MatrixMaker_load().");
+			return 0;
+		}
+
+		NcFile nc(fname_py, NcFile::ReadOnly);
+		self->maker->read_from_netcdf(nc, std::string(vname_py));
+		nc.close();
+
+		return Py_None;
+	} catch(...) {
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_load()");
+		return 0;
+	}
+}
+
 static void MatrixMaker_dealloc(PyMatrixMaker *self)
 {
 	self->~PyMatrixMaker();
@@ -172,9 +240,15 @@ static void MatrixMaker_dealloc(PyMatrixMaker *self)
 
 static PyMethodDef MatrixMaker_methods[] = {
 
+	{"init", (PyCFunction)MatrixMaker_init, METH_KEYWORDS,
+		""},
 	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
+		""},
+	{"save", (PyCFunction)MatrixMaker_save, METH_VARARGS,
+		""},
+	{"load", (PyCFunction)MatrixMaker_load, METH_VARARGS,
 		""},
 	{NULL}     /* Sentinel - marks the end of this structure */
 };

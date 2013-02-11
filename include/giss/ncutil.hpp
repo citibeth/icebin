@@ -106,15 +106,18 @@ void netcdf_write_functions(std::vector<boost::function<void ()>> const &functio
 
 
 // -----------------------------------------------------------
+/** NOTE: val is NOT a pointer to ensure the blitz::Array is copied into
+the boost::bind closure.  blitz::Array does reference counting, so this
+does not actually copy any data. */
 template<class T, int rank>
-void netcdf_write_blitz(NcVar *nc_var, blitz::Array<T, rank> const *val);
+void netcdf_write_blitz(NcVar *nc_var, blitz::Array<T, rank> const &val);
 
 template<class T, int rank>
-void netcdf_write_blitz(NcVar *nc_var, blitz::Array<T, rank> const *val)
+void netcdf_write_blitz(NcVar *nc_var, blitz::Array<T, rank> const &val)
 {
 	long counts[rank];
-	for (int i=0; i<rank; ++i) counts[i] = val->extent(i);
-	nc_var->put(val->data(), counts);
+	for (int i=0; i<rank; ++i) counts[i] = val.extent(i);
+	nc_var->put(val.data(), counts);
 }
 // ----------------------------------------------------
 template<class T, int rank>
@@ -131,6 +134,7 @@ boost::function<void ()> netcdf_define(
 	blitz::Array<T,rank> const &val,
 	std::vector<NcDim *> const &ddims = {})
 {
+
 	// Type-check for unit strides
 	int stride = 1;
 	for (int i=rank-1; i>=0; --i) {
@@ -159,7 +163,7 @@ boost::function<void ()> netcdf_define(
 	NcVar *nc_var = nc.add_var(vname.c_str(), get_nc_type<T>(), rank, dims);
 
 	// Write it out (later)
-	boost::bind(&netcdf_write_blitz<T,rank>, nc_var, &val);
+	return boost::bind(&netcdf_write_blitz<T,rank>, nc_var, val);
 }
 // -------------------------------------------------------------
 template<class T>

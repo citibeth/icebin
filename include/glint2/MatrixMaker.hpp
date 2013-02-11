@@ -48,7 +48,7 @@ public:
 	IceSheet &operator[](int ix) { return *sheets[ix]; }
 	IceSheet &operator[](std::string const &name) {
 		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii) {
-			if (name == (*ii)->name()) return **ii;
+			if (name == (*ii)->name) return **ii;
 		}
 		fprintf(stderr, "Could not find ice sheet named: %s\n", name.c_str());
 		throw std::exception();

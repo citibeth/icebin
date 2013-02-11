@@ -75,21 +75,25 @@ int N_ndim)
 	if (ndim != N_ndim) {
  		char buf[200 + vname.size()];
 		sprintf(buf, "check_dimensions(%s): Number of template dimensions (%d) must match number of array dimensions (%d)", vname.c_str(), N_ndim, ndim);
+		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
 		throw std::exception();
 	}
 
 	// Check that it's not null
 	if (!ovec) {
-		PyErr_SetString(PyExc_ValueError,
-			("check_dimensions: Array object " + vname + " is null").c_str());
+		std::string serr = "check_dimensions: Array object " + vname + " is null";
+		fprintf(stderr, "%s\n", serr.c_str());
+		PyErr_SetString(PyExc_ValueError, serr.c_str());
 		throw std::exception();
 	}
 
 	// Check that it's type PyArrayObject
 	if (!PyArray_Check(ovec)) {
+		std::string serr = "check_dimensions: Object " + vname + " is not a Numpy array";
+		fprintf(stderr, "%s\n", serr.c_str());
 		PyErr_SetString(PyExc_ValueError,
-			("check_dimensions: Object " + vname + " is not a Numpy array").c_str());
+			serr.c_str());
 		throw std::exception();
 	}
 	PyArrayObject *vec = (PyArrayObject *)ovec;
@@ -98,6 +102,7 @@ int N_ndim)
 	if (vec->descr->type_num != type_num || vec->nd != ndim)  {
 		char buf[200 + vname.size()];
 		sprintf(buf, "check_dimensions: %s must be of type_num %d and %d dimensions (its is of type_num=%d and %d dimensions).", vname.c_str(), type_num, ndim, vec->descr->type_num, vec->nd);
+		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
 		throw std::exception();
 	}
@@ -110,6 +115,7 @@ int N_ndim)
 			sprintf(buf,
 				"%s: Array dimension #%d is %d, should be %d",
 				vname.c_str(), i, vec->dimensions[i], dims[i]);
+			fprintf(stderr, "%s\n", buf);
 			PyErr_SetString(PyExc_ValueError, buf);
 			throw std::exception();
 		}
@@ -172,6 +178,7 @@ VectorSparseMatrix py_to_VectorSparseMatrix(PyObject *m_tuple, std::string const
 	{
  		char buf[200 + vname.size()];
 		sprintf(buf, "py_to_vectorSparseMatrix(%s): Trouble parsing tuples", vname.c_str());
+		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
 
 		throw std::exception();
@@ -204,6 +211,7 @@ giss::BlitzSparseMatrix py_to_BlitzSparseMatrix(PyObject *m_tuple, std::string c
 	{
  		char buf[200 + vname.size()];
 		sprintf(buf, "py_to_BlitzSparseMatrix(%s): Trouble parsing tuples", vname.c_str());
+		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
 
 		throw std::exception();

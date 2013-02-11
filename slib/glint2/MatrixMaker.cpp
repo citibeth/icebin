@@ -77,6 +77,8 @@ boost::function<void ()> MatrixMaker::netcdf_define(NcFile &nc, std::string cons
 	std::vector<boost::function<void ()>> fns;
 	fns.reserve(sheets.size() + 1);
 
+printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
+
 	// ------ Attributes
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
@@ -85,7 +87,7 @@ boost::function<void ()> MatrixMaker::netcdf_define(NcFile &nc, std::string cons
 	std::string sheet_names = "";
 	for (auto sheetp = sheets.begin(); ; ) {
 		IceSheet &sheet = **sheetp;
-		sheet_names.append(vname + ".icesheets");
+		sheet_names.append(sheet.name);
 		++sheetp;
 		if (sheetp == sheets.end()) break;
 		sheet_names.append(",");
@@ -101,13 +103,15 @@ boost::function<void ()> MatrixMaker::netcdf_define(NcFile &nc, std::string cons
 	fns.push_back(grid1->netcdf_define(nc, vname + ".grid1"));
 	if (mask1.get())
 		fns.push_back(giss::netcdf_define(nc, vname + "mask1", *mask1));
-	fns.push_back(giss::netcdf_define(nc, vname + "hpdefs", hpdefs));
-	fns.push_back(giss::netcdf_define(nc, vname + "hcmax", hcmax));
+	fns.push_back(giss::netcdf_define(nc, vname + ".hpdefs", hpdefs));
+	fns.push_back(giss::netcdf_define(nc, vname + ".hcmax", hcmax));
 	for (auto sheetp = sheets.begin(); sheetp != sheets.end(); ++sheetp) {
 		IceSheet &sheet = **sheetp;
-		fns.push_back(sheet.netcdf_define(nc, vname + "." + sheet.name()));
+		fns.push_back(sheet.netcdf_define(nc, vname + "." + sheet.name));
 	}
 
+
+printf("MatrixMaker::netcdf_define(%s) (END)\n", vname.c_str());
 
 	return boost::bind(&giss::netcdf_write_functions, fns);
 }
@@ -141,6 +145,7 @@ std::unique_ptr<IceSheet> read_ice_sheet(NcFile &nc, std::string const &vname)
 #endif
 
 	sheet->read_from_netcdf(nc, vname);
+	printf("read_ice_sheet(%s) END\n", vname.c_str());
 	return sheet;
 
 }
@@ -150,6 +155,7 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 {
 	clear();
 
+	printf("MatrixMaker::read_from_netcdf(%s) 1\n", vname.c_str());
 	grid1.reset(read_grid(nc, vname + ".grid1").release());
 	if (giss::get_var_safe(nc, vname + ".mask1")) {
 		mask1.reset(new blitz::Array<int,1>(
@@ -157,6 +163,8 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 	}
 	hpdefs = giss::read_vector<double>(nc, vname + ".hpdefs");
 	hcmax = giss::read_blitz<double,1>(nc, vname + ".hcmax");
+
+	printf("MatrixMaker::read_from_netcdf(%s) 2\n", vname.c_str());
 
 //	grid2.reset(read_grid(nc, "grid2").release());
 //	exgrid.reset(read_grid(nc, "exgrid").release());
@@ -167,7 +175,9 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 		giss::get_att(info_var, "sheetnames")->as_string(0))));
 
 	for (auto sname = sheet_names.begin(); sname != sheet_names.end(); ++sname) {
-		sheets.push_back(read_ice_sheet(nc, vname + "." + *sname));
+		std::string sheet_name(vname + "." + *sname);
+		printf("MatrixMaker::read_from_netcdf(%s) %s 3\n", vname.c_str(), sheet_name.c_str());
+		sheets.push_back(read_ice_sheet(nc, sheet_name));
 	}
 
 
@@ -176,9 +186,11 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 std::unique_ptr<IceSheet> new_ice_sheet(Grid::Parameterization parameterization)
 {
 	switch(parameterization.index()) {
-		case Grid::Parameterization::L0 :
-			return std::unique_ptr<IceSheet>(new IceSheet_L0);
-		break;
+		case Grid::Parameterization::L0 : {
+			IceSheet *ics = new IceSheet_L0;
+			return std::unique_ptr<IceSheet>(ics);
+//			return std::unique_ptr<IceSheet>(new IceSheet_L0);
+		} break;
 #if 0
 		case Grid::Parameterization::L1 :
 			return std::unique_ptr<IceSheet>(new IceSheet_L1);
@@ -186,6 +198,7 @@ std::unique_ptr<IceSheet> new_ice_sheet(Grid::Parameterization parameterization)
 #endif
 		default :
 			fprintf(stderr, "Unrecognized parameterization: %s\n", parameterization.str());
+			throw std::exception();
 	}
 }
 

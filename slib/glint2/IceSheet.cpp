@@ -5,6 +5,8 @@
 
 namespace glint2 {
 
+IceSheet::IceSheet() : name("icesheet") {}
+
 void IceSheet::clear()
 {
 	grid2.reset();
@@ -18,29 +20,31 @@ void IceSheet::clear()
 /** Call this after you've set data members, to finish construction. */
 void IceSheet::realize()
 {
+	if (name == "") name = grid2->name;
+
 	// Check bounds, etc.
 	if (exgrid->grid1_ncells_full != gcm->grid1->ncells_full()) {
 		fprintf(stderr, "Exchange Grid for %s incompatible with GCM grid: ncells_full = %d (vs %d expected)\n",
-			name().c_str(), exgrid->grid1_ncells_full, gcm->grid1->ncells_full());
+			name.c_str(), exgrid->grid1_ncells_full, gcm->grid1->ncells_full());
 		throw std::exception();
 	}
 
 	if (exgrid->grid2_ncells_full != grid2->ncells_full()) {
 		fprintf(stderr, "Exchange Grid for %s incompatible with Ice grid: ncells_full = %d (vs %d expected)\n",
-			name().c_str(), exgrid->grid2_ncells_full, grid2->ncells_full());
+			name.c_str(), exgrid->grid2_ncells_full, grid2->ncells_full());
 		throw std::exception();
 	}
 
 	long n2 = grid2->ndata();
 	if (mask2.get() && mask2->extent(0) != n2) {
 		fprintf(stderr, "Mask2 for %s has wrong size: %ld (vs %ld expected)\n",
-			name().c_str(), mask2->extent(0), n2);
+			name.c_str(), mask2->extent(0), n2);
 		throw std::exception();
 	}
 
 	if (elev2.extent(0) != n2) {
 		fprintf(stderr, "Elev2 for %s has wrong size: %ld (vs %ld expected)\n",
-			name().c_str(), elev2.extent(0), n2);
+			name.c_str(), elev2.extent(0), n2);
 		throw std::exception();
 	}
 
@@ -75,7 +79,7 @@ boost::function<void ()> IceSheet::netcdf_define(NcFile &nc, std::string const &
 {
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
-	info_var->add_att("name", name().c_str());
+	info_var->add_att("name", name.c_str());
 
 	std::vector<boost::function<void ()>> fns;
 
@@ -94,14 +98,17 @@ void IceSheet::read_from_netcdf(NcFile &nc, std::string const &vname)
 {
 	clear();
 
-	grid2.reset(read_grid(nc, "grid2").release());
-	exgrid = giss::shared_cast<ExchangeGrid,Grid>(read_grid(nc, "exgrid"));
+	printf("IceSheet::read_from_netcdf(%s) 1\n", vname.c_str());
+
+	grid2.reset(read_grid(nc, vname + ".grid2").release());
+	exgrid = giss::shared_cast<ExchangeGrid,Grid>(read_grid(nc, vname + ".exgrid"));
 	if (giss::get_var_safe(nc, vname + ".mask2")) {
 		mask2.reset(new blitz::Array<int,1>(
 		giss::read_blitz<int,1>(nc, vname + ".mask2")));
 	}
 
 	elev2 = giss::read_blitz<double,1>(nc, vname + ".elev2");
+	printf("IceSheet::read_from_netcdf(%s) END\n", vname.c_str());
 }
 
 

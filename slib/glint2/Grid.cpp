@@ -54,12 +54,21 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 }
 
 // ------------------------------------------------------------
-Grid::Grid(Type _type) : type(_type), coordinates(Grid::Coordinates::LONLAT), parameterization(Grid::Parameterization::L0) {}
+Grid::Grid(Type _type) :
+	type(_type),
+	coordinates(Grid::Coordinates::LONLAT),
+	parameterization(Grid::Parameterization::L0),
+	_max_realized_cell_index(0),
+	_max_realized_vertex_index(0) {}
 
 long Grid::ndata() const
 {
-	if (parameterization == Parameterization::L1)
+printf("ndata start\n");
+	if (parameterization == Parameterization::L1) {
+printf("ndata L1: %d\n", nvertices_full());
 		return nvertices_full();
+	}
+printf("ndata !L1: %d\n", ncells_full());
 	return ncells_full();
 }
 
@@ -214,7 +223,8 @@ printf("netcdf_define(%s) 1\n", vname.c_str());
 		char buf[32];
 		sprintf(buf, "%ld", ncells_full());
 		info_var->add_att("cells.num_full", buf);
-		info_var->add_att("vertices.num_full", nvertices_full());
+		info_var->add_att("vertices.num_full", (int)nvertices_full());
+printf("CC\n");
 
 printf("netcdf_define(%s) 2\n", vname.c_str());
 	// ------- Dimensions
@@ -265,7 +275,7 @@ std::string const &vname)
 {
 	clear();
 
-//	printf("Grid::read_from_netcdf(%s)\n", vname.c_str());
+	printf("Grid::read_from_netcdf(%s) 1\n", vname.c_str());
 	// ---------- Read the Basic Info
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 		name = std::string(giss::get_att(info_var, "name")->as_string(0));
@@ -287,6 +297,8 @@ std::string const &vname)
 
 		_nvertices_full = giss::get_att(info_var, "vertices.num_full")->as_int(0);
 
+	printf("Grid::read_from_netcdf(%s) 2\n", vname.c_str());
+
 	// ---------- Read the Vertices
 	// Basic Info
 	std::vector<int> vertices_index(
@@ -305,6 +317,7 @@ std::string const &vname)
 		double y = vertices_xy[i*2 + 1];
 		add_vertex(Vertex(x, y, index));
 	}
+	printf("Grid::read_from_netcdf(%s) 3\n", vname.c_str());
 
 	// ---------- Read the Cells
 	std::vector<int> cells_index(giss::read_int_vector(nc, vname + ".cells.index"));
@@ -323,6 +336,8 @@ std::string const &vname)
 
 	std::vector<int> vrefs(giss::read_int_vector(nc, vname + ".cells.vertex_refs"));
 	std::vector<int> vrefs_start(giss::read_int_vector(nc, vname + ".cells.vertex_refs_start"));
+
+	printf("Grid::read_from_netcdf(%s) 4\n", vname.c_str());
 
 	// Assemble into Cells
 	for (size_t i=0; i < cells_index.size(); ++i) {
@@ -349,6 +364,7 @@ std::string const &vname)
 		// Add thecell to the grid
 		add_cell(std::move(cell));
 	}
+	printf("Grid::read_from_netcdf(%s) 5 (done)\n", vname.c_str());
 }
 
 void Grid::to_netcdf(std::string const &fname)

@@ -21,7 +21,7 @@ public:
 	std::shared_ptr<glint2::Grid> grid2;		/// Ice Grid
 	std::shared_ptr<glint2::ExchangeGrid> exgrid;	/// Exchange grid (between GCM and Ice)
 
-	std::string const &name() const { return grid2->name; }
+	std::string name; //const &name() const { return grid2->name; }
 
 	std::unique_ptr<blitz::Array<int,1>> mask2;
 
@@ -37,7 +37,7 @@ public:
 
 	// -------------------------------------------
 
-	IceSheet() {}
+	IceSheet();
 	virtual void clear();
 protected:
 	virtual void realize();
