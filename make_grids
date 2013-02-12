@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -o verbose
+
+sbin/greenland_4x5
+sbin/searise100
+sbin/overlap greenland_4x5.nc searise100.nc
+
+sbin/greenland_2x2_5
+sbin/searise
+sbin/overlap greenland_2x2_5.nc searise.nc
+
+
+
