@@ -2,10 +2,10 @@
 # before trying to run the tests.
 
 
-all : greenland_2x2_5-searise.nc #data
+all : greenland_2x2_5-searise.nc
 
-#data :
-
+data :
+	./fetch_data
 
 greenland_2x2_5-searise.nc : greenland_2x2_5.nc searise.nc
 	../sbin/overlap greenland_2x2_5.nc searise.nc

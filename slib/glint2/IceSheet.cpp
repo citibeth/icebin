@@ -79,6 +79,8 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet::hp_to_hc()
 
 boost::function<void ()> IceSheet::netcdf_define(NcFile &nc, std::string const &vname) const
 {
+	printf("Defining ice sheet %s\n", vname.c_str());
+
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
 	info_var->add_att("name", name.c_str());
@@ -89,8 +91,9 @@ boost::function<void ()> IceSheet::netcdf_define(NcFile &nc, std::string const &
 	fns.push_back(exgrid->netcdf_define(nc, vname + ".exgrid"));
 
 	NcDim *n2_dim = nc.add_dim((vname + ".n2").c_str(), elev2.extent(0));
-	if (mask2.get())
+	if (mask2.get()) {
 		fns.push_back(giss::netcdf_define(nc, vname + ".mask2", *mask2, {n2_dim}));
+	}
 	fns.push_back(giss::netcdf_define(nc, vname + ".elev2", elev2, {n2_dim}));
 
 	return boost::bind(&giss::netcdf_write_functions, fns);
@@ -101,6 +104,9 @@ void IceSheet::read_from_netcdf(NcFile &nc, std::string const &vname)
 	clear();
 
 	printf("IceSheet::read_from_netcdf(%s) 1\n", vname.c_str());
+
+	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+	name = giss::get_att(info_var, "name")->as_string(0);
 
 	grid2.reset(read_grid(nc, vname + ".grid2").release());
 	exgrid = giss::shared_cast<ExchangeGrid,Grid>(read_grid(nc, vname + ".exgrid"));
