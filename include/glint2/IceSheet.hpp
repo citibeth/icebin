@@ -42,7 +42,7 @@ public:
 protected:
 	virtual void realize();
 public:
-	virtual ~IceSheet() {}
+	virtual ~IceSheet();
 
 	// ------------------------------------------------
 

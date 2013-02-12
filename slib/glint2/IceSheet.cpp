@@ -7,6 +7,8 @@ namespace glint2 {
 
 IceSheet::IceSheet() : name("icesheet") {}
 
+IceSheet::~IceSheet() {}
+
 void IceSheet::clear()
 {
 	grid2.reset();
@@ -107,7 +109,7 @@ void IceSheet::read_from_netcdf(NcFile &nc, std::string const &vname)
 		giss::read_blitz<int,1>(nc, vname + ".mask2")));
 	}
 
-	elev2 = giss::read_blitz<double,1>(nc, vname + ".elev2");
+	elev2.reference(giss::read_blitz<double,1>(nc, vname + ".elev2"));
 	printf("IceSheet::read_from_netcdf(%s) END\n", vname.c_str());
 }
 

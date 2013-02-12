@@ -104,6 +104,7 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 	if (mask1.get())
 		fns.push_back(giss::netcdf_define(nc, vname + "mask1", *mask1));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hpdefs", hpdefs));
+printf("***************** 1 hcmax.extent(0) = %d\n", hcmax.extent(0));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hcmax", hcmax));
 	for (auto sheetp = sheets.begin(); sheetp != sheets.end(); ++sheetp) {
 		IceSheet &sheet = **sheetp;
@@ -162,7 +163,7 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 		giss::read_blitz<int,1>(nc, vname + ".mask1")));
 	}
 	hpdefs = giss::read_vector<double>(nc, vname + ".hpdefs");
-	hcmax = giss::read_blitz<double,1>(nc, vname + ".hcmax");
+	hcmax.reference(giss::read_blitz<double,1>(nc, vname + ".hcmax"));
 
 	printf("MatrixMaker::read_from_netcdf(%s) 2\n", vname.c_str());
 

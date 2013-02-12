@@ -93,11 +93,14 @@ blitz::Array<T,rank> read_blitz(NcFile &nc, std::string const &var_name)
 	long counts[rank];
 	for (int i=0; i<rank; ++i) {
 		shape[i] = vpoints->get_dim(i)->size();
+printf("read_blitz: shape[%d] = %d\n", i, shape[i]);
 		counts[i] = shape[i];
 	}
 
 	blitz::Array<T,rank> ret(shape);
+for (int i=0; i<rank; ++i) printf("read_blitz: ret.extent(%d) = %d\n", i, ret.extent(i));
 	vpoints->get(ret.data(), counts);
+	return ret;
 }
 
 
@@ -139,7 +142,7 @@ boost::function<void ()> netcdf_define(
 	int stride = 1;
 	for (int i=rank-1; i>=0; --i) {
 		if (val.stride(i) != stride) {
-			fprintf(stderr, "Unexpected stride of %d in dimension %d\n", stride, i);
+			fprintf(stderr, "Unexpected stride of %d in dimension %d (extent=%d) of %s (rank=%d)\n", val.stride(i), i, val.extent(i), vname.c_str(), rank);
 			throw std::exception();
 		}
 		stride *= val.extent(i);
