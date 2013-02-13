@@ -49,6 +49,11 @@ void MatrixMaker::compute_fhc(
 	blitz::Array<double,2> *fhc1h,	// OUT
 	blitz::Array<double,1> *fgice1)	// OUT: Portion of gridcell covered in ground ice (from landmask)
 {
+	if (fhc1h)
+		giss::check_dimensions("compute_fhc:fhc1h", *fhc1h, {nhc(), n1()});
+	if (fgice1)
+		giss::check_dimensions("compute_fhc:fgice1", *fhc1h, {n1()});
+
 	// Zero it all out
 	int n1 = grid1->ndata();
 	if (fhc1h) {

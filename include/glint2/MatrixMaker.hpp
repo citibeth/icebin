@@ -58,6 +58,7 @@ public:
 	int get_hc(int index1, double elev);
 
 	int nhc() { return hpdefs.size(); }
+	int n1() { return grid1->ndata(); }
 
 	/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
 	void compute_fhc(

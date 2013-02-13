@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdio>
 #include <blitz/array.h>
 
 namespace giss {
@@ -31,5 +32,24 @@ blitz::Array<T,1> const vector_to_blitz(std::vector<T> const &vec)
     return blitz::Array<T,1>(vecp, shape, strides,
 		blitz::neverDeleteData);
 }
+
+/** Makes sure a blitz::Array dimension.
+Raises a Python exception if it does not. */
+template<class T, int rank>
+void check_dimensions(
+std::string const &vname,
+blitz::Array<T, rank> const &arr,
+std::vector<int> const &dims)
+{
+	for (int i=0; i<rank; ++i) {
+		if (dims[i] >= 0 && arr.extent(i) != dims[i]) {
+			fprintf(stderr,
+				"Error in %s: expected dimension #%d = %d (is %d instead)\n",
+				vname.c_str(), i, dims[i], arr.extent(i));
+			throw std::exception();
+		}
+	}
+}
+
 
 }
