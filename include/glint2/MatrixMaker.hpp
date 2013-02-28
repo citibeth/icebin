@@ -21,7 +21,15 @@ namespace glint2 {
 class MatrixMaker
 {
 public:
-	std::vector<std::unique_ptr<IceSheet>> sheets;
+//	std::map<int, std::unique_ptr<IceSheet>> sheets;
+	giss:MapDict<int, IceSheet> sheets;
+protected:
+	int _next_sheet_index;
+	std::unique_ptr<GridDomain> domain;
+public:
+	MatrixMaker(std::unique_ptr<GridDomain> &&_domain) : domain(std::move(_domain)) {}
+
+//	std::vector<std::unique_ptr<IceSheet>> sheets;
 	
 	/** These are all left public because someone will probably want
 	to look at / use them. */
@@ -30,6 +38,7 @@ public:
 	std::shared_ptr<glint2::Grid> grid1;		/// GCM Grid
 
 	// Blitz++ arrays are reference counted internally
+	// TODO: This should cover only GCM grid cells in our domain.
 	std::unique_ptr<blitz::Array<int,1>> mask1;
 
 	/** Position of height points in elevation space (same for all GCM grid cells) */
@@ -60,10 +69,17 @@ public:
 	int nhc() { return hpdefs.size(); }
 	int n1() { return grid1->ndata(); }
 
-	/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
+	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
+	Ice sheets cannot overlap each other (although their grids can, if we're
+	guaranteed that ice-filled grid cells will never overlap). */
 	void compute_fhc(
 		blitz::Array<double,2> *fhc1h,	// OUT
 		blitz::Array<double,1> *fgice1);	// OUT: Portion of gridcell covered in ground ice (from landmask)
+
+	void compute_fhc2(
+		std::vector<int> &indices1,	// i1
+		std::vector<double> &fhc1h_vals,	// [*nhc]
+		std::vector<double> &fgice_vals);
 
 
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;

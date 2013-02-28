@@ -17,15 +17,17 @@ protected:
 	MatrixMaker *gcm;
 
 public:
+	int index;
 
 	std::shared_ptr<glint2::Grid> grid2;		/// Ice Grid
 	std::shared_ptr<glint2::ExchangeGrid> exgrid;	/// Exchange grid (between GCM and Ice)
 
 	std::string name; //const &name() const { return grid2->name; }
 
+	/** TODO: How does mask2 work for L1 grids? */
 	std::unique_ptr<blitz::Array<int,1>> mask2;
 
-	/** Elevation of each cell Ma(L0) or vertex (L1) in the ice model */
+	/** Elevation of each cell (L0) or vertex (L1) in the ice model */
 	blitz::Array<double,1> elev2;	// [n2]
 
 	/** The overlap matrix, derived from exgrid.
@@ -42,13 +44,22 @@ public:
 protected:
 	virtual void realize();
 public:
+	void filter_cells1(boost::function<bool (int)> const &include_cell1);
+
 	virtual ~IceSheet();
 
 	// ------------------------------------------------
 
+#if 0
 	virtual void compute_fhc(
 		blitz::Array<double,2> *fhc1h,	// OUT
 		blitz::Array<double,1> *fgice1) = 0;	// OUT: Portion of gridcell covered in ground ice (from landmask)
+#endif
+
+	void compute_fhc2(
+		std::vector<int> &indices1,	// i1
+		std::vector<double> &fhc1h_vals,	// [*nhc]
+		std::vector<double> &fgice1_vals) = 0;
 
 	/** Make matrix to go from
 		height points [nhc*n1] to ice grid [n2].

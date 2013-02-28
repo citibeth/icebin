@@ -1,0 +1,1 @@
+#define GET_SPEC_FLOAT_3(arr, spec) get_spec_float_3(arr, lbound(arr,1),lbound(arr,2),lbound(arr,3), spec)

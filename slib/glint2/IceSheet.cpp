@@ -58,9 +58,37 @@ void IceSheet::realize()
 		overlap_raw->add(cell->i, cell->j, area_of_polygon(*cell));
 
 	// Mask out unused cells
+	// TODO: How will this work on L1 grids?  Is mask2 for vetices or just cells?
 	overlap_m = mask_out(
 		giss::BlitzSparseMatrix(*overlap_raw), gcm->mask1.get(), mask2.get());
 }
+
+// -----------------------------------------------------
+/** Made for binding... */
+static bool in_good(std::unordered_set<int> const *set, int index_c)
+{
+	return (set->find(index_c) != set->end());
+}
+
+void IceSheet::filter_cells1(boost::function<bool (int)> const &include_cell1)
+{
+
+	// Remove unneeded cells from exgrid
+	// Figure out which cells in grid2 to keep
+	std::unordered_set<int> good_index2;
+	for (auto excell = exgrid.begin(); excell != exgrid.end(); ++excell) {
+		int index1 = excell->i;
+		if (include_cell1(index1)) {
+			good_index2.add(excell->j);
+		} else {
+			exgrid.remove_cell(excell);
+		}
+	}
+
+	// Remove unneeded cells from grid2
+	grid2->filter_cells(boost::bind(&in_good, &good_index2, _1));
+}
+// -----------------------------------------------------
 
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet::hp_to_hc()
 {

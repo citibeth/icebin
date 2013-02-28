@@ -21,9 +21,17 @@ public:
 	/** Uses: elev2, hcmax, overlap */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc();
 
+#if 0
 	virtual void compute_fhc(
 		blitz::Array<double,2> *fhc1h,
 		blitz::Array<double,1> *fgice1);	// Portion of gridcell covered in ground ice (from landmask)
+#endif
+
+	void compute_fhc2(
+		std::vector<int> &indices1,	// i1
+		std::vector<double> &fhc1h_vals,	// [*nhc]
+		std::vector<double> &fgice1_vals);
+
 
 	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

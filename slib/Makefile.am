@@ -15,6 +15,7 @@ libglint2_la_SOURCES = \
 	giss/hsl_zd11_x.cpp giss/ncutil.cpp giss/IndexTranslator.cpp \
 	giss/geodesy.cpp \
 	giss/Proj2.cpp \
+	giss/f90blitz_f.f90 \
 	glint2/Grid.cpp \
 	glint2/Grid_LonLat.cpp \
 	glint2/Grid_XY.cpp \
@@ -31,29 +32,29 @@ libglint2_la_SOURCES = \
 	glint2/clippers.cpp
 
 # # ------------------------------------------------------
-# if HAVE_GALAHAD
-# -include f90_deps.mk
-# FORTRAN_COMMAND_LINE = $(FCCOMPILE) -c -o
-# 
-# deps : f90_deps.mk
-# .PHONY : all deps
-# 
-# f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
-# 	python ../f90_mod_deps.py $(FORTRAN_SOURCES) >f90_deps.mk
-# 
-# FORTRAN_SOURCES = eqp_f.f90 hsl_zd11d.f90 hsl_zd11d_f.f90 ncutil_f.f90 qpt_f.f90 x_loc_f.f90
-# libglint2_la_SOURCES += $(FORTRAN_SOURCES)
-# 
-# # Fortran headers (.mod files) are installed from this directory.
-# # For C/C++ header files, see ../include
-# 
-# #libglint2_la_HEADERS = $(filter-out eqp_f.mod,$(FORTRAN_SOURCES:.f90=.mod))
-# # We should really use a Python script to figure out which module files are created.
-# # See ../f90_mod_deps.py
-# libglint2_la_HEADERS = c_loc_x.mod hsl_zd11_double.mod hsl_zd11_double_x.mod ncutil_mod.mod qpt_x.mod
-# libglint2_ladir = $(includedir)
-# 
-# endif
+giss/f90blitz_f.f90 ../include/giss/f90blitz_f.f90 : giss/f90blitz_f.py
+	python giss/f90blitz_f.py giss/f90blitz_f.f90 ../include/giss/f90blitz_f.h
+
+-include f90_deps.mk
+FORTRAN_COMMAND_LINE = $(FCCOMPILE) -c -o
+
+deps : f90_deps.mk
+.PHONY : all deps
+
+f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
+	python ../f90_mod_deps.py $(FORTRAN_SOURCES) >f90_deps.mk
+
+FORTRAN_SOURCES = giss/f90blitz_f.f90
+libglint2_la_SOURCES += $(FORTRAN_SOURCES)
+
+# Fortran headers (.mod files) are installed from this directory.
+# For C/C++ header files, see ../include
+
+#libglint2_la_HEADERS = $(filter-out eqp_f.mod,$(FORTRAN_SOURCES:.f90=.mod))
+# We should really use a Python script to figure out which module files are created.
+# See ../f90_mod_deps.py
+libglint2_la_HEADERS = f90blitz.mod
+libglint2_ladir = $(includedir)
 # # ------------------------------------------------------
 
 

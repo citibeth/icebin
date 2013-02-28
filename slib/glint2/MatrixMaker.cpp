@@ -32,15 +32,17 @@ void MatrixMaker::realize() {
 	}
 
 	// ------------- Realize the ice sheets
-	for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
-		(*ii)->realize();
+	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet)
+		sheet->realize();
 }
 
 int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet) {
+	int index = _next_sheet_index++;
+	sheet->index = index;
 	sheet->gcm = this;
-	int n = sheets.size();
-	sheets.push_back(std::move(sheet));
-	return n;
+	
+	sheets.insert(sheet->index, std::move(sheet));
+	return index;
 }
 
 
@@ -68,11 +70,36 @@ void MatrixMaker::compute_fhc(
 		for (int i1=0; i1<n1; ++i1) (*fgice1)(i1) = 0.;
 	}
 
-	// Add in for each ice sheet
-	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-		(*sheet)->compute_fhc(fhc1h, fgice1);
+	// Add in our sparse-vector values
+	std::vector<int> &indices1;	// i1
+	std::vector<double> &fhc1h_vals;	// [*nhc]
+	std::vector<double> &fgice_vals;
+	compute_fhc2(indices1, fhc1h_vals, fgice_vals);
+
+	for (size_t ii=0; ii<indices1.size(); ++ii) {
+		int i1 = indices1[ii];
+		if (fhc1h) {
+			int ii_times_nhc = ii * nhc();
+			for (int ihc=0; ihc<nhc(); ++ihc) {
+				(*fhc1h)(ihc, i1) += fhc1h_vals[ii_times_nhc + ihc];
+			}
+		}
+		if (fgice) (*fgice)(i1) += fgice_vals[ii];
 	}
 }
+
+/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
+void MatrixMaker::compute_fhc2(
+		std::vector<int> &indices1,	// i1
+		std::vector<double> &fhc1h_vals,	// [*nhc]
+		std::vector<double> &fgice_vals)
+{
+	// Add in for each ice sheet
+	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+		sheet->compute_fhc(idices1, fhc1h_vals, fgice_vals);
+	}
+}
+
 
 // ==============================================================
 // Write out the parts that this class computed --- so we can test/check them
@@ -90,11 +117,10 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 
 	// Names of the ice sheets
 	std::string sheet_names = "";
-	for (auto sheetp = sheets.begin(); ; ) {
-		IceSheet &sheet = **sheetp;
-		sheet_names.append(sheet.name);
-		++sheetp;
-		if (sheetp == sheets.end()) break;
+	for (auto sheet = sheets.begin(); ; ) {
+		sheet_names.append(sheet->name);
+		++sheet;
+		if (sheet == sheets.end()) break;
 		sheet_names.append(",");
 	}
 	info_var->add_att("sheetnames", sheet_names.c_str());
@@ -111,9 +137,8 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 	fns.push_back(giss::netcdf_define(nc, vname + ".hpdefs", hpdefs));
 printf("***************** 1 hcmax.extent(0) = %d\n", hcmax.extent(0));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hcmax", hcmax));
-	for (auto sheetp = sheets.begin(); sheetp != sheets.end(); ++sheetp) {
-		IceSheet &sheet = **sheetp;
-		fns.push_back(sheet.netcdf_define(nc, vname + "." + sheet.name));
+	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+		fns.push_back(sheet.netcdf_define(nc, vname + "." + sheet->name));
 	}
 
 
@@ -186,6 +211,15 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 		sheets.push_back(read_ice_sheet(nc, sheet_name));
 	}
 
+	// Remove grid cells that are not part of this domain.
+	// TODO: This should be done while reading the cells in the first place.
+	boost::function<bool (int)> include_cell1(domain->get_in_halo());
+	grid1.filter_cells(include_cell1);
+
+	// Now remove cells from the exgrids and grid2s that interacted with grid1
+	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
+		sheet->filter_cells1(include_cell1);
+	}
 
 }
 

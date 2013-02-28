@@ -349,12 +349,7 @@ std::string const &vname)
 		cell.j = cells_ijk[i*3 + 1];
 		cell.k = cells_ijk[i*3 + 2];
 
-//		cell.i = cells_i[i];
-//		cell.j = cells_j[i];
-//		cell.k = cells_k[i];
 		cell.area = cells_area[i];
-//		cell._native_area = cells_native_area[i];
-//		cell._proj_area = cells_proj_area[i];
 
 		// Add the vertices
 		cell.reserve(vrefs_start[i+1] - vrefs_start[i]);
@@ -416,5 +411,39 @@ std::vector<double> Grid::get_proj_area(std::string const &sproj) const
 	return area;
 }
 // ---------------------------------------------------
+/** Remove cells and vertices not relevant to us --- for example, not in our MPI domain. */
+void Grid::filter_cells(boost::function<bool (int)> const &include_cell)
+{
+	std::set<Vertex *> good_vertices;	// Remove vertices that do NOT end up in this set.
+
+	// Set counts so they won't change
+	_ncells_full = ncells_full();
+	_nvertices_full = nvertices_full();
+
+	// Remove cells that don't fit our filter
+	_max_realized_cell_index = -1;
+	for (auto cell = cells_begin(); cell != cells_end(); +=cell) {
+		if (include_cell(cell->index)) {
+			_max_realized_cell_index = std::max(_max_realized_cell_index, cell->index);
+
+			// Make sure we don't delete this cell's vertices
+			for (vertex = cell->begin(); vertex != cell->end(); ++vertex)
+				good_vertices.insert(&*vertex);
+		} else {
+			// Remove the cell, maybe remove its vertices later
+			_cells.erase(cell);
+		}
+	}
+
+	// Remove vertices that don't fit our filter
+	_max_realized_vertex_index = -1;
+	for (auto vertex = vertices_begin(); vertex != vertices_end(); +=vertex) {
+		if (good_vertices.find(&*vertex) != good_vertices.end()) {
+			_max_realized_vertex_index = std::max(_max_realized_vertex_index, vertex->index);
+		} else {
+			_vertices.erase(vertex);
+		}
+	}
+}
 
 }	// namespace

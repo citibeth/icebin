@@ -96,8 +96,8 @@ public:
 };		// class Cell
 // ----------------------------------------------------
 class Grid {
-	giss::Dict<int, Vertex> _vertices;
-	giss::Dict<int, Cell> _cells;
+	giss::HashDict<int, Vertex> _vertices;
+	giss::HashDict<int, Cell> _cells;
 
 public:
 	// Corresponds to classes
@@ -213,6 +213,12 @@ public:
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname);
 
 	void to_netcdf(std::string const &fname);
+
+
+	/** Remove cells and vertices not relevant to us --- for example, not in our MPI domain.
+	This will be done AFTER we read it in.  It's an optimization. */
+	void filter_cells(boost::function<bool (int)> const &include_cell);
+
 };
 
 std::unique_ptr<Grid> read_grid(NcFile &nc, std::string const &vname);

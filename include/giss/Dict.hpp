@@ -19,8 +19,6 @@ public:
 
 	auto operator*() -> decltype(*(this->IterT::operator*()))
 		{ return *(this->IterT::operator*()); }
-//	auto operator->() -> decltype(*(this->IterT::operator->()))
-//		{ return &*(this->IterT::operator*()); }
 	auto operator->() -> decltype(&*(this->IterT::operator*()))
 		{ return &*(this->IterT::operator*()); }
 
@@ -28,9 +26,8 @@ public:
 
 
 
-/** An iterator that derferences its result one more time.
-Useful to iterate through colletions of unique_ptr as if
-they're plain values. */
+/** Opposite of DerefIterator.  Requires one more
+dereference than the wrapped iterator. */
 template<class IterT>
 class RerefIterator : public IterT {
 public:
@@ -42,64 +39,31 @@ public:
 
 
 
-// template<class ValT>
-// class DerefCmp {
-// 	bool operator<(ValT const *rhs) const {
-// 		return (*rhs) < (*this);
-// 	}
-// }
-
-template<class KeyT, class ValT>
-struct Dict : public std::unordered_map<KeyT, std::unique_ptr<ValT>>
+template<class superT, class ValT>
+struct SecondIterator : public superT
 {
-	typedef std::unordered_map<KeyT, std::unique_ptr<ValT>> super;
+	SecondIterator(superT const &ii) : superT(ii) {}
 
-	struct ValIterator : public super::iterator
-	{
-		ValIterator(typename super::iterator const &ii) : super::iterator(ii) {}
+	ValT &operator*() const
+		{ return *(superT::operator*().second); }
+	ValT *operator->() const
+		{ return &*(superT::operator*().second); }
+};
 
-		ValT &operator*() const
-			{ return *(super::iterator::operator*().second); }
-		ValT *operator->() const
-			{ return &*(super::iterator::operator*().second); }
-#if 0
-		auto operator*() -> decltype(*(super::operator*().second))
-			{ return *(super::operator*().second); }
-		auto operator->() -> decltype(&*(super::operator*().second))
-			{ return &*(super::operator*().second); }
-#endif
+template<
+	template<class KeyTT, class ValTT> class BaseTpl,
+	class KeyT, class ValT>
+struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
+{
+	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super;
 
-	};
-
+	typedef SecondIterator<typename super::iterator, ValT> ValIterator;
 	ValIterator begin() { return ValIterator(super::begin()); }
 	ValIterator end() { return ValIterator(super::end()); }
 
-// 	std::vector<ValT *> as_vector() {
-// 		std::vector<ValT *> ret;
-// 		ret.reserve(size());
-// 		for (auto ii = begin(); ii != end(); ++ii) ret.push_back(&*ii);
-// 		return ret;
-// 	}
-
-
-	struct const_ValIterator : public super::const_iterator
-	{
-		const_ValIterator(typename super::const_iterator const &ii) : super::const_iterator(ii) {}
-
-		ValT const &operator*() const
-			{ return *(super::const_iterator::operator*().second); }
-		ValT const *operator->() const
-			{ return &*(super::const_iterator::operator*().second); }
-	};
-
+	typedef SecondIterator<typename super::const_iterator, ValT> const_ValIterator;
 	const_ValIterator begin() const { return const_ValIterator(super::begin()); }
 	const_ValIterator end() const { return const_ValIterator(super::end()); }
-
-
-
-
-
-
 
 
 
@@ -109,8 +73,7 @@ struct Dict : public std::unordered_map<KeyT, std::unique_ptr<ValT>>
 		return &*(ii->second);
 	}
 
-	std::pair<ValT *, bool> insert(KeyT const &key, ValT &&val) {
-		std::unique_ptr<ValT> valp(new ValT(std::move(val)));
+	std::pair<ValT *, bool> insert(KeyT const &key, std::unique_ptr<ValT> &&valp) {
 		auto ret = super::insert(std::make_pair(key, std::move(valp)));
 		typename super::iterator nw_it;
 			nw_it = ret.first;
@@ -118,7 +81,11 @@ struct Dict : public std::unordered_map<KeyT, std::unique_ptr<ValT>>
 		bool &is_inserted(ret.second);
 
 		return std::make_pair(nw_valp, is_inserted);
-//		return std::make_pair<ValT *,bool>((&**(ret.first), ret.second);
+	}
+
+	std::pair<ValT *, bool> insert(KeyT const &key, ValT &&val) {
+		return insert(key,
+			std::unique_ptr<ValT>(new ValT(std::move(val))));
 	}
 
 private :
@@ -143,7 +110,22 @@ public :
 	}	
 
 
-};
+};	// class Dict
+
+// -----------------------------------------
+template<class KeyT, class ValT>
+class _MapDict_core : public std::map<KeyT, ValT> {};
+
+template<class KeyT, class ValT>
+class MapDict : public Dict<_MapDict_core, KeyT, ValT> {}
+// -----------------------------------------
+template<class KeyT, class ValT>
+class _HashDict_core : public std::map<KeyT, ValT> {};
+
+template<class KeyT, class ValT>
+class HashDict : public Dict<_HashDict_core, KeyT, ValT> {}
+// -----------------------------------------
+
 
 
 }
