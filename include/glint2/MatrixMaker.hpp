@@ -73,13 +73,8 @@ public:
 	Ice sheets cannot overlap each other (although their grids can, if we're
 	guaranteed that ice-filled grid cells will never overlap). */
 	void compute_fhc(
-		blitz::Array<double,2> *fhc1h,	// OUT
-		blitz::Array<double,1> *fgice1);	// OUT: Portion of gridcell covered in ground ice (from landmask)
-
-	void compute_fhc2(
-		std::vector<int> &indices1,	// i1
-		std::vector<double> &fhc1h_vals,	// [*nhc]
-		std::vector<double> &fgice_vals);
+		giss::CooVector<int,double> &fhc1h,
+		giss::CooVector<int,double> &fgice1);
 
 
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;

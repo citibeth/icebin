@@ -71,7 +71,7 @@ class ModelEDomain : public glint2::GridDomain {
 		// Info about the local grid (C-style indices)
 		int _i0h_f, int _i1h_f, int _j0h_f, int _j1h_f,
 		int _i0_f, int _i1_f, int _j0_f, int _j1_f,
-		int _j0s_f, int _j1s_f) :
+		int _j0s_f, int _j1s_f) : GridDomain(2),
 
 		im_f(_im_f), jm_f(_jm_f),
 		i0h_f(_i0h_f), i1h_f(_i1h_f), j0h_f(_j0h_f), j1h_f(_j1h_f),

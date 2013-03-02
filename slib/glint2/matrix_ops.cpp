@@ -76,14 +76,18 @@ blitz::Array<int,1> const *mask2)
 // Area-Weighted Remapping
 
 /** Upgrids from grid2 (ice grid) to grid1 (grid1-projected, or grid1hc-projected)
-Transformation: [n2] --> [n1] */
+Transformation: [n2] --> [n1]
+
+Element (row, col) in output must be divided by area1[row] (see divide_rows())
+*/
 std::unique_ptr<giss::VectorSparseMatrix> grid2_to_grid1(
-giss::BlitzSparseMatrix const &overlap)
+giss::BlitzSparseMatrix const &overlap,
+giss::SparseAccumulator<int,double> &area1)
 {
 	int n1 = overlap.nrow;
 	int n2 = overlap.ncol;
 
-	std::vector<double> area1(overlap.sum_per_row());
+	accum_per_row(overlap, area1);
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
 		giss::SparseDescr(n1, n2)));
@@ -92,7 +96,7 @@ giss::BlitzSparseMatrix const &overlap)
 		int i1 = ii.row();
 		int i2 = ii.col();
 
-		ret->add(i1, i2, ii.val() / area1[i1]);
+		ret->add(i1, i2, ii.val());
 	}
 
 	return ret;

@@ -90,18 +90,6 @@ void IceSheet::filter_cells1(boost::function<bool (int)> const &include_cell1)
 }
 // -----------------------------------------------------
 
-std::unique_ptr<giss::VectorSparseMatrix> IceSheet::hp_to_hc()
-{
-	// Get two matrices and convert to Eigen format.
-	auto e_ice_to_hc(giss_to_Eigen(*ice_to_hc()));
-	auto e_hp_to_ice(giss_to_Eigen(*hp_to_ice()));	// TODO: Consider making this one column-major to ease multiplication below.
-
-	// Multiply the matices in Eigen format
-	auto e_ret((*e_ice_to_hc) * (*e_hp_to_ice));
-
-	// Convert back to GISS format sparse matrices
-	return giss::Eigen_to_giss(e_ret);
-}
 // ==============================================================
 // Write out the parts that this class computed --- so we can test/check them
 

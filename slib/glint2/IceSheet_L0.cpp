@@ -25,11 +25,12 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_ice()
 }
 
 /** Uses: elev2, gcm->hcmax, overlap */
-std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_hc()
+std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_hc(
+	giss::SparseAccumulator<int,double> &area1_m_hc)
 {
 	// Just area-weighted remap from ice back to hc grid
 	auto g2_to_g1(grid2_to_grid1(
-		giss::BlitzSparseMatrix(*overlap_m_hc)));
+		giss::BlitzSparseMatrix(*overlap_m_hc), area1_m_hc));
 // TODO: Fix up projection stuff, then un-comment line below.
 //	proj_to_native(*gcm->grid1, proj, *g2_to_g1);
 
@@ -82,16 +83,82 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_hc()
 // 	}
 // }
 
+
+/**
+@param area1_m IN/OUT: Area of each GCM cell covered by
+	(non-masked-out) ice sheet.
+@param area1_m_hc IN/OUT: Area of each GCM cell / height class coverd by
+	(non-masked-out) ice sheet
+    NOTE: Indexed in 1-D according to HCIndex convention [nhc * n1] */
+void IceSheet_L0::accum_areas(
+giss::SparseAccumulator<int,double> &area1_m,
+giss::SparseAccumulator<int,double> &area1_m_hc)
+{
+	accum_per_row(*overlap_m_hc, area1_m_hc);
+	accum_per_row(*overlap_m, area1_m);
+}
+
+
+
 /** Computes the FHC value for grid cells relevant to this ice model.
 Does not touch FHC for other grid cells.
 @param fhc1(nhc,n1) OUT: Fraction of landice in each cell that is in the given height class.  See ModelE. */
 void IceSheet_L0::compute_fhc2(
-std::vector<int> &indices1,	// i1
-std::vector<double> &fhc1h_vals,	// [*nhc]
-std::vector<double> &fgice1_vals)
+giss::SparseAccumulator<int,double> &fgice1,
+giss::SparseAccumulator<int,double> &fhc1h,
+giss::SparseAccumulator<int,double> &area1_m)
 {
-	// TODO: These full arrays are not good in MPI
-	std::vector<double> area1 = overlap_raw->sum_per_row();
+	// ======== Compute fhc1h (must divide by area1_m afterwards)
+	SparseAccumulator<int,double> area1_m_hc;
+	accum_per_row(*overlap_m_hc, area1_m_hc);
+
+
+
+	HCIndex hci(this->n1());	// Calculate bundled hc/i1 indices
+
+
+
+		for (int hc=0; hc<gcm->nhc(); ++hc) {
+			int i1hc = hci.ik_to_index(i1, hc);
+			auto ii(area1_m_hc.find(i1hc));
+			if (ii != area1_m_hc.end()) {
+				// fhc1h_vals.push_back(ii->second / area1_m[i1]);
+				fhc1h_vals.push_back(ii->second);
+			} else fhc1h_vals.push_back(0);
+
+
+
+
+	SparseAccumulator<int,double> area1_m;
+	accum_per_row(*overlap_m, area1_m);
+
+
+
+	// Compute fgice1
+	for (auto ii = area1_m.begin(); ii != area1_m.end(); ++i) {
+		int i1 = ii->first;
+		double area1_m_i1 = ii->second;
+
+		indices.push_back(i1);
+		fgice1_vals.push_back(area1_m_i1 / gcm->grid1->get_cell(i1)->area);
+	}
+
+	// Compute fhc1h
+	HCIndex hci(this->n1());	// Calculate bundled hc/i1 indices
+
+
+
+		for (int hc=0; hc<gcm->nhc(); ++hc) {
+			int i1hc = hci.ik_to_index(i1, hc);
+			auto ii(area1_m_hc.find(i1hc));
+			if (ii != area1_m_hc.end()) {
+				// fhc1h_vals.push_back(ii->second / area1_m[i1]);
+				fhc1h_vals.push_back(ii->second);
+			} else fhc1h_vals.push_back(0);
+	}
+
+
+
 	std::vector<double> area1_m = overlap_m->sum_per_row();
 	std::vector<double> area1_m_hc = overlap_m_hc->sum_per_row();
 

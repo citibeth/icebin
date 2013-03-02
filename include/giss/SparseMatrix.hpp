@@ -173,6 +173,16 @@ public:
 	std::map<int,double> sum_per_row_map() const;
 	std::map<int,double> sum_per_col_map() const;
 
+	template<class SparseMatrixT>
+	void append(SparseMatrixT const &mat) {
+		if (mat.nrow != this->nrow || mat.ncol != this->ncol) {
+			fprintf(stderr, "SparseMatrix::append() has wrong size argument\n");
+			throw std::exception;
+		}
+		for (auto ii=mat.begin(); ii != mat.end(); ++ii)
+			add(ii.row(), ii.col(), ii.val());
+	}
+
 private:
 	void netcdf_write(NcFile *nc, std::string const &vname) const;
 };
@@ -207,7 +217,6 @@ void SparseMatrix1<SparseMatrix0T>::set(int row, int col, double const val, Spar
 
 	this->_set(row, col, val, dups);
 }
-
 
 template<class SparseMatrix0T>
 void SparseMatrix1<SparseMatrix0T>::netcdf_write(NcFile *nc, std::string const &vname) const
@@ -456,6 +465,8 @@ public:
 
 	std::vector<int> const &rows() const { return indx; }
 	std::vector<int> const &cols() const { return jndx; }
+	int rowcols(int i) const
+		{ return (i == 0 ? rows() : cols()); }
 	std::vector<double> const &vals() const { return val; }
 
 	// --------------------------------------------------
@@ -472,6 +483,8 @@ public:
 		void operator++() { ++i; }
 		int row() const { return parent->indx[i] - parent->index_base; }
 		int col() const { return parent->jndx[i] - parent->index_base; }
+		int rowcol(int i) const
+			{ return (i == 0 ? row() : col()); }
 		double &val() { return parent->val[i]; }
 		double &value() { return val(); }
 	};
@@ -490,6 +503,8 @@ public:
 		void operator++() { ++i; }
 		int row() const { return parent->indx[i] - parent->index_base; }
 		int col() const { return parent->jndx[i] - parent->index_base; }
+		int rowcol(int i) const
+			{ return (i == 0 ? row() : col()); }
 		double const &val() { return parent->val[i]; }
 		double const &value() { return val(); }
 	};
@@ -972,8 +987,10 @@ SparseMatrixT &mat)
 		ii.val() *= diag(ii.row());
 }
 
+// ===============================================================
+// ======== Extra Functions
 
-
+extern VectorSparseMatrix multiply(VectorSparseMatrix &a, VectorSparseMatrix &b);
 
 
 }	// namespace giss

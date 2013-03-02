@@ -50,12 +50,6 @@ public:
 
 	// ------------------------------------------------
 
-#if 0
-	virtual void compute_fhc(
-		blitz::Array<double,2> *fhc1h,	// OUT
-		blitz::Array<double,1> *fgice1) = 0;	// OUT: Portion of gridcell covered in ground ice (from landmask)
-#endif
-
 	void compute_fhc2(
 		std::vector<int> &indices1,	// i1
 		std::vector<double> &fhc1h_vals,	// [*nhc]
@@ -66,13 +60,14 @@ public:
 	This is used on each ice timestep to generate SMB. */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice() = 0;
 
+protected:
 	/** Make matrix to go from
 		ide grid [n2] to height classes [nhc*n1].
 	The matrix hp2ice * ice2hc is used every GCM timestep to generate
 	SMB for the atmosphere.  (It is later multiplied by FHC). */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc() = 0;
-
-	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc();
+	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc(
+		giss::SparseAccumulator<int,double> &area1_m_hc) = 0;
+public:
 
 	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname);

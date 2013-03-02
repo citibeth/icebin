@@ -39,6 +39,15 @@ class GridDomain_Identity {
 		{ return true; }
 };
 
+// ==========================================================
+extern void global_to_local(
+	GridDomain const &domain,
+	std::vector<int> const &global,
+	std::vector<blitz::Array<double,1>> &olocal);
 
+extern std::unique_ptr<VectorSparseMatrix> filter_matrix(
+	GridDomain const &domain1,
+	GridDomain const &domain2,
+	VectorSparseMatrix const &mat);
 
 }

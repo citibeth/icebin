@@ -6,7 +6,8 @@ using namespace glint::modele;
 
 struct modele_api {
 	std::unique_ptr<MatrixMaker> maker;
-	ModelEDomain *domain;
+	ModelEDomain *domain;	// Points to domain owned by maker
+	std::unique_ptr<VectorSparseMatrix> hp_to_hc;
 }
 
 /** @param spec 
@@ -52,10 +53,13 @@ extern "C" modele_api_delete_(modele_api *api)
 	delete api;
 }
 // -----------------------------------------------------
-extern "C" modele_api_compute_fhc_(modele_api *api,
+extern "C"
+void modele_api_compute_fhc_c_(modele_api *api,
 	giss::F90Array<double, 3> &fhc1h_f,
 	giss::F90Array<double, 2> &fgice1_f)
 {
+	ModelEDomain &domain(*api->domain);
+
 	// Reconstruct arrays, using Fortran conventions
 	// (smallest stride first, whatever-based indexing it came with)
 	auto fhc1h(fhc1h_f.to_blitz());
@@ -64,37 +68,85 @@ extern "C" modele_api_compute_fhc_(modele_api *api,
 	// Zero out fhc1h and fgice1...
 	fhc1h = 0;
 	fgice1 = 0;
-#if 0
-	ModelEDomain const &domain(*api->domain);
-	for (int j=domain.j0h_f; j <= domain.j1h_f; ++j) {
-	for (int i=domain.i0h_f; i <= domain.i1h_f; ++i) {
-		fhc1h(i,j) = 0;
-		fgice1(i,j) = 0;
-	}}
-#endif
 
 	// Get the sparse vector values
-	std::vector<int> &indices1;	// i1
-	std::vector<double> &fhc1h_vals;	// [*nhc]
-	std::vector<double> &fgice1_vals;
-	compute_fhc2(indices1, fhc1h_vals, fgice1_vals);
+	giss::CooVector<std::pair<int,int>,double> fhc1h_s
+	giss::CooVector<int,double> fgice1_s;
+	api->maker->compute_fhc(fhc1h_s, fgice1_s);
 
-	// Put them into the Fortran arrays for this domain
-	for (size_t ii=0; ii<indices1.size(); ++ii) {
-		int i1 = indices1[ii];
+	// Translate the sparse vectors to the ModelE data structures
+	for (auto ii = fgice1_s.begin(); ii != fgice1_s.end(); ++ii) {
+		int i1 = ii->first;
 
-		// Filter out things not in our halo
-		if (!domain.in_halo(i1)) continue;
+		// Filter out things not in our domain
+		// (we'll get the answer for our halo via a halo update)
+		if (!domain.in_domain(i1)) continue;
 
 		// Convert to local (ModelE 2-D) indexing convention
 		int local[domain.num_local_indices];
 		domain.global_to_local(i1, local);
 
-		// Add into Fortran array
-		fhc1h(local[0], local[1]) += fhc1h_vals[ii];
-		fgice1(local[0], local[1]) += fgice1_vals[ii];
+		// Store it away
+		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
+		fgice1(local[0], local[1]) += ii->second;
+	}
+
+	for (auto ii = fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii) {
+		int i1 = ii->first.first;
+		int hc = ii->first.second;		// zero-based
+		double val = ii->second;
+
+		// Filter out things not in our domain
+		// (we'll get the answer for our halo via a halo update)
+		if (!domain.in_domain(i1)) continue;
+
+		// Convert to local (ModelE 2-D + height class) indexing convention
+		int local[domain.num_local_indices];
+		domain.global_to_local(i1, local);
+
+		// Store it away
+		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
+		int hc_f = hc + 1;		// convert zero-based to 1-based arrays
+		fhc1h(local[0], local[1], hc_f) += val;
 	}
 }
 // -----------------------------------------------------
+/** Call this to figure out how to dimension arrays.
+@return Number of elements in the sparse matrix */
+extern "C"
+int modele_api_hp_to_hc_part1_(modele_api *api)
+{
+	auto mat(api->maker->hp_to_hc());
+	api->hp_to_hc = filter_matrix(*api->domain, *api->domain, *mat);
+	return api->hp_to_hc->size();
+}
 // -----------------------------------------------------
+/** Call this after rows, cols and vals have been dimensioned. */
+extern "C"
+void modele_api_hp_to_hc_part2_(modele_api *api,
+	giss::F90Array<double, 3> &rows_i_f,
+	giss::F90Array<double, 3> &rows_j_f,
+	giss::F90Array<double, 3> &cols_i_f,
+	giss::F90Array<double, 3> &cols_j_f,
+	giss::F90Array<double, 3> &vals_f)
+{
+
+	// Array bounds checking not needed, it's done
+	// in lower-level subroutines that we call.
+
+	// Copy the rows while translating
+	std::vector<blitz::Array<int,1>> lrows = {rows_i_f.to_blitz(), rows_j_f.to_blitz()};
+	global_to_local(*api->domain, *api->hp_to_hc.rows(), lrows);
+
+	// Copy the cols while translating
+	std::vector<blitz::Array<int,1>> lcols = {cols_i_f.to_blitz(), cols_j_f.to_blitz()};
+	global_to_local(*api->domain, *api->hp_to_hc.cols(), lcols);
+
+	// Copy the values, just a simple vector copy
+	auto vals(vals_f.to_blitz());
+	vals = vector_to_blitz(api->hp_to_hc.vals());
+
+	// Free temporary storage
+	api->hp_to_hc.reset();
+}
 // -----------------------------------------------------

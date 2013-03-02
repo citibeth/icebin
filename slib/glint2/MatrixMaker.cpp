@@ -48,58 +48,73 @@ int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet) {
 
 /** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
 void MatrixMaker::compute_fhc(
-	blitz::Array<double,2> *fhc1h,	// OUT
-	blitz::Array<double,1> *fgice1)	// OUT: Portion of gridcell covered in ground ice (from landmask)
+	giss::CooMatrix<std::pair<int,int>,double> &fhc1h,	// std::pair<i1, hc>
+	giss::CooMatrix<int,double> &fgice1)
 {
-	if (fhc1h)
-		giss::check_dimensions("compute_fhc:fhc1h", *fhc1h, {nhc(), n1()});
-	if (fgice1)
-		giss::check_dimensions("compute_fhc:fgice1", *fhc1h, {n1()});
-
-	// Zero it all out
-	int n1 = grid1->ndata();
-	if (fhc1h) {
-		for (int ihc=0; ihc<nhc(); ++ihc) {
-			for (int i1=0; i1<n1; ++i1) {
-				(*fhc1h)(ihc,i1) = 0.;
-			}
-		}
-	}
-
-	if (fgice1) {
-		for (int i1=0; i1<n1; ++i1) (*fgice1)(i1) = 0.;
-	}
-
-	// Add in our sparse-vector values
-	std::vector<int> &indices1;	// i1
-	std::vector<double> &fhc1h_vals;	// [*nhc]
-	std::vector<double> &fgice_vals;
-	compute_fhc2(indices1, fhc1h_vals, fgice_vals);
-
-	for (size_t ii=0; ii<indices1.size(); ++ii) {
-		int i1 = indices1[ii];
-		if (fhc1h) {
-			int ii_times_nhc = ii * nhc();
-			for (int ihc=0; ihc<nhc(); ++ihc) {
-				(*fhc1h)(ihc, i1) += fhc1h_vals[ii_times_nhc + ihc];
-			}
-		}
-		if (fgice) (*fgice)(i1) += fgice_vals[ii];
-	}
-}
-
-/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
-void MatrixMaker::compute_fhc2(
-		std::vector<int> &indices1,	// i1
-		std::vector<double> &fhc1h_vals,	// [*nhc]
-		std::vector<double> &fgice_vals)
-{
-	// Add in for each ice sheet
+	// Accumulate areas over all ice sheets
+	giss::SparseAccumulator<int,double> &area1_m;
+	giss::SparseAccumulator<int,double> &area1_m_hc;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-		sheet->compute_fhc(idices1, fhc1h_vals, fgice_vals);
+		sheet->accum_areas(area1_m, area1_m_hc);
 	}
+
+	// Summing duplicates on area1_m and area1_m_hc not needed
+	// because the unordered_map sums them automatically.
+
+	// Compute fhc1h
+	fhc1h.clear();
+	HCIndex hc_index(n1());
+	for (auto ii = area1_m_hc.begin(); ii != area1_m_hc.end(); ++ii) {
+		int i1hc = ii->first;
+
+		// Separate out into grid cell and height class
+		int i1, hc;
+		hc_index.index_to_ik(i1hc, i1, hc);
+
+		fhc1h.add(std::make_pair(i1, hc), ii->second / area1_m[i1]);
+	}
+	fhc1h.sort();
+
+	// Compute fgice1
+	fgice1.clear();
+	for (auto ii = area1_m.begin(); ii != area1_m.end(); ++ii) {
+		int i1 = ii->first;
+		double ice_covered_area = ii->second;
+		fgice1.add(i1, ice_covered_area / grid1->get_cell(i1)->area);
+	}
+	fgice.sort();
 }
 
+std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
+{
+	std::unique_ptr<VectorSparseMatrix> ret(
+		new VectorSparseMatrix(
+		SparseDescr(nhc(), nhc())));
+
+	// Compute the hp->ice and ice->hc transformations for each ice sheet
+	// and combine into one hp->hc matrix for all ice sheets.
+	SparseAccumulator<int,double> accum;
+	SparseAccumulator<int,double> *area1_m_hc = &accum;
+	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+		auto hp_to_ice(sheet->hp_to_ice());
+		auto ice_to_hc(sheet->ice_to_hc(*area1_m_hc));
+		ret->append(*multiply(*ice_to_hc, *hp_to_ice));
+	}
+
+	// Compute 1 / area1_m_hc
+	for (auto ii = area1_m_hc->begin(); ii != area1_m_hc->end(); ++ii)
+		ii->second = 1.0d / ii->second;
+	SparseAccumulator<int,double> *area1_m_hc_inv = area1_m_hc;
+	area1_m_hc = 0;
+
+	// Divide by area1_m_hc
+	for (auto ii = ret.begin(); ii != ret.end(); ++ii)
+		ii.val() *= (*area1_m_hc_inv)[ii.col()];
+
+	ret.sum_duplicates();
+
+	return ret;
+}
 
 // ==============================================================
 // Write out the parts that this class computed --- so we can test/check them
