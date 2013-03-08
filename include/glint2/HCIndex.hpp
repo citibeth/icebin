@@ -2,7 +2,8 @@
 
 namespace glint2 {
 
-/** Utility to get height-classified indexing right. */
+/** Utility to get height-classified indexing right.
+TODO: Make this more efficient by rounding n1 up to a power of 2. */
 class HCIndex {
 public:
 
@@ -18,7 +19,6 @@ public:
 		k = index / n1;
 		i = index - k*n1;
 	}
-
 };
 
 }

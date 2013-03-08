@@ -115,7 +115,7 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
 
 	return ret;
 }
-
+// --------------------------------------------------------------
 // ==============================================================
 // Write out the parts that this class computed --- so we can test/check them
 
@@ -175,7 +175,7 @@ static std::vector<std::string> parse_comma_list(std::string list)
 	return result;
 }
 
-std::unique_ptr<IceSheet> read_ice_sheet(NcFile &nc, std::string const &vname)
+std::unique_ptr<IceSheet> read_icesheet(NcFile &nc, std::string const &vname)
 {
 	auto info_var = nc.get_var((vname + ".info").c_str());
 	std::string stype(giss::get_att(info_var, "parameterization")->as_string(0));
@@ -191,7 +191,7 @@ std::unique_ptr<IceSheet> read_ice_sheet(NcFile &nc, std::string const &vname)
 #endif
 
 	sheet->read_from_netcdf(nc, vname);
-	printf("read_ice_sheet(%s) END\n", vname.c_str());
+	printf("read_icesheet(%s) END\n", vname.c_str());
 	return sheet;
 
 }
@@ -217,13 +217,13 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 
 	// Read list of ice sheets
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
-	std::vector<std::string> sheet_names(parse_comma_list(std::string(
-		giss::get_att(info_var, "sheetnames")->as_string(0))));
+	sheet_names = parse_comma_list(std::string(
+		giss::get_att(info_var, "sheetnames")->as_string(0)));
 
 	for (auto sname = sheet_names.begin(); sname != sheet_names.end(); ++sname) {
 		std::string sheet_name(vname + "." + *sname);
 		printf("MatrixMaker::read_from_netcdf(%s) %s 3\n", vname.c_str(), sheet_name.c_str());
-		sheets.push_back(read_ice_sheet(nc, sheet_name));
+		sheets.push_back(read_icesheet(nc, sheet_name));
 	}
 
 	// Remove grid cells that are not part of this domain.

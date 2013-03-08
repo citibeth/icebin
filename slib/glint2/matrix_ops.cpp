@@ -222,6 +222,7 @@ std::vector<double> const &hpdefs)
 	//std::vector<double> area1(overlap.sum_per_row());
 	std::vector<double> area2(overlap.sum_per_col());
 
+	HCIndex hc_index(n1);
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
 		giss::SparseDescr(n2, nhc * n1)));
 
@@ -237,8 +238,10 @@ std::vector<double> const &hpdefs)
 		double whps[2];	
 		linterp_1d(hpdefs, elevation, ihps, whps);
 //		printf("%d %f %f (%d : %f), (%d : %f)\n", i2, elev2(i2), overlap_ratio, ihps[0], whps[0], ihps[1], whps[1]);
-		ret->add(i2, ihps[0]*n1 + i1, overlap_ratio * whps[0]);
-		ret->add(i2, ihps[1]*n1 + i1, overlap_ratio * whps[1]);
+		ret->add(i2, hc_index.ik_to_index(i1, ihps[0]), // ihps[0]*n1 + i1,
+			overlap_ratio * whps[0]);
+		ret->add(i2, hc_index.ik_to_index(i1, ihps[1]),	// ihps[1]*n1 + i1,
+			overlap_ratio * whps[1]);
 	}
 
 

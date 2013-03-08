@@ -48,6 +48,9 @@ struct SecondIterator : public superT
 		{ return *(superT::operator*().second); }
 	ValT *operator->() const
 		{ return &*(superT::operator*().second); }
+
+	auto key() -> decltype(superT::operator*().first) const
+		{ return superT::operator*().first; }
 };
 
 template<

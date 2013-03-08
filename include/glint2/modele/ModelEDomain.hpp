@@ -46,8 +46,8 @@ namespace modele {
 //         INTEGER :: J_STRT_HALO  ! Begin halo latitude  index
 //         INTEGER :: J_STOP_HALO  ! End   halo latitude  index
 
-
 // ------------------------------------------------
+#if 0
 class ModelEIndex : public glint2::LocalIndex {
 public:
 	int i_f;		// Fortran-style, starting with 1
@@ -55,7 +55,7 @@ public:
 
 	ModelEIndex(int _i_f, int _j_f) : i_f(_i_f), j_f(_j_f) {}
 };
-
+#endif
 // ------------------------------------------------
 class ModelEDomain : public glint2::GridDomain {
 
@@ -88,10 +88,11 @@ class ModelEDomain : public glint2::GridDomain {
 		int i_c = gindex - im * j_c;
 
 		// Convert to 1-based indexing
+		int j_f = j_c + 1;
 		lindex[0] = i_c + 1;
-		lindex[1] = j_c + 1;
+		lindex[1] = j_f;
 
-		return true;
+		return (j_f >= j0_f && j_f <= j1_f);
 	}
 
 	bool in_domain(int *lindex)

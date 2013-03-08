@@ -9,6 +9,7 @@
 namespace glint2 {
 
 class MatrixMaker;
+class IceCoupler;
 
 class IceSheet {
 protected:
@@ -30,12 +31,19 @@ public:
 	/** Elevation of each cell (L0) or vertex (L1) in the ice model */
 	blitz::Array<double,1> elev2;	// [n2]
 
+	// ============== Volatile / Compute Variables
+
 	/** The overlap matrix, derived from exgrid.
 	NOTE: This sparse matrix has its elements in the same order as in exgrid. */
 	std::unique_ptr<giss::VectorSparseMatrix> overlap_raw;	/// Overlap matrix between grid1 and grid2
 
 	/** Masked with mask1 and mask2. */
 	std::unique_ptr<giss::VectorSparseMatrix> overlap_m;
+
+	/** Multiply by this each ice timestep to compute SMB */
+	std::unique_ptr<giss::VectorSparseMatrix> _hp_to_ice;
+
+	// ===================================================
 
 	// -------------------------------------------
 
@@ -58,7 +66,12 @@ public:
 	/** Make matrix to go from
 		height points [nhc*n1] to ice grid [n2].
 	This is used on each ice timestep to generate SMB. */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice() = 0;
+	virtual std::unique_ptr<giss::VectorSparseMatrix> compute_hp_to_ice() = 0;
+
+	void giss::VectorSparseMatrix &hp_to_ice() {
+		if (!_hp_to_ice.get()) _hp_to_ice.reset(compute_hp_to_ice());
+		return *_hp_to_ice;
+	}
 
 protected:
 	/** Make matrix to go from

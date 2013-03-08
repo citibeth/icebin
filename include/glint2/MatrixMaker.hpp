@@ -22,6 +22,8 @@ class MatrixMaker
 {
 public:
 //	std::map<int, std::unique_ptr<IceSheet>> sheets;
+
+	std::vector<string> sheet_names;	// Gives numbering of ALL sheets as well as names
 	giss:MapDict<int, IceSheet> sheets;
 protected:
 	int _next_sheet_index;
@@ -75,6 +77,12 @@ public:
 	void compute_fhc(
 		giss::CooVector<int,double> &fhc1h,
 		giss::CooVector<int,double> &fgice1);
+
+	size_t ice_matrices_size() {
+		size_t nele = 0;
+		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
+			nele += ii->size();
+	}
 
 
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;

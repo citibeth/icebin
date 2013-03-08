@@ -24,6 +24,11 @@ public:
 	// Default implementation is OK; or re-implement to avoid
 	// going through extra virtual function call
 	virtual boost::function<bool (int)> get_in_halo() const;
+
+	void global_to_local(
+		std::vector<int> const &global,
+		std::vector<blitz::Array<double,1>> &olocal);
+
 };
 // ------------------------------------------------
 class GridDomain_Identity {
@@ -40,10 +45,12 @@ class GridDomain_Identity {
 };
 
 // ==========================================================
+#if 0
 extern void global_to_local(
 	GridDomain const &domain,
 	std::vector<int> const &global,
 	std::vector<blitz::Array<double,1>> &olocal);
+#endif
 
 extern std::unique_ptr<VectorSparseMatrix> filter_matrix(
 	GridDomain const &domain1,
