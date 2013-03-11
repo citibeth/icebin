@@ -29,8 +29,10 @@ class IceModel {
 		blitz::Array<double,1> const &indices,
 		std::map<IceField, blitz::Array<double,1>> const &vals2) = 0;
 
+	virtual void read_from_netcdf(NcFile &nc, std::string const &vname) {}
+
 };
 
-std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname);
+extern std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname);
 
 }

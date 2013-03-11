@@ -11,25 +11,36 @@ lib_LTLIBRARIES = libglint2.la
 
 # the sources to add to the library and to add to the source distribution
 libglint2_la_SOURCES = \
-	giss/SparseMatrix.cpp \
-	giss/hsl_zd11_x.cpp giss/ncutil.cpp giss/IndexTranslator.cpp \
+	giss/CooVector.cpp \
 	giss/geodesy.cpp \
+	giss/hsl_zd11_x.cpp \
+	giss/IndexTranslator.cpp \
+	giss/ncutil.cpp \
 	giss/Proj2.cpp \
-	giss/f90blitz_f.f90 \
+	giss/SparseMatrix.cpp \
+	giss/sparsemult.cpp \
+	glint2/clippers.cpp \
+	glint2/ExchangeGrid.cpp \
+	glint2/GCMCoupler.cpp \
+	glint2/GCMCoupler_MPI.cpp \
 	glint2/Grid.cpp \
 	glint2/Grid_LonLat.cpp \
 	glint2/Grid_XY.cpp \
-	glint2/read_grid.cpp \
-	glint2/modele/grids_ll.cpp \
+	glint2/GridDomain.cpp \
+	glint2/GridDomain_Listed.cpp \
 	glint2/gridutil.cpp \
 	glint2/HeightClassifier.cpp \
-	glint2/matrix_ops.cpp \
 	glint2/IceSheet.cpp \
 	glint2/IceSheet_L0.cpp \
+	glint2/matrix_ops.cpp \
 	glint2/MatrixMaker.cpp \
+	glint2/modele/grids_ll.cpp \
+	glint2/modele/modele_api.cpp \
+	glint2/read_grid.cpp \
+	glint2/read_icemodel.cpp \
 	glint2/read_matrixmaker.cpp \
-	glint2/ExchangeGrid.cpp \
-	glint2/clippers.cpp
+	giss/f90blitz_f.f90 \
+	glint2/modele/modele_api_f.f90
 
 # # ------------------------------------------------------
 giss/f90blitz_f.f90 ../include/giss/f90blitz_f.f90 : giss/f90blitz_f.py
