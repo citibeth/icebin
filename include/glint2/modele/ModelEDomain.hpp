@@ -1,3 +1,5 @@
+#pragma once
+
 namespace glint2 {
 namespace modele {
 
@@ -47,16 +49,6 @@ namespace modele {
 //         INTEGER :: J_STOP_HALO  ! End   halo latitude  index
 
 // ------------------------------------------------
-#if 0
-class ModelEIndex : public glint2::LocalIndex {
-public:
-	int i_f;		// Fortran-style, starting with 1
-	int j_f;		// Fortran-style, starting with 1
-
-	ModelEIndex(int _i_f, int _j_f) : i_f(_i_f), j_f(_j_f) {}
-};
-#endif
-// ------------------------------------------------
 class ModelEDomain : public glint2::GridDomain {
 
 	int im_f, jm_f;
@@ -80,49 +72,26 @@ class ModelEDomain : public glint2::GridDomain {
 
 
 	/** Given a global index (C-style 0...ndata()-1), returns a local
-	index for this MPI node.  Returns false if this is outside our halo. */
-	bool global_to_local(int gindex_c, int *lindex)
+	index for this MPI node.
+	@return May reaturn false if the grid cell falls outside the halo (but will not always).
+		Use in_domain() or in_halo() to find out for sure. */
+	void global_to_local(int gindex_c, int *lindex)
 	{
 		// Decompose index into i & j (zero-based)
 		int j_c = gindex / im;
 		int i_c = gindex - im * j_c;
 
 		// Convert to 1-based indexing
-		int j_f = j_c + 1;
 		lindex[0] = i_c + 1;
-		lindex[1] = j_f;
-
-		return (j_f >= j0_f && j_f <= j1_f);
+		lindex[1] = j_c + 1;
 	}
 
 	bool in_domain(int *lindex)
-	{
-	}
+		{ return (lindex[0] >= j0_f) && (lindex[1] <= j1_f); }
 
-	bool in_domain(int *lindex)
-	{
-	}
+	bool in_halo(int *lindex)
+		{ return (lindex[0] >= j0h_f) && (lindex[1] <= j1h_f); }
 
-
-	bool in_domain(int gindex_c)
-	{
-		int j_c = gindex / im;
-		int i_c = gindex - im * j_c;
-		int j_f = j_c + 1;
-		int i_f = i_c + 1;
-
-		return (j_f >= j0_f && j_f <= j1_f);
-	}
-
-	bool in_halo(int gindex_c)
-	{
-		int j_c = gindex / im;
-		int i_c = gindex - im * j_c;
-		int j_f = j_c + 1;
-		int i_f = i_c + 1;
-
-		return (j_f >= j0h_f && j_f <= j1h_f);
-	}
 };
 // ------------------------------------------------
 

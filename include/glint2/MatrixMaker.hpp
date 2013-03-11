@@ -23,8 +23,8 @@ class MatrixMaker
 public:
 //	std::map<int, std::unique_ptr<IceSheet>> sheets;
 
-	std::vector<string> sheet_names;	// Gives numbering of ALL sheets as well as names
-	giss:MapDict<int, IceSheet> sheets;
+//	std::vector<string> sheet_names;	// Gives numbering of ALL sheets as well as names
+    giss::MapDict<std::string, IceSheet> sheets;
 protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;
