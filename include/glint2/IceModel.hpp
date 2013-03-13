@@ -29,7 +29,7 @@ public:
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc. */
 	virtual void run_timestep(
-		blitz::Array<double,1> const &indices,
+		blitz::Array<int,1> const &indices,
 		std::map<IceField, blitz::Array<double,1>> const &vals2) = 0;
 
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname) {}

@@ -14,6 +14,8 @@ struct SMBMsg {
 	int i2;			// Index into ice model
 	double vals[1];		// Always at least one val; but this could be extended
 
+	double &get(int i) { return *(vals + i); }
+
 	/** @return size of the struct, given a certain number of values */
 	static size_t size(int nfields)
 		{ return sizeof(SMBMsg) + (nfields-1) * sizeof(double); }
@@ -34,6 +36,11 @@ protected :
 
 	// Rank of the root process, which will receive data on the ice grid
 	int root;
+
+	void call_ice_model(
+		giss::DynArray<SMBMsg> &rbuf,
+		std::vector<IceField> const &fields,
+		SMBMsg *begin, SMBMsg *end);
 
 public :
 	GCMCoupler_MPI(MPI_Comm _comm, int _root) :

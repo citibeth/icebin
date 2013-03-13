@@ -32,7 +32,7 @@ int SMBMsg::compar(void const *a, void const *b)
 // ===================================================
 // GCMCoupler_MPI
 
-static void call_ice_model(
+void GCMCoupler_MPI::call_ice_model(
 	giss::DynArray<SMBMsg> &rbuf,
 	std::vector<IceField> const &fields,
 	SMBMsg *begin, SMBMsg *end)
@@ -47,15 +47,16 @@ static void call_ice_model(
 		shape, stride, blitz::neverDeleteData);
 
 	// Construct values vectors
-	std::vector<blitz::Array<double,1>> vals2;
+	std::map<IceField, blitz::Array<double,1>> vals2;
 	stride[0] = rbuf.ele_size / sizeof(double);
 	for (int i=0; i<nfields; ++i) {
+
 		vals2.insert(std::make_pair(fields[i],
-			blitz::Array<double,1>(&(*begin)[i],
+			blitz::Array<double,1>(&begin->get(i),
 				shape, stride, blitz::neverDeleteData)));
 	}
 
-	models[sheetno].run_timestep(indices, vals2);
+	models[sheetno]->run_timestep(indices, vals2);
 };
 
 
@@ -63,23 +64,24 @@ static void call_ice_model(
 /** @param sbuf the (filled) array of ice grid values for this MPI node. */
 void GCMCoupler_MPI::couple_to_ice(
 std::vector<IceField> const &fields,
-DynArray<SMBMsg> &sbuf)
+giss::DynArray<SMBMsg> &sbuf)
 {
 	int nfields = fields.size();
 
 	// Gather buffers on root node
 	int num_mpi_nodes, rank;
-	MPI_Comm::size(comm, &num_mpi_nodes); 
-	MPI_Comm::rank(comm, &rank);
+	MPI_Comm_size(comm, &num_mpi_nodes); 
+	MPI_Comm_rank(comm, &rank);
 
 	// MPI_Gather the count
 	std::unique_ptr<int[]> rcounts;
 	if (rank == root) rcounts.reset(new int[num_mpi_nodes]);
+	int nele_l = sbuf.size;
 	MPI_Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, root, comm);
 
 	// Compute displacements as prefix sum of rcounts
 	std::unique_ptr<int[]> displs;
-	std::unique_ptr<DynArray<SMBMsg>> rbuf;
+	std::unique_ptr<giss::DynArray<SMBMsg>> rbuf;
 	if (rank == root) {
 		displs.reset(new int[num_mpi_nodes+1]);
 		displs[0] = 0;
@@ -88,19 +90,19 @@ DynArray<SMBMsg> &sbuf)
 
 		// Create receive buffer, and gather into it
 		// (There's an extra item in the array for a sentinel)
-		rbuf.reset(new DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
+		rbuf.reset(new giss::DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
 	}
 
 	MPI_Datatype mpi_type(SMBMsg::new_MPI_struct(nfields));
 	MPI_Gatherv(sbuf.begin(), sbuf.size, mpi_type,
-		rbuf->begin(), rcounts, displs, mpi_type,
+		rbuf->begin(), &rcounts[0], &displs[0], mpi_type,
 		root, comm);
-	mpi_type::Free();
+	MPI_Type_free(&mpi_type);
 
 	if (rank == root) {
 		// Sort the receive buffer so items in same ice sheet
 		// are found together
-		qsort(rbuf.begin(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
+		qsort(rbuf->begin(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
 
 		// Add a sentinel
 		(*rbuf)[rbuf->size-1].sheetno = 999999;
@@ -134,7 +136,7 @@ DynArray<SMBMsg> &sbuf)
 }
 
 void GCMCoupler_MPI::read_from_netcdf(NcFile &nc, std::string const &vname,
-	std::vector<string> const &sheet_names)
+	std::vector<std::string> const &sheet_names)
 {
 	int rank;
 	MPI_Comm::rank(comm, &rank);
