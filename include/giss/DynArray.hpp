@@ -4,7 +4,7 @@ namespace giss {
 
 template<class T>
 class DynArray {
-
+public:
 	size_t const size;
 	size_t const ele_size;
 	char * const buf;

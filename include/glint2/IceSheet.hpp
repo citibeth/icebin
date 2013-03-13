@@ -5,6 +5,7 @@
 #include <blitz/array.h>
 #include <giss/SparseMatrix.hpp>
 #include <glint2/ExchangeGrid.hpp>
+#include <giss/SparseAccumulator.hpp>
 
 namespace glint2 {
 
@@ -58,18 +59,17 @@ public:
 
 	// ------------------------------------------------
 
-	void compute_fhc2(
-		std::vector<int> &indices1,	// i1
-		std::vector<double> &fhc1h_vals,	// [*nhc]
-		std::vector<double> &fgice1_vals) = 0;
+	virtual void accum_areas(
+		giss::SparseAccumulator<int,double> &area1_m,
+		giss::SparseAccumulator<int,double> &area1_m_hc) = 0;
 
 	/** Make matrix to go from
 		height points [nhc*n1] to ice grid [n2].
 	This is used on each ice timestep to generate SMB. */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> compute_hp_to_ice() = 0;
 
-	void giss::VectorSparseMatrix &hp_to_ice() {
-		if (!_hp_to_ice.get()) _hp_to_ice.reset(compute_hp_to_ice());
+	giss::VectorSparseMatrix &hp_to_ice() {
+		if (!_hp_to_ice.get()) _hp_to_ice = compute_hp_to_ice();
 		return *_hp_to_ice;
 	}
 

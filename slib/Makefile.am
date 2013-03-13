@@ -11,7 +11,6 @@ lib_LTLIBRARIES = libglint2.la
 
 # the sources to add to the library and to add to the source distribution
 libglint2_la_SOURCES = \
-	giss/CooVector.cpp \
 	giss/geodesy.cpp \
 	giss/hsl_zd11_x.cpp \
 	giss/IndexTranslator.cpp \

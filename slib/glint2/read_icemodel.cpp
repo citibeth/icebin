@@ -1,4 +1,5 @@
 #include <glint2/IceModel.hpp>
+#include <glint2/IceModel_DISMAL.hpp>
 
 namespace glint2 {
 

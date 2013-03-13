@@ -39,7 +39,7 @@ public:
 
 
 
-template<class superT, class ValT>
+template<class superT, class KeyT, class ValT>
 struct SecondIterator : public superT
 {
 	SecondIterator(superT const &ii) : superT(ii) {}
@@ -49,7 +49,7 @@ struct SecondIterator : public superT
 	ValT *operator->() const
 		{ return &*(superT::operator*().second); }
 
-	auto key() -> decltype(superT::operator*().first) const
+	KeyT const &key() const
 		{ return superT::operator*().first; }
 };
 
@@ -60,11 +60,11 @@ struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
 {
 	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super;
 
-	typedef SecondIterator<typename super::iterator, ValT> ValIterator;
+	typedef SecondIterator<typename super::iterator, KeyT, ValT> ValIterator;
 	ValIterator begin() { return ValIterator(super::begin()); }
 	ValIterator end() { return ValIterator(super::end()); }
 
-	typedef SecondIterator<typename super::const_iterator, ValT> const_ValIterator;
+	typedef SecondIterator<typename super::const_iterator, KeyT, ValT> const_ValIterator;
 	const_ValIterator begin() const { return const_ValIterator(super::begin()); }
 	const_ValIterator end() const { return const_ValIterator(super::end()); }
 
@@ -120,13 +120,13 @@ template<class KeyT, class ValT>
 class _MapDict_core : public std::map<KeyT, ValT> {};
 
 template<class KeyT, class ValT>
-class MapDict : public Dict<_MapDict_core, KeyT, ValT> {}
+class MapDict : public Dict<_MapDict_core, KeyT, ValT> {};
 // -----------------------------------------
 template<class KeyT, class ValT>
 class _HashDict_core : public std::map<KeyT, ValT> {};
 
 template<class KeyT, class ValT>
-class HashDict : public Dict<_HashDict_core, KeyT, ValT> {}
+class HashDict : public Dict<_HashDict_core, KeyT, ValT> {};
 // -----------------------------------------
 
 

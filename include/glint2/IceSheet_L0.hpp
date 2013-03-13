@@ -21,17 +21,16 @@ public:
 	/** Uses: elev2, hcmax, overlap */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc();
 
-#if 0
-	virtual void compute_fhc(
-		blitz::Array<double,2> *fhc1h,
-		blitz::Array<double,1> *fgice1);	// Portion of gridcell covered in ground ice (from landmask)
-#endif
 
-	void compute_fhc2(
-		std::vector<int> &indices1,	// i1
-		std::vector<double> &fhc1h_vals,	// [*nhc]
-		std::vector<double> &fgice1_vals);
-
+	/**
+	@param area1_m IN/OUT: Area of each GCM cell covered by
+		(non-masked-out) ice sheet.
+	@param area1_m_hc IN/OUT: Area of each GCM cell / height class coverd by
+		(non-masked-out) ice sheet
+	    NOTE: Indexed in 1-D according to HCIndex convention [nhc * n1] */
+	void accum_areas(
+		giss::SparseAccumulator<int,double> &area1_m,
+		giss::SparseAccumulator<int,double> &area1_m_hc);
 
 	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

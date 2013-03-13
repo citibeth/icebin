@@ -30,6 +30,11 @@ NETCDFF_HOME=$HOME/opt/netcdf-fortran
 export NETCDFF_CFLAGS="-I $NETCDFF_HOME/include"
 export NETCDFF_LIBS="-L$NETCDFF_HOME/lib -lnetcdff"
 
+MPI_HOME=$HOME/opt/openmpi-1.6.4
+export MPI_INCLUDE="$MPI_HOME/include"
+export MPI_CFLAGS="-I $MPI_INCLUDE"
+export MPI_LIBS="-L$MPI_HOME/lib -lopenmpi"
+
 export PROJ_HOME=/opt/local
 export PROJ_CFLAGS="-I $PROJ_HOME/include"
 export PROJ_LIBS="-L$PROJ_HOME/lib -lproj"

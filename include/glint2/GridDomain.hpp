@@ -34,6 +34,11 @@ public:
 	going through extra virtual function call
 	@return The in_halo() function */
 	virtual boost::function<bool (int)> get_in_halo() const;
+
+	void global_to_local(
+		std::vector<int> const &global,
+		std::vector<blitz::Array<double,1>> &olocal);
+
 };
 // ------------------------------------------------
 class GridDomain_Identity {

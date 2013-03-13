@@ -1,16 +1,20 @@
+#pragma once
+
+#include <vector>
+#include <algorithm>
+
 namespace giss {
 
 template<class IndexT, class ValT>
 class CooVector : public std::vector<std::pair<IndexT, ValT>>
 {
-	std::vector<IndexT> indices;
-	std::vector<ValT> vals;
+//	typedef std::vector<std::pair<IndexT, ValT>> super;
 
-	pulic void add(IndexT index, IndexT val)
-		{ push_back(std::make_pair(index, val)); }
+	void add(IndexT index, IndexT val)
+		{ this->push_back(std::make_pair(index, val)); }
 
 	void sort()
-		{ std::sort(begin(), end()); }
+		{ std::sort(this->begin(), this->end()); }
 
 	void sum_duplicates();
 };
@@ -24,7 +28,7 @@ void CooVector<IndexT,ValT>::sum_duplicates()
 	// New array will never be bigger than original
 	int j=-1;		// Last-written item in output array
 	int last_index = -1;	// Last index we saw in input array
-	for (int i=0; i<size(); ++i) {
+	for (int i=0; i<this->size(); ++i) {
 		int index = (*this)[i].first;
 		int val = (*this)[i].second;
 
@@ -38,7 +42,7 @@ void CooVector<IndexT,ValT>::sum_duplicates()
 	}
 	int n = j+1;	// Size of output array
 
-	resize(n);
+	this->resize(n);
 }
 
 

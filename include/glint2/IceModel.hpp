@@ -1,5 +1,8 @@
 #pragma once
 
+#include <boost/enum.hpp>
+#include <glint2/IceSheet.hpp>
+
 namespace glint2 {
 
 /** The different things we can pass to an ice model. */
@@ -9,17 +12,17 @@ enum class IceField {
 };
 
 class IceModel {
-
+public:
 	BOOST_ENUM_VALUES( Type, int,
 		(DISMAL)		(0)		// Demo Ice Sheet Model and LandIce
 		(PISM)			(1)
 		(ISSM)			(2)
-	)
+	);
 
 	/** Initialize any grid information, etc. from the IceSheet struct. */
-	virtual void init(IceSheet *sheet);
+//	virtual void init(IceSheet *sheet);
 
-	/** Query all the ice models to figure out what fields they need */
+ 	/** Query all the ice models to figure out what fields they need */
 	virtual void get_required_fields(std::set<IceField> &fields) = 0;
 
 	/** @param index Index of each grid value.

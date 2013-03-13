@@ -177,7 +177,7 @@ public:
 	void append(SparseMatrixT const &mat) {
 		if (mat.nrow != this->nrow || mat.ncol != this->ncol) {
 			fprintf(stderr, "SparseMatrix::append() has wrong size argument\n");
-			throw std::exception;
+			throw std::exception();
 		}
 		for (auto ii=mat.begin(); ii != mat.end(); ++ii)
 			add(ii.row(), ii.col(), ii.val());
@@ -465,7 +465,7 @@ public:
 
 	std::vector<int> const &rows() const { return indx; }
 	std::vector<int> const &cols() const { return jndx; }
-	int rowcols(int i) const
+	std::vector<int> const &rowcols(int i) const
 		{ return (i == 0 ? rows() : cols()); }
 	std::vector<double> const &vals() const { return val; }
 
@@ -990,7 +990,7 @@ SparseMatrixT &mat)
 // ===============================================================
 // ======== Extra Functions
 
-extern VectorSparseMatrix multiply(VectorSparseMatrix &a, VectorSparseMatrix &b);
+extern std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparseMatrix &b);
 
 
 }	// namespace giss

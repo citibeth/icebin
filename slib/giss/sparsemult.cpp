@@ -1,10 +1,12 @@
-#pragma once
+#include <vector>
+#include <giss/SparseMatrix.hpp>
 
-namepsace giss {
+namespace giss {
 
 static std::vector<int> get_rowcol_beginnings(
-	VectorSparseMatrix const &a,
-	int const rowcol)
+	VectorSparseMatrix &a,
+	int const rowcol,
+	std::vector<int> &abegin)
 {
 	// Get beginning of each row in a (including sentinel at end)
 	a.sort(SparseMatrix::SortOrder::ROW_MAJOR);
@@ -23,10 +25,10 @@ static std::vector<int> get_rowcol_beginnings(
 }
 
 static double multiply_row_col(
-	VectorSparsematrix const &r,
+	VectorSparseMatrix const &r,
 	int const r0,	// Position within the sparsematrix vectors
 	int const r1,
-	VectorSparsematrix const &c,
+	VectorSparseMatrix const &c,
 	int const c0,
 	int const c1)
 {
@@ -44,12 +46,14 @@ static double multiply_row_col(
 			// Duplicate entries ==> add together
 			int rcol = r.cols()[ri];
 			double rval = 0;
-			do rval += r.vals()[ri++] while (r.cols()[ri] == rcol);
+			do {
+				rval += r.vals()[ri++];
+			} while (r.cols()[ri] == rcol);
 
 			// Duplicate entries ==> add together
 			int crow = c.rows()[ci];
 			double cval = 0;
-			do cval += c.vals()[ci++] while (c.rows()[ci] == crow);
+			do { cval += c.vals()[ci++]; } while (c.rows()[ci] == crow);
 
 			ret += rval * cval;
 		}
@@ -62,13 +66,11 @@ std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparse
 {
 	// Get beginning of each row in a (including sentinel at end)
 	a.sort(SparseMatrix::SortOrder::ROW_MAJOR);
-	std::vector<VectorSparseMatrix::iterator> abegin(
-		get_rowcol_beginnings(a, 0, abegin, arow));
+	std::vector<int> abegin(get_rowcol_beginnings(a, 0, abegin));
 
 	// Get beginning of each col in b (including sentinel at end)
 	b.sort(SparseMatrix::SortOrder::COLUMN_MAJOR);
-	std::vector<VectorSparseMatrix::iterator> bbegin(
-		get_rowcol_beginnings(b, 1, bbegin, brow));
+	std::vector<int> bbegin(get_rowcol_beginnings(b, 1, bbegin));
 
 	// Multiply each row by each column
 	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
@@ -80,7 +82,7 @@ std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparse
 		double val = multiply_row_col(
 			a, abegin[ai], abegin[ai+1],
 			b, bbegin[bi], bbegin[bi+1]);
-		ret.add(abegin[ai].row(), bbegin[bi].col(), val);
+		ret->add(abegin[ai], bbegin[bi], val);
 	}}
 
 	return ret;

@@ -1,11 +1,39 @@
 #include <mpi.h>
 
 #include <cstdlib>
+#include <glint2/GCMCoupler_MPI.hpp>
 
 namespace glint2 {
 
+// ===================================================
+// SMBMsg
+
+MPI_Datatype SMBMsg::new_MPI_struct(int nfields)
+{
+	int nele = 2 + nfields;
+	int blocklengths[] = {1, 1, nfields};
+	MPI_Aint displacements[] = {offsetof(SMBMsg,sheetno), offsetof(SMBMsg,i2), offsetof(SMBMsg, vals)};
+	MPI_Datatype types[] = {MPI_INT, MPI_INT, MPI_DOUBLE};
+	MPI_Datatype ret;
+	MPI_Type_create_struct(3, blocklengths, displacements, types, &ret);
+	return ret;
+}
+
+/** for use with qsort */
+int SMBMsg::compar(void const *a, void const *b)
+{
+	SMBMsg const *aa = reinterpret_cast<SMBMsg const *>(a);
+	SMBMsg const *bb = reinterpret_cast<SMBMsg const *>(b);
+	int cmp = aa->sheetno - bb->sheetno;
+	if (cmp != 0) return cmp;
+	return aa->i2 - bb->i2;
+}
+
+// ===================================================
+// GCMCoupler_MPI
+
 static void call_ice_model(
-	DynArray<SMBMsg> &rbuf,
+	giss::DynArray<SMBMsg> &rbuf,
 	std::vector<IceField> const &fields,
 	SMBMsg *begin, SMBMsg *end)
 {
@@ -41,13 +69,13 @@ DynArray<SMBMsg> &sbuf)
 
 	// Gather buffers on root node
 	int num_mpi_nodes, rank;
-	MPI::Comm::size(comm, &num_mpi_nodes); 
-	MPI::Comm::rank(comm, &rank);
+	MPI_Comm::size(comm, &num_mpi_nodes); 
+	MPI_Comm::rank(comm, &rank);
 
 	// MPI_Gather the count
 	std::unique_ptr<int[]> rcounts;
 	if (rank == root) rcounts.reset(new int[num_mpi_nodes]);
-	MPI::Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, root, comm);
+	MPI_Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, root, comm);
 
 	// Compute displacements as prefix sum of rcounts
 	std::unique_ptr<int[]> displs;
@@ -63,8 +91,8 @@ DynArray<SMBMsg> &sbuf)
 		rbuf.reset(new DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
 	}
 
-	MPI::Datatype mpi_type(SMBMsg::new_MPI_struct(nfields));
-	MPI::Gatherv(sbuf.begin(), sbuf.size, mpi_type,
+	MPI_Datatype mpi_type(SMBMsg::new_MPI_struct(nfields));
+	MPI_Gatherv(sbuf.begin(), sbuf.size, mpi_type,
 		rbuf->begin(), rcounts, displs, mpi_type,
 		root, comm);
 	mpi_type::Free();
@@ -109,7 +137,7 @@ void GCMCoupler_MPI::read_from_netcdf(NcFile &nc, std::string const &vname,
 	std::vector<string> const &sheet_names)
 {
 	int rank;
-	MPI::Comm::rank(comm, &rank);
+	MPI_Comm::rank(comm, &rank);
 
 	// Only load up ice model proxies on root node
 	if (rank != root) return;

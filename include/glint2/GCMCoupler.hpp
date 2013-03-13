@@ -15,8 +15,8 @@ public:
 	std::set<IceField> get_required_fields();
 
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname,
-		std::vector<string> const &sheet_names);
+		std::vector<std::string> const &sheet_names);
 
-}
+};
 
 }
