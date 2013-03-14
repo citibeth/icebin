@@ -54,16 +54,17 @@ public:
 
 };
 // ------------------------------------------------
-class GridDomain_Identity : public GridDomain {
-
+class GridDomain_Identity : public GridDomain
+{
+public:
 	GridDomain_Identity() : GridDomain(1) {}
 
-	void global_to_local(int gindex_c, int *lindex)
+	void global_to_local(int gindex_c, int *lindex) const
 		{ lindex[0] = gindex_c; }
 
-	bool in_domain(int index_c) const
+	bool in_domain(int *lindex) const
 		{ return true; }
-	bool in_halo(int index_c) const
+	bool in_halo(int *lindex) const
 		{ return true; }
 };
 

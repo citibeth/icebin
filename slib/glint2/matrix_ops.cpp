@@ -102,6 +102,23 @@ giss::SparseAccumulator<int,double> &area1)
 	return ret;
 }
 
+/** Divides mat /= area.
+@param area (IN) Vector to divide by.  Value is moved out of this.
+@param area_inv (OUT) 1/area */
+void divide_by(giss::VectorSparseMatrix &mat,
+	giss::SparseAccumulator<int,double> &area,
+	giss::SparseAccumulator<int,double> &area_inv)
+{
+	// Compute 1 / area
+	for (auto ii = area.begin(); ii != area.end(); ++ii)
+		ii->second = 1.0d / ii->second;
+	area_inv = std::move(area);
+
+	// Divide by area.  (Now area is really equal to 1/area)
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
+		ii.val() *= area_inv[ii.col()];
+}
+
 std::unique_ptr<giss::VectorSparseMatrix> grid1_to_grid2(
 giss::BlitzSparseMatrix const &overlap)
 {

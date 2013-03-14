@@ -101,24 +101,14 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
 
 	// Compute the hp->ice and ice->hc transformations for each ice sheet
 	// and combine into one hp->hc matrix for all ice sheets.
-	giss::SparseAccumulator<int,double> accum;
-	giss::SparseAccumulator<int,double> *area1_m_hc = &accum;
+	giss::SparseAccumulator<int,double> area1_m_hc;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 		giss::VectorSparseMatrix &hp_to_ice = sheet->hp_to_ice();
-		auto ice_to_hc(sheet->ice_to_hc(*area1_m_hc));
+		auto ice_to_hc(sheet->ice_to_hc(area1_m_hc));
 		ret->append(*multiply(*ice_to_hc, hp_to_ice));
 	}
 
-	// Compute 1 / area1_m_hc
-	for (auto ii = area1_m_hc->begin(); ii != area1_m_hc->end(); ++ii)
-		ii->second = 1.0d / ii->second;
-	giss::SparseAccumulator<int,double> *area1_m_hc_inv = area1_m_hc;
-	area1_m_hc = 0;
-
-	// Divide by area1_m_hc
-	for (auto ii = ret->begin(); ii != ret->end(); ++ii)
-		ii.val() *= (*area1_m_hc_inv)[ii.col()];
-
+	divide_by(*ret, area1_m_hc);
 	ret->sum_duplicates();
 
 	return ret;

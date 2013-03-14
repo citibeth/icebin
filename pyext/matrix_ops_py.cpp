@@ -137,8 +137,12 @@ PyObject *grid2_to_grid1_py(PyObject *self, PyObject *args)
 		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
 
 		// Do the call
+		giss::SparseAccumulator<int,double> area1_m_hc;
 		std::unique_ptr<giss::VectorSparseMatrix> ret_c(
-			glint2::grid2_to_grid1(overlap));
+			glint2::grid2_to_grid1(overlap, area1_m_hc));
+
+		glint2::divide_by(*ret_c, area1_m_hc);
+		ret_c->sum_duplicates();
 
 		// Create an output tuple of Numpy arrays
 		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);

@@ -32,7 +32,7 @@ protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;
 public:
-	MatrixMaker(std::unique_ptr<GridDomain> &&_domain) : domain(std::move(_domain)) {}
+	MatrixMaker(std::unique_ptr<GridDomain> &&_domain = std::unique_ptr<GridDomain>(new GridDomain_Identity())) : domain(std::move(_domain)) {}
 
 //	std::vector<std::unique_ptr<IceSheet>> sheets;
 	

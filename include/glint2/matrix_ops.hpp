@@ -40,6 +40,9 @@ std::unique_ptr<giss::VectorSparseMatrix> grid2_to_grid1(
 	giss::BlitzSparseMatrix const &overlap,
 	giss::SparseAccumulator<int,double> &area1);
 
+void divide_by(giss::VectorSparseMatrix &mat,
+	giss::SparseAccumulator<int,double> &area);
+
 std::unique_ptr<giss::VectorSparseMatrix> grid1_to_grid2(
 	giss::BlitzSparseMatrix const &overlap);
 
