@@ -27,6 +27,6 @@ struct F90Array {
 			blitz::neverDeleteData, stor);
 	}
 
-}	// namespace giss
-
 };
+
+}	// namespace giss

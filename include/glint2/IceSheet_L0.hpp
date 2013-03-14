@@ -16,10 +16,11 @@ public:
 	std::unique_ptr<giss::VectorSparseMatrix> overlap_m_hc;
 
 	/** Uses: elev2, hpdefs, overlap */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice();
+	virtual std::unique_ptr<giss::VectorSparseMatrix> compute_hp_to_ice();
 
 	/** Uses: elev2, hcmax, overlap */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc();
+	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc(
+		giss::SparseAccumulator<int,double> &area1_m_hc);
 
 
 	/**

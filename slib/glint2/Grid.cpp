@@ -1,3 +1,4 @@
+#include <set>
 #include <algorithm>
 #include <glint2/Grid.hpp>
 #include <giss/ncutil.hpp>
@@ -422,12 +423,12 @@ void Grid::filter_cells(boost::function<bool (int)> const &include_cell)
 
 	// Remove cells that don't fit our filter
 	_max_realized_cell_index = -1;
-	for (auto cell = cells_begin(); cell != cells_end(); +=cell) {
+	for (auto cell = cells_begin(); cell != cells_end(); ++cell) {
 		if (include_cell(cell->index)) {
 			_max_realized_cell_index = std::max(_max_realized_cell_index, cell->index);
 
 			// Make sure we don't delete this cell's vertices
-			for (vertex = cell->begin(); vertex != cell->end(); ++vertex)
+			for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex)
 				good_vertices.insert(&*vertex);
 		} else {
 			// Remove the cell, maybe remove its vertices later
@@ -437,7 +438,7 @@ void Grid::filter_cells(boost::function<bool (int)> const &include_cell)
 
 	// Remove vertices that don't fit our filter
 	_max_realized_vertex_index = -1;
-	for (auto vertex = vertices_begin(); vertex != vertices_end(); +=vertex) {
+	for (auto vertex = vertices_begin(); vertex != vertices_end(); ++vertex) {
 		if (good_vertices.find(&*vertex) != good_vertices.end()) {
 			_max_realized_vertex_index = std::max(_max_realized_vertex_index, vertex->index);
 		} else {

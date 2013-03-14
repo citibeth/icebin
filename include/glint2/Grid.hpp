@@ -182,6 +182,9 @@ public:
 
 	Cell *add_cell(Cell &&cell);
 
+	void cells_erase(giss::HashDict<int, Cell>::iterator &ii)
+		{ _cells.erase(ii); }
+
 	// ========= Vertex Collection Operators
 
 	auto vertices_begin() -> decltype(_vertices.begin()) { return _vertices.begin(); }

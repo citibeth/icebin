@@ -13,7 +13,7 @@ public:
 	DynArray(size_t _ele_size, size_t _size) :
 		ele_size(_ele_size),
 		size(_size),
-		buf(malloc(size * ele_size)),
+		buf((char *)malloc(size * ele_size)),
 		buf_end(buf + size * ele_size) {}
 
 	~DynArray() { free(buf); }

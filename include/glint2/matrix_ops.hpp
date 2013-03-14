@@ -1,7 +1,9 @@
 #pragma once
 
-#include <glint2/eigen.hpp>
 #include <blitz/array.h>
+#include <giss/SparseAccumulator.hpp>
+#include <giss/SparseMatrix.hpp>
+#include <giss/blitz.hpp>
 #include <glint2/HeightClassifier.hpp>
 #include <glint2/Grid.hpp>
 #include <glint2/Grid_LonLat.hpp>
@@ -35,10 +37,11 @@ blitz::Array<int,1> const *mask2);
 /** Upgrids from grid2 (ice grid) to grid1 (grid1-projected, or grid1hc-projected)
 Transformation: [n2] --> [n1] */
 std::unique_ptr<giss::VectorSparseMatrix> grid2_to_grid1(
-giss::BlitzSparseMatrix const &overlap);
+	giss::BlitzSparseMatrix const &overlap,
+	giss::SparseAccumulator<int,double> &area1);
 
 std::unique_ptr<giss::VectorSparseMatrix> grid1_to_grid2(
-giss::BlitzSparseMatrix const &overlap);
+	giss::BlitzSparseMatrix const &overlap);
 
 // ==================================================================
 // Geometric and Projection Error in Spherical/Cartesian Grids

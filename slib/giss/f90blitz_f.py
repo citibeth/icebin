@@ -107,8 +107,8 @@ def get_macros(fctypes, ranks) :
 fctypes = [('real*8', 'double'), ('integer', 'int')]
 ranks = [1,2,3]
 
-fctypes = [('real*4', 'float')]
-ranks = [3]
+#fctypes = [('real*4', 'float')]
+#ranks = [3]
 
 module = get_module(fctypes, ranks)
 macros = get_macros(fctypes, ranks)

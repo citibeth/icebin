@@ -180,7 +180,7 @@ public:
 			throw std::exception();
 		}
 		for (auto ii=mat.begin(); ii != mat.end(); ++ii)
-			add(ii.row(), ii.col(), ii.val());
+			this->add(ii.row(), ii.col(), ii.val());
 	}
 
 private:

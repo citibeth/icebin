@@ -1,1 +1,6 @@
-#define GET_SPEC_FLOAT_3(arr, spec) get_spec_float_3(arr, lbound(arr,1),lbound(arr,2),lbound(arr,3), spec)
+#define GET_SPEC_DOUBLE_1(arr, spec) get_spec_double_1(arr, lbound(arr,1), spec)
+#define GET_SPEC_DOUBLE_2(arr, spec) get_spec_double_2(arr, lbound(arr,1),lbound(arr,2), spec)
+#define GET_SPEC_DOUBLE_3(arr, spec) get_spec_double_3(arr, lbound(arr,1),lbound(arr,2),lbound(arr,3), spec)
+#define GET_SPEC_INT_1(arr, spec) get_spec_int_1(arr, lbound(arr,1), spec)
+#define GET_SPEC_INT_2(arr, spec) get_spec_int_2(arr, lbound(arr,1),lbound(arr,2), spec)
+#define GET_SPEC_INT_3(arr, spec) get_spec_int_3(arr, lbound(arr,1),lbound(arr,2),lbound(arr,3), spec)

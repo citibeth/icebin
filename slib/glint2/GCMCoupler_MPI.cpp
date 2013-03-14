@@ -50,9 +50,10 @@ void GCMCoupler_MPI::call_ice_model(
 	std::map<IceField, blitz::Array<double,1>> vals2;
 	stride[0] = rbuf.ele_size / sizeof(double);
 	for (int i=0; i<nfields; ++i) {
+		SMBMsg &rbegin(*begin);
 
 		vals2.insert(std::make_pair(fields[i],
-			blitz::Array<double,1>(&begin->get(i),
+			blitz::Array<double,1>(&rbegin[i],
 				shape, stride, blitz::neverDeleteData)));
 	}
 
@@ -109,8 +110,8 @@ giss::DynArray<SMBMsg> &sbuf)
 
 		// Make a set of all the ice sheets in this model run
 		std::set<int> sheets_remain;
-		for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet)
-			sheets_remain.add(sheet.key());
+		for (auto sheet=models.begin(); sheet != models.end(); ++sheet)
+			sheets_remain.insert(sheet.key());
 
 		// Call each ice sheet (that we have data for)
 		SMBMsg *lscan = rbuf->begin();
@@ -118,8 +119,8 @@ giss::DynArray<SMBMsg> &sbuf)
 		while (rscan < rbuf->end()) {
 			if (rscan->sheetno != lscan->sheetno) {
 				int sheetno = lscan->sheetno;
-				call_ice_model(rbuf, fields, lscan, rscan);
-				sheets_remain.remove(sheetno);
+				call_ice_model(*rbuf, fields, lscan, rscan);
+				sheets_remain.erase(sheetno);
 				lscan = rscan;
 			}
 			rbuf->incr(rscan);
@@ -129,8 +130,10 @@ giss::DynArray<SMBMsg> &sbuf)
 		for (auto sheet=sheets_remain.begin(); sheet != sheets_remain.end(); ++sheet) {
 			int sheetno = *sheet;
 			std::vector<int> indices;
-			std::vector<blitz::Array<double,1>> vals2;
-			models[sheetno].run_timestep(indices, vals2);
+			std::map<IceField, blitz::Array<double,1>> vals2;
+			// Run with null data
+			models[sheetno]->run_timestep(
+				giss::vector_to_blitz(indices), vals2);
 		}
 	}		// if (rank == root)
 }
@@ -139,7 +142,7 @@ void GCMCoupler_MPI::read_from_netcdf(NcFile &nc, std::string const &vname,
 	std::vector<std::string> const &sheet_names)
 {
 	int rank;
-	MPI_Comm::rank(comm, &rank);
+	MPI_Comm_rank(comm, &rank);
 
 	// Only load up ice model proxies on root node
 	if (rank != root) return;

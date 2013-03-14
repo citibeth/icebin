@@ -14,7 +14,7 @@ struct SMBMsg {
 	int i2;			// Index into ice model
 	double vals[1];		// Always at least one val; but this could be extended
 
-	double &get(int i) { return *(vals + i); }
+	double &operator[](int i) { return *(vals + i); }
 
 	/** @return size of the struct, given a certain number of values */
 	static size_t size(int nfields)

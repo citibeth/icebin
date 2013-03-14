@@ -5,9 +5,10 @@ namespace giss {
 
 static std::vector<int> get_rowcol_beginnings(
 	VectorSparseMatrix &a,
-	int const rowcol,
-	std::vector<int> &abegin)
+	int const rowcol)
 {
+	std::vector<int> abegin;
+
 	// Get beginning of each row in a (including sentinel at end)
 	a.sort(SparseMatrix::SortOrder::ROW_MAJOR);
 	int last_row = -1;
@@ -22,6 +23,8 @@ static std::vector<int> get_rowcol_beginnings(
 			last_row = ai.rowcol(rowcol);
 		}
 	}
+
+	return abegin;
 }
 
 static double multiply_row_col(
@@ -66,11 +69,11 @@ std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparse
 {
 	// Get beginning of each row in a (including sentinel at end)
 	a.sort(SparseMatrix::SortOrder::ROW_MAJOR);
-	std::vector<int> abegin(get_rowcol_beginnings(a, 0, abegin));
+	std::vector<int> abegin(get_rowcol_beginnings(a, 0));
 
 	// Get beginning of each col in b (including sentinel at end)
 	b.sort(SparseMatrix::SortOrder::COLUMN_MAJOR);
-	std::vector<int> bbegin(get_rowcol_beginnings(b, 1, bbegin));
+	std::vector<int> bbegin(get_rowcol_beginnings(b, 1));
 
 	// Multiply each row by each column
 	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(

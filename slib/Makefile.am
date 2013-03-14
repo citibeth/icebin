@@ -54,8 +54,8 @@ deps : f90_deps.mk
 f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
 	python ../f90_mod_deps.py $(FORTRAN_SOURCES) >f90_deps.mk
 
-FORTRAN_SOURCES = giss/f90blitz_f.f90
-libglint2_la_SOURCES += $(FORTRAN_SOURCES)
+#FORTRAN_SOURCES = giss/f90blitz_f.f90
+#libglint2_la_SOURCES += $(FORTRAN_SOURCES)
 
 # Fortran headers (.mod files) are installed from this directory.
 # For C/C++ header files, see ../include

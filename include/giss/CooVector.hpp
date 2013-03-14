@@ -8,9 +8,10 @@ namespace giss {
 template<class IndexT, class ValT>
 class CooVector : public std::vector<std::pair<IndexT, ValT>>
 {
+public:
 //	typedef std::vector<std::pair<IndexT, ValT>> super;
 
-	void add(IndexT index, IndexT val)
+	void add(IndexT const &index, ValT const &val)
 		{ this->push_back(std::make_pair(index, val)); }
 
 	void sort()

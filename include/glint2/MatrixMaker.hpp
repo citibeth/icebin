@@ -1,9 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <giss/CooVector.hpp>
 #include <glint2/Grid.hpp>
 #include <glint2/matrix_ops.hpp>
 #include <glint2/IceSheet.hpp>
+#include <glint2/GridDomain.hpp>
 
 /*
 Height Points (HP) [nhc*n1] --A--> Ice [n2] --B--> Height Classes (HC) [nhc*n1] --C--> GCM
@@ -25,6 +27,7 @@ public:
 
 //	std::vector<string> sheet_names;	// Gives numbering of ALL sheets as well as names
     giss::MapDict<std::string, IceSheet> sheets;
+	std::map<int, IceSheet *> sheets_by_id;
 protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;
@@ -56,14 +59,13 @@ public:
 	/** Call this after you've set everything up, added all ice sheets, etc. */
 	void realize();
 
-	IceSheet &operator[](int ix) { return *sheets[ix]; }
-	IceSheet &operator[](std::string const &name) {
-		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii) {
-			if (name == (*ii)->name) return **ii;
-		}
-		fprintf(stderr, "Could not find ice sheet named: %s\n", name.c_str());
-		throw std::exception();
+	IceSheet *operator[](int ix) {
+		auto ii = sheets_by_id.find(ix);
+		if (ii == sheets_by_id.end()) return NULL;
+		return ii->second;
 	}
+	IceSheet *operator[](std::string const &name)
+		{ return sheets[name]; }
 
 	/** @return The height class of the given point in gridcell #index1. */
 	int get_hc(int index1, double elev);
@@ -75,13 +77,16 @@ public:
 	Ice sheets cannot overlap each other (although their grids can, if we're
 	guaranteed that ice-filled grid cells will never overlap). */
 	void compute_fhc(
-		giss::CooVector<int,double> &fhc1h,
+		giss::CooVector<std::pair<int,int>,double> &fhc1h,	// std::pair<i1, hc>
 		giss::CooVector<int,double> &fgice1);
+
+	std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc();
 
 	size_t ice_matrices_size() {
 		size_t nele = 0;
 		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
-			nele += ii->size();
+			nele += ii->grid2->ndata();
+		return nele;
 	}
 
 

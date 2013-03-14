@@ -6,26 +6,33 @@ namespace giss {
 
 template<class IndexT, class AccumT>
 class SparseAccumulator : public std::unordered_map<IndexT, AccumT> {
+public :
 	typedef std::unordered_map<IndexT, AccumT> super;
 
 	void add(IndexT const &index, AccumT const &val) {
-		auto ii(find(index));
-		if (ii == super::end()) insert(std::make_pair(index, val));
-		else (*ii) += val;
+		auto ii(super::find(index));
+		if (ii == super::end()) super::insert(std::make_pair(index, val));
+		else ii->second += val;
 	}
 
 	void set(IndexT const &index, AccumT const &val) {
-		auto ii(find(index));
-		if (ii == super::end()) insert(std::make_pair(index, val));
-		else (*ii) = val;
+		auto ii(super::find(index));
+		if (ii == super::end()) super::insert(std::make_pair(index, val));
+		else ii->second = val;
 	}
 
-
 	AccumT &operator[](IndexT const &index) {
-		auto ii(find(index));
+		auto ii(super::find(index));
 		if (ii == super::end()) throw std::exception();
 		return ii->second;
 	}
+
+	AccumT const &operator[](IndexT const &index) const {
+		auto ii(super::find(index));
+		if (ii == super::end()) throw std::exception();
+		return ii->second;
+	}
+
 };
 
 template<class SparseMatrixT>

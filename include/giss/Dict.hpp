@@ -61,6 +61,7 @@ struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
 	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super;
 
 	typedef SecondIterator<typename super::iterator, KeyT, ValT> ValIterator;
+	typedef ValIterator iterator;
 	ValIterator begin() { return ValIterator(super::begin()); }
 	ValIterator end() { return ValIterator(super::end()); }
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <boost/function.hpp>
+#include <blitz/array.h>
+#include <giss/SparseMatrix.hpp>
 
 namespace glint2 {
 
@@ -18,36 +20,45 @@ public:
 	(for ModelE, this is generally 2, cells are inexed by i,j) */
 	const int num_local_indices;
 
-	GridDomain(int _num_local_indices) : num_local_indies(_num_local_indices) {}
+	GridDomain(int _num_local_indices) : num_local_indices(_num_local_indices) {}
 	virtual ~GridDomain() {}
 
 	/** Convert to local indexing scheme for this MPI node. */
-	virtual void global_to_local(int gindex_c, int *lindex) const;
+	virtual void global_to_local(int gindex_c, int *lindex) const = 0;
 
 	/** Tells whether a grid cell is in the MPI node's domain.
 	@param lindex Result of global_to_local() */
-	virtual bool in_domain(int *lindex);
+	virtual bool in_domain(int *lindex) const = 0;
 
 	/** Tells whether a grid cell is in the MPI node's halo (or main domain).
 	@param lindex Result of global_to_local() */
-	virtual bool in_halo(int *lindex);
+	virtual bool in_halo(int *lindex) const = 0;
+
+	bool in_halo2(int gindex_c) const
+	{
+		int lindex[num_local_indices];
+		global_to_local(gindex_c, lindex);
+		return in_halo(lindex);
+	}
 
 	/** Default implementation is OK; or re-implement to avoid
 	going through extra virtual function call
 	@return The in_halo() function */
-	virtual boost::function<bool (int)> get_in_halo() const;
+	virtual boost::function<bool (int)> get_in_halo2() const;
 
+#if 0
 	void global_to_local(
-		std::vector<int> const &global,
+		blitz::Array<double,1> const &global,
 		std::vector<blitz::Array<double,1>> &olocal);
+#endif
 
 };
 // ------------------------------------------------
-class GridDomain_Identity {
+class GridDomain_Identity : public GridDomain {
 
 	GridDomain_Identity() : GridDomain(1) {}
 
-	bool global_to_local(int gindex_c, int *lindex)
+	void global_to_local(int gindex_c, int *lindex)
 		{ lindex[0] = gindex_c; }
 
 	bool in_domain(int index_c) const
@@ -64,9 +75,9 @@ extern void global_to_local(
 	std::vector<blitz::Array<double,1>> &olocal);
 #endif
 
-extern std::unique_ptr<VectorSparseMatrix> filter_matrix(
+extern std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 	GridDomain const &domain1,
 	GridDomain const &domain2,
-	VectorSparseMatrix const &mat);
+	giss::VectorSparseMatrix const &mat);
 
 }

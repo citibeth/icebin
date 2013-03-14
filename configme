@@ -33,7 +33,7 @@ export NETCDFF_LIBS="-L$NETCDFF_HOME/lib -lnetcdff"
 MPI_HOME=$HOME/opt/openmpi
 export MPI_INCLUDE="$MPI_HOME/include"
 export MPI_CFLAGS="-I $MPI_INCLUDE"
-export MPI_LIBS="-L$MPI_HOME/lib -lopenmpi"
+export MPI_LIBS="-L$MPI_HOME/lib -lmpi"
 
 export PROJ_HOME=/opt/local
 export PROJ_CFLAGS="-I $PROJ_HOME/include"

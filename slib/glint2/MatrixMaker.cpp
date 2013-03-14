@@ -1,13 +1,14 @@
+#include <giss/ncutil.hpp>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet_L0.hpp>
-#include <glint2/eigen.hpp>
-#include <giss/ncutil.hpp>
+#include <glint2/HCIndex.hpp>
 
 namespace glint2 {
 
 void MatrixMaker::clear()
 {
 	sheets.clear();
+	sheets_by_id.clear();
 	grid1.reset();
 	mask1.reset();
 	hpdefs.clear();
@@ -36,24 +37,31 @@ void MatrixMaker::realize() {
 		sheet->realize();
 }
 
-int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet) {
-	int index = _next_sheet_index++;
+int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet)
+{
+	if (sheet->name == "") {
+		fprintf(stderr, "MatrixMaker::add_ice_sheet(): Sheet must have a name\n");
+		throw std::exception();
+	}
+
+	int const index = _next_sheet_index++;
 	sheet->index = index;
 	sheet->gcm = this;
 	
-	sheets.insert(sheet->index, std::move(sheet));
+	sheets_by_id.insert(std::make_pair(sheet->index, sheet.get()));
+	sheets.insert(sheet->name, std::move(sheet));
 	return index;
 }
 
 
 /** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
 void MatrixMaker::compute_fhc(
-	giss::CooMatrix<std::pair<int,int>,double> &fhc1h,	// std::pair<i1, hc>
-	giss::CooMatrix<int,double> &fgice1)
+	giss::CooVector<std::pair<int,int>,double> &fhc1h,	// std::pair<i1, hc>
+	giss::CooVector<int,double> &fgice1)
 {
 	// Accumulate areas over all ice sheets
-	giss::SparseAccumulator<int,double> &area1_m;
-	giss::SparseAccumulator<int,double> &area1_m_hc;
+	giss::SparseAccumulator<int,double> area1_m;
+	giss::SparseAccumulator<int,double> area1_m_hc;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 		sheet->accum_areas(area1_m, area1_m_hc);
 	}
@@ -82,36 +90,36 @@ void MatrixMaker::compute_fhc(
 		double ice_covered_area = ii->second;
 		fgice1.add(i1, ice_covered_area / grid1->get_cell(i1)->area);
 	}
-	fgice.sort();
+	fgice1.sort();
 }
 
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
 {
-	std::unique_ptr<VectorSparseMatrix> ret(
-		new VectorSparseMatrix(
-		SparseDescr(nhc(), nhc())));
+	std::unique_ptr<giss::VectorSparseMatrix> ret(
+		new giss::VectorSparseMatrix(
+		giss::SparseDescr(nhc(), nhc())));
 
 	// Compute the hp->ice and ice->hc transformations for each ice sheet
 	// and combine into one hp->hc matrix for all ice sheets.
-	SparseAccumulator<int,double> accum;
-	SparseAccumulator<int,double> *area1_m_hc = &accum;
+	giss::SparseAccumulator<int,double> accum;
+	giss::SparseAccumulator<int,double> *area1_m_hc = &accum;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-		auto hp_to_ice(sheet->hp_to_ice());
+		giss::VectorSparseMatrix &hp_to_ice = sheet->hp_to_ice();
 		auto ice_to_hc(sheet->ice_to_hc(*area1_m_hc));
-		ret->append(*multiply(*ice_to_hc, *hp_to_ice));
+		ret->append(*multiply(*ice_to_hc, hp_to_ice));
 	}
 
 	// Compute 1 / area1_m_hc
 	for (auto ii = area1_m_hc->begin(); ii != area1_m_hc->end(); ++ii)
 		ii->second = 1.0d / ii->second;
-	SparseAccumulator<int,double> *area1_m_hc_inv = area1_m_hc;
+	giss::SparseAccumulator<int,double> *area1_m_hc_inv = area1_m_hc;
 	area1_m_hc = 0;
 
 	// Divide by area1_m_hc
-	for (auto ii = ret.begin(); ii != ret.end(); ++ii)
+	for (auto ii = ret->begin(); ii != ret->end(); ++ii)
 		ii.val() *= (*area1_m_hc_inv)[ii.col()];
 
-	ret.sum_duplicates();
+	ret->sum_duplicates();
 
 	return ret;
 }
@@ -153,7 +161,7 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 printf("***************** 1 hcmax.extent(0) = %d\n", hcmax.extent(0));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hcmax", hcmax));
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-		fns.push_back(sheet.netcdf_define(nc, vname + "." + sheet->name));
+		fns.push_back(sheet->netcdf_define(nc, vname + "." + sheet->name));
 	}
 
 
@@ -217,19 +225,20 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 
 	// Read list of ice sheets
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
-	sheet_names = parse_comma_list(std::string(
+	std::vector<std::string> sheet_names = parse_comma_list(std::string(
 		giss::get_att(info_var, "sheetnames")->as_string(0)));
 
 	for (auto sname = sheet_names.begin(); sname != sheet_names.end(); ++sname) {
-		std::string sheet_name(vname + "." + *sname);
-		printf("MatrixMaker::read_from_netcdf(%s) %s 3\n", vname.c_str(), sheet_name.c_str());
-		sheets.push_back(read_icesheet(nc, sheet_name));
+		std::string var_name(vname + "." + *sname);
+		printf("MatrixMaker::read_from_netcdf(%s) %s 3\n",
+			vname.c_str(), var_name.c_str());
+		add_ice_sheet(read_icesheet(nc, var_name));
 	}
 
 	// Remove grid cells that are not part of this domain.
 	// TODO: This should be done while reading the cells in the first place.
-	boost::function<bool (int)> include_cell1(domain->get_in_halo());
-	grid1.filter_cells(include_cell1);
+	boost::function<bool (int)> include_cell1(domain->get_in_halo2());
+	grid1->filter_cells(include_cell1);
 
 	// Now remove cells from the exgrids and grid2s that interacted with grid1
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {

@@ -1,6 +1,6 @@
+#include <unordered_set>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet.hpp>
-#include <glint2/eigen.hpp>
 #include <giss/memory.hpp>
 
 namespace glint2 {
@@ -76,12 +76,12 @@ void IceSheet::filter_cells1(boost::function<bool (int)> const &include_cell1)
 	// Remove unneeded cells from exgrid
 	// Figure out which cells in grid2 to keep
 	std::unordered_set<int> good_index2;
-	for (auto excell = exgrid.begin(); excell != exgrid.end(); ++excell) {
+	for (auto excell = exgrid->cells_begin(); excell != exgrid->cells_end(); ++excell) {
 		int index1 = excell->i;
 		if (include_cell1(index1)) {
-			good_index2.add(excell->j);
+			good_index2.insert(excell->j);
 		} else {
-			exgrid.remove_cell(excell);
+			exgrid->cells_erase(excell);
 		}
 	}
 

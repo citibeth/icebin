@@ -1,14 +1,16 @@
 module modele_api
 use f90blitz
+use iso_c_binding
 implicit none
 
-subroutine modele_api_compute_fhc(api, &
-	fhc1h, fgice1, &
-	i0h, j0h)
-IMPLICIT NONE
-	type(c_ptr), value :: api,
-	real*8, dimension(i0h:,j0h:,:) :: fhc1h,
-	real*8, dimension(i0h:,j0h:) :: fgice1
+contains
+
+subroutine modele_api_compute_fhc(api, fhc1h, fgice1, i0h, j0h)
+type(c_ptr), value :: api
+integer :: i0h, j0h
+real*8, dimension(i0h:,j0h:,:) :: fhc1h
+real*8, dimension(i0h:,j0h:) :: fgice1
+
 	! ----------
 
 	type(arr_spec_3) :: fhc1h_f
@@ -25,7 +27,7 @@ end subroutine
 subroutine modele_api_hp_to_hc(api, &
 	rows_i, rows_j, cols_i, cols_j, vals)
 implicit none
-	type(c_ptr), value :: api,
+	type(c_ptr), value :: api
 	integer, dimension(:), allocatable :: rows_i, rows_j
 	integer, dimension(:), allocatable :: cols_i, cols_j
 	real*8, dimension(:), allocatable :: vals
@@ -39,7 +41,7 @@ implicit none
 	! ------------------- subroutine body
 
 	! -------- Part 1: Figure out how big we must make the arrays
-	n = modele_api_hp_to_hc_part1(api)
+	call modele_api_hp_to_hc_part1(api, n)
 
 	! -------- Allocate those arrays
 	allocate(rows_i(n))
@@ -53,7 +55,7 @@ implicit none
 	call get_spec_int_1(rows_j, 1, rows_j_f)
 	call get_spec_int_1(cols_i, 1, cols_i_f)
 	call get_spec_int_1(cols_j, 1, cols_j_f)
-	call get_spec_int_1(vals_i, 1, vals_i_f)
+	call get_spec_double_1(vals, 1, vals_f)
 
 	! -------- Part 2: Fill the arrays we allocated
 	call modele_api_hp_to_hc_part2(api, &
@@ -61,3 +63,4 @@ implicit none
 
 end subroutine
 
+end module

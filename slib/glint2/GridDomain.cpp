@@ -3,9 +3,10 @@
 namespace glint2 {
 
 // -------------------------------------------------------
-boost::function<bool (int)> GridDomain::get_in_halo()
-{ return boost::bind(this, &GridDomain::in_halo, _1); }
+boost::function<bool (int)> GridDomain::get_in_halo2() const
+	{ return boost::bind(&GridDomain::in_halo2, this, _1); }
 
+#if 0
 void GridDomain::global_to_local(
 	blitz::Array<double,1> const &global,
 	std::vector<blitz::Array<double,1>> &olocal)
@@ -32,26 +33,32 @@ void GridDomain::global_to_local(
 			olocal[i](j) = lindex[i];
 	}
 }
+#endif
 // -------------------------------------------------------
-std::unique_ptr<VectorSparseMatrix> filter_matrix(
+std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 	GridDomain const &domain1,
 	GridDomain const &domain2,
-	VectorSparseMatrix const &mat)
+	giss::VectorSparseMatrix const &mat)
 {
-	VectorSparseMatrix ret;
+	std::unique_ptr<giss::VectorSparseMatrix> ret(
+		new giss::VectorSparseMatrix(mat));
 
+	int lindex1[domain1.num_local_indices];
+	int lindex2[domain2.num_local_indices];
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
 		// Output of linear transformation: Only include
 		// if it's part of our domain.
-		if (!domain1.in_domain(ii.row())) continue;
+		domain1.global_to_local(ii.row(), lindex1);
+		if (!domain1.in_domain(lindex1)) continue;
 
 		// Input of linear transformation: must be in halo
-		if (!domain2.in_halo(ii.col())) {
-			fprintf("Error filtering matrix: grid cell %d in input (column) is not available in the halo.\n", ii.col());
-			throw std::exception;
+		domain2.global_to_local(ii.col(), lindex2);
+		if (!domain2.in_halo(lindex2)) {
+			fprintf(stderr, "Error filtering matrix: grid cell %d in input (column) is not available in the halo.\n", ii.col());
+			throw std::exception();
 		}
 
-		ret.add(ii.row(), ii.col(), ii.val());
+		ret->add(ii.row(), ii.col(), ii.val());
 	}
 
 	return ret;
