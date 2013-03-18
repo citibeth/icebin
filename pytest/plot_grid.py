@@ -5,12 +5,21 @@ import matplotlib.pyplot
 import glint2
 import sys
 
+# Usage: plot_grid <grid-file.nc> [var-name]
+#    var-name default = 'grid'
+
 # Simple script to plot the polygons of a grid
+# m.greenland2.grid2
 
 fname = sys.argv[1]
 
+if len(sys.argv) > 2 :
+	vname = sys.argv[2]
+else :
+	vname = 'grid'
+
 nc = netCDF4.Dataset(fname)
-grid = glint2.pyGrid(nc, 'grid')
+grid = glint2.pyGrid(nc, vname)
 nc.close()
 
 # Plot multiple plots on one page

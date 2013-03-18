@@ -79,7 +79,7 @@ public:
 	index for this MPI node.
 	@return May reaturn false if the grid cell falls outside the halo (but will not always).
 		Use in_domain() or in_halo() to find out for sure. */
-	void global_to_local(int gindex_c, int *lindex)
+	void global_to_local(int gindex_c, int *lindex) const
 	{
 		// Decompose index into i & j (zero-based)
 		int j_c = gindex_c / im;
@@ -90,10 +90,10 @@ public:
 		lindex[1] = j_c + 1;
 	}
 
-	bool in_domain(int *lindex)
+	bool in_domain(int *lindex) const
 		{ return (lindex[0] >= j0_f) && (lindex[1] <= j1_f); }
 
-	bool in_halo(int *lindex)
+	bool in_halo(int *lindex) const
 		{ return (lindex[0] >= j0h_f) && (lindex[1] <= j1h_f); }
 
 };

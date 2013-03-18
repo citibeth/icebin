@@ -36,6 +36,7 @@ int main(int argc, char **argv)
 
 	printf("--------------- Overlapping\n");
 	ExchangeGrid exch(*grid1, *grid2);
+	exch.sort_renumber_vertices();
 
 	printf("--------------- Writing Out\n");
 	std::string fname = grid1->name + "-" + grid2->name + ".nc";

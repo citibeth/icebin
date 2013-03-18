@@ -54,27 +54,29 @@ public:
 
 };
 // ------------------------------------------------
+/** The "NOP" GridDomain.  Does not translate indices. */
 class GridDomain_Identity : public GridDomain
 {
 public:
-	GridDomain_Identity() : GridDomain(1) {}
+	GridDomain_Identity() : GridDomain(1) 
+	{
+		printf("new GridDomain_Identity()\n");
+	}
 
 	void global_to_local(int gindex_c, int *lindex) const
-		{ lindex[0] = gindex_c; }
+	{
+		lindex[0] = gindex_c;
+	}
 
 	bool in_domain(int *lindex) const
 		{ return true; }
 	bool in_halo(int *lindex) const
-		{ return true; }
+	{
+		return true;
+	}
 };
 
 // ==========================================================
-#if 0
-extern void global_to_local(
-	GridDomain const &domain,
-	std::vector<int> const &global,
-	std::vector<blitz::Array<double,1>> &olocal);
-#endif
 
 extern std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 	GridDomain const &domain1,

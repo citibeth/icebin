@@ -21,9 +21,11 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj);
 
 struct Vertex {
 	long index;
-	double x;
-	double y;
-	Vertex(double _x, double _y, int _index=-1) : index(_index), x(_x), y(_y) {}
+	double const x;
+	double const y;
+
+	Vertex(double _x, double _y, int _index=-1) :
+		x(_x), y(_y), index(_index) {}
 
 	bool operator<(Vertex const &rhs) const
 		{ return index < rhs.index; }
@@ -55,23 +57,6 @@ public:
 
 	/** Area of this grid cell, whether it is a Cartesian or lat/lon cell. */
 	double area;
-
-	/** Area of this grid cel in its native coordinate system (if it's
-	been projected) */
-//	double _native_area;
-//	double _proj_area;
-//
-//	double native_area() const { return _native_area; }
-//	double proj_area() const {	// Lazy evaluation here
-//		if (_proj_area >= 0) { return _proj_area; }
-//
-//		// We allow a const_cast here becuase _proj_area is used for
-//		// caching values ONLY.
-//		const_cast<Cell *>(this)->_proj_area = area_of_polygon(*this);
-//		return _proj_area;
-//	}
-
-
 
 	size_t size() const { return _vertices.size(); }
 	typedef giss::DerefIterator<std::vector<Vertex *>::const_iterator> vertex_iterator;
@@ -123,12 +108,6 @@ public:
 	Type type;
 	Coordinates coordinates;
 	Parameterization parameterization;
-
-#if 0
-	std::string stype;		// xy, lonlat, cs, mesh, etc
-	/** Tells whether vertex coordinates are in x/y on a plane or lon/lat on a sphere. */
-	std::string scoord;		// xy or lonlat
-#endif
 
 	std::string name;
 
@@ -200,6 +179,10 @@ public:
 	long nvertices_realized() const { return _vertices.size(); }
 
 	Vertex *add_vertex(Vertex &&vertex);
+
+	/** Sort vertices by X/Y coordinates,
+	and then re-number them into sorted order. */
+	void sort_renumber_vertices();
 
 	// ========================================
 

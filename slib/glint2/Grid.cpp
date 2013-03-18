@@ -54,6 +54,27 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 	return ret;
 }
 
+/** Compute the center of a polygon in a plane.
+NOTE: Does NOT work (correctly) for lon/lat coordinates
+http://stackoverflow.com/questions/5271583/center-of-gravity-of-a-polygon */
+extern void center_of_polygon(Cell const &cell, double &x, double &y)
+{
+	double A = area_of_polygon(cell);
+	double Cx = 0;
+	double Cy = 0;
+	auto v0(cell.begin());
+	auto v1(v0);
+	for (++ v1; v1 != cell.end(); v0=v1,++v1) {
+		double cross = (v0->x * v1->y - v1->x * v0->y);
+		Cx += (v0->x + v1->x) * cross;
+		Cy += (v0->y + v1->y) * cross;
+	}
+
+	double fact = 1.0 / (6.0 * A);
+	x= Cx * fact;
+	y = Cy * fact;
+}
+
 // ------------------------------------------------------------
 Grid::Grid(Type _type) :
 	type(_type),
@@ -64,12 +85,9 @@ Grid::Grid(Type _type) :
 
 long Grid::ndata() const
 {
-printf("ndata start\n");
 	if (parameterization == Parameterization::L1) {
-printf("ndata L1: %d\n", nvertices_full());
 		return nvertices_full();
 	}
-printf("ndata !L1: %d\n", ncells_full());
 	return ncells_full();
 }
 
@@ -116,14 +134,41 @@ Vertex *Grid::add_vertex(Vertex &&vertex) {
 }
 
 // ------------------------------------------------------------
+struct CmpVertexXY {
+	bool operator()(Vertex const *a, Vertex const *b)
+	{
+		double diff = a->x - b->x;
+		if (diff < 0) return true;
+		if (diff > 0) return false;
+		return (a->y - b->y) < 0;
+	}
+};
+
+void Grid::sort_renumber_vertices()
+{
+	// Construct array of Vertex pointers
+	std::vector<Vertex *> vertices;
+	for (auto vertex = vertices_begin(); vertex != vertices_end(); ++vertex)
+		vertices.push_back(&*vertex);
+
+	// Sort it by x and y!
+	std::sort(vertices.begin(), vertices.end(), CmpVertexXY());
+
+	// Renumber vertices
+	long i=0;
+	for (auto vertex = vertices.begin(); vertex != vertices.end(); ++vertex)
+		(*vertex)->index = i++;
+}
+
+// ------------------------------------------------------------
 void Grid::netcdf_write(NcFile *nc, std::string const &vname) const
 {
-printf("Grid::netcdf_write() 1\n");
+printf("Grid::netcdf_write(%s) 1\n", vname.c_str());
 	// ---------- Write out the vertices
 	NcVar *vertices_index_var = nc->get_var((vname + ".vertices.index").c_str());
 	NcVar *vertices_xy_var = nc->get_var((vname + ".vertices.xy").c_str());
 
-	std::vector<Vertex *> vertices(_vertices.sorted());
+	std::vector<Vertex *> vertices(_vertices.sorted());	// Sort by index
 	int i=0;
 	for (auto vertex = vertices.begin(); vertex != vertices.end(); ++i, ++vertex) {
 		vertices_index_var->set_cur(i);
@@ -159,29 +204,12 @@ printf("Grid::netcdf_write() 3\n");
 		cells_index_var->set_cur(i);
 		cells_index_var->put(&cell->index, 1);
 
-// 		cells_i_var->set_cur(i);
-// 		cells_i_var->put(&cell->i, 1);
-// 
-// 		cells_j_var->set_cur(i);
-// 		cells_j_var->put(&cell->j, 1);
-// 
-// 		cells_k_var->set_cur(i);
-// 		cells_k_var->put(&cell->k, 1);
-
 		int ijk[3] = {cell->i, cell->j, cell->k};
 		cells_ijk_var->set_cur(i, 0);
 		cells_ijk_var->put(ijk, 1, 3);
 
 		cells_area_var->set_cur(i);
 		cells_area_var->put(&cell->area, 1);
-
-// 		cells_native_area_var->set_cur(i);
-// 		double native_area = cell->native_area();
-// 		cells_native_area_var->put(&native_area, 1);
-// 
-// 		cells_proj_area_var->set_cur(i);
-// 		double proj_area = cell->proj_area();
-// 		cells_proj_area_var->put(&proj_area, 1);
 
 		// Write vertex indices for this cell
 		cells_vertex_refs_start_var->set_cur(i);
@@ -192,7 +220,6 @@ printf("Grid::netcdf_write() 3\n");
 			++ivref;
 		}
 	}
-printf("Grid::netcdf_write() 4\n");
 
 	// Write out a sentinel for polygon index bounds
 	cells_vertex_refs_start_var->set_cur(i);
@@ -328,12 +355,7 @@ std::string const &vname)
 	std::vector<int> cells_ijk(ncells*3);
 	cells_ijk_var->get(&cells_ijk[0], ncells, 3);
 
-//	std::vector<int> cells_i(giss::read_int_vector(nc, vname + ".cells.i"));
-//	std::vector<int> cells_j(giss::read_int_vector(nc, vname + ".cells.j"));
-//	std::vector<int> cells_k(giss::read_int_vector(nc, vname + ".cells.k"));
 	std::vector<double> cells_area(giss::read_double_vector(nc, vname + ".cells.area"));
-//	std::vector<double> cells_native_area(giss::read_double_vector(nc, vname + ".cells.native_area"));
-//	std::vector<double> cells_proj_area(giss::read_double_vector(nc, vname + ".cells.proj_area"));
 
 	std::vector<int> vrefs(giss::read_int_vector(nc, vname + ".cells.vertex_refs"));
 	std::vector<int> vrefs_start(giss::read_int_vector(nc, vname + ".cells.vertex_refs_start"));
@@ -415,7 +437,9 @@ std::vector<double> Grid::get_proj_area(std::string const &sproj) const
 /** Remove cells and vertices not relevant to us --- for example, not in our MPI domain. */
 void Grid::filter_cells(boost::function<bool (int)> const &include_cell)
 {
-	std::set<Vertex *> good_vertices;	// Remove vertices that do NOT end up in this set.
+	std::set<int> good_vertices;	// Remove vertices that do NOT end up in this set.
+
+printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 
 	// Set counts so they won't change
 	_ncells_full = ncells_full();
@@ -423,28 +447,39 @@ void Grid::filter_cells(boost::function<bool (int)> const &include_cell)
 
 	// Remove cells that don't fit our filter
 	_max_realized_cell_index = -1;
-	for (auto cell = cells_begin(); cell != cells_end(); ++cell) {
-		if (include_cell(cell->index)) {
+	for (auto cell = cells_begin(); cell != cells_end(); ) { //++cell) {
+		bool keep = include_cell(cell->index);
+		if (keep) {
 			_max_realized_cell_index = std::max(_max_realized_cell_index, cell->index);
 
 			// Make sure we don't delete this cell's vertices
 			for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex)
-				good_vertices.insert(&*vertex);
+				good_vertices.insert(vertex->index);
+			++cell;
 		} else {
 			// Remove the cell, maybe remove its vertices later
-			_cells.erase(cell);
+			// Careful with iterators: invalidated after erase()
+			auto old_cell = cell;
+			++cell;
+			_cells.erase(old_cell);
 		}
 	}
 
 	// Remove vertices that don't fit our filter
 	_max_realized_vertex_index = -1;
-	for (auto vertex = vertices_begin(); vertex != vertices_end(); ++vertex) {
-		if (good_vertices.find(&*vertex) != good_vertices.end()) {
+	for (auto vertex = vertices_begin(); vertex != vertices_end(); ) {
+		if (good_vertices.find(vertex->index) != good_vertices.end()) {
 			_max_realized_vertex_index = std::max(_max_realized_vertex_index, vertex->index);
+			++vertex;
 		} else {
-			_vertices.erase(vertex);
+			// Careful with iterators: invalidated after erase()
+			auto old_vertex = vertex;
+			++vertex;
+			_vertices.erase(old_vertex);
 		}
 	}
+
+	printf("END filter_cells(%s) %p\n", name.c_str(), this);
 }
 
 }	// namespace

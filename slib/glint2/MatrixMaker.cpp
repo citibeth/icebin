@@ -108,7 +108,8 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
 		ret->append(*multiply(*ice_to_hc, hp_to_ice));
 	}
 
-	divide_by(*ret, area1_m_hc);
+	giss::SparseAccumulator<int,double> area1_m_hc_inv;
+	divide_by(*ret, area1_m_hc, area1_m_hc_inv);
 	ret->sum_duplicates();
 
 	return ret;

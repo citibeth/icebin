@@ -32,7 +32,11 @@ PyObject *height_classify_py(PyObject *self, PyObject *args)
 		PyObject *hcmax_py;
 		if (!PyArg_ParseTuple(args, "OOO",
 			&overlap_py, &elev2_py, &hcmax_py))
-		{ return NULL; }
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"height_classify_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		// Check arrays and copy to giss::VectorSparseMatrix
 		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
@@ -62,7 +66,11 @@ PyObject *coo_matvec_py(PyObject *self, PyObject *args)
 		PyObject *yy_py = NULL;
 		if (!PyArg_ParseTuple(args, "OOO",
 			&mat_py, &xx_py, &yy_py))
-		{ return NULL; }
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"coo_matvec_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		// Cast and typecheck arguments
 		giss::BlitzSparseMatrix mat(giss::py_to_BlitzSparseMatrix(mat_py, "mat"));
@@ -105,7 +113,11 @@ PyObject *grid1_to_grid2_py(PyObject *self, PyObject *args)
 		PyObject *overlap_py;
 		if (!PyArg_ParseTuple(args, "O",
 			&overlap_py))
-		{ return NULL; }
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"grid1_to_grid2_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		// Check arrays and copy to giss::VectorSparseMatrix
 		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
@@ -131,7 +143,11 @@ PyObject *grid2_to_grid1_py(PyObject *self, PyObject *args)
 		PyObject *overlap_py;
 		if (!PyArg_ParseTuple(args, "O",
 			&overlap_py))
-		{ return NULL; }
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"grid2_to_grid1_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		// Check arrays and copy to giss::VectorSparseMatrix
 		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
@@ -141,7 +157,8 @@ PyObject *grid2_to_grid1_py(PyObject *self, PyObject *args)
 		std::unique_ptr<giss::VectorSparseMatrix> ret_c(
 			glint2::grid2_to_grid1(overlap, area1_m_hc));
 
-		glint2::divide_by(*ret_c, area1_m_hc);
+		giss::SparseAccumulator<int,double> area1_m_hc_inv;
+		glint2::divide_by(*ret_c, area1_m_hc, area1_m_hc_inv);
 		ret_c->sum_duplicates();
 
 		// Create an output tuple of Numpy arrays
@@ -163,7 +180,11 @@ PyObject *mask_out_py(PyObject *self, PyObject *args)
 		PyObject *mask2_py;
 		if (!PyArg_ParseTuple(args, "OOO",
 			&overlap_py, &mask1_py, &mask2_py))
-		{ return NULL; }
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"mask_out_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		// Check arrays and copy to giss::VectorSparseMatrix
 		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
@@ -211,7 +232,11 @@ PyObject *proj_native_area_correct_py(PyObject *self, PyObject *args)
 		char *sdir_py;
 		if (!PyArg_ParseTuple(args, "Oss",
 			&grid_py, &sproj_py, &sdir_py))
-		{ return NULL; }
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"proj_native_area_correct_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		glint2::Grid &grid(*grid_py->grid);
 
@@ -237,8 +262,11 @@ PyObject *multiply_bydiag_py(PyObject *self, PyObject *args)
 		PyObject *arg2_py;
 		if (!PyArg_ParseTuple(args, "OO",
 			&arg1_py, &arg2_py))
-		{ return NULL; }
-//printf("arg1=%p, arg2=%p\n", arg1_py, arg2_py);
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"multiply_bydiag_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		// Figure whether we're doing (A * diag) or (diag * A)
 		PyObject *mat_py;
@@ -281,7 +309,11 @@ PyObject *hp_interp_py(PyObject *self, PyObject *args)
 		PyObject *hpdefs_py;
 		if (!PyArg_ParseTuple(args, "OOO",
 			&overlap_py, &elev2_py, &hpdefs_py))
-		{ return NULL; }
+		{
+			PyErr_SetString(PyExc_ValueError,
+				"hp_interp_py() called with invalid arguments.");
+			return NULL;
+		}
 
 		// Check arrays and copy to giss::VectorSparseMatrix
 		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));

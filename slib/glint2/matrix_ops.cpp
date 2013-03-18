@@ -116,7 +116,7 @@ void divide_by(giss::VectorSparseMatrix &mat,
 
 	// Divide by area.  (Now area is really equal to 1/area)
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
-		ii.val() *= area_inv[ii.col()];
+		ii.val() *= area_inv[ii.row()];
 }
 
 std::unique_ptr<giss::VectorSparseMatrix> grid1_to_grid2(

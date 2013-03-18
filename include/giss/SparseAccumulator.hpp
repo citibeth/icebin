@@ -23,7 +23,10 @@ public :
 
 	AccumT &operator[](IndexT const &index) {
 		auto ii(super::find(index));
-		if (ii == super::end()) throw std::exception();
+		if (ii == super::end()) {
+			std::cout << "SparseAccumulator[" << index << "] doesn't exist" << std::endl;
+			throw std::exception();
+		}
 		return ii->second;
 	}
 

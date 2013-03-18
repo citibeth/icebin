@@ -1,3 +1,4 @@
+#include <netcdfcpp.h>
 #include <giss/blitz.hpp>
 #include <giss/f90blitz.hpp>
 #include <glint2/modele/ModelEDomain.hpp>
@@ -20,18 +21,18 @@ struct modele_api {
 	// Permanent, used to compute ice sheet SMB
 };
 
-/** @param spec 
-extern "C" modele_api_new_(
-	char *maker_fname_f, const int &maker_fname_len,
-	char *maker_vname_f, const int &maker_vname_len,
+/** @param spec  */
+extern "C" modele_api *modele_api_new(
+	char const *maker_fname_f, int maker_fname_len,
+	char const *maker_vname_f, int maker_vname_len,
 
 	// Info about the global grid
-	const int &im, const int &jm,
+	int im, int jm,
 
 	// Info about the local grid (C-style indices)
-	const int &i0h, const int &i1h, const int &j0h, const int &j1h,
-	const int &i0, const int &i1, const int &j0, const int &j1,
-	const int &j0s, const int &j1s,
+	int i0h, int i1h, int j0h, int j1h,
+	int i0, int i1, int j0, int j1,
+	int j0s, int j1s,
 
 	// MPI Stuff
 	int comm_f, int root)
@@ -41,38 +42,39 @@ extern "C" modele_api_new_(
 	std::string maker_vname(maker_vname_f, maker_vname_len);
 
 	// Allocate our return variable
-	std::unique_ptr<modele_api> api(new model_api());
+	std::unique_ptr<modele_api> api(new modele_api());
 
 	// Set up the domain
 	std::unique_ptr<GridDomain> mdomain(
-	new ModelEDomain(
-		i0h, i1h, j0h, j1h,
-		i0, i1, j0, j1,
-		j0s, j1s));
+		new ModelEDomain(im, jm,
+			i0h, i1h, j0h, j1h,
+			i0, i1, j0, j1,
+			j0s, j1s));
 	api->domain = (ModelEDomain *)mdomain.get();
 
 	// Load the MatrixMaker	(filtering by our domain, of course)
 	// Also load the ice sheets
 	api->maker.reset(new MatrixMaker(std::move(mdomain)));
-	NcFile nc(maker_fname, NcFile::ReadOnly);
+	NcFile nc(maker_fname.c_str(), NcFile::ReadOnly);
 	api->maker->read_from_netcdf(nc, maker_vname);
 
 	// Read the coupler, along with ice model proxies
 	api->gcm_coupler.reset(new GCMCoupler_MPI(MPI_Comm_f2c(comm_f), root));
-	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->sheet_names);
+	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->get_sheet_names());
 	nc.close();
 
 	// No exception, we can release our pointer back to Fortran
 	return api.release();
 }
 // -----------------------------------------------------
-extern "C" modele_api_delete_(modele_api *api)
+extern "C" void modele_api_delete(modele_api *&api)
 {
-	delete api;
+	if (api) delete api;
+	api = 0;
 }
 // -----------------------------------------------------
 extern "C"
-void modele_api_compute_fhc_c_(modele_api *api,
+void modele_api_compute_fhc_c(modele_api *api,
 	giss::F90Array<double, 3> &fhc1h_f,
 	giss::F90Array<double, 2> &fgice1_f)
 {
@@ -88,7 +90,7 @@ void modele_api_compute_fhc_c_(modele_api *api,
 	fgice1 = 0;
 
 	// Get the sparse vector values
-	giss::CooVector<std::pair<int,int>,double> fhc1h_s
+	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
 	giss::CooVector<int,double> fgice1_s;
 	api->maker->compute_fhc(fhc1h_s, fgice1_s);
 
@@ -98,15 +100,14 @@ void modele_api_compute_fhc_c_(modele_api *api,
 
 		// Filter out things not in our domain
 		// (we'll get the answer for our halo via a halo update)
-		if (!domain.in_domain(i1)) continue;
-
 		// Convert to local (ModelE 2-D) indexing convention
-		int local[domain.num_local_indices];
-		domain.global_to_local(i1, local);
+		int lindex[domain.num_local_indices];
+		domain.global_to_local(i1, lindex);
+		if (!domain.in_domain(lindex)) continue;
 
 		// Store it away
 		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
-		fgice1(local[0], local[1]) += ii->second;
+		fgice1(lindex[0], lindex[1]) += ii->second;
 	}
 
 	for (auto ii = fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii) {
@@ -116,27 +117,27 @@ void modele_api_compute_fhc_c_(modele_api *api,
 
 		// Filter out things not in our domain
 		// (we'll get the answer for our halo via a halo update)
-		if (!domain.in_domain(i1)) continue;
 
 		// Convert to local (ModelE 2-D + height class) indexing convention
-		int local[domain.num_local_indices];
-		domain.global_to_local(i1, local);
+		int lindex[domain.num_local_indices];
+		domain.global_to_local(i1, lindex);
+		if (!domain.in_domain(lindex)) continue;
 
 		// Store it away
 		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
 		int hc_f = hc + 1;		// convert zero-based to 1-based arrays
-		fhc1h(local[0], local[1], hc_f) += val;
+		fhc1h(lindex[0], lindex[1], hc_f) += val;
 	}
 }
 // -----------------------------------------------------
 /** Call this to figure out how to dimension arrays.
 @return Number of elements in the sparse matrix */
 extern "C"
-void modele_api_hp_to_hc_part1_(modele_api *api, int &ret)
+int modele_api_hp_to_hc_part1(modele_api *api)
 {
 	auto mat(api->maker->hp_to_hc());
 	api->hp_to_hc = filter_matrix(*api->domain, *api->domain, *mat);
-	ret = api->hp_to_hc->size();
+	return api->hp_to_hc->size();
 }
 // -----------------------------------------------------
 static void global_to_local_hp(
@@ -163,7 +164,7 @@ static void global_to_local_hp(
 // -----------------------------------------------------
 /** Call this after rows, cols and vals have been dimensioned. */
 extern "C"
-void modele_api_hp_to_hc_part2_(modele_api *api,
+void modele_api_hp_to_hc_part2(modele_api *api,
 	giss::F90Array<int, 1> &rows_i_f,
 	giss::F90Array<int, 1> &rows_j_f,
 	giss::F90Array<int, 1> &rows_k_f,
@@ -198,6 +199,7 @@ void modele_api_hp_to_hc_part2_(modele_api *api,
 // -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide. */
+extern "C"
 void modele_api_couple_to_ice(
 modele_api *api,
 giss::F90Array<double,3> &smb1hp_f,

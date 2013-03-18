@@ -39,6 +39,14 @@ public:
 	/** These are all left public because someone will probably want
 	to look at / use them. */
 
+	/** @return Vector of names of the ice sheets. */
+	std::vector<std::string> get_sheet_names() {
+		std::vector<std::string> ret;
+		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
+			ret.push_back(ii.key());
+		return ret;
+	}
+
 	// ------------ Stuff we're passed in
 	std::shared_ptr<glint2::Grid> grid1;		/// GCM Grid
 
