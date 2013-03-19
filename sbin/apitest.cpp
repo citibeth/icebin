@@ -1,5 +1,8 @@
 #include <glint2/modele_api.hpp>
 
+using namespace glint2;
+using namespace glint2::modele;
+
 int main(int argc, char **argv)
 {
 
@@ -33,7 +36,6 @@ int main(int argc, char **argv)
 
 	int im = 144;
 	int jm = 90;
-//	int nhc = 40;
 
 	modele_api *api = modele_api_new(
 		maker_fname.c_str(), maker_fname.size(),
@@ -54,7 +56,23 @@ int main(int argc, char **argv)
 		// int comm_f, int root;
 		MPI_Comm_c2f(comm), 0);
 
-	modele_api_compute_fhc_c(api, fhc1h, fgice1);
+	int nhc = api->maker->nhc();
+
+	auto fhc1h = blitz::Array<double,3>(
+		blitz::Range(1,im),
+		blitz::Range(1,jm),
+		blitz::Range(1,nhc),
+		blitz::fortranArray);
+	giss::F90Array<double,3> fhc1h_f(fhc1h);
+
+	auto fgice1 = blitz::Array<double,2>(
+		blitz::Range(1,im),
+		blitz::Range(1,jm),
+		blitz::fortranArray);
+	giss::F90Array<double,2> fgice1_f(fgice1);
+
+
+	modele_api_compute_fhc_c(api, fhc1h_f, fgice1_f);
 
 
 	modele_api_delete(api);

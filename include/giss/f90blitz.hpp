@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdio>
 #include <blitz/array.h>
 #include <mpi.h>

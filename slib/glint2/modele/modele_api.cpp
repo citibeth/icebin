@@ -1,25 +1,12 @@
 #include <netcdfcpp.h>
 #include <giss/blitz.hpp>
 #include <giss/f90blitz.hpp>
-#include <glint2/modele/ModelEDomain.hpp>
-#include <glint2/MatrixMaker.hpp>
-#include <glint2/GCMCoupler_MPI.hpp>
 #include <glint2/HCIndex.hpp>
+#include <glint2/modele_api.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
 
-struct modele_api {
-	std::unique_ptr<MatrixMaker> maker;
-	ModelEDomain *domain;	// Points to domain owned by maker
-
-	std::unique_ptr<GCMCoupler_MPI> gcm_coupler;
-
-	// Temporary, until we return the matrix back to the GCM
-	std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc;
-
-	// Permanent, used to compute ice sheet SMB
-};
 
 /** @param spec  */
 extern "C" modele_api *modele_api_new(
