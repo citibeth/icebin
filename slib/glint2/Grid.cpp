@@ -459,9 +459,7 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 		} else {
 			// Remove the cell, maybe remove its vertices later
 			// Careful with iterators: invalidated after erase()
-			auto old_cell = cell;
-			++cell;
-			_cells.erase(old_cell);
+			cell = _cells.erase(cell);	// Increments too
 		}
 	}
 
@@ -473,9 +471,7 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 			++vertex;
 		} else {
 			// Careful with iterators: invalidated after erase()
-			auto old_vertex = vertex;
-			++vertex;
-			_vertices.erase(old_vertex);
+			vertex = _vertices.erase(vertex);	// Increments too
 		}
 	}
 

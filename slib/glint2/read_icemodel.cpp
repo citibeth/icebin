@@ -5,6 +5,7 @@ namespace glint2 {
 
 std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname)
 {
+	printf("BEGIN read_icemodel(%s)\n", vname.c_str());
 	auto info_var = nc.get_var((vname + ".info").c_str());
 
 	IceModel::Type type = giss::parse_enum<IceModel::Type>(
@@ -27,7 +28,7 @@ std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname)
 
 	ice_model->read_from_netcdf(nc, vname);
 	return ice_model;
-
+	printf("END read_icemodel(%s)\n", vname.c_str());
 }
 // -----------------------------------------------------
 

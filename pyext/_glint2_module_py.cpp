@@ -6,7 +6,6 @@
 
 // ============================================================
 // Type definitions for the Python classes this module defines
-// extern PyTypeObject GridType
 
 // Function defintions, per sub-module
 extern PyMethodDef matrix_ops_functions[];
@@ -19,11 +18,13 @@ static PyMethodDef *glint2_function_sets[] = {
 	NULL
 };
 
+extern PyTypeObject NcFileType;
 extern PyTypeObject GridType;
 extern PyTypeObject MatrixMakerType;
 
 // All the classes (PyTypeObject) for the entire module
 static PyTypeObject *glint2_types[] = {
+	&NcFileType,
 	&GridType,
 	&MatrixMakerType,
 	NULL

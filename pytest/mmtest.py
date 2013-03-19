@@ -22,5 +22,7 @@ print 'greenland2_id = %d' % greenland2_id
 mm.realize()
 
 print '***** Writing out MatrixMaker'
-mm.save('mm.nc', 'm')
+nc = glint2.NcFile('mm.nc', 'w')
+mm.write(nc, 'm')
+nc.close()
 

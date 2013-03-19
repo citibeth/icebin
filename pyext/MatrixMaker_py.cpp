@@ -8,6 +8,7 @@
 #include <glint2/MatrixMaker.hpp>
 #include "pyutil.hpp"
 #include <giss/memory.hpp>
+#include "PyClass.hpp"
 
 using namespace glint2;
 
@@ -179,26 +180,26 @@ static PyObject *MatrixMaker_realize(PyMatrixMaker *self, PyObject *args)
 }
 
 /** Read from a file */
-static PyObject *MatrixMaker_save(PyMatrixMaker *self, PyObject *args)
+static PyObject *MatrixMaker_write(PyMatrixMaker *self, PyObject *args)
 {
 	try {
 		// Get arguments
-		char *fname_py = NULL;
+		PyClass<NcFile> *nc_py = NULL;
 		char *vname_py = NULL;
-		if (!PyArg_ParseTuple(args, "ss", &fname_py, &vname_py)) {
+		if (!PyArg_ParseTuple(args, "Os", &nc_py, &vname_py)) {
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
-				"Bad arguments to MatrixMaker_save().");
+				"Bad arguments to MatrixMaker_write().");
 			return 0;
 		}
 
-		NcFile nc(fname_py, NcFile::Replace);
-		self->maker->netcdf_define(nc, std::string(vname_py))();
-		nc.close();
+//		NcFile nc(fname_py, NcFile::Replace);
+		self->maker->netcdf_define(*(nc_py->ptr), std::string(vname_py))();
+//		nc.close();
 
 		return Py_None;
 	} catch(...) {
-		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_save()");
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_write()");
 		return 0;
 	}
 }
@@ -246,7 +247,7 @@ static PyMethodDef MatrixMaker_methods[] = {
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
 		""},
-	{"save", (PyCFunction)MatrixMaker_save, METH_VARARGS,
+	{"write", (PyCFunction)MatrixMaker_write, METH_VARARGS,
 		""},
 	{"load", (PyCFunction)MatrixMaker_load, METH_VARARGS,
 		""},

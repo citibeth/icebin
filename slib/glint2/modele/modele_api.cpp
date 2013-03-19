@@ -63,6 +63,8 @@ extern "C" modele_api *modele_api_new(
 	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->get_sheet_names());
 	nc.close();
 
+	// TODO: Test that im and jm are consistent with the grid read.
+
 	// No exception, we can release our pointer back to Fortran
 	return api.release();
 }

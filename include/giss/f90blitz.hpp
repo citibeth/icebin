@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <blitz/array.h>
+#include <mpi.h>
 
 namespace giss {
 
@@ -11,6 +12,20 @@ struct F90Array {
 	ArrT *deltas[rank];
 	int lbounds[rank];
 	int ubounds[rank];
+
+	/** Extract F90Array info from existing blitz::Array.  Used to
+	write C++ test code for Fortrn APIs. */
+	F90Array(blitz::Array<ArrT,rank> &arr) {
+		this->base = arr.data();
+
+		blitz::TinyVector<int, rank> idx(0);
+		for (int i=0; i<rank; ++i) {
+			this->deltas[i] = this->base + arr.stride(i);
+			this->lbounds[i] = arr.lbound(i);
+			this->ubounds[i] = arr.ubound(i);
+		}
+	}
+
 
 	blitz::Array<ArrT,rank> to_blitz()
 	{
