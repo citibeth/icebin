@@ -3,6 +3,19 @@ import giss.basemap
 import giss.modele
 import matplotlib.pyplot
 
+basemap = giss.basemap.greenland_laea()
+
+# Sum over all elevation classes
+nc1 = netCDF4.Dataset('fhc.nc')
+fhc1 = nc1.variables['fhc1h'][:]
+
+fhc1_sum = np.sum(fhc1, axis=(0))
+
+pp = giss.modele.plot_params(val=fhc1_sum)
+pp['title'] = 'fhc1_sum'
+giss.plot.plot_var(basemap=basemap, **pp)		# Plot, and show on screen
+
+
 for ihc in range(0,10) :
 
 	nc0 = netCDF4.Dataset('GIC.144X90.DEC01.1.ext_hc.nc')
@@ -13,7 +26,6 @@ for ihc in range(0,10) :
 
 	fhcdiff = fhc1 - fhc0
 	# ----------------------------------------
-	basemap = giss.basemap.greenland_laea()
 	figure = matplotlib.pyplot.figure(figsize=(15,8.5))
 
 	ax = figure.add_subplot(131)
@@ -34,3 +46,6 @@ for ihc in range(0,10) :
 
 	figure.savefig('fhc-%d.png' % ihc)
 #	matplotlib.pyplot.show()
+
+
+
