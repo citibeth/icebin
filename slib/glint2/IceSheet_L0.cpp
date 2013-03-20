@@ -48,8 +48,10 @@ void IceSheet_L0::accum_areas(
 giss::SparseAccumulator<int,double> &area1_m,
 giss::SparseAccumulator<int,double> &area1_m_hc)
 {
+printf("BEGIN accum_area(%s) %p\n", name.c_str(), overlap_m_hc.get());
 	accum_per_row(*overlap_m_hc, area1_m_hc);
 	accum_per_row(*overlap_m, area1_m);
+printf("END accum_area(%s)\n", name.c_str());
 }
 
 

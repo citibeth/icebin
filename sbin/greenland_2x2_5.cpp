@@ -19,7 +19,8 @@ int main(int argc, char **argv)
 	Grid_LonLat grid;
 	glint2::modele::set_lonlat_2x2_5(grid);
 	grid.name = "greenland_2x2_5";
-	grid.points_in_side = 4;
+//	grid.points_in_side = 4;
+	grid.points_in_side = 2;	// Use 2 for comparison with past experiments
 	grid.eq_rad = EQ_RAD;
 	grid.realize(boost::bind(
 		&SphericalClip::lonlat, -74., 59., -10., 87.5,

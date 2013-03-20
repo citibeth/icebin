@@ -70,7 +70,7 @@ static void Grid_dealloc(PyGrid *self)
 
 // -----------------------------------------------------------
 
-static PyObject * Grid_get_proj_area(PyGrid *self_py, PyObject *args)
+static PyObject * Grid_get_proj_areas(PyGrid *self_py, PyObject *args)
 {
 	PyObject *ret_py = NULL;
 	try {
@@ -83,20 +83,20 @@ static PyObject * Grid_get_proj_area(PyGrid *self_py, PyObject *args)
 		}
 
 		// Do the call
-		auto ret(self_py->grid->get_proj_area(std::string(sproj_py)));
+		auto ret(self_py->grid->get_proj_areas(std::string(sproj_py)));
 
 		// Convert to Python format
 		ret_py = giss::vector_to_py(ret);
-//printf("Grid_get_proj_area() finished OK, ret_py = %p\n", ret_py);
+//printf("Grid_get_proj_areas() finished OK, ret_py = %p\n", ret_py);
 		return ret_py;
 	} catch(...) {
-		printf("Grid_get_proj_area() encountered an exception...\n");
+		printf("Grid_get_proj_areas() encountered an exception...\n");
 		if (ret_py) Py_DECREF(ret_py);
 		return NULL;
 	}
 }
 // -----------------------------------------------------------
-static PyObject * Grid_get_native_area(PyGrid *self_py, PyObject *args)
+static PyObject * Grid_get_native_areas(PyGrid *self_py, PyObject *args)
 {
 	PyObject *ret_py = NULL;
 	try {
@@ -106,7 +106,7 @@ static PyObject * Grid_get_native_area(PyGrid *self_py, PyObject *args)
 		{ return NULL; }
 
 		// Do the call
-		auto ret(self_py->grid->get_native_area());
+		auto ret(self_py->grid->get_native_areas());
 
 		// Convert to Python format
 		ret_py = giss::vector_to_py(ret);
@@ -119,9 +119,9 @@ static PyObject * Grid_get_native_area(PyGrid *self_py, PyObject *args)
 // -----------------------------------------------------------
 
 static PyMethodDef Grid_methods[] = {
-	{"get_proj_area", (PyCFunction)Grid_get_proj_area, METH_VARARGS,
+	{"get_proj_areas", (PyCFunction)Grid_get_proj_areas, METH_VARARGS,
 		""},
-	{"get_native_area", (PyCFunction)Grid_get_native_area, METH_VARARGS,
+	{"get_native_areas", (PyCFunction)Grid_get_native_areas, METH_VARARGS,
 		""},
 
 	{NULL}     /* Sentinel - marks the end of this structure */

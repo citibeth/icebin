@@ -86,7 +86,10 @@ public:
 
     ~Proj()
     {
-        if (pj) pj_free(pj);
+        if (pj) {
+			pj_free(pj);
+			pj = 0;
+		}
         // if (pj_def) pj_dalloc(pj_def);
     }
 

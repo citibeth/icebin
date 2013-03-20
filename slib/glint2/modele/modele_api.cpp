@@ -44,11 +44,14 @@ extern "C" modele_api *modele_api_new(
 	api->maker.reset(new MatrixMaker(std::move(mdomain)));
 	NcFile nc(maker_fname.c_str(), NcFile::ReadOnly);
 	api->maker->read_from_netcdf(nc, maker_vname);
+	api->maker->realize();
 
 	// Read the coupler, along with ice model proxies
 	api->gcm_coupler.reset(new GCMCoupler_MPI(MPI_Comm_f2c(comm_f), root));
 	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->get_sheet_names());
 	nc.close();
+
+
 
 	// TODO: Test that im and jm are consistent with the grid read.
 
@@ -74,9 +77,8 @@ void modele_api_compute_fhc_c(modele_api *api,
 	auto fhc1h(fhc1h_f.to_blitz());
 	auto fgice1(fgice1_f.to_blitz());
 
-	// Zero out fhc1h and fgice1...
+	// Zero out fhc1h (but not fgice1)
 	fhc1h = 0;
-	fgice1 = 0;
 
 	// Get the sparse vector values
 	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
@@ -84,6 +86,7 @@ void modele_api_compute_fhc_c(modele_api *api,
 	api->maker->compute_fhc(fhc1h_s, fgice1_s);
 
 	// Translate the sparse vectors to the ModelE data structures
+	std::vector<std::tuple<int, int, double>> fgice1_vals;
 	for (auto ii = fgice1_s.begin(); ii != fgice1_s.end(); ++ii) {
 		int i1 = ii->first;
 
@@ -96,9 +99,28 @@ void modele_api_compute_fhc_c(modele_api *api,
 
 		// Store it away
 		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
-		fgice1(lindex[0], lindex[1]) += ii->second;
+		fgice1_vals.push_back(std::make_tuple(lindex[0], lindex[1], ii->second));
 	}
 
+	// Zero out fgice1, ONLY where we're touching it.
+	for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
+		int ix_i = std::get<0>(*ii);
+		int ix_j = std::get<1>(*ii);
+		double val = std::get<2>(*ii);
+
+		fgice1(ix_i, ix_j) = 0;
+	}
+
+	// Replace with our values
+	for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
+		int ix_i = std::get<0>(*ii);
+		int ix_j = std::get<1>(*ii);
+		double val = std::get<2>(*ii);
+
+		fgice1(ix_i, ix_j) += val;
+	}
+
+	// Work on fhc1h
 	for (auto ii = fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii) {
 		int i1 = ii->first.first;
 		int hc = ii->first.second;		// zero-based

@@ -52,5 +52,4 @@ std::vector<int> const &dims)
 	}
 }
 
-
 }

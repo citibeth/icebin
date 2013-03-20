@@ -120,6 +120,7 @@ void netcdf_write_blitz(NcVar *nc_var, blitz::Array<T, rank> const &val)
 {
 	long counts[rank];
 	for (int i=0; i<rank; ++i) counts[i] = val.extent(i);
+//printf("netcdf_write_blitz: %p %p\n", nc_var, val.data());
 	nc_var->put(val.data(), counts);
 }
 // ----------------------------------------------------

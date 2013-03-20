@@ -34,7 +34,7 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 	auto it0 = cell.begin();
 	proj.transform(it0->x, it0->y, x00, y00);
 
-//printf("(%f, %f) --> (%f, %f)\n", it0->x, it0->y, x00, y00);
+printf("(%f, %f) --> (%f, %f)\n", it0->x, it0->y, x00, y00);
 
 	double x0, y0, x1, y1;
 	x0 = x00; y0 = y00;
@@ -403,7 +403,7 @@ void Grid::to_netcdf(std::string const &fname)
 // ---------------------------------------------------
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-std::vector<double> Grid::get_native_area() const
+std::vector<double> Grid::get_native_areas() const
 {
 	// Get the cell areas
 	std::vector<double> area(this->ncells_full(), nan);
@@ -414,16 +414,23 @@ std::vector<double> Grid::get_native_area() const
 	return area;
 }
 
-std::vector<double> Grid::get_proj_area(std::string const &sproj) const
+void Grid::get_ll_to_xy(giss::Proj2 &proj, std::string const &sproj) const
 {
+printf("get_ll_to_xy(sproj=%s)\n", sproj.c_str());
 	// Set up the projection
-	giss::Proj2 proj;
 	if (coordinates == Coordinates::LONLAT) {
 		proj.init(sproj, giss::Proj2::Direction::LL2XY);
 	} else {
 		fprintf(stderr, "proj_to_native() only makes sense for grids in Lon/Lat Coordinates!");
 		throw std::exception();
 	}
+}
+
+
+std::vector<double> Grid::get_proj_areas(std::string const &sproj) const
+{
+	giss::Proj2 proj;
+	get_ll_to_xy(proj, sproj);
 
 	// Get the projected cell areas
 	std::vector<double> area(this->ncells_full(), nan);

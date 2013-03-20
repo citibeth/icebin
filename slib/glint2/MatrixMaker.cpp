@@ -59,17 +59,42 @@ void MatrixMaker::compute_fhc(
 	giss::CooVector<std::pair<int,int>,double> &fhc1h,	// std::pair<i1, hc>
 	giss::CooVector<int,double> &fgice1)
 {
+
 	// Accumulate areas over all ice sheets
 	giss::SparseAccumulator<int,double> area1_m;
 	giss::SparseAccumulator<int,double> area1_m_hc;
+	fgice1.clear();
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-		sheet->accum_areas(area1_m, area1_m_hc);
+
+		// Local area1_m just for this ice sheet
+		giss::SparseAccumulator<int,double> larea1_m;
+		sheet->accum_areas(larea1_m, area1_m_hc);
+
+		// Use the local area1_m to contribute to fgice1
+		giss::Proj2 proj;
+		grid1->get_ll_to_xy(proj, sheet->grid2->sproj);
+		for (auto ii = larea1_m.begin(); ii != larea1_m.end(); ++ii) {
+			int const i1 = ii->first;
+			double ice_covered_area = ii->second;
+			Cell *cell = grid1->get_cell(i1);
+			double area1 = area_of_proj_polygon(*cell, proj);
+printf("area1(%d) = %f\n", i1, area1);
+			fgice1.add(i1, ice_covered_area / area1);
+
+		}
+
+		// Accumulate to global area1_m
+		for (auto ii = larea1_m.begin(); ii != larea1_m.end(); ++ii) {
+			area1_m.add(ii->first, ii->second);
+		}
 	}
+	fgice1.sort();
 
 	// Summing duplicates on area1_m and area1_m_hc not needed
 	// because the unordered_map sums them automatically.
 
-	// Compute fhc1h
+	// Compute fhc1h.  Unlike fgice1, this does NOT need to be done
+	// separately for each ice sheet.
 	fhc1h.clear();
 	HCIndex hc_index(n1());
 	for (auto ii = area1_m_hc.begin(); ii != area1_m_hc.end(); ++ii) {
@@ -83,14 +108,7 @@ void MatrixMaker::compute_fhc(
 	}
 	fhc1h.sort();
 
-	// Compute fgice1
-	fgice1.clear();
-	for (auto ii = area1_m.begin(); ii != area1_m.end(); ++ii) {
-		int i1 = ii->first;
-		double ice_covered_area = ii->second;
-		fgice1.add(i1, ice_covered_area / grid1->get_cell(i1)->area);
-	}
-	fgice1.sort();
+	printf("END compute fgice1()\n");
 }
 
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
@@ -149,7 +167,6 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 	if (mask1.get())
 		fns.push_back(giss::netcdf_define(nc, vname + "mask1", *mask1));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hpdefs", hpdefs));
-printf("***************** 1 hcmax.extent(0) = %d\n", hcmax.extent(0));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hcmax", hcmax));
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 		fns.push_back(sheet->netcdf_define(nc, vname + "." + sheet->name));

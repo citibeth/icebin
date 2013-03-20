@@ -1,8 +1,11 @@
+#include <boost/function.hpp>
+#include <netcdfcpp.h>
 #include <glint2/modele_api.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
 
+// --------------------------------------------------------
 int main(int argc, char **argv)
 {
 
@@ -71,8 +74,36 @@ int main(int argc, char **argv)
 		blitz::fortranArray);
 	giss::F90Array<double,2> fgice1_f(fgice1);
 
+	{
+		NcFile nc("Z2HX2fromZ1QX1N_hc.nc");
+		long counts[2] = {jm, im};
+		nc.get_var("fgice")->get(fgice1.data(), counts);
+		nc.close();
+	}
 
 	modele_api_compute_fhc_c(api, fhc1h_f, fgice1_f);
+
+	// ----------------------------------------------------------
+	// Save it to a netCDF file so we can tell if it's correct
+	NcFile nc("fhc.nc", NcFile::Replace);
+
+	// Define variables
+	std::vector<boost::function<void ()>> fns;
+	NcDim *im_dim = nc.add_dim("im", im);
+	NcDim *jm_dim = nc.add_dim("jm", jm);
+	NcDim *nhc_dim = nc.add_dim("nhc", nhc);
+
+	auto fhc1h_c(fhc1h.transpose(2,1,0));	// Re-order dimensions for netCDF standard
+	fns.push_back(giss::netcdf_define(nc, "fhc1h", fhc1h_c, {nhc_dim, jm_dim, im_dim}));
+
+	auto fgice1_c(fgice1.transpose(1,0));
+	fns.push_back(giss::netcdf_define(nc, "fgice1", fgice1_c, {jm_dim, im_dim}));
+
+	// Write it out
+	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
+	nc.close();
+	// ----------------------------------------------------------
+
 
 
 	modele_api_delete(api);

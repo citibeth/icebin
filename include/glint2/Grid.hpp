@@ -186,8 +186,9 @@ public:
 
 	// ========================================
 
-	std::vector<double> get_proj_area(std::string const &sproj) const;
-	std::vector<double> get_native_area() const;
+	void get_ll_to_xy(giss::Proj2 &proj, std::string const &sproj) const;
+	std::vector<double> get_proj_areas(std::string const &sproj) const;
+	std::vector<double> get_native_areas() const;
 
 
 

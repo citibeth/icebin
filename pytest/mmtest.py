@@ -13,11 +13,11 @@ searise_fname = '../data/Greenland_5km_v1.1.nc'
 (elev2, mask2) = giss.searise.read_elevation2_mask2(searise_fname)
 greenland_id = mm.add_ice_sheet('../searise.nc', '../greenland_2x2_5-searise.nc',
 	elev2, mask2=mask2, name='greenland')
-greenland2_id = mm.add_ice_sheet('../searise.nc', '../greenland_2x2_5-searise.nc',
-	elev2, mask2=mask2, name='greenland2')
+#greenland2_id = mm.add_ice_sheet('../searise.nc', '../greenland_2x2_5-searise.nc',
+#	elev2, mask2=mask2, name='greenland2')
 
 print 'greenland_id = %d' % greenland_id
-print 'greenland2_id = %d' % greenland2_id
+#print 'greenland2_id = %d' % greenland2_id
 
 mm.realize()
 

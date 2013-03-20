@@ -152,8 +152,8 @@ extern std::vector<double> proj_native_area_correct(Grid const &grid1, std::stri
 {
 	bool p2n = (sdir == "p2n");
 
-	auto proj_area(grid1.get_proj_area(sproj));
-	auto native_area(grid1.get_native_area());
+	auto proj_area(grid1.get_proj_areas(sproj));
+	auto native_area(grid1.get_native_areas());
 
 	std::vector<double> num;
 	std::vector<double> denom;
