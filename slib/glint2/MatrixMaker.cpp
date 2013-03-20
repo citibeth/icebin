@@ -26,7 +26,7 @@ void MatrixMaker::realize() {
 	}
 
 	long nhc = hpdefs.size();
-	if (hcmax.extent(0) != nhc-1) {
+	if (hcmax.extent(0) != nhc) {
 		fprintf(stderr, "hcmax for %s has wrong size: %d (vs %d expected)\n",
 			mask1->extent(0), n1);
 		throw std::exception();

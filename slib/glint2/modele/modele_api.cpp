@@ -77,9 +77,6 @@ void modele_api_compute_fhc_c(modele_api *api,
 	auto fhc1h(fhc1h_f.to_blitz());
 	auto fgice1(fgice1_f.to_blitz());
 
-	// Zero out fhc1h (but not fgice1)
-	fhc1h = 0;
-
 	// Get the sparse vector values
 	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
 	giss::CooVector<int,double> fgice1_s;
@@ -119,6 +116,9 @@ void modele_api_compute_fhc_c(modele_api *api,
 
 		fgice1(ix_i, ix_j) += val;
 	}
+	// -----------------------------------------------------
+
+	std::vector<std::tuple<int, int, int, double>> fhc1h_vals;
 
 	// Work on fhc1h
 	for (auto ii = fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii) {
@@ -137,7 +137,27 @@ void modele_api_compute_fhc_c(modele_api *api,
 		// Store it away
 		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
 		int hc_f = hc + 1;		// convert zero-based to 1-based arrays
-		fhc1h(lindex[0], lindex[1], hc_f) += val;
+		fhc1h_vals.push_back(std::make_tuple(lindex[0], lindex[1], hc_f, val));
+	}
+
+	fhc1h = 0;
+	fhc1h(blitz::Range::all(), blitz::Range::all(), 1) = 1.0;
+	for (auto ii=fhc1h_vals.begin(); ii != fhc1h_vals.end(); ++ii) {
+		int ix_i = std::get<0>(*ii);
+		int ix_j = std::get<1>(*ii);
+		int hc_f = std::get<2>(*ii);
+		double val = std::get<3>(*ii);
+
+		fhc1h(ix_i, ix_j, 1) = 0;
+	}
+
+	for (auto ii=fhc1h_vals.begin(); ii != fhc1h_vals.end(); ++ii) {
+		int ix_i = std::get<0>(*ii);
+		int ix_j = std::get<1>(*ii);
+		int hc_f = std::get<2>(*ii);
+		double val = std::get<3>(*ii);
+
+		fhc1h(ix_i, ix_j, hc_f) += val;
 	}
 }
 // -----------------------------------------------------

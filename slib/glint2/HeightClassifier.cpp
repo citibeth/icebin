@@ -17,6 +17,7 @@ int HeightClassifier::operator()(double elevation) const
 	auto top(std::upper_bound(begin, end, elevation));
 
 	int hc = top.position()[0] - begin.position()[0];
+//printf("hc = %d\n", hc);
 	return hc;
 }
 
