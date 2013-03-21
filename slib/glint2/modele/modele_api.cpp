@@ -67,15 +67,27 @@ extern "C" void modele_api_delete(modele_api *&api)
 // -----------------------------------------------------
 extern "C"
 void modele_api_compute_fhc_c(modele_api *api,
-	giss::F90Array<double, 3> &fhc1h_f,
-	giss::F90Array<double, 2> &fgice1_f)
+	giss::F90Array<double, 3> &fhc1h_f,			// IN/OUT
+	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT
+	giss::F90Array<double, 2> &fgrnd1_f,		// OUT
+	giss::F90Array<double, 2> &focean1_f,		// IN
+	giss::F90Array<double, 2> &flake1_f			// IN
+)
 {
 	ModelEDomain &domain(*api->domain);
 
+#if 0
+printf("domain: (%d %d) (%d %d %d %d) (%d %d %d %d) (%d %d)\n",
+domain.im, domain.jm,
+domain.i0h_f, domain.i1h_f, domain.j0h_f, domain.j1h_f,
+domain.i0_f, domain.i1_f, domain.j0_f, domain.j1_f,
+domain.j0s_f, domain.j1s_f);
+
+printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
+#endif
+
 	// Reconstruct arrays, using Fortran conventions
 	// (smallest stride first, whatever-based indexing it came with)
-	auto fhc1h(fhc1h_f.to_blitz());
-	auto fgice1(fgice1_f.to_blitz());
 
 	// Get the sparse vector values
 	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
@@ -100,6 +112,7 @@ void modele_api_compute_fhc_c(modele_api *api,
 	}
 
 	// Zero out fgice1, ONLY where we're touching it.
+	auto fgice1(fgice1_f.to_blitz());
 	for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
 		int ix_i = std::get<0>(*ii);
 		int ix_j = std::get<1>(*ii);
@@ -116,6 +129,13 @@ void modele_api_compute_fhc_c(modele_api *api,
 
 		fgice1(ix_i, ix_j) += val;
 	}
+	// -----------------------------------------------------
+	// Balance fgice against other landcover types
+	auto fgrnd1(fgrnd1_f.to_blitz());
+	auto focean1(focean1_f.to_blitz());
+	auto flake1(flake1_f.to_blitz());
+	fgrnd1 = 1.0 - focean1 - flake1 - fgice1;
+
 	// -----------------------------------------------------
 
 	std::vector<std::tuple<int, int, int, double>> fhc1h_vals;
@@ -140,6 +160,7 @@ void modele_api_compute_fhc_c(modele_api *api,
 		fhc1h_vals.push_back(std::make_tuple(lindex[0], lindex[1], hc_f, val));
 	}
 
+	auto fhc1h(fhc1h_f.to_blitz());
 	fhc1h = 0;
 	fhc1h(blitz::Range::all(), blitz::Range::all(), 1) = 1.0;
 	for (auto ii=fhc1h_vals.begin(); ii != fhc1h_vals.end(); ++ii) {

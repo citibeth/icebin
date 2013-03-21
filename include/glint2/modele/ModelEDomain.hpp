@@ -52,7 +52,6 @@ namespace modele {
 
 // ------------------------------------------------
 class ModelEDomain : public GridDomain {
-
 	int im, jm;
 	int i0h_f, i1h_f, j0h_f, j1h_f;
 	int i0_f, i1_f, j0_f, j1_f;
@@ -91,10 +90,15 @@ public:
 	}
 
 	bool in_domain(int *lindex) const
-		{ return (lindex[0] >= j0_f) && (lindex[1] <= j1_f); }
+		{ return (lindex[1] >= j0_f) && (lindex[1] <= j1_f); }
 
 	bool in_halo(int *lindex) const
-		{ return (lindex[0] >= j0h_f) && (lindex[1] <= j1h_f); }
+	{
+		bool ret = (lindex[1] >= j0h_f) && (lindex[1] <= j1h_f);
+//printf("in_halo: (%d >= %d) && (%d <= %d) == %d\n", lindex[1], j0h_f, lindex[1], j1h_f, ret);
+
+		return ret;
+	}
 
 };
 // ------------------------------------------------

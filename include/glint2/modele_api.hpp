@@ -43,7 +43,10 @@ extern "C" void modele_api_delete(glint2::modele::modele_api *&api);
 extern "C"
 void modele_api_compute_fhc_c(glint2::modele::modele_api *api,
 	giss::F90Array<double, 3> &fhc1h_f,
-	giss::F90Array<double, 2> &fgice1_f);
+	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT
+	giss::F90Array<double, 2> &fgrnd1_f,		// OUT
+	giss::F90Array<double, 2> &focean1_f,
+	giss::F90Array<double, 2> &flake1_f);
 
 extern "C"
 int modele_api_hp_to_hc_part1(glint2::modele::modele_api *api);

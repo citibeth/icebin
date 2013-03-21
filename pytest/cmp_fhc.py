@@ -2,26 +2,41 @@ import netCDF4
 import giss.basemap
 import giss.modele
 import matplotlib.pyplot
+import numpy as np
 
 basemap = giss.basemap.greenland_laea()
 
+fhc_nc = 'fhc-00.nc'
+
 # Sum over all elevation classes
-nc1 = netCDF4.Dataset('fhc.nc')
+nc1 = netCDF4.Dataset(fhc_nc)
 fhc1 = nc1.variables['fhc1h'][:]
 
-fhc1_sum = np.sum(fhc1, axis=(0))
+# Should be zero everywhere
+fhc1_sum = np.sum(fhc1, axis=(0)) - 1.0
 
 pp = giss.modele.plot_params(val=fhc1_sum)
 pp['title'] = 'fhc1_sum'
-giss.plot.plot_var(basemap=basemap, **pp)		# Plot, and show on screen
+giss.plot.plot_var(basemap=basemap, fname='fhc1_sum.png', **pp)
 
+# ====================================================
+
+fall = nc1.variables['fgice1'][:] + nc1.variables['fgrnd1'][:] + nc1.variables['focean1'][:] + nc1.variables['flake1'][:] - 1
+print 'F-all sum = %f' % np.sum(np.abs(fall))
+
+pp = giss.modele.plot_params(val=fall)
+pp['title'] = 'Total Surface Fraction-1 (should be 0)'
+giss.plot.plot_var(basemap=basemap, fname='fall.png', **pp)
+
+
+# ====================================================
 
 for ihc in range(0,10) :
 
 	nc0 = netCDF4.Dataset('GIC.144X90.DEC01.1.ext_hc.nc')
 	fhc0 = nc0.variables['fhc'][ihc,:]
 
-	nc1 = netCDF4.Dataset('fhc.nc')
+	nc1 = netCDF4.Dataset(fhc_nc)
 	fhc1 = nc1.variables['fhc1h'][ihc,:]
 
 	fhcdiff = fhc1 - fhc0
