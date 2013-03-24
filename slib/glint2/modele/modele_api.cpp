@@ -279,7 +279,7 @@ giss::F90Array<double,3> &seb1hp_f)
 	int nmsg = 0;
 	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
 		int sheetno = sheet->index;
-printf("modele_api: %p.sheetno = %d\n", &*sheet, sheetno);
+//printf("modele_api: %p.sheetno = %d\n", &*sheet, sheetno);
 		giss::VectorSparseMatrix &mat(sheet->hp_to_ice());
 
 		// Skip if we have nothing to do for this ice sheet
@@ -297,7 +297,7 @@ printf("modele_api: %p.sheetno = %d\n", &*sheet, sheetno);
 			api->domain->global_to_local(i1, lindex);
 			msg[0] = ii.val() * smb1hp(lindex[0], lindex[1], ihc+1);
 			msg[1] = ii.val() * seb1hp(lindex[0], lindex[1], ihc+1);
-printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1hp(lindex[0], lindex[1], ihc+1), seb1hp(lindex[0], lindex[1], ihc+1));
+//printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1hp(lindex[0], lindex[1], ihc+1), seb1hp(lindex[0], lindex[1], ihc+1));
 
 			++nmsg;
 		}

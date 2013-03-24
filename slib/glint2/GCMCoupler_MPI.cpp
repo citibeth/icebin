@@ -141,7 +141,7 @@ printf("BB\n");
 		SMBMsg *lscan = rbuf->begin();
 		SMBMsg *rscan = lscan;
 		while (rscan < rbuf->end()) {
-printf("rscan = %d %d %f %f (%p %p)\n", rscan->sheetno, rscan->i2, (*rscan)[0], (*rscan)[1], rscan, rbuf->end());
+//printf("rscan = %d %d %f %f (%p %p)\n", rscan->sheetno, rscan->i2, (*rscan)[0], (*rscan)[1], rscan, rbuf->end());
 			if (rscan->sheetno != lscan->sheetno) {
 printf("rscan = =========================================\n");
 				int sheetno = lscan->sheetno;
