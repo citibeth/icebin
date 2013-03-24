@@ -14,8 +14,11 @@ public:
 	/** Query all the ice models to figure out what fields they need */
 	std::set<IceField> get_required_fields();
 
+	/** @param sheets (OPTIONAL): IceSheet data structures w/ grids, etc. */
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname,
-		std::vector<std::string> const &sheet_names);
+		std::vector<std::string> const &sheet_names,
+	    giss::MapDict<std::string, IceSheet> const &sheets);
+
 
 };
 

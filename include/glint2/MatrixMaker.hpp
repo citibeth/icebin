@@ -32,7 +32,7 @@ protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;
 public:
-	MatrixMaker(std::unique_ptr<GridDomain> &&_domain = std::unique_ptr<GridDomain>(new GridDomain_Identity())) : domain(std::move(_domain)) {}
+	MatrixMaker(std::unique_ptr<GridDomain> &&_domain = std::unique_ptr<GridDomain>(new GridDomain_Identity())) :  _next_sheet_index(0), domain(std::move(_domain)) {}
 
 //	std::vector<std::unique_ptr<IceSheet>> sheets;
 	
@@ -93,7 +93,7 @@ public:
 	size_t ice_matrices_size() {
 		size_t nele = 0;
 		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
-			nele += ii->grid2->ndata();
+			nele += ii->hp_to_ice().size();
 		return nele;
 	}
 

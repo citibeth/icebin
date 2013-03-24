@@ -46,6 +46,7 @@ int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet)
 
 	int const index = _next_sheet_index++;
 	sheet->index = index;
+printf("MatrixMaker: %p.sheetno = %d\n", &*sheet, sheet->index);
 	sheet->gcm = this;
 	
 	sheets_by_id.insert(std::make_pair(sheet->index, sheet.get()));
@@ -78,7 +79,7 @@ void MatrixMaker::compute_fhc(
 			double ice_covered_area = ii->second;
 			Cell *cell = grid1->get_cell(i1);
 			double area1 = area_of_proj_polygon(*cell, proj);
-printf("area1(%d) = %f\n", i1, area1);
+//printf("area1(%d) = %f\n", i1, area1);
 			fgice1.add(i1, ice_covered_area / area1);
 
 		}

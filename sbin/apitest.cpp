@@ -57,6 +57,12 @@ int main(int argc, char **argv)
 		break;
 	}
 
+//j0 = 1;
+//j1 = jm;
+//j0s = 2;
+//j1s = jm-1;
+
+
 
 
 	modele_api *api = modele_api_new(
@@ -117,7 +123,7 @@ int main(int argc, char **argv)
 		focean1(blitz::Range::all(), j) = 0;
 		flake1(blitz::Range::all(), j) = 0;
 	}
-	for (int j=j1; j <= jm; ++j) {
+	for (int j=j1+1; j <= jm; ++j) {
 		fgice1(blitz::Range::all(), j) = 0;
 		fgrnd1(blitz::Range::all(), j) = 0;
 		focean1(blitz::Range::all(), j) = 0;
@@ -156,13 +162,76 @@ int main(int argc, char **argv)
 	auto flake1_c(flake1.transpose(1,0));
 	fns.push_back(giss::netcdf_define(ncout, "flake1", flake1_c, {jm_dim, im_dim}));
 
-	// Write it out
-	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
 	// ----------------------------------------------------------
-	// -------- Now test the regridding matrices...
+	// -------- Test regridding to the ice model
+//	NcFile ijhc_nc("JUL1952.ijhcncar225.nc");
+	NcFile ijhc_nc("JUL1950.ijhchc1k225.nc");
+
+printf("AA JUL1952\n");
+	auto impm_c(giss::read_blitz<double,3>(ijhc_nc, "impm_lndice"));
+printf("AA %d %d %d\n", impm_c.extent(0), impm_c.extent(1), impm_c.extent(2));
+	auto impm(giss::c_to_f(impm_c));	// Fortran-style array
+printf("AA\n");
+	giss::F90Array<double,3> impm_f(impm);
+
+printf("AA\n");
+	auto imph_c(giss::read_blitz<double,3>(ijhc_nc, "imph_lndice"));
+printf("AA\n");
+	auto imph(giss::c_to_f(imph_c));	// Fortran-style array
+printf("AA\n");
+	giss::F90Array<double,3> imph_f(imph);
+
+
+	for (int i=0; i<impm_c.extent(0); ++i) {
+	for (int j=0; j<impm_c.extent(1); ++j) {
+	for (int k=0; k<impm_c.extent(2); ++k) {
+		double &impm_ijk = impm_c(i,j,k);
+		if (fabs(impm_ijk) >= 1e10) impm_ijk = 0;
+		double &imph_ijk = imph_c(i,j,k);
+		if (fabs(imph_ijk) >= 1e10) imph_ijk = 0;
+	}}}
+
+
+
+	ijhc_nc.close();
+printf("AA\n");
+
+{int i=54;
+int j=76;
+	for (int ihc=1; ihc <= 10; ++ihc) {
+		printf("vval: (%d %d %d): %g %g\n", i,j,ihc, impm_c(ihc-1, j-1, i-1), impm(i,j,ihc));
+	}
+}
+
+
+
+
+#if 1
+	// HACK: Clear things not in our domain
+	for (int j=1; j<j0; ++j) {
+		impm(blitz::Range::all(), j, blitz::Range::all()) = 0;
+		imph(blitz::Range::all(), j, blitz::Range::all()) = 0;
+	}
+	for (int j=j1+1; j <= jm; ++j) {
+		impm(blitz::Range::all(), j, blitz::Range::all()) = 0;
+		imph(blitz::Range::all(), j, blitz::Range::all()) = 0;
+	}
+#endif
+
+printf("AA\n");
+	modele_api_couple_to_ice(api, impm_f, imph_f);
+	
+printf("AA\n");
+	ijhc_nc.close();
+
+printf("AA\n");
 
 
 	// --------------------------------------------------------
+	// Write it out
+	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
+printf("AA\n");
+
 	// Finish up
 	modele_api_delete(api);
 	ncout.close();

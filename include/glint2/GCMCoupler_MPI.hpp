@@ -52,7 +52,8 @@ public :
 		giss::DynArray<SMBMsg> &sbuf);
 
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname,
-		std::vector<std::string> const &sheet_names);
+		std::vector<std::string> const &sheet_names,
+	    giss::MapDict<std::string, IceSheet> const &sheets);
 
 };
 

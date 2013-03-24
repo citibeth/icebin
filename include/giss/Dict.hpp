@@ -77,6 +77,12 @@ struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
 		return &*(ii->second);
 	}
 
+	ValT const *operator[](KeyT const &key) const {
+		auto ii = super::find(key);
+		if (ii == super::end()) return 0;
+		return &*(ii->second);
+	}
+
 	std::pair<ValT *, bool> insert(KeyT const &key, std::unique_ptr<ValT> &&valp) {
 		auto ret = super::insert(std::make_pair(key, std::move(valp)));
 		typename super::iterator nw_it;

@@ -31,13 +31,13 @@ public:
 	T const &operator[](int ix) const
 		{ return *reinterpret_cast<T const *>(buf + ele_size * ix); }
 
-	T *incr(T *ptr) const {
-		return reinterpret_cast<T *>(
+	void incr(T *&ptr) const {
+		ptr = reinterpret_cast<T *>(
 			reinterpret_cast<char *>(ptr) + ele_size);
 	}
 
-	T *decr(T *ptr) const {
-		return reinterpret_cast<T *>(
+	void decr(T *&ptr) const {
+		ptr = reinterpret_cast<T *>(
 			reinterpret_cast<char *>(ptr) - ele_size);
 	}
 

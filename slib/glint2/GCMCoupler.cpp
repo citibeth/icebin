@@ -14,12 +14,13 @@ std::set<IceField> GCMCoupler::get_required_fields()
 
 
 void GCMCoupler::read_from_netcdf(NcFile &nc, std::string const &vname,
-	std::vector<std::string> const &sheet_names)
+	std::vector<std::string> const &sheet_names,
+    giss::MapDict<std::string, IceSheet> const &sheets)
 {
 	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 	int i = 0;
 	for (auto name = sheet_names.begin(); name != sheet_names.end(); ++name) {
-		models.insert(i, read_icemodel(nc, vname + "." + *name));
+		models.insert(i, read_icemodel(nc, vname + "." + *name, sheets[*name]));
 		++i;
 	}
 	printf("END GCMCoupler::read_from_netcdf()\n");

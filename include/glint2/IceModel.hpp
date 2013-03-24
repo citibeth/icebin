@@ -36,6 +36,7 @@ public:
 
 };
 
-extern std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname);
+extern std::unique_ptr<IceModel> read_icemodel(
+	NcFile &nc, std::string const &vname, IceSheet const *sheet = NULL);
 
 }

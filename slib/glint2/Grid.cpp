@@ -34,7 +34,7 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 	auto it0 = cell.begin();
 	proj.transform(it0->x, it0->y, x00, y00);
 
-printf("(%f, %f) --> (%f, %f)\n", it0->x, it0->y, x00, y00);
+//printf("(%f, %f) --> (%f, %f)\n", it0->x, it0->y, x00, y00);
 
 	double x0, y0, x1, y1;
 	x0 = x00; y0 = y00;

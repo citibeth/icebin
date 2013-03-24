@@ -48,7 +48,7 @@ extern "C" modele_api *modele_api_new(
 
 	// Read the coupler, along with ice model proxies
 	api->gcm_coupler.reset(new GCMCoupler_MPI(MPI_Comm_f2c(comm_f), root));
-	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->get_sheet_names());
+	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
 	nc.close();
 
 
@@ -279,6 +279,7 @@ giss::F90Array<double,3> &seb1hp_f)
 	int nmsg = 0;
 	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
 		int sheetno = sheet->index;
+printf("modele_api: %p.sheetno = %d\n", &*sheet, sheetno);
 		giss::VectorSparseMatrix &mat(sheet->hp_to_ice());
 
 		// Skip if we have nothing to do for this ice sheet
@@ -296,13 +297,15 @@ giss::F90Array<double,3> &seb1hp_f)
 			api->domain->global_to_local(i1, lindex);
 			msg[0] = ii.val() * smb1hp(lindex[0], lindex[1], ihc+1);
 			msg[1] = ii.val() * seb1hp(lindex[0], lindex[1], ihc+1);
+printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1hp(lindex[0], lindex[1], ihc+1), seb1hp(lindex[0], lindex[1], ihc+1));
+
 			++nmsg;
 		}
 	}
 
 	// Sanity check: make sure we haven't overrun our buffer
 	if (nmsg != sbuf.size) {
-		fprintf(stderr, "Wrong number of items in buffer: %d vs %d expected\n", nmsg, nmsg);
+		fprintf(stderr, "Wrong number of items in buffer: %d vs %d expected\n", nmsg, sbuf.size);
 		throw std::exception();
 	}
 

@@ -3,7 +3,8 @@
 
 namespace glint2 {
 
-std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname)
+/** @param sheet (OPTIONAL): Info on the ice sheet data structure */
+std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname, IceSheet const *sheet)
 {
 	printf("BEGIN read_icemodel(%s)\n", vname.c_str());
 	auto info_var = nc.get_var((vname + ".info").c_str());
@@ -13,9 +14,10 @@ std::unique_ptr<IceModel> read_icemodel(NcFile &nc, std::string const &vname)
 
 	std::unique_ptr<IceModel> ice_model;
 	switch(type.index()) {
-		case IceModel::Type::DISMAL :
-			ice_model.reset(new IceModel_DISMAL());
-			break;
+		case IceModel::Type::DISMAL : {
+			Grid_XY const *grid2 = dynamic_cast<Grid_XY const *>(&*(sheet->grid2));
+			ice_model.reset(new IceModel_DISMAL(*grid2));
+		} break;
 #if 0
 		case IceModel::Type::PISM :
 			ice_model.reset(new IceModel_PISM());
