@@ -1,6 +1,7 @@
 #include <boost/function.hpp>
 #include <netcdfcpp.h>
 #include <glint2/modele_api.hpp>
+#include <giss/f90blitz.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
@@ -57,10 +58,12 @@ int main(int argc, char **argv)
 		break;
 	}
 
-//j0 = 1;
-//j1 = jm;
-//j0s = 2;
-//j1s = jm-1;
+#if 1
+	j0 = 1;
+	j1 = jm;
+	j0s = 2;
+	j1s = jm-1;
+#endif
 
 
 
@@ -167,18 +170,12 @@ int main(int argc, char **argv)
 //	NcFile ijhc_nc("JUL1952.ijhcncar225.nc");
 	NcFile ijhc_nc("JUL1950.ijhchc1k225.nc");
 
-printf("AA JUL1952\n");
 	auto impm_c(giss::read_blitz<double,3>(ijhc_nc, "impm_lndice"));
-printf("AA %d %d %d\n", impm_c.extent(0), impm_c.extent(1), impm_c.extent(2));
 	auto impm(giss::c_to_f(impm_c));	// Fortran-style array
-printf("AA\n");
 	giss::F90Array<double,3> impm_f(impm);
 
-printf("AA\n");
 	auto imph_c(giss::read_blitz<double,3>(ijhc_nc, "imph_lndice"));
-printf("AA\n");
 	auto imph(giss::c_to_f(imph_c));	// Fortran-style array
-printf("AA\n");
 	giss::F90Array<double,3> imph_f(imph);
 
 
@@ -194,19 +191,7 @@ printf("AA\n");
 
 
 	ijhc_nc.close();
-printf("AA\n");
 
-{int i=54;
-int j=76;
-	for (int ihc=1; ihc <= 10; ++ihc) {
-		printf("vval: (%d %d %d): %g %g\n", i,j,ihc, impm_c(ihc-1, j-1, i-1), impm(i,j,ihc));
-	}
-}
-
-
-
-
-#if 1
 	// HACK: Clear things not in our domain
 	for (int j=1; j<j0; ++j) {
 		impm(blitz::Range::all(), j, blitz::Range::all()) = 0;
@@ -216,16 +201,61 @@ int j=76;
 		impm(blitz::Range::all(), j, blitz::Range::all()) = 0;
 		imph(blitz::Range::all(), j, blitz::Range::all()) = 0;
 	}
-#endif
 
-printf("AA\n");
 	modele_api_couple_to_ice(api, impm_f, imph_f);
 	
-printf("AA\n");
 	ijhc_nc.close();
 
-printf("AA\n");
 
+
+	// --------------------------------------------------------
+	// Try the HP-to-HC matrix
+	int n = modele_api_hp_to_hc_part1(api);
+
+	blitz::Array<int,1> rows_i(blitz::Range(1,n));	// Fortran-style 1-base
+	blitz::Array<int,1> rows_j(blitz::Range(1,n));
+	blitz::Array<int,1> rows_k(blitz::Range(1,n));
+
+	blitz::Array<int,1> cols_i(blitz::Range(1,n));
+	blitz::Array<int,1> cols_j(blitz::Range(1,n));
+	blitz::Array<int,1> cols_k(blitz::Range(1,n));
+
+	blitz::Array<double,1> vals(blitz::Range(1,n));
+
+	giss::F90Array<int, 1> rows_i_f(rows_i);
+	giss::F90Array<int, 1> rows_j_f(rows_j);
+	giss::F90Array<int, 1> rows_k_f(rows_k);
+
+	giss::F90Array<int, 1> cols_i_f(cols_i);
+	giss::F90Array<int, 1> cols_j_f(cols_j);
+	giss::F90Array<int, 1> cols_k_f(cols_k);
+
+	giss::F90Array<double, 1> vals_f(vals);
+
+	modele_api_hp_to_hc_part2(api,
+		rows_i_f, rows_j_f, rows_k_f,
+		cols_i_f, cols_j_f, cols_k_f,
+		vals_f);
+
+	// Write it out
+//	NcFile hphcnc("hphc.nc", NcFile::Replace);
+
+//	std::vector<boost::function<void ()>> fns2;
+	NcDim *n_dim = ncout.add_dim("n_hphc", n);
+
+	fns.push_back(giss::netcdf_define(ncout, "rows_i", rows_i, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "rows_j", rows_j, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "rows_k", rows_k, {n_dim}));
+
+	fns.push_back(giss::netcdf_define(ncout, "cols_i", cols_i, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "cols_j", cols_j, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "cols_k", cols_k, {n_dim}));
+
+	fns.push_back(giss::netcdf_define(ncout, "vals", vals, {n_dim}));
+
+//	for (auto ii = fns2.begin(); ii != fns2.end(); ++ii) (*ii)();
+
+//	hphcnc.close();
 
 	// --------------------------------------------------------
 	// Write it out

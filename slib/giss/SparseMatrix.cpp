@@ -41,8 +41,7 @@ printf("VectorSparseMatrix::sort(%d, %ld)\n", sort_order, size());
 	for (int i=0; i<n; ++i) perm.push_back(i);
 	std::sort(perm.begin(), perm.end(), cmp);
 
-for (int i=0; i<100; ++i) printf("%d, ", perm[i]);
-printf("\n");
+//for (int i=0; i<100; ++i) printf("%d, ", perm[i]); printf("\n");
 
 	// Apply permutation to val
 	std::vector<double> dtmp; dtmp.reserve(n);

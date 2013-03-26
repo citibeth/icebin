@@ -176,7 +176,7 @@ public:
 	template<class SparseMatrixT>
 	void append(SparseMatrixT const &mat) {
 		if (mat.nrow != this->nrow || mat.ncol != this->ncol) {
-			fprintf(stderr, "SparseMatrix::append() has wrong size argument\n");
+			fprintf(stderr, "SparseMatrix::append() has wrong size argument (%d, %d) vs. (%d, %d) expected\n", mat.nrow, mat.ncol, this->nrow, this->ncol);
 			throw std::exception();
 		}
 		for (auto ii=mat.begin(); ii != mat.end(); ++ii)

@@ -112,23 +112,38 @@ void MatrixMaker::compute_fhc(
 	printf("END compute fgice1()\n");
 }
 
+/** TODO: This doesn't account for spherical earth */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
 {
+	int n1_nhc = grid1->ndata() * nhc();
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
 		new giss::VectorSparseMatrix(
-		giss::SparseDescr(nhc(), nhc())));
+		giss::SparseDescr(n1_nhc, n1_nhc)));
 
 	// Compute the hp->ice and ice->hc transformations for each ice sheet
 	// and combine into one hp->hc matrix for all ice sheets.
 	giss::SparseAccumulator<int,double> area1_m_hc;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+printf("***** sheet: %s\n", sheet->name.c_str());
 		giss::VectorSparseMatrix &hp_to_ice = sheet->hp_to_ice();
 		auto ice_to_hc(sheet->ice_to_hc(area1_m_hc));
+
+std::vector<boost::function<void ()>> fns;
+giss::SparseAccumulator<int,double> area1_m_hc_inv;
+NcFile nc("i2hc.nc", NcFile::Replace);
+divide_by(*ice_to_hc, area1_m_hc, area1_m_hc_inv);
+fns.push_back(hp_to_ice.netcdf_define(nc, "hp2i"));
+fns.push_back(ice_to_hc->netcdf_define(nc, "i2hc"));
+for (auto ii=fns.begin(); ii != fns.end(); ++ii) (*ii)();
+nc.close();
+
+
 		ret->append(*multiply(*ice_to_hc, hp_to_ice));
 	}
 
 	giss::SparseAccumulator<int,double> area1_m_hc_inv;
 	divide_by(*ret, area1_m_hc, area1_m_hc_inv);
+printf("After divide_by: %ld %d\n", area1_m_hc.size(), area1_m_hc_inv.size());
 	ret->sum_duplicates();
 
 	return ret;

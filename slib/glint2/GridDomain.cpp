@@ -35,6 +35,7 @@ void GridDomain::global_to_local(
 }
 #endif
 // -------------------------------------------------------
+#if 0
 std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 	GridDomain const &domain1,
 	GridDomain const &domain2,
@@ -54,7 +55,9 @@ std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 		// Input of linear transformation: must be in halo
 		domain2.global_to_local(ii.col(), lindex2);
 		if (!domain2.in_halo(lindex2)) {
-			fprintf(stderr, "Error filtering matrix: grid cell %d in input (column) is not available in the halo.\n", ii.col());
+			fprintf(stderr, "Error filtering matrix: grid cell %d (", ii.col());
+			for (int i=0; i<domain2.num_local_indices; ++i) fprintf(stderr, "%d ", lindex2[i]);
+			fprintf(stderr, ") in input (column) is not available in the halo.\n");
 			throw std::exception();
 		}
 
@@ -63,6 +66,7 @@ std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 
 	return ret;
 }
+#endif
 // -------------------------------------------------------
 
 

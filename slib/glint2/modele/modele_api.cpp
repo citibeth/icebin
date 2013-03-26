@@ -182,13 +182,57 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 	}
 }
 // -----------------------------------------------------
+
+
+
+static std::unique_ptr<giss::VectorSparseMatrix> filter_matrix_hp(
+	HCIndex const &hc_index,
+	GridDomain const &domain1,
+	GridDomain const &domain2,
+	giss::VectorSparseMatrix const &mat)
+{
+	std::unique_ptr<giss::VectorSparseMatrix> ret(
+		new giss::VectorSparseMatrix(mat));
+
+	int lindex1[domain1.num_local_indices];
+	int lindex2[domain2.num_local_indices];
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
+
+		// Output of linear transformation: Only include
+		// if it's part of our domain.
+		int hc1, i1;
+		hc_index.index_to_ik(ii.row(), i1, hc1);
+		domain1.global_to_local(i1, lindex1);
+		if (!domain1.in_domain(lindex1)) continue;
+
+		// Input of linear transformation: must be in halo
+		int hc2, i2;
+		hc_index.index_to_ik(ii.col(), i2, hc2);
+		domain2.global_to_local(i2, lindex2);
+		if (!domain2.in_halo(lindex2)) {
+			fprintf(stderr, "Error filtering matrix: grid cell %d (", ii.col());
+			for (int i=0; i<domain2.num_local_indices; ++i) fprintf(stderr, "%d ", lindex2[i]);
+			fprintf(stderr, ") in input (column) is not available in the halo.\n");
+			throw std::exception();
+		}
+
+		ret->add(ii.row(), ii.col(), ii.val());
+	}
+
+	return ret;
+}
+
+
+
 /** Call this to figure out how to dimension arrays.
 @return Number of elements in the sparse matrix */
 extern "C"
 int modele_api_hp_to_hc_part1(modele_api *api)
 {
 	auto mat(api->maker->hp_to_hc());
-	api->hp_to_hc = filter_matrix(*api->domain, *api->domain, *mat);
+//This is wrong... filtering must be done in (nhc,jm,im) space, not just (jm,im)
+	HCIndex hc_index(api->maker->n1());
+	api->hp_to_hc = filter_matrix_hp(hc_index, *api->domain, *api->domain, *mat);
 	return api->hp_to_hc->size();
 }
 // -----------------------------------------------------

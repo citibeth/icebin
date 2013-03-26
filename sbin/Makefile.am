@@ -17,7 +17,7 @@ bin_PROGRAMS = \
 	searise searise50 searise100 \
 	greenland_4x5 greenland_2x2_5 \
 	overlap \
-	apitest blitztest
+	apitest blitztest smulttest
 
 hires_SOURCES = hires.cpp
 
@@ -36,5 +36,7 @@ test_grid2_SOURCES = test_grid2.cpp
 test_grid1_SOURCES = test_grid1.cpp
 
 blitztest_SOURCES = blitztest.cpp
+
+smulttest_SOURCES = smulttest.cpp
 
 ###############################################################################

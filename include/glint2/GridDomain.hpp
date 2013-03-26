@@ -78,9 +78,11 @@ public:
 
 // ==========================================================
 
+#if 0
 extern std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 	GridDomain const &domain1,
 	GridDomain const &domain2,
 	giss::VectorSparseMatrix const &mat);
+#endif
 
 }
