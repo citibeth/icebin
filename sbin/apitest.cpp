@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 		break;
 	}
 
-#if 1
+#if 0
 	j0 = 1;
 	j1 = jm;
 	j0s = 2;

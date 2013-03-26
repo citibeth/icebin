@@ -192,7 +192,7 @@ static std::unique_ptr<giss::VectorSparseMatrix> filter_matrix_hp(
 	giss::VectorSparseMatrix const &mat)
 {
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
-		new giss::VectorSparseMatrix(mat));
+		new giss::VectorSparseMatrix((giss::SparseDescr)mat));
 
 	int lindex1[domain1.num_local_indices];
 	int lindex2[domain2.num_local_indices];
@@ -203,7 +203,10 @@ static std::unique_ptr<giss::VectorSparseMatrix> filter_matrix_hp(
 		int hc1, i1;
 		hc_index.index_to_ik(ii.row(), i1, hc1);
 		domain1.global_to_local(i1, lindex1);
-		if (!domain1.in_domain(lindex1)) continue;
+		if (!domain1.in_domain(lindex1)) {
+//printf("Throwing out of domain: %d %d\n", lindex1[0], lindex1[1]);
+			continue;
+		}
 
 		// Input of linear transformation: must be in halo
 		int hc2, i2;
@@ -219,6 +222,7 @@ static std::unique_ptr<giss::VectorSparseMatrix> filter_matrix_hp(
 		ret->add(ii.row(), ii.col(), ii.val());
 	}
 
+printf("filter_matrix_hp went from size %ld to %ld\n", mat.size(), ret->size());
 	return ret;
 }
 
@@ -231,11 +235,9 @@ int modele_api_hp_to_hc_part1(modele_api *api)
 {
 	auto mat(api->maker->hp_to_hc());
 	HCIndex hc_index(api->maker->n1());
-#if 0
 	api->hp_to_hc = filter_matrix_hp(hc_index, *api->domain, *api->domain, *mat);
-#else
-	api->hp_to_hc = std::move(mat);
-#endif
+printf("Filtered matrix at %p (from %p)\n", api->hp_to_hc.get(), mat.get());
+	// api->hp_to_hc = std::move(mat);	// debugging
 	return api->hp_to_hc->size();
 }
 // -----------------------------------------------------
@@ -255,6 +257,7 @@ static void global_to_local_hp(
 		int ihc, i1;
 		hc_index.index_to_ik(grows[i], i1, ihc);
 		api->domain->global_to_local(i1, lindex);
+//if (lindex[1] >= 80) printf("Found big lindex: %d %d\n", lindex[0], lindex[1]);
 		rows_i(i+1) = lindex[0];
 		rows_j(i+1) = lindex[1];
 		rows_k(i+1) = ihc+1;	// Convert to Fortran indexing
@@ -278,11 +281,13 @@ void modele_api_hp_to_hc_part2(modele_api *api,
 
 	HCIndex hc_index(api->maker->n1());
 
+printf("Translating matrix at %p\n", api->hp_to_hc.get());
 	// Translate rows and cols
 	global_to_local_hp(api, hc_index, api->hp_to_hc->rows(),
 		rows_i_f.to_blitz(),
 		rows_j_f.to_blitz(),
 		rows_k_f.to_blitz());
+printf("Translating: Done With Rows!\n");
 	global_to_local_hp(api, hc_index, api->hp_to_hc->cols(),
 		cols_i_f.to_blitz(),
 		cols_j_f.to_blitz(),
