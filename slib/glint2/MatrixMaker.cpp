@@ -128,6 +128,7 @@ printf("***** sheet: %s\n", sheet->name.c_str());
 		giss::VectorSparseMatrix &hp_to_ice = sheet->hp_to_ice();
 		auto ice_to_hc(sheet->ice_to_hc(area1_m_hc));
 
+#if 0
 std::vector<boost::function<void ()>> fns;
 giss::SparseAccumulator<int,double> area1_m_hc_inv;
 NcFile nc("i2hc.nc", NcFile::Replace);
@@ -136,7 +137,7 @@ fns.push_back(hp_to_ice.netcdf_define(nc, "hp2i"));
 fns.push_back(ice_to_hc->netcdf_define(nc, "i2hc"));
 for (auto ii=fns.begin(); ii != fns.end(); ++ii) (*ii)();
 nc.close();
-
+#endif
 
 		ret->append(*multiply(*ice_to_hc, hp_to_ice));
 	}
@@ -145,6 +146,12 @@ nc.close();
 	divide_by(*ret, area1_m_hc, area1_m_hc_inv);
 printf("After divide_by: %ld %d\n", area1_m_hc.size(), area1_m_hc_inv.size());
 	ret->sum_duplicates();
+
+printf("Writing hp2hc ret = %p\n", ret.get());
+NcFile nc("hp2hc.nc", NcFile::Replace);
+ret->netcdf_define(nc, "hp2hc")();
+nc.close();
+printf("Done Writing hp2hc ret = %p\n", ret.get());
 
 	return ret;
 }

@@ -1,5 +1,6 @@
 #include <vector>
 #include <giss/SparseMatrix.hpp>
+#include <giss/eigen.hpp>
 
 namespace giss {
 
@@ -97,52 +98,65 @@ if (orow == 1 && ocol == 0) {
 	return ret;
 }
 
-
 std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparseMatrix &b)
 {
-	// Get beginning of each row in a (including sentinel at end)
-	a.sort(SparseMatrix::SortOrder::ROW_MAJOR);
-	std::vector<int> abegin(get_rowcol_beginnings(a, 0));
+        // Get two matrices and convert to Eigen format.
+        auto a_e(giss_to_Eigen(a));
+		auto b_e(giss_to_Eigen(b));   // TODO: Consider making this one column-major to ease multiplication below.
 
-#if 0
-printf("----- A\n");
-{ int i=0; for (auto ii=a.begin(); ii != a.end(); ++ii) printf("%d: (%d, %d) --> %g\n", i++, ii.row(), ii.col(), ii.val()); }
-for (auto ii=abegin.begin(); ii != abegin.end(); ++ii) printf("%d, ", *ii);
-printf("\n");
-#endif
+        // Multiply the matices in Eigen format
+        auto e_ret((*a_e) * (*b_e));
 
-	// Get beginning of each col in b (including sentinel at end)
-	b.sort(SparseMatrix::SortOrder::COLUMN_MAJOR);
-	std::vector<int> bbegin(get_rowcol_beginnings(b, 1));
-
-#if 0
-printf("----- B\n");
-{ int i=0; for (auto ii=b.begin(); ii != b.end(); ++ii) printf("%d: (%d, %d) --> %g\n", i++, ii.row(), ii.col(), ii.val()); }
-for (auto ii=bbegin.begin(); ii != bbegin.end(); ++ii) printf("%d, ", *ii);
-printf("\n");
-#endif
-
-	// Multiply each row by each column
-	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
-		SparseDescr(a.nrow, b.ncol)));;
-
-	for (int ai = 0; ai < abegin.size()-1; ++ai) {
-	for (int bi = 0; bi < bbegin.size()-1; ++bi) {
-		// Multiply a row by a column
-		double val = multiply_row_col(
-			a, abegin[ai], abegin[ai+1],
-			b, bbegin[bi], bbegin[bi+1]);
-		if (val == 0.0) continue;
-
-		int row = a.rows()[abegin[ai]];
-		int col = b.cols()[bbegin[bi]];
-if (col == 25120) {
-	printf("************* 25120 ai=%d (%d of %ld) (%d of %ld)\n", ai, bi, bbegin.size(), bbegin[bi], b.cols().size());
+        // Convert back to GISS format sparse matrices
+        return giss::Eigen_to_giss(e_ret);
 }
-		ret->add(row, col, val);
-	}}
 
-	return ret;
-}
+// This is buggy.  Trying Eigen sparse multiplication instead.
+// std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparseMatrix &b)
+// {
+// 	// Get beginning of each row in a (including sentinel at end)
+// 	a.sort(SparseMatrix::SortOrder::ROW_MAJOR);
+// 	std::vector<int> abegin(get_rowcol_beginnings(a, 0));
+// 
+// #if 0
+// printf("----- A\n");
+// { int i=0; for (auto ii=a.begin(); ii != a.end(); ++ii) printf("%d: (%d, %d) --> %g\n", i++, ii.row(), ii.col(), ii.val()); }
+// for (auto ii=abegin.begin(); ii != abegin.end(); ++ii) printf("%d, ", *ii);
+// printf("\n");
+// #endif
+// 
+// 	// Get beginning of each col in b (including sentinel at end)
+// 	b.sort(SparseMatrix::SortOrder::COLUMN_MAJOR);
+// 	std::vector<int> bbegin(get_rowcol_beginnings(b, 1));
+// 
+// #if 0
+// printf("----- B\n");
+// { int i=0; for (auto ii=b.begin(); ii != b.end(); ++ii) printf("%d: (%d, %d) --> %g\n", i++, ii.row(), ii.col(), ii.val()); }
+// for (auto ii=bbegin.begin(); ii != bbegin.end(); ++ii) printf("%d, ", *ii);
+// printf("\n");
+// #endif
+// 
+// 	// Multiply each row by each column
+// 	std::unique_ptr<VectorSparseMatrix> ret(new VectorSparseMatrix(
+// 		SparseDescr(a.nrow, b.ncol)));;
+// 
+// 	for (int ai = 0; ai < abegin.size()-1; ++ai) {
+// 	for (int bi = 0; bi < bbegin.size()-1; ++bi) {
+// 		// Multiply a row by a column
+// 		double val = multiply_row_col(
+// 			a, abegin[ai], abegin[ai+1],
+// 			b, bbegin[bi], bbegin[bi+1]);
+// 		if (val == 0.0) continue;
+// 
+// 		int row = a.rows()[abegin[ai]];
+// 		int col = b.cols()[bbegin[bi]];
+// if (col == 25120) {
+// 	printf("************* 25120 ai=%d (%d of %ld) (%d of %ld)\n", ai, bi, bbegin.size(), bbegin[bi], b.cols().size());
+// }
+// 		ret->add(row, col, val);
+// 	}}
+// 
+// 	return ret;
+// }
 
 } // namespace giss

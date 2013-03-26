@@ -230,9 +230,12 @@ extern "C"
 int modele_api_hp_to_hc_part1(modele_api *api)
 {
 	auto mat(api->maker->hp_to_hc());
-//This is wrong... filtering must be done in (nhc,jm,im) space, not just (jm,im)
 	HCIndex hc_index(api->maker->n1());
+#if 0
 	api->hp_to_hc = filter_matrix_hp(hc_index, *api->domain, *api->domain, *mat);
+#else
+	api->hp_to_hc = std::move(mat);
+#endif
 	return api->hp_to_hc->size();
 }
 // -----------------------------------------------------
@@ -240,7 +243,7 @@ static void global_to_local_hp(
 	modele_api *api,	
 	HCIndex const &hc_index,
 	std::vector<int> const &grows,
-	blitz::Array<int,1> rows_i,
+	blitz::Array<int,1> rows_i,		// Fortran-style array, base=1
 	blitz::Array<int,1> rows_j,
 	blitz::Array<int,1> rows_k)		// height point index
 {
@@ -252,9 +255,9 @@ static void global_to_local_hp(
 		int ihc, i1;
 		hc_index.index_to_ik(grows[i], i1, ihc);
 		api->domain->global_to_local(i1, lindex);
-		rows_i(i) = lindex[0];
-		rows_j(i) = lindex[1];
-		rows_k(i) = ihc+1;	// Convert to Fortran indexing
+		rows_i(i+1) = lindex[0];
+		rows_j(i+1) = lindex[1];
+		rows_k(i+1) = ihc+1;	// Convert to Fortran indexing
 	}
 }
 // -----------------------------------------------------
@@ -287,7 +290,8 @@ void modele_api_hp_to_hc_part2(modele_api *api,
 
 	// Copy the values, just a simple vector copy
 	auto vals(vals_f.to_blitz());
-	vals = giss::vector_to_blitz(api->hp_to_hc->vals());
+	std::vector<double> const &mvals(api->hp_to_hc->vals());
+	for (int i=0; i<mvals.size(); ++i) vals(i+1) = mvals[i];
 
 	// Free temporary storage
 	api->hp_to_hc.reset();
