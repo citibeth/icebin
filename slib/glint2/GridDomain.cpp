@@ -42,7 +42,7 @@ std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 	giss::VectorSparseMatrix const &mat)
 {
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
-		new giss::VectorSparseMatrix(mat));
+		new giss::VectorSparseMatrix((SparseDescr)mat));
 
 	int lindex1[domain1.num_local_indices];
 	int lindex2[domain2.num_local_indices];
