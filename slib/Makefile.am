@@ -2,6 +2,9 @@
 
 include ../commonmk.am
 
+install-data-local :
+	$(INSTALL_DATA) modele_api.mod $(DESTDIR)$(includedir)
+
 ###############################################################################
 # THE LIBRARIES TO BUILD
 ###############################################################################
