@@ -1,15 +1,15 @@
-module modele_api
+module glint2_modele
 use f90blitz
 use iso_c_binding
 !use MpiSupport_mod
 implicit none
 
 ! ================================================
-! Stuff from modele_api.cpp
+! Stuff from glint2_modele.cpp
 
 INTERFACE
 
-	function modele_api_new( &
+	function glint2_modele_new( &
 		maker_fname_f, maker_fname_len, &
 		maker_vname_f, maker_vname_len, &
 		im,jm, &
@@ -27,23 +27,23 @@ INTERFACE
 		integer(c_int), value :: i0,i1,j0,j1
 		integer(c_int), value :: j0s,j1s
 		integer(c_int), value :: comm_f, root
-		type(c_ptr) :: modele_api_new
+		type(c_ptr) :: glint2_modele_new
 	end function
 
-	subroutine modele_api_delete(api) bind(c)
+	subroutine glint2_modele_delete(api) bind(c)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr) :: api		! NOT VALUE here.
 	end subroutine
 
-	function modele_api_nhc(api) bind(c)
+	function glint2_modele_nhc(api) bind(c)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr), value :: api
-		integer(c_int) :: modele_api_nhc
+		integer(c_int) :: glint2_modele_nhc
 	end function
 
-	subroutine modele_api_get_elevhc_c(api, elevhc)
+	subroutine glint2_modele_get_elevhc_c(api, elevhc)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr), value :: api
@@ -51,7 +51,7 @@ INTERFACE
 	end subroutine
 
 
-	subroutine modele_api_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f) bind(c)
+	subroutine glint2_modele_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f) bind(c)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr), value :: api
@@ -62,13 +62,13 @@ INTERFACE
 		type(arr_spec_2) :: flake1_f
 	end subroutine
 
-	function modele_api_hp_to_hc_part1(api) bind(c)
+	function glint2_modele_hp_to_hc_part1(api) bind(c)
 		use iso_c_binding
 		type(c_ptr), value :: api
-		integer(c_int) :: modele_api_hp_to_hc_part1
+		integer(c_int) :: glint2_modele_hp_to_hc_part1
 	end function
 
-	subroutine modele_api_hp_to_hc_part2(api, &
+	subroutine glint2_modele_hp_to_hc_part2(api, &
 		rows_i_f, rows_j_f, rows_k_f, &
 		cols_i_f, cols_j_f, cols_k_f, &
 		vals_f) bind(c)
@@ -80,7 +80,7 @@ INTERFACE
 		type(arr_spec_1) :: vals_f
 	end subroutine
 
-	subroutine modele_api_couple_to_ice(api, smb1hp_f, seb1hp_f) bind(c)
+	subroutine glint2_modele_couple_to_ice(api, smb1hp_f, seb1hp_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
@@ -96,7 +96,7 @@ END INTERFACE
 
 contains
 
-subroutine modele_api_get_elevhc(api, elevhc, i0h, j0h)
+subroutine glint2_modele_get_elevhc(api, elevhc, i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
 real*8, dimension(i0h:,j0h:,:) :: elevhc
@@ -109,11 +109,11 @@ real*8, dimension(i0h:,j0h:,:) :: elevhc
 	call get_spec_double_3(elevhc, i0h, j0h, 1, elevhc_f)
 
 	! Call the C-side of the interface
-	call modele_api_get_elevhc_c(api, elevhc_f)
+	call glint2_modele_get_elevhc_c(api, elevhc_f)
 end subroutine
 
 
-subroutine modele_api_compute_fhc(api, fhc1h, fgice1, fgrnd1, focean1, flake1, i0h, j0h)
+subroutine glint2_modele_compute_fhc(api, fhc1h, fgice1, fgrnd1, focean1, flake1, i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
 real*8, dimension(i0h:,j0h:,:) :: fhc1h
@@ -132,10 +132,10 @@ real*8, dimension(i0h:,j0h:) :: fgice1, fgrnd1, focean1, flake1
 	call get_spec_double_2(flake1, i0h, j0h, flake1_f)
 
 	! Call the C-side of the interface
-	call modele_api_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f)
+	call glint2_modele_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f)
 end subroutine
 
-subroutine modele_api_hp_to_hc(api, &
+subroutine glint2_modele_hp_to_hc(api, &
 	rows_i, rows_j, rows_k, &		! k = height point/class dimension
 	cols_i, cols_j, cols_k, vals)
 implicit none
@@ -153,7 +153,7 @@ implicit none
 	! ------------------- subroutine body
 
 	! -------- Part 1: Figure out how big we must make the arrays
-	n = modele_api_hp_to_hc_part1(api)
+	n = glint2_modele_hp_to_hc_part1(api)
 
 	! -------- Allocate those arrays
 	allocate(rows_i(n))
@@ -174,7 +174,7 @@ implicit none
 	call get_spec_double_1(vals, 1, vals_f)
 
 	! -------- Part 2: Fill the arrays we allocated
-	call modele_api_hp_to_hc_part2(api, &
+	call glint2_modele_hp_to_hc_part2(api, &
 		rows_i_f, rows_j_f, rows_k_f, &
 		cols_i_f, cols_j_f, cols_k_f, &
 		vals_f)

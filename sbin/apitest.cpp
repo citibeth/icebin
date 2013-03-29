@@ -1,6 +1,6 @@
 #include <boost/function.hpp>
 #include <netcdfcpp.h>
-#include <glint2/modele_api.hpp>
+#include <glint2/modele/glint2_modele.hpp>
 #include <giss/f90blitz.hpp>
 
 using namespace glint2;
@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 
 
 
-	modele_api *api = modele_api_new(
+	glint2_modele *api = glint2_modele_new(
 		maker_fname.c_str(), maker_fname.size(),
 		maker_vname.c_str(), maker_vname.size(),
 
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 	}
 
 
-	modele_api_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f);
+	glint2_modele_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f);
 
 	// ----------------------------------------------------------
 
@@ -202,7 +202,7 @@ int main(int argc, char **argv)
 		imph(blitz::Range::all(), j, blitz::Range::all()) = 0;
 	}
 
-	modele_api_couple_to_ice(api, impm_f, imph_f);
+	glint2_modele_couple_to_ice(api, impm_f, imph_f);
 	
 	ijhc_nc.close();
 
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 
 	// --------------------------------------------------------
 	// Try the HP-to-HC matrix
-	int n = modele_api_hp_to_hc_part1(api);
+	int n = glint2_modele_hp_to_hc_part1(api);
 
 	blitz::Array<int,1> rows_i(blitz::Range(1,n));	// Fortran-style 1-base
 	blitz::Array<int,1> rows_j(blitz::Range(1,n));
@@ -232,7 +232,7 @@ int main(int argc, char **argv)
 
 	giss::F90Array<double, 1> vals_f(vals);
 
-	modele_api_hp_to_hc_part2(api,
+	glint2_modele_hp_to_hc_part2(api,
 		rows_i_f, rows_j_f, rows_k_f,
 		cols_i_f, cols_j_f, cols_k_f,
 		vals_f);
@@ -263,7 +263,7 @@ int main(int argc, char **argv)
 printf("AA\n");
 
 	// Finish up
-	modele_api_delete(api);
+	glint2_modele_delete(api);
 	ncout.close();
 
 	// -----------------------------------

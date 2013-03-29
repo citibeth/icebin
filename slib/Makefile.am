@@ -3,7 +3,7 @@
 include ../commonmk.am
 
 install-data-local :
-	$(INSTALL_DATA) modele_api.mod $(DESTDIR)$(includedir)
+	$(INSTALL_DATA) glint2_modele.mod $(DESTDIR)$(includedir)
 
 ###############################################################################
 # THE LIBRARIES TO BUILD
@@ -38,12 +38,12 @@ libglint2_la_SOURCES = \
 	glint2/matrix_ops.cpp \
 	glint2/MatrixMaker.cpp \
 	glint2/modele/grids_ll.cpp \
-	glint2/modele/modele_api.cpp \
+	glint2/modele/glint2_modele.cpp \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
 	glint2/read_matrixmaker.cpp \
 	giss/f90blitz_f.f90 \
-	glint2/modele/modele_api_f.f90
+	glint2/modele/glint2_modele_f.f90
 
 # # ------------------------------------------------------
 giss/f90blitz_f.f90 ../include/giss/f90blitz_f.f90 : giss/f90blitz_f.py

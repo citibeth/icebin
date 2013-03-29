@@ -2,14 +2,14 @@
 #include <giss/blitz.hpp>
 #include <giss/f90blitz.hpp>
 #include <glint2/HCIndex.hpp>
-#include <glint2/modele_api.hpp>
+#include <glint2/modele/glint2_modele.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
 
 
 /** @param spec  */
-extern "C" modele_api *modele_api_new(
+extern "C" glint2_modele *glint2_modele_new(
 	char const *maker_fname_f, int maker_fname_len,
 	char const *maker_vname_f, int maker_vname_len,
 
@@ -29,7 +29,7 @@ extern "C" modele_api *modele_api_new(
 	std::string maker_vname(maker_vname_f, maker_vname_len);
 
 	// Allocate our return variable
-	std::unique_ptr<modele_api> api(new modele_api());
+	std::unique_ptr<glint2_modele> api(new glint2_modele());
 
 	// Set up the domain
 	std::unique_ptr<GridDomain> mdomain(
@@ -59,26 +59,26 @@ extern "C" modele_api *modele_api_new(
 	return api.release();
 }
 // -----------------------------------------------------
-extern "C" void modele_api_delete(modele_api *&api)
+extern "C" void glint2_modele_delete(glint2_modele *&api)
 {
 	if (api) delete api;
 	api = 0;
 }
 // -----------------------------------------------------
 extern "C"
-int modele_api_nhc(modele_api *api)
+int glint2_modele_nhc(glint2_modele *api)
 {
 	return api->maker->nhc();
 }
 // -----------------------------------------------------
 extern "C"
-void modele_api_get_elevhc_c(modele_api *api,
+void glint2_modele_get_elevhc_c(glint2_modele *api,
 	giss::F90Array<double, 3> &elevhc_f)			// OUT
 {
 	auto elevhc(elevhc_f.to_blitz());
 	int nhc = api->maker->nhc();
 	if (nhc != elevhc.extent(2)) {
-		fprintf(stderr, "modele_api_get_elevhc: Inconsistent nhc (%d vs %d)\n", elevhc.extent(2), api->maker->nhc());
+		fprintf(stderr, "glint2_modele_get_elevhc: Inconsistent nhc (%d vs %d)\n", elevhc.extent(2), api->maker->nhc());
 		throw std::exception();
 	}
 
@@ -92,7 +92,7 @@ void modele_api_get_elevhc_c(modele_api *api,
 }
 // -----------------------------------------------------
 extern "C"
-void modele_api_compute_fhc_c(modele_api *api,
+void glint2_modele_compute_fhc_c(glint2_modele *api,
 	giss::F90Array<double, 3> &fhc1h_f,			// IN/OUT
 	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT
 	giss::F90Array<double, 2> &fgrnd1_f,		// OUT
@@ -257,7 +257,7 @@ printf("filter_matrix_hp went from size %ld to %ld\n", mat.size(), ret->size());
 /** Call this to figure out how to dimension arrays.
 @return Number of elements in the sparse matrix */
 extern "C"
-int modele_api_hp_to_hc_part1(modele_api *api)
+int glint2_modele_hp_to_hc_part1(glint2_modele *api)
 {
 	auto mat(api->maker->hp_to_hc());
 	HCIndex hc_index(api->maker->n1());
@@ -268,7 +268,7 @@ printf("Filtered matrix at %p (from %p)\n", api->hp_to_hc.get(), mat.get());
 }
 // -----------------------------------------------------
 static void global_to_local_hp(
-	modele_api *api,	
+	glint2_modele *api,	
 	HCIndex const &hc_index,
 	std::vector<int> const &grows,
 	blitz::Array<int,1> rows_i,		// Fortran-style array, base=1
@@ -292,7 +292,7 @@ static void global_to_local_hp(
 // -----------------------------------------------------
 /** Call this after rows, cols and vals have been dimensioned. */
 extern "C"
-void modele_api_hp_to_hc_part2(modele_api *api,
+void glint2_modele_hp_to_hc_part2(glint2_modele *api,
 	giss::F90Array<int, 1> &rows_i_f,
 	giss::F90Array<int, 1> &rows_j_f,
 	giss::F90Array<int, 1> &rows_k_f,
@@ -331,8 +331,8 @@ printf("Translating: Done With Rows!\n");
 /** @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide. */
 extern "C"
-void modele_api_couple_to_ice(
-modele_api *api,
+void glint2_modele_couple_to_ice(
+glint2_modele *api,
 giss::F90Array<double,3> &smb1hp_f,
 giss::F90Array<double,3> &seb1hp_f)
 {
@@ -358,7 +358,7 @@ giss::F90Array<double,3> &seb1hp_f)
 	int nmsg = 0;
 	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
 		int sheetno = sheet->index;
-//printf("modele_api: %p.sheetno = %d\n", &*sheet, sheetno);
+//printf("glint2_modele: %p.sheetno = %d\n", &*sheet, sheetno);
 		giss::VectorSparseMatrix &mat(sheet->hp_to_ice());
 
 		// Skip if we have nothing to do for this ice sheet
