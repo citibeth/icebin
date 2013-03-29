@@ -66,6 +66,32 @@ extern "C" void modele_api_delete(modele_api *&api)
 }
 // -----------------------------------------------------
 extern "C"
+int modele_api_nhc(modele_api *api)
+{
+	return api->maker->nhc();
+}
+// -----------------------------------------------------
+extern "C"
+void modele_api_get_elevhc_c(modele_api *api,
+	giss::F90Array<double, 3> &elevhc_f)			// OUT
+{
+	auto elevhc(elevhc_f.to_blitz());
+	int nhc = api->maker->nhc();
+	if (nhc != elevhc.extent(2)) {
+		fprintf(stderr, "modele_api_get_elevhc: Inconsistent nhc (%d vs %d)\n", elevhc.extent(2), api->maker->nhc());
+		throw std::exception();
+	}
+
+	for (int k=1; k <= nhc; ++k) {
+		double val = api->maker->hpdefs[k-1];
+		for (int j=elevhc.lbound(1); j <= elevhc.ubound(1); ++j) {
+		for (int i=elevhc.lbound(0); i <= elevhc.ubound(0); ++i) {
+			elevhc(i,j,k) = val;
+		}
+	}}
+}
+// -----------------------------------------------------
+extern "C"
 void modele_api_compute_fhc_c(modele_api *api,
 	giss::F90Array<double, 3> &fhc1h_f,			// IN/OUT
 	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT

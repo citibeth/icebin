@@ -1,6 +1,7 @@
 module modele_api
 use f90blitz
 use iso_c_binding
+!use MpiSupport_mod
 implicit none
 
 ! ================================================
@@ -34,6 +35,21 @@ INTERFACE
 		use f90blitz
 		type(c_ptr) :: api		! NOT VALUE here.
 	end subroutine
+
+	function modele_api_nhc(api) bind(c)
+		use iso_c_binding
+		use f90blitz
+		type(c_ptr), value :: api
+		integer(c_int) :: modele_api_nhc
+	end function
+
+	subroutine modele_api_get_elevhc_c(api, elevhc)
+		use iso_c_binding
+		use f90blitz
+		type(c_ptr), value :: api
+		type(arr_spec_3) :: elevhc
+	end subroutine
+
 
 	subroutine modele_api_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f) bind(c)
 		use iso_c_binding
@@ -73,10 +89,29 @@ INTERFACE
 
 END INTERFACE
 
+!include 'mpif.h'
+
 ! ================================================
 
 
 contains
+
+subroutine modele_api_get_elevhc(api, elevhc, i0h, j0h)
+type(c_ptr), value :: api
+integer :: i0h, j0h
+real*8, dimension(i0h:,j0h:,:) :: elevhc
+
+	! ----------
+
+	type(arr_spec_3) :: elevhc_f
+
+	! Grab array descriptors
+	call get_spec_double_3(elevhc, i0h, j0h, 1, elevhc_f)
+
+	! Call the C-side of the interface
+	call modele_api_get_elevhc_c(api, elevhc_f)
+end subroutine
+
 
 subroutine modele_api_compute_fhc(api, fhc1h, fgice1, fgrnd1, focean1, flake1, i0h, j0h)
 type(c_ptr), value :: api
