@@ -2,7 +2,7 @@
 
 # initial information about the project
 AC_INIT([glint2],[2.0],[me@myLib.org])
-AC_CONFIG_HEADERS([include/glint2/config.h])
+AC_CONFIG_HEADERS([slib/glint2/config.h])
 AC_PROG_CXX
 
 m4_include([m4/boost.m4])
@@ -65,7 +65,7 @@ AC_SUBST([LIBS])
 
 # files to generate via autotools (.am or .in source files)
 AC_CONFIG_FILES([Makefile])
-AC_CONFIG_FILES([include/Makefile])
+#AC_CONFIG_FILES([include/Makefile])
 AC_CONFIG_FILES([slib/Makefile])
 AC_CONFIG_FILES([sbin/Makefile])
 AC_CONFIG_FILES([pyext/Makefile])

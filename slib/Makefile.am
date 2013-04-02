@@ -2,8 +2,8 @@
 
 include ../commonmk.am
 
-install-data-local :
-	$(INSTALL_DATA) glint2_modele.mod $(DESTDIR)$(includedir)
+#install-data-local :
+#	$(INSTALL_DATA) glint2_modele.mod $(DESTDIR)$(includedir)
 
 ###############################################################################
 # THE LIBRARIES TO BUILD
@@ -46,8 +46,8 @@ libglint2_la_SOURCES = \
 	glint2/modele/glint2_modele_f.f90
 
 # # ------------------------------------------------------
-giss/f90blitz_f.f90 ../include/giss/f90blitz_f.f90 : giss/f90blitz_f.py
-	python giss/f90blitz_f.py giss/f90blitz_f.f90 ../include/giss/f90blitz_f.h
+giss/f90blitz_f.f90 giss/f90blitz_f.h : giss/f90blitz_f.py
+	python giss/f90blitz_f.py giss/f90blitz_f.f90 giss/f90blitz_f.h
 
 -include f90_deps.mk
 FORTRAN_COMMAND_LINE = $(FCCOMPILE) -c -o
@@ -67,9 +67,17 @@ f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
 #libglint2_la_HEADERS = $(filter-out eqp_f.mod,$(FORTRAN_SOURCES:.f90=.mod))
 # We should really use a Python script to figure out which module files are created.
 # See ../f90_mod_deps.py
-libglint2_la_HEADERS = f90blitz.mod
+#libglint2_la_HEADERS = f90blitz.mod glint2_modele.mod $(shell find -E . -regex '.*\.(hpp|h)' )
+
+nobase_include_HEADERS = $(shell \
+		find -E . -regex '.*\.(hpp|h|mod)' \
+	)
+
+
+
 libglint2_ladir = $(includedir)
 # # ------------------------------------------------------
+
 
 
 # PY_SOURCES = pyutil.cpp Grid_py.cpp Rasterizer_py.cpp Glint2_py.cpp glint2_module_py.cpp
