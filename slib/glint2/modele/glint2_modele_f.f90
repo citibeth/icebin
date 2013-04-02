@@ -51,15 +51,21 @@ INTERFACE
 	end subroutine
 
 
-	subroutine glint2_modele_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f) bind(c)
+	subroutine glint2_modele_compute_fgice_c(api, fgice1_f, fgrnd1_f, focean1_f, flake1_f) bind(c)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr), value :: api
-		type(arr_spec_3) :: fhc1h_f
 		type(arr_spec_2) :: fgice1_f
 		type(arr_spec_2) :: fgrnd1_f
 		type(arr_spec_2) :: focean1_f
 		type(arr_spec_2) :: flake1_f
+	end subroutine
+
+	subroutine glint2_modele_compute_fhc_c(api, fhc1h_f) bind(c)
+		use iso_c_binding
+		use f90blitz
+		type(c_ptr), value :: api
+		type(arr_spec_3) :: fhc1h_f
 	end subroutine
 
 	function glint2_modele_hp_to_hc_part1(api) bind(c)
@@ -113,27 +119,40 @@ real*8, dimension(i0h:,j0h:,:) :: elevhc
 end subroutine
 
 
-subroutine glint2_modele_compute_fhc(api, fhc1h, fgice1, fgrnd1, focean1, flake1, i0h, j0h)
+subroutine glint2_modele_compute_fgice(api, fgice1, fgrnd1, focean1, flake1, i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
-real*8, dimension(i0h:,j0h:,:) :: fhc1h					! OUT
 real*8, dimension(i0h:,j0h:) :: fgice1					! OUT
 real*8, dimension(i0h:,j0h:) :: fgrnd1, focean1, flake1	! INOUT
 
 	! ----------
 
-	type(arr_spec_3) :: fhc1h_f
 	type(arr_spec_2) :: fgice1_f, fgrnd1_f, focean1_f, flake1_f
 
 	! Grab array descriptors
-	call get_spec_double_3(fhc1h, i0h, j0h, 1, fhc1h_f)
 	call get_spec_double_2(fgice1, i0h, j0h, fgice1_f)
 	call get_spec_double_2(fgrnd1, i0h, j0h, fgrnd1_f)
 	call get_spec_double_2(focean1, i0h, j0h, focean1_f)
 	call get_spec_double_2(flake1, i0h, j0h, flake1_f)
 
 	! Call the C-side of the interface
-	call glint2_modele_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f)
+	call glint2_modele_compute_fice_c(api, fgice1_f, fgrnd1_f, focean1_f, flake1_f)
+end subroutine
+
+subroutine glint2_modele_compute_fhc(api, fhc1h, i0h, j0h)
+type(c_ptr), value :: api
+integer :: i0h, j0h
+real*8, dimension(i0h:,j0h:,:) :: fhc1h					! OUT
+
+	! ----------
+
+	type(arr_spec_3) :: fhc1h_f
+
+	! Grab array descriptors
+	call get_spec_double_3(fhc1h, i0h, j0h, 1, fhc1h_f)
+
+	! Call the C-side of the interface
+	call glint2_modele_compute_fhc_c(api, fhc1h_f)
 end subroutine
 
 subroutine glint2_modele_hp_to_hc(api, &

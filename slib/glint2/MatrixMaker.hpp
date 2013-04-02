@@ -84,9 +84,15 @@ public:
 	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
 	Ice sheets cannot overlap each other (although their grids can, if we're
 	guaranteed that ice-filled grid cells will never overlap). */
-	void compute_fhc(
-		giss::CooVector<std::pair<int,int>,double> &fhc1h,	// std::pair<i1, hc>
+	void compute_fgice(
 		giss::CooVector<int,double> &fgice1);
+
+	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
+	Ice sheets cannot overlap each other (although their grids can, if we're
+	guaranteed that ice-filled grid cells will never overlap). */
+	void compute_fhc(
+		giss::CooVector<std::pair<int,int>,double> &fhc1h);	// std::pair<i1, hc>
+
 
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc();
 

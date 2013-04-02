@@ -41,12 +41,15 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 extern "C" void glint2_modele_delete(glint2::modele::glint2_modele *&api);
 
 extern "C"
-void glint2_modele_compute_fhc_c(glint2::modele::glint2_modele *api,
-	giss::F90Array<double, 3> &fhc1h_f,
+void glint2_modele_compute_fgice_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT
 	giss::F90Array<double, 2> &fgrnd1_f,		// OUT
 	giss::F90Array<double, 2> &focean1_f,
 	giss::F90Array<double, 2> &flake1_f);
+
+extern "C"
+void glint2_modele_compute_fhc_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 3> &fhc1h_f);
 
 extern "C"
 int glint2_modele_hp_to_hc_part1(glint2::modele::glint2_modele *api);

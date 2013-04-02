@@ -56,13 +56,11 @@ printf("MatrixMaker: %p.sheetno = %d\n", &*sheet, sheet->index);
 
 
 /** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
-void MatrixMaker::compute_fhc(
-	giss::CooVector<std::pair<int,int>,double> &fhc1h,	// std::pair<i1, hc>
+void MatrixMaker::compute_fgice(
 	giss::CooVector<int,double> &fgice1)
 {
 
 	// Accumulate areas over all ice sheets
-	giss::SparseAccumulator<int,double> area1_m;
 	giss::SparseAccumulator<int,double> area1_m_hc;
 	fgice1.clear();
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
@@ -83,13 +81,24 @@ void MatrixMaker::compute_fhc(
 			fgice1.add(i1, ice_covered_area / area1);
 
 		}
-
-		// Accumulate to global area1_m
-		for (auto ii = larea1_m.begin(); ii != larea1_m.end(); ++ii) {
-			area1_m.add(ii->first, ii->second);
-		}
 	}
 	fgice1.sort();
+
+
+	printf("END compute_fgice()\n");
+}
+
+/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
+void MatrixMaker::compute_fhc(
+	giss::CooVector<std::pair<int,int>,double> &fhc1h)	// std::pair<i1, hc>
+{
+
+	// Accumulate areas over all ice sheets
+	giss::SparseAccumulator<int,double> area1_m;
+	giss::SparseAccumulator<int,double> area1_m_hc;
+	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+		sheet->accum_areas(area1_m, area1_m_hc);
+	}
 
 	// Summing duplicates on area1_m and area1_m_hc not needed
 	// because the unordered_map sums them automatically.
@@ -109,8 +118,11 @@ void MatrixMaker::compute_fhc(
 	}
 	fhc1h.sort();
 
-	printf("END compute fgice1()\n");
+	printf("END compute_fhc()\n");
 }
+
+
+
 
 /** TODO: This doesn't account for spherical earth */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()

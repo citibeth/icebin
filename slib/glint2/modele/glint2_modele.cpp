@@ -98,10 +98,9 @@ void glint2_modele_get_elevhc_c(glint2_modele *api,
 }
 // -----------------------------------------------------
 extern "C"
-void glint2_modele_compute_fhc_c(glint2_modele *api,
-	giss::F90Array<double, 3> &fhc1h_f,			// IN/OUT
-	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT
-	giss::F90Array<double, 2> &fgrnd1_f,		// OUT
+void glint2_modele_compute_fgice_c(glint2_modele *api,
+	giss::F90Array<double, 2> &fgice1_f,		// OUT
+	giss::F90Array<double, 2> &fgrnd1_f,		// IN/OUT
 	giss::F90Array<double, 2> &focean1_f,		// IN
 	giss::F90Array<double, 2> &flake1_f			// IN
 )
@@ -124,7 +123,7 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 	// Get the sparse vector values
 	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
 	giss::CooVector<int,double> fgice1_s;
-	api->maker->compute_fhc(fhc1h_s, fgice1_s);
+	api->maker->compute_fgice(fgice1_s);
 
 	// Translate the sparse vectors to the ModelE data structures
 	std::vector<std::tuple<int, int, double>> fgice1_vals;
@@ -169,6 +168,30 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 	fgrnd1 = 1.0 - focean1 - flake1 - fgice1;
 
 	// -----------------------------------------------------
+}
+// -----------------------------------------------------
+extern "C"
+void glint2_modele_compute_fhc_c(glint2_modele *api,
+	giss::F90Array<double, 3> &fhc1h_f)			// IN/OUT
+{
+	ModelEDomain &domain(*api->domain);
+
+#if 0
+printf("domain: (%d %d) (%d %d %d %d) (%d %d %d %d) (%d %d)\n",
+domain.im, domain.jm,
+domain.i0h_f, domain.i1h_f, domain.j0h_f, domain.j1h_f,
+domain.i0_f, domain.i1_f, domain.j0_f, domain.j1_f,
+domain.j0s_f, domain.j1s_f);
+
+printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
+#endif
+
+	// Reconstruct arrays, using Fortran conventions
+	// (smallest stride first, whatever-based indexing it came with)
+
+	// Get the sparse vector values
+	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
+	api->maker->compute_fhc(fhc1h_s);
 
 	std::vector<std::tuple<int, int, int, double>> fhc1h_vals;
 

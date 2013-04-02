@@ -134,7 +134,8 @@ int main(int argc, char **argv)
 	}
 
 
-	glint2_modele_compute_fhc_c(api, fhc1h_f, fgice1_f, fgrnd1_f, focean1_f, flake1_f);
+	glint2_modele_compute_fgice_c(api, fgice1_f, fgrnd1_f, focean1_f, flake1_f);
+	glint2_modele_compute_fhc_c(api, fhc1h_f);
 
 	// ----------------------------------------------------------
 
