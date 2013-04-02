@@ -116,8 +116,9 @@ end subroutine
 subroutine glint2_modele_compute_fhc(api, fhc1h, fgice1, fgrnd1, focean1, flake1, i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
-real*8, dimension(i0h:,j0h:,:) :: fhc1h
-real*8, dimension(i0h:,j0h:) :: fgice1, fgrnd1, focean1, flake1
+real*8, dimension(i0h:,j0h:,:) :: fhc1h					! OUT
+real*8, dimension(i0h:,j0h:) :: fgice1					! OUT
+real*8, dimension(i0h:,j0h:) :: fgrnd1, focean1, flake1	! INOUT
 
 	! ----------
 

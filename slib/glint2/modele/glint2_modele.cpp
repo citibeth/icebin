@@ -24,6 +24,8 @@ extern "C" glint2_modele *glint2_modele_new(
 	// MPI Stuff
 	int comm_f, int root)
 {
+	printf("***** BEGIN glint2_modele()\n");
+
 	// Convert Fortran arguments
 	std::string maker_fname(maker_fname_f, maker_fname_len);
 	std::string maker_vname(maker_vname_f, maker_vname_len);
@@ -55,6 +57,8 @@ extern "C" glint2_modele *glint2_modele_new(
 
 	// TODO: Test that im and jm are consistent with the grid read.
 
+	printf("***** END glint2_modele()\n");
+
 	// No exception, we can release our pointer back to Fortran
 	return api.release();
 }
@@ -68,7 +72,9 @@ extern "C" void glint2_modele_delete(glint2_modele *&api)
 extern "C"
 int glint2_modele_nhc(glint2_modele *api)
 {
-	return api->maker->nhc();
+	int ret = api->maker->nhc();
+	printf("glint2_modele_nhc() returning %d\n", ret);
+	return ret;
 }
 // -----------------------------------------------------
 extern "C"
