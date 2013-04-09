@@ -7,7 +7,15 @@ implicit none
 ! ================================================
 ! Stuff from glint2_modele.cpp
 
+type glint2_modele_matrix
+	! k = height point/class dimension
+	integer, dimension(:), allocatable :: rows_i, rows_j, rows_k
+	integer, dimension(:), allocatable :: cols_i, cols_j, cols_k
+	real*8, dimension(:), allocatable :: vals
+end type glint2_modele_matrix
+
 INTERFACE
+
 
 	function glint2_modele_new( &
 		maker_fname_f, maker_fname_len, &
@@ -155,14 +163,10 @@ real*8, dimension(i0h:,j0h:,:) :: fhc1h					! OUT
 	call glint2_modele_compute_fhc_c(api, fhc1h_f)
 end subroutine
 
-subroutine glint2_modele_hp_to_hc(api, &
-	rows_i, rows_j, rows_k, &		! k = height point/class dimension
-	cols_i, cols_j, cols_k, vals)
+subroutine glint2_modele_hp_to_hc(api, mat)
 implicit none
 	type(c_ptr), value :: api
-	integer, dimension(:), allocatable :: rows_i, rows_j, rows_k
-	integer, dimension(:), allocatable :: cols_i, cols_j, cols_k
-	real*8, dimension(:), allocatable :: vals
+	type(glint2_modele_matrix) :: mat
 	integer :: n
 
 	! ------------------- local vars
@@ -176,22 +180,22 @@ implicit none
 	n = glint2_modele_hp_to_hc_part1(api)
 
 	! -------- Allocate those arrays
-	allocate(rows_i(n))
-	allocate(rows_j(n))
-	allocate(rows_k(n))
-	allocate(cols_i(n))
-	allocate(cols_j(n))
-	allocate(cols_k(n))
-	allocate(vals(n))
+	allocate(mat%rows_i(n))
+	allocate(mat%rows_j(n))
+	allocate(mat%rows_k(n))
+	allocate(mat%cols_i(n))
+	allocate(mat%cols_j(n))
+	allocate(mat%cols_k(n))
+	allocate(mat%vals(n))
 
 	! -------- Grab array descriptors from arrays we just allocated
-	call get_spec_int_1(rows_i, 1, rows_i_f)
-	call get_spec_int_1(rows_j, 1, rows_j_f)
-	call get_spec_int_1(rows_j, 1, rows_k_f)
-	call get_spec_int_1(cols_i, 1, cols_i_f)
-	call get_spec_int_1(cols_j, 1, cols_j_f)
-	call get_spec_int_1(cols_j, 1, cols_k_f)
-	call get_spec_double_1(vals, 1, vals_f)
+	call get_spec_int_1(mat%rows_i, 1, rows_i_f)
+	call get_spec_int_1(mat%rows_j, 1, rows_j_f)
+	call get_spec_int_1(mat%rows_j, 1, rows_k_f)
+	call get_spec_int_1(mat%cols_i, 1, cols_i_f)
+	call get_spec_int_1(mat%cols_j, 1, cols_j_f)
+	call get_spec_int_1(mat%cols_j, 1, cols_k_f)
+	call get_spec_double_1(mat%vals, 1, vals_f)
 
 	! -------- Part 2: Fill the arrays we allocated
 	call glint2_modele_hp_to_hc_part2(api, &
