@@ -79,6 +79,7 @@ public:
 	int get_hc(int index1, double elev);
 
 	int nhc() { return hpdefs.size(); }
+	int nhp() { return hpdefs.size(); }
 	int n1() { return grid1->ndata(); }
 
 	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.

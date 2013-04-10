@@ -59,11 +59,19 @@ printf("VectorSparseMatrix::sort(%d, %ld)\n", sort_order, size());
 	jndx = std::move(itmp);	
 }
 
-void VectorSparseMatrix::sum_duplicates()
+void VectorSparseMatrix::sum_duplicates(
+	SparseMatrix::SortOrder sort_order) // = SparseMatrix::SortOrder::ROW_MAJOR
 {
 	// Decide on how we'll sort
 	CmpIndex2 cmp;
-	cmp.init(&indx[0], &jndx[0]);
+	switch(sort_order) {
+		case SparseMatrix::SortOrder::COLUMN_MAJOR :
+			cmp.init(&jndx[0], &indx[0]);
+		break;
+		default :
+			cmp.init(&indx[0], &jndx[0]);
+		break;
+	}
 
 	// Generate a sorted permuatation
 	int n = size();

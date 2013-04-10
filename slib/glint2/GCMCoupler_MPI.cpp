@@ -126,7 +126,7 @@ printf("[%d] MPI_Gatherv DONE\n", rank);
 	if (rank == root) {
 		// Sort the receive buffer so items in same ice sheet
 		// are found together
-//		qsort(rbuf->begin(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
+		qsort(rbuf->begin(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
 
 		// Add a sentinel
 		(*rbuf)[rbuf->size-1].sheetno = 999999;

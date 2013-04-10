@@ -168,6 +168,92 @@ printf("Done Writing hp2hc ret = %p\n", ret.get());
 	return ret;
 }
 // --------------------------------------------------------------
+/** @return fhpmat[i, (j, hp)]: the amount of area that the height
+           point hp of cell j contributes to cell i in height-class
+           space. */
+std::unique_ptr<giss::VectorSparseMatrix>  MatrixMaker::compute_fhpmat(
+	giss::VectorSparseMatrix const &hp_to_hc,
+	SparseAccumulator<std::pair<int,int>, double> const &fhc1h) const
+{
+	int const n1 = grid1->ndata();
+	std::unique_ptr<giss::VectorSparseMatrix> fhpmat(
+		new giss::VectorSparseMatrix(giss::SparseDescr(n1, n1*nhp())));
+
+	HCIndex hc_index(n1());
+	for (auto ii = hp_to_hc.begin(); ii != hp_to_hc.end(); ++ii) {
+		// Separate out into grid cell and height point / class
+		int i0, hp0;		// Columns (domain of linear transformation)
+		hc_index.index_to_ik(ii.col(), i0, hp0);
+		int i1, hc1;		// Rows (range)
+		hc_index.index_to_ik(ii.row(), i1, hc1);
+
+		// See if there IS an fhc number for this
+		auto fhc_ptr = fhc1h.find(std::make_pair(i1, hc1));
+		if (fhc_ptr == fhc1h.end()) continue;
+
+		// Collapse down height classes, and multiply by fractional area of each
+		fhpmat.add(
+			std::make_pair<i1, ii.col()>,
+			ii.val() * fhc_ptr->second);
+	}
+	fhpmat->sum_duplicates(SparseMatrix::SortOrder::ROW_MAJOR);
+	return fhpmat;
+}
+// --------------------------------------------------------------
+
+/** Computes the relative contribution of one height point to
+the total ice-covered area of a GCM cell, and the total area of a GCM cell,
+respectively.  These are APPROXIMATE, since ice grid cells that overlap other
+GCM cells are IGNORED.
+
+@param hp_to_hc MUST BE SORTED ROW_MAJOR!!!
+@return Indexed by (n1, nhc)
+*/
+giss::CooVector<std::pair<int,int>,double> MatrixMaker::compute_fhp_approx(
+	giss::VectorSparseMatrix const &fhpmat)
+{
+	giss::CooVector<std::pair<int,int>,double> fhp_approx;
+
+	HCIndex hc_index(n1());
+	auto rbegin(get_row_beginnings(fhpmat));
+
+	// For each row of matrix
+	for (int ri=0; ri<rbegin.size()-1; ++ri) {
+		double sum_row = 0;	
+		double sum_inrow = 0;
+
+		// Get sums of this row
+		for (int i=rbegin[ri]; i<rbegin[i+1]; ++i) {
+			int const row = hp_to_hc.rows()[i]
+			int const col = hp_to_hc.cols()[i];
+			double const val = hp_to_hc.vals()[i];
+
+			int i0, hp0;		// Columns (domain of linear transformation)
+			hc_index.index_to_ik(hp_to_hc.cols()[i], i0, hp0);
+
+			sum_row += val;
+			if (i0 == i1) sum_inrow += val;
+		}
+
+		// Scale for portions of this row outside the gridcell
+		double scale_factor = sum_row / sum_inrow;
+		for (int i=rbegin[ri]; i<rbegin[i+1]; ++i) {
+			int const row = hp_to_hc.rows()[i]
+			int const col = hp_to_hc.cols()[i];
+			double const val = hp_to_hc.vals()[i];
+
+			int i0, hp0;		// Columns (domain of linear transformation)
+			hc_index.index_to_ik(hp_to_hc.cols()[i], i0, hp0);
+
+			if (i0 == i1) fhp_approx.add(
+				std::make_pair(i0,hp0),   val * scale_factor);
+		}
+	}
+
+	return fhp_approx;
+}
+// --------------------------------------------------------------
+// --------------------------------------------------------------
 // ==============================================================
 // Write out the parts that this class computed --- so we can test/check them
 

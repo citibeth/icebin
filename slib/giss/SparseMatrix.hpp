@@ -569,7 +569,8 @@ public:
 	void sort(SparseMatrix::SortOrder sort_order = SortOrder::ROW_MAJOR);
 
 	/** Sums together items in the matrix with duplicate (row, col) */
-	void sum_duplicates();
+	void sum_duplicates(
+		SparseMatrix::SortOrder sort_order = SparseMatrix::SortOrder::ROW_MAJOR);
 
 	/** Construct a VectorSparseMatrix based on arrays in a netCDF file.
 	@param nc The netCDF file
@@ -990,7 +991,23 @@ SparseMatrixT &mat)
 // ===============================================================
 // ======== Extra Functions
 
-extern std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparseMatrix &b);
+extern std::unique_ptr<VectorSparseMatrix> multiply_eigen_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b);
+extern std::unique_ptr<VectorSparseMatrix> multiply_giss_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b);
+
+inline std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparseMatrix &b)
+	{ return multiply_eigen_algorithm(a, b); }
+
+extern std::vector<int> get_rowcol_beginnings(
+	VectorSparseMatrix const &a,
+	int const rowcol);
+
+/** Only use on a matrix that's been sorted row-major */
+std::vector<int> get_row_beginnings(VectorSparseMatrix const &a)
+	{ return get_rowcol_beginnings(a, 0); }
+
+/** Only use on a matrix that's been sorted column-major */
+std::vector<int> get_col_beginnings(VectorSparseMatrix const &a)
+	{ return get_rowcol_beginnings(a, 1); }
 
 
 }	// namespace giss

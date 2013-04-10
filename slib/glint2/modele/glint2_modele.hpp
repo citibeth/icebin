@@ -10,6 +10,25 @@
 namespace glint2 {
 namespace modele {
 
+struct glint2_modele_matrix_f {
+	giss::F90Array<int, 1> &rows_i_f;
+	giss::F90Array<int, 1> &rows_j_f;
+	giss::F90Array<int, 1> &rows_k_f;
+	giss::F90Array<int, 1> &cols_i_f;
+	giss::F90Array<int, 1> &cols_j_f;
+	giss::F90Array<int, 1> &cols_k_f;
+	giss::F90Array<double, 1> &vals_f;
+};
+
+struct glint2_modele_matrix {
+	blitz::Array<int, 1> rows_i, rows_j, rows_k;
+	blitz::Array<int, 1> cols_i, cols_j, cols_k;
+	blitz::Array<double, 1> vals;
+
+	explicit glint2_modele_matrix(glint2_modele_matrix_f const &f);
+};
+
+
 struct glint2_modele {
 	std::unique_ptr<MatrixMaker> maker;
 	ModelEDomain *domain;	// Points to domain owned by maker
@@ -48,21 +67,14 @@ void glint2_modele_compute_fgice_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &flake1_f);
 
 extern "C"
-void glint2_modele_compute_fhc_c(glint2::modele::glint2_modele *api,
-	giss::F90Array<double, 3> &fhc1h_f);
+int glint2_modele_init_landice_com_part1(glint2_modele *api);
 
 extern "C"
-int glint2_modele_hp_to_hc_part1(glint2::modele::glint2_modele *api);
-
-extern "C"
-void glint2_modele_hp_to_hc_part2(glint2::modele::glint2_modele *api,
-	giss::F90Array<int, 1> &rows_i_f,
-	giss::F90Array<int, 1> &rows_j_f,
-	giss::F90Array<int, 1> &rows_k_f,
-	giss::F90Array<int, 1> &cols_i_f,
-	giss::F90Array<int, 1> &cols_j_f,
-	giss::F90Array<int, 1> &cols_k_f,
-	giss::F90Array<double, 1> &vals_f);
+void glint2_modele_init_landice_com_part2(glint2_modele *api,
+	giss::F90Array<double, 3> &fhc1h_f,				// IN/OUT
+	giss::F90Array<double, 3> &elevhc_f,			// IN/OUT
+	glint2_modele_matrix_f &hp_to_hc_f,				// OUT
+	giss::F90Array<double, 3> &fhp_approx1h_f);		// OUT
 
 extern "C"
 void glint2_modele_couple_to_ice(
