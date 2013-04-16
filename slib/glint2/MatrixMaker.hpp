@@ -6,6 +6,7 @@
 #include <glint2/matrix_ops.hpp>
 #include <glint2/IceSheet.hpp>
 #include <glint2/GridDomain.hpp>
+#include <giss/hash.hpp>
 
 /*
 Height Points (HP) [nhc*n1] --A--> Ice [n2] --B--> Height Classes (HC) [nhc*n1] --C--> GCM
@@ -18,6 +19,8 @@ C: See get_fhc() below, then multiply by FHC in ModelE code.
 
 namespace glint2 {
 
+
+typedef giss::SparseAccumulator<std::pair<int,int>, double, giss::HashPair<int,int>> SparseAccumulator1hc;
 
 /** Generates the matrices required in the GCM */
 class MatrixMaker
@@ -78,9 +81,9 @@ public:
 	/** @return The height class of the given point in gridcell #index1. */
 	int get_hc(int index1, double elev);
 
-	int nhc() { return hpdefs.size(); }
-	int nhp() { return hpdefs.size(); }
-	int n1() { return grid1->ndata(); }
+	int nhc() const { return hpdefs.size(); }
+	int nhp() const { return hpdefs.size(); }
+	int n1() const { return grid1->ndata(); }
 
 	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
 	Ice sheets cannot overlap each other (although their grids can, if we're
@@ -96,6 +99,26 @@ public:
 
 
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc();
+
+	/** @return fhpmat[i, (j, hp)]: the amount of area that the height
+           point hp of cell j contributes to cell i in height-class
+           space. */
+	std::unique_ptr<giss::VectorSparseMatrix>  compute_fhpmat(
+		giss::VectorSparseMatrix const &hp_to_hc,
+		SparseAccumulator1hc const &fhc1h) const;
+//		giss::SparseAccumulator<std::pair<int,int>, double> const &fhc1h) const;
+
+	/** Computes the relative contribution of one height point to
+	the total ice-covered area of a GCM cell, and the total area of a GCM cell,
+	respectively.  These are APPROXIMATE, since ice grid cells that overlap other
+	GCM cells are IGNORED.
+
+	@param hp_to_hc MUST BE SORTED ROW_MAJOR!!!
+	@return Indexed by (n1, nhc)
+	*/
+	giss::CooVector<std::pair<int,int>,double> compute_fhp_approx(
+		giss::VectorSparseMatrix const &hp_to_hc,
+		giss::VectorSparseMatrix const &fhpmat);
 
 	size_t ice_matrices_size() {
 		size_t nele = 0;

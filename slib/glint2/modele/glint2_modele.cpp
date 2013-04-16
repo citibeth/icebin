@@ -8,12 +8,7 @@ using namespace glint2;
 using namespace glint2::modele;
 
 // ---------------------------------------------------
-explicit glint2_modele_matrix::glint2_modele_matrix(glint2_modele_matrix_f const &f) :
-	rows_i(f.rows_i_f.to_blitz()), rows_j(f.rows_j_f.to_blitz()), rows_k(f.rows_k_f.to_blitz()),
-	cols_i(f.cols_i_f.to_blitz()), cols_j(f.cols_j_f.to_blitz()), cols_k(f.cols_k_f.to_blitz()),
-	vals(f.vals_f.to_blitz())
-{}
-// ---------------------------------------------------
+
 /** @param spec  */
 extern "C" glint2_modele *glint2_modele_new(
 	char const *maker_fname_f, int maker_fname_len,
@@ -212,11 +207,34 @@ printf("Filtered matrix at %p (from %p)\n", api->hp_to_hc.get(), mat.get());
 	return api->hp_to_hc->size();
 }
 // -----------------------------------------------------
+static void global_to_local_hp(
+	glint2_modele *api,	
+	HCIndex const &hc_index,
+	std::vector<int> const &grows,
+	blitz::Array<int,1> rows_i,		// Fortran-style array, base=1
+	blitz::Array<int,1> rows_j,
+	blitz::Array<int,1> rows_k)		// height point index
+{
+	// Copy the rows while translating
+	// auto rows_k(rows_k_f.to_blitz());
+	//std::vector<double> &grows = *api->hp_to_hc.rows();
+	int lindex[api->domain->num_local_indices];
+	for (int i=0; i<grows.size(); ++i) {		
+		int ihc, i1;
+		hc_index.index_to_ik(grows[i], i1, ihc);
+		api->domain->global_to_local(i1, lindex);
+//if (lindex[1] >= 80) printf("Found big lindex: %d %d\n", lindex[0], lindex[1]);
+		rows_i(i+1) = lindex[0];
+		rows_j(i+1) = lindex[1];
+		rows_k(i+1) = ihc+1;	// Convert to Fortran indexing
+	}
+}
+// -----------------------------------------------------
 extern "C"
 void glint2_modele_init_landice_com_part2(glint2_modele *api,
 	giss::F90Array<double, 3> &fhc1h_f,				// IN/OUT
 	giss::F90Array<double, 3> &elevhc_f,			// IN/OUT
-	glint2_modele_matrix_f &hp_to_hc_f,				// OUT
+	glint2::modele::glint2_modele_matrix_f &hp_to_hc_f,				// OUT
 	giss::F90Array<double, 3> &fhp_approx1h_f)		// OUT
 {
 	// =================== elevhc
@@ -306,7 +324,7 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 	}
 
 	// ======================= hp_to_hc (computed from part1)
-	glint2_modele_matrix hp_to_hc(hp_to_hc_f);
+	glint2_modele_matrix hp_to_hc(hp_to_hc_f.to_blitz());
 
 	// Array bounds checking not needed, it's done
 	// in lower-level subroutines that we call.
@@ -331,18 +349,19 @@ printf("Translating: Done With Rows!\n");
 	for (int i=0; i<mvals.size(); ++i) hp_to_hc.vals(i+1) = mvals[i];
 
 	// ======================= fhp_approx
-	giss::SparseAccumulator<std::pair<int,int>,double> fhc1h_a;
+//	giss::SparseAccumulator<std::pair<int,int>,double> fhc1h_a;
+	glint2::SparseAccumulator1hc fhc1h_a;
 	for (auto ii=fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii)
 		fhc1h_a.add(ii->first, ii->second);
 
-	auto fhpmat(api->maker->compute_fhpmat(*api->hp_to_hc, fhc1h_a);
+	auto fhpmat(api->maker->compute_fhpmat(*api->hp_to_hc, fhc1h_a));
 	// giss::CooVector<std::pair<int,int>,double> fhp_approx
-	auto fhp_approx_s(api->maker->compute_fhp_approx(*fhpmat);
+	auto fhp_approx_s(api->maker->compute_fhp_approx(*api->hp_to_hc, *fhpmat));
 
 	// Store into Fortran arrays
 	auto fhp_approx1h(fhp_approx1h_f.to_blitz());
-	fhp_approx = 0;		// Clear full array
-	for (auto ii=fhp_approx_s.begin(); ii != fhp_approx_s.end(); ++i) {
+	fhp_approx1h = 0;		// Clear full array
+	for (auto ii=fhp_approx_s.begin(); ii != fhp_approx_s.end(); ++ii) {
 		int i1 = ii->first.first;
 		int ihc = ii->first.second;
 		double val = ii->second;
@@ -356,29 +375,6 @@ printf("Translating: Done With Rows!\n");
 
 	// ======================= Free temporary storage
 	api->hp_to_hc.reset();
-}
-// -----------------------------------------------------
-static void global_to_local_hp(
-	glint2_modele *api,	
-	HCIndex const &hc_index,
-	std::vector<int> const &grows,
-	blitz::Array<int,1> rows_i,		// Fortran-style array, base=1
-	blitz::Array<int,1> rows_j,
-	blitz::Array<int,1> rows_k)		// height point index
-{
-	// Copy the rows while translating
-	// auto rows_k(rows_k_f.to_blitz());
-	//std::vector<double> &grows = *api->hp_to_hc.rows();
-	int lindex[api->domain->num_local_indices];
-	for (int i=0; i<grows.size(); ++i) {		
-		int ihc, i1;
-		hc_index.index_to_ik(grows[i], i1, ihc);
-		api->domain->global_to_local(i1, lindex);
-//if (lindex[1] >= 80) printf("Found big lindex: %d %d\n", lindex[0], lindex[1]);
-		rows_i(i+1) = lindex[0];
-		rows_j(i+1) = lindex[1];
-		rows_k(i+1) = ihc+1;	// Convert to Fortran indexing
-	}
 }
 // -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields

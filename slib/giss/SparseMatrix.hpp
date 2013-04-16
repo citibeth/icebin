@@ -1002,11 +1002,11 @@ extern std::vector<int> get_rowcol_beginnings(
 	int const rowcol);
 
 /** Only use on a matrix that's been sorted row-major */
-std::vector<int> get_row_beginnings(VectorSparseMatrix const &a)
+inline std::vector<int> get_row_beginnings(VectorSparseMatrix const &a)
 	{ return get_rowcol_beginnings(a, 0); }
 
 /** Only use on a matrix that's been sorted column-major */
-std::vector<int> get_col_beginnings(VectorSparseMatrix const &a)
+inline std::vector<int> get_col_beginnings(VectorSparseMatrix const &a)
 	{ return get_rowcol_beginnings(a, 1); }
 
 

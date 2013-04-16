@@ -135,9 +135,30 @@ int main(int argc, char **argv)
 
 
 	glint2_modele_compute_fgice_c(api, fgice1_f, fgrnd1_f, focean1_f, flake1_f);
-	glint2_modele_compute_fhc_c(api, fhc1h_f);
+//	glint2_modele_compute_fhc_c(api, fhc1h_f);
 
 	// ----------------------------------------------------------
+	// Try the HP-to-HC matrix
+	int n = glint2_modele_init_landice_com_part1(api);
+
+	modele::glint2_modele_matrix hp_to_hc(n);
+	glint2_modele_matrix_f hp_to_hc_f(hp_to_hc);
+
+	blitz::Array<double,3> elevhc(
+		blitz::Range(1,im),
+		blitz::Range(1,jm),
+		blitz::Range(1,nhc),
+		blitz::fortranArray);
+	giss::F90Array<double, 3> elevhc_f(elevhc);
+	blitz::Array<double,3> fhp_approx1h(
+		blitz::Range(1,im),
+		blitz::Range(1,jm),
+		blitz::Range(1,nhc),
+		blitz::fortranArray);
+	giss::F90Array<double, 3> fhp_approx1h_f(fhp_approx1h);
+
+	glint2_modele_init_landice_com_part2(api,
+		fhc1h_f, elevhc_f, hp_to_hc_f, fhp_approx1h_f);
 
 	// ----------------------------------------------------------
 	// Save it to a netCDF file so we can tell if it's correct
@@ -210,33 +231,6 @@ int main(int argc, char **argv)
 
 
 	// --------------------------------------------------------
-	// Try the HP-to-HC matrix
-	int n = glint2_modele_hp_to_hc_part1(api);
-
-	blitz::Array<int,1> rows_i(blitz::Range(1,n));	// Fortran-style 1-base
-	blitz::Array<int,1> rows_j(blitz::Range(1,n));
-	blitz::Array<int,1> rows_k(blitz::Range(1,n));
-
-	blitz::Array<int,1> cols_i(blitz::Range(1,n));
-	blitz::Array<int,1> cols_j(blitz::Range(1,n));
-	blitz::Array<int,1> cols_k(blitz::Range(1,n));
-
-	blitz::Array<double,1> vals(blitz::Range(1,n));
-
-	giss::F90Array<int, 1> rows_i_f(rows_i);
-	giss::F90Array<int, 1> rows_j_f(rows_j);
-	giss::F90Array<int, 1> rows_k_f(rows_k);
-
-	giss::F90Array<int, 1> cols_i_f(cols_i);
-	giss::F90Array<int, 1> cols_j_f(cols_j);
-	giss::F90Array<int, 1> cols_k_f(cols_k);
-
-	giss::F90Array<double, 1> vals_f(vals);
-
-	glint2_modele_hp_to_hc_part2(api,
-		rows_i_f, rows_j_f, rows_k_f,
-		cols_i_f, cols_j_f, cols_k_f,
-		vals_f);
 
 	// Write it out
 //	NcFile hphcnc("hphc.nc", NcFile::Replace);
@@ -244,15 +238,15 @@ int main(int argc, char **argv)
 //	std::vector<boost::function<void ()>> fns2;
 	NcDim *n_dim = ncout.add_dim("n_hphc", n);
 
-	fns.push_back(giss::netcdf_define(ncout, "rows_i", rows_i, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "rows_j", rows_j, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "rows_k", rows_k, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "rows_i", hp_to_hc.rows_i, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "rows_j", hp_to_hc.rows_j, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "rows_k", hp_to_hc.rows_k, {n_dim}));
 
-	fns.push_back(giss::netcdf_define(ncout, "cols_i", cols_i, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "cols_j", cols_j, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "cols_k", cols_k, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "cols_i", hp_to_hc.cols_i, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "cols_j", hp_to_hc.cols_j, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "cols_k", hp_to_hc.cols_k, {n_dim}));
 
-	fns.push_back(giss::netcdf_define(ncout, "vals", vals, {n_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "vals", hp_to_hc.vals, {n_dim}));
 
 //	for (auto ii = fns2.begin(); ii != fns2.end(); ++ii) (*ii)();
 

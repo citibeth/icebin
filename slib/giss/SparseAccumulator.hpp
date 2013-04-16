@@ -1,13 +1,14 @@
 #pragma once
 
 #include <unordered_map>
+#include <giss/hash.hpp>
 
 namespace giss {
 
-template<class IndexT, class AccumT>
-class SparseAccumulator : public std::unordered_map<IndexT, AccumT> {
+template<class IndexT, class AccumT, class Hash = std::hash<IndexT>>
+class SparseAccumulator : public std::unordered_map<IndexT, AccumT, Hash> {
 public :
-	typedef std::unordered_map<IndexT, AccumT> super;
+	typedef std::unordered_map<IndexT, AccumT, Hash> super;
 
 	void add(IndexT const &index, AccumT const &val) {
 		auto ii(super::find(index));

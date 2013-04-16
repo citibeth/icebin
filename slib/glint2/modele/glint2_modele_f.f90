@@ -1,11 +1,5 @@
-module glint2_modele
+module glint2_modele_types
 use f90blitz
-use iso_c_binding
-!use MpiSupport_mod
-implicit none
-
-! ================================================
-! Stuff from glint2_modele.cpp
 
 type glint2_modele_matrix
 	! k = height point/class dimension
@@ -19,6 +13,18 @@ type, bind(c) :: glint2_modele_matrix_f
 	type(arr_spec_1) :: cols_i_f, cols_j_f, cols_k_f	! int
 	type(arr_spec_1) :: vals_f							! double
 end type
+
+end module
+
+module glint2_modele
+use f90blitz
+use iso_c_binding
+use glint2_modele_types
+!use MpiSupport_mod
+implicit none
+
+! ================================================
+! Stuff from glint2_modele.cpp
 
 INTERFACE
 
@@ -70,16 +76,18 @@ INTERFACE
 	function glint2_modele_init_landice_com_part1(api) bind(c)
 		use iso_c_binding
 		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_hp_to_hc_part1
+		integer(c_int) :: glint2_modele_init_landice_com_part1
 	end function
 
 	subroutine glint2_modele_init_landice_com_part2(api, &
 		fhc1h_f, elevhc_f, hp_to_hc_f, fhp_approx1h_f) bind(c)
-		use iso_c_binding
+	use iso_c_binding
+	use f90blitz
+	use glint2_modele_types
 		type(c_ptr), value :: api
 		type(arr_spec_3) :: fhc1h_f
 		type(arr_spec_3) :: elevhc_f
-		type(glint2_modele_matrix) :: hp_to_hc_f
+		type(glint2_modele_matrix_f) :: hp_to_hc_f
 		type(arr_spec_3) :: fhp_approx1h_f
 	end subroutine
 
@@ -122,8 +130,8 @@ real*8, dimension(i0h:,j0h:) :: fgrnd1, focean1, flake1	! INOUT
 end subroutine
 
 subroutine glint2_modele_init_landice_com(api, &
-	fhc1h, elevhc, hp_to_hc, fhp_approx1h,
-	i0h, j0h) bind(c)
+	fhc1h, elevhc, hp_to_hc, fhp_approx1h, &
+	i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
 real*8, dimension(i0h:,j0h:,:) :: fhc1h					! OUT
@@ -138,12 +146,13 @@ real*8, dimension(i0h:,j0h:,:) :: fhp_approx1h
 	type(glint2_modele_matrix_f) :: mat_f
 	type(arr_spec_3) :: fhc1h_f
 	type(arr_spec_3) :: elevhc_f
+	type(glint2_modele_matrix_f) :: hp_to_hc_f
 	type(arr_spec_3) :: fhp_approx1h_f
 
 	! ------------------- subroutine body
 
 	! -------- Part 1: Figure out how big we must make the arrays
-	n = glint2_modele_hp_to_hc_part1(api)
+	n = glint2_modele_init_landice_com_part1(api)
 
 	! -------- Allocate those arrays
 	allocate(hp_to_hc%rows_i(n))

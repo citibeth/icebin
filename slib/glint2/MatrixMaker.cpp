@@ -1,3 +1,4 @@
+#include <giss/CooVector.hpp>
 #include <giss/ncutil.hpp>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet_L0.hpp>
@@ -173,13 +174,14 @@ printf("Done Writing hp2hc ret = %p\n", ret.get());
            space. */
 std::unique_ptr<giss::VectorSparseMatrix>  MatrixMaker::compute_fhpmat(
 	giss::VectorSparseMatrix const &hp_to_hc,
-	SparseAccumulator<std::pair<int,int>, double> const &fhc1h) const
+	SparseAccumulator1hc const &fhc1h) const
+//	giss::SparseAccumulator<std::pair<int,int>, double> const &fhc1h) const
 {
 	int const n1 = grid1->ndata();
 	std::unique_ptr<giss::VectorSparseMatrix> fhpmat(
 		new giss::VectorSparseMatrix(giss::SparseDescr(n1, n1*nhp())));
 
-	HCIndex hc_index(n1());
+	HCIndex hc_index(n1);
 	for (auto ii = hp_to_hc.begin(); ii != hp_to_hc.end(); ++ii) {
 		// Separate out into grid cell and height point / class
 		int i0, hp0;		// Columns (domain of linear transformation)
@@ -188,15 +190,13 @@ std::unique_ptr<giss::VectorSparseMatrix>  MatrixMaker::compute_fhpmat(
 		hc_index.index_to_ik(ii.row(), i1, hc1);
 
 		// See if there IS an fhc number for this
-		auto fhc_ptr = fhc1h.find(std::make_pair(i1, hc1));
+		auto fhc_ptr(fhc1h.find(std::pair<int,int>(i1, hc1)));
 		if (fhc_ptr == fhc1h.end()) continue;
 
 		// Collapse down height classes, and multiply by fractional area of each
-		fhpmat.add(
-			std::make_pair<i1, ii.col()>,
-			ii.val() * fhc_ptr->second);
+		fhpmat->add(i1, ii.col(), ii.val() * fhc_ptr->second);
 	}
-	fhpmat->sum_duplicates(SparseMatrix::SortOrder::ROW_MAJOR);
+	fhpmat->sum_duplicates(giss::SparseMatrix::SortOrder::ROW_MAJOR);
 	return fhpmat;
 }
 // --------------------------------------------------------------
@@ -210,6 +210,7 @@ GCM cells are IGNORED.
 @return Indexed by (n1, nhc)
 */
 giss::CooVector<std::pair<int,int>,double> MatrixMaker::compute_fhp_approx(
+	giss::VectorSparseMatrix const &hp_to_hc,
 	giss::VectorSparseMatrix const &fhpmat)
 {
 	giss::CooVector<std::pair<int,int>,double> fhp_approx;
@@ -224,12 +225,13 @@ giss::CooVector<std::pair<int,int>,double> MatrixMaker::compute_fhp_approx(
 
 		// Get sums of this row
 		for (int i=rbegin[ri]; i<rbegin[i+1]; ++i) {
-			int const row = hp_to_hc.rows()[i]
+			int const row = hp_to_hc.rows()[i];
 			int const col = hp_to_hc.cols()[i];
 			double const val = hp_to_hc.vals()[i];
 
 			int i0, hp0;		// Columns (domain of linear transformation)
 			hc_index.index_to_ik(hp_to_hc.cols()[i], i0, hp0);
+			int const i1 = row;
 
 			sum_row += val;
 			if (i0 == i1) sum_inrow += val;
@@ -238,12 +240,13 @@ giss::CooVector<std::pair<int,int>,double> MatrixMaker::compute_fhp_approx(
 		// Scale for portions of this row outside the gridcell
 		double scale_factor = sum_row / sum_inrow;
 		for (int i=rbegin[ri]; i<rbegin[i+1]; ++i) {
-			int const row = hp_to_hc.rows()[i]
+			int const row = hp_to_hc.rows()[i];
 			int const col = hp_to_hc.cols()[i];
 			double const val = hp_to_hc.vals()[i];
 
 			int i0, hp0;		// Columns (domain of linear transformation)
 			hc_index.index_to_ik(hp_to_hc.cols()[i], i0, hp0);
+			int const i1 = row;
 
 			if (i0 == i1) fhp_approx.add(
 				std::make_pair(i0,hp0),   val * scale_factor);
