@@ -126,7 +126,7 @@ real*8, dimension(i0h:,j0h:) :: fgrnd1, focean1, flake1	! INOUT
 	call get_spec_double_2(flake1, i0h, j0h, flake1_f)
 
 	! Call the C-side of the interface
-	call glint2_modele_compute_fice_c(api, fgice1_f, fgrnd1_f, focean1_f, flake1_f)
+	call glint2_modele_compute_fgice_c(api, fgice1_f, fgrnd1_f, focean1_f, flake1_f)
 end subroutine
 
 subroutine glint2_modele_init_landice_com(api, &
