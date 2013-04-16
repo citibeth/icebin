@@ -179,7 +179,7 @@ real*8, dimension(i0h:,j0h:,:) :: fhp_approx1h
 	call get_spec_double_3(fhp_approx1h, i0h, j0h, 1, fhp_approx1h_f)
 
 	! Call the C-side of the interface
-	call modele_init_landice_com_part2(api, &
+	call glint2_modele_init_landice_com_part2(api, &
 		fhc1h_f, elevhc_f, hp_to_hc_f, fhp_approx1h_f)
 
 end subroutine
