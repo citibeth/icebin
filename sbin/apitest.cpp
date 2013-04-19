@@ -91,6 +91,13 @@ int main(int argc, char **argv)
 
 	int nhc = api->maker->nhc();
 
+	auto used1h = blitz::Array<int,3>(
+		blitz::Range(1,im),
+		blitz::Range(1,jm),
+		blitz::Range(1,nhc),
+		blitz::fortranArray);
+	giss::F90Array<int,3> used1h_f(used1h);
+
 	auto fhc1h = blitz::Array<double,3>(
 		blitz::Range(1,im),
 		blitz::Range(1,jm),
@@ -105,6 +112,7 @@ int main(int argc, char **argv)
 		blitz::fortranArray); \
 	giss::F90Array<double,2> name##_f(name)
 
+	FRAC_VAR(fgice1_glint2);
 	FRAC_VAR(fgice1);
 	FRAC_VAR(fgrnd1);
 	FRAC_VAR(focean1);
@@ -121,12 +129,14 @@ int main(int argc, char **argv)
 	}
 
 	for (int j=1; j<j0; ++j) {
+		fgice1_glint2(blitz::Range::all(), j) = 0;
 		fgice1(blitz::Range::all(), j) = 0;
 		fgrnd1(blitz::Range::all(), j) = 0;
 		focean1(blitz::Range::all(), j) = 0;
 		flake1(blitz::Range::all(), j) = 0;
 	}
 	for (int j=j1+1; j <= jm; ++j) {
+		fgice1_glint2(blitz::Range::all(), j) = 0;
 		fgice1(blitz::Range::all(), j) = 0;
 		fgrnd1(blitz::Range::all(), j) = 0;
 		focean1(blitz::Range::all(), j) = 0;
@@ -134,8 +144,9 @@ int main(int argc, char **argv)
 	}
 
 
-	glint2_modele_compute_fgice_c(api, fgice1_f, fgrnd1_f, focean1_f, flake1_f);
-//	glint2_modele_compute_fhc_c(api, fhc1h_f);
+	glint2_modele_compute_fgice_c(api, 1 /*true*/,
+		fgice1_glint2_f,
+		fgice1_f, fgrnd1_f, focean1_f, flake1_f);
 
 	// ----------------------------------------------------------
 	// Try the HP-to-HC matrix
@@ -157,8 +168,17 @@ int main(int argc, char **argv)
 		blitz::fortranArray);
 	giss::F90Array<double, 3> fhp_approx1h_f(fhp_approx1h);
 
+	blitz::Array<double,2> zatmo1(
+		blitz::Range(1,im),
+		blitz::Range(1,jm),
+		blitz::fortranArray);
+	giss::F90Array<double, 2> zatmo1_f(zatmo1);
+
+	zatmo1 = 0;
+
 	glint2_modele_init_landice_com_part2(api,
-		fhc1h_f, elevhc_f, hp_to_hc_f, fhp_approx1h_f);
+		zatmo1_f, 1.0, fgice1_glint2_f, fgice1_f,
+		used1h_f, fhc1h_f, elevhc_f, hp_to_hc_f, fhp_approx1h_f);
 
 	// ----------------------------------------------------------
 	// Save it to a netCDF file so we can tell if it's correct
@@ -171,6 +191,9 @@ int main(int argc, char **argv)
 	NcDim *im_dim = ncout.add_dim("im", im);
 	NcDim *jm_dim = ncout.add_dim("jm", jm);
 	NcDim *nhc_dim = ncout.add_dim("nhc", nhc);
+
+	auto used1h_c(used1h.transpose(1,0));	// Re-order dimensions for netCDF standard
+	fns.push_back(giss::netcdf_define(ncout, "used1h", used1h_c, {nhc_dim, jm_dim, im_dim}));
 
 	auto fhc1h_c(fhc1h.transpose(2,1,0));	// Re-order dimensions for netCDF standard
 	fns.push_back(giss::netcdf_define(ncout, "fhc1h", fhc1h_c, {nhc_dim, jm_dim, im_dim}));

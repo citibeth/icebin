@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unordered_set>
 #include <memory>
 #include <glint2/Grid.hpp>
 #include <blitz/array.h>
@@ -58,6 +59,7 @@ public:
 	virtual ~IceSheet();
 
 	// ------------------------------------------------
+//	virtual void accum_used(std::unordered_set<int> &used);
 
 	virtual void accum_areas(
 		giss::SparseAccumulator<int,double> &area1_m,

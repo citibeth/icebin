@@ -55,6 +55,26 @@ printf("MatrixMaker: %p.sheetno = %d\n", &*sheet, sheet->index);
 	return index;
 }
 
+#if 0
+// NOT fully filtered.
+std::vector<int> MatrixMaker::get_used1()
+{
+	std::unordered_set<int> used;
+	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+//		sheet->accum_used(used, domain.get());
+		sheet->accum_used(used);
+	}
+
+	// Return sorted vector
+	std::vector<int> ret;
+	ret.reserve(used.size());
+	for (auto ii = used.begin(); ii != used.end(); ++ii) ret.push_back(*ii);
+	std::sort(ret.begin(), ret.end());
+
+	return ret;
+}
+#endif
+
 
 /** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
 void MatrixMaker::compute_fgice(

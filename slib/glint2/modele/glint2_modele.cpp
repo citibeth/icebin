@@ -74,12 +74,17 @@ extern "C"
 int glint2_modele_nhc(glint2_modele *api)
 {
 	int ret = api->maker->nhc();
+	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
+    // (not part of GLINT2)
+	ret += 1;
 	printf("glint2_modele_nhc() returning %d\n", ret);
 	return ret;
 }
 // -----------------------------------------------------
 extern "C"
 void glint2_modele_compute_fgice_c(glint2_modele *api,
+	int replace_fgice_b,
+	giss::F90Array<double, 2> &fgice1_glint2_f,		// OUT
 	giss::F90Array<double, 2> &fgice1_f,		// OUT
 	giss::F90Array<double, 2> &fgrnd1_f,		// IN/OUT
 	giss::F90Array<double, 2> &focean1_f,		// IN
@@ -125,13 +130,19 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 
 	// Zero out fgice1, ONLY where we're touching it.
 	auto fgice1(fgice1_f.to_blitz());
-	for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
-		int ix_i = std::get<0>(*ii);
-		int ix_j = std::get<1>(*ii);
-		double val = std::get<2>(*ii);
+	if (replace_fgice_b != 0) {
+		for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
+			int ix_i = std::get<0>(*ii);
+			int ix_j = std::get<1>(*ii);
+			double val = std::get<2>(*ii);
 
-		fgice1(ix_i, ix_j) = 0;
+			fgice1(ix_i, ix_j) = 0;
+		}
 	}
+
+	// Zero out the GLINT2-only version completely
+	auto fgice1_glint2(fgice1_f.to_blitz());
+	fgice1_glint2 = 0;
 
 	// Replace with our values
 	for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
@@ -140,6 +151,7 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 		double val = std::get<2>(*ii);
 
 		fgice1(ix_i, ix_j) += val;
+		fgice1_glint2(ix_i, ix_j) += val;
 	}
 	// -----------------------------------------------------
 	// Balance fgice against other landcover types
@@ -211,10 +223,12 @@ static void global_to_local_hp(
 	glint2_modele *api,	
 	HCIndex const &hc_index,
 	std::vector<int> const &grows,
-	blitz::Array<int,1> rows_i,		// Fortran-style array, base=1
-	blitz::Array<int,1> rows_j,
-	blitz::Array<int,1> rows_k)		// height point index
+	std::string const &name,	// For debugging
+	blitz::Array<int,1> &rows_i,		// Fortran-style array, base=1
+	blitz::Array<int,1> &rows_j,
+	blitz::Array<int,1> &rows_k)		// height point index
 {
+//printf("BEGIN global_to_local_hp %p %p %p %p\n", &grows[0], rows_i.data(), rows_j.data(), rows_k.data());
 	// Copy the rows while translating
 	// auto rows_k(rows_k_f.to_blitz());
 	//std::vector<double> &grows = *api->hp_to_hc.rows();
@@ -223,51 +237,70 @@ static void global_to_local_hp(
 		int ihc, i1;
 		hc_index.index_to_ik(grows[i], i1, ihc);
 		api->domain->global_to_local(i1, lindex);
-//if (lindex[1] >= 80) printf("Found big lindex: %d %d\n", lindex[0], lindex[1]);
 		rows_i(i+1) = lindex[0];
 		rows_j(i+1) = lindex[1];
-		rows_k(i+1) = ihc+1;	// Convert to Fortran indexing
+		// +1 for C-to-Fortran conversion
+		// +1 because lowest HP/HC is reserved
+		rows_k(i+1) = ihc+2;
 	}
+//printf("END global_to_local_hp\n");
 }
 // -----------------------------------------------------
 extern "C"
 void glint2_modele_init_landice_com_part2(glint2_modele *api,
-	giss::F90Array<double, 3> &fhc1h_f,				// IN/OUT
-	giss::F90Array<double, 3> &elevhc_f,			// IN/OUT
+	giss::F90Array<double, 2> &zatmo1_f,	// IN
+	double const BYGRAV,					// IN
+	giss::F90Array<double, 2> &fgice1_glint2_f,	// IN
+	giss::F90Array<double, 2> &fgice1_f,	// IN
+	giss::F90Array<int,3> &used1hp_f,		// IN/OUT
+	giss::F90Array<double, 3> &fhc1h_f,		// IN/OUT
+	giss::F90Array<double, 3> &elev1hp_f,	// IN/OUT
 	glint2::modele::glint2_modele_matrix_f &hp_to_hc_f,				// OUT
 	giss::F90Array<double, 3> &fhp_approx1h_f)		// OUT
 {
-	// =================== elevhc
+	// =================== elev1hp
 	// Just copy out of hpdefs array, elevation points are the same
 	// on all grid cells.
 
-	auto elevhc(elevhc_f.to_blitz());
+	auto elev1hp(elev1hp_f.to_blitz());
 	int nhc = api->maker->nhc();
-	if (nhc != elevhc.extent(2)) {
-		fprintf(stderr, "glint2_modele_get_elevhc: Inconsistent nhc (%d vs %d)\n", elevhc.extent(2), api->maker->nhc());
+	if (nhc != elev1hp.extent(2)) {
+		fprintf(stderr, "glint2_modele_get_elev1hp: Inconsistent nhc (%d vs %d)\n", elev1hp.extent(2), api->maker->nhc());
 		throw std::exception();
 	}
 
-	for (int k=1; k <= nhc; ++k) {
-		double val = api->maker->hpdefs[k-1];
-		for (int j=elevhc.lbound(1); j <= elevhc.ubound(1); ++j) {
-		for (int i=elevhc.lbound(0); i <= elevhc.ubound(0); ++i) {
-			elevhc(i,j,k) = val;
+	// Copy 1-D height point definitions to elev1hp
+	for (int k=0; k < nhc; ++k) {
+		double val = api->maker->hpdefs[k];
+		for (int j=elev1hp.lbound(1); j <= elev1hp.ubound(1); ++j) {
+		for (int i=elev1hp.lbound(0); i <= elev1hp.ubound(0); ++i) {
+			// +1 for C-to-Fortran conversion
+			// +1 because lowest HP/HC is reserved
+			elev1hp(i,j,k+2) = val;
+		}}
+	}
+
+	// Copy zatmo to elevation of reserved height point
+	auto zatmo1(zatmo1_f.to_blitz());
+	for (int j=elev1hp.lbound(1); j <= elev1hp.ubound(1); ++j) {
+	for (int i=elev1hp.lbound(0); i <= elev1hp.ubound(0); ++i) {
+		elev1hp(i,j,1) = zatmo1(i,j) * BYGRAV;
+	}}
+
+	// ======================= fhc(:,:,1)
+	auto fgice1(fgice1_f.to_blitz());
+	auto fgice1_glint2(fgice1_glint2_f.to_blitz());
+	auto fhc1h(fhc1h_f.to_blitz());
+	fhc1h = 0;
+	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
+	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
+		if (fgice1(i,j) > 0) {
+			fhc1h(i,j,1) = 1.0d - fgice1_glint2(i,j) / fgice1(i,j);
 		}
 	}}
 
-	// ======================= fhc
+	// ======================= fhc(:,:,hp>1)
 	ModelEDomain &domain(*api->domain);
-
-#if 0
-printf("domain: (%d %d) (%d %d %d %d) (%d %d %d %d) (%d %d)\n",
-domain.im, domain.jm,
-domain.i0h_f, domain.i1h_f, domain.j0h_f, domain.j1h_f,
-domain.i0_f, domain.i1_f, domain.j0_f, domain.j1_f,
-domain.j0s_f, domain.j1s_f);
-
-printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
-#endif
 
 	// Reconstruct arrays, using Fortran conventions
 	// (smallest stride first, whatever-based indexing it came with)
@@ -291,37 +324,43 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 		domain.global_to_local(i1, lindex);
 		if (!domain.in_domain(lindex)) continue;
 
-		// Store it away
-		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
-		int hc_f = hc + 1;		// convert zero-based to 1-based arrays
-		fhc1h_vals.push_back(std::make_tuple(lindex[0], lindex[1], hc_f, val));
+		// +1 for C-to-Fortran conversion
+		// +1 because lowest HP/HC is reserved for non-model ice
+		fhc1h(lindex[0], lindex[1], hc+2) +=
+			val * (1.0d - fhc1h(lindex[0], lindex[1],1));
 	}
 
-	// Set first height class = 1, all other =0, for all grid cells
-	// (this is appropriate for non ice areas)
-	auto fhc1h(fhc1h_f.to_blitz());
-	fhc1h = 0;
-	fhc1h(blitz::Range::all(), blitz::Range::all(), 1) = 1.0;
+	// ====================== used
+	auto used1hp(used1hp_f.to_blitz());
+	used1hp = 0;
+	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
+	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
+		// Nothing to do if there's no ice in this grid cell
+		if (fgice1(i,j) == 0) continue;
 
-	// Clear all FHC for grid cells where we have data
-	for (auto ii=fhc1h_vals.begin(); ii != fhc1h_vals.end(); ++ii) {
-		int ix_i = std::get<0>(*ii);
-		int ix_j = std::get<1>(*ii);
-		int hc_f = std::get<2>(*ii);
-		double val = std::get<3>(*ii);
+		// Set used for the legacy height point
+		used1hp(i,j,1) = (fhc1h(i,j,1) > 0 ? 1 : 0);
 
-		fhc1h(ix_i, ix_j, 1) = 0;
-	}
+		// Min & max height point used for each grid cell
+		int mink = std::numeric_limits<int>::max();
+		int maxk = std::numeric_limits<int>::min();
 
-	// Set FHC for grid cells where we have data
-	for (auto ii=fhc1h_vals.begin(); ii != fhc1h_vals.end(); ++ii) {
-		int ix_i = std::get<0>(*ii);
-		int ix_j = std::get<1>(*ii);
-		int hc_f = std::get<2>(*ii);
-		double val = std::get<3>(*ii);
+		// Loop over HP's (but not the reserved ones) to find
+		// range of HP's used on this grid cell.
+		for (int k=2; k <= nhc; ++k) {
+			if (fhc1h(i,j,k) > 0) {
+				mink = std::min(mink, k);
+				maxk = std::max(maxk, k);
+			}
+		}
 
-		fhc1h(ix_i, ix_j, hc_f) += val;
-	}
+		// Add a couple of HPs around it!
+		mink = std::max(2, mink-2);
+		maxk = std::min(nhc, maxk+2);
+
+		// Set everything from mink to maxk as used
+		for (int k=mink; k<maxk; ++k) used1hp(i,j,k) = 1;
+	}}
 
 	// ======================= hp_to_hc (computed from part1)
 	glint2_modele_matrix hp_to_hc(hp_to_hc_f.to_blitz());
@@ -333,13 +372,13 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 
 printf("Translating matrix at %p\n", api->hp_to_hc.get());
 	// Translate rows and cols
-	global_to_local_hp(api, hc_index, api->hp_to_hc->rows(),
+	global_to_local_hp(api, hc_index, api->hp_to_hc->rows(),"rows",
 		hp_to_hc.rows_i,
 		hp_to_hc.rows_j,
 		hp_to_hc.rows_k);
 printf("Translating: Done With Rows!\n");
 
-	global_to_local_hp(api, hc_index, api->hp_to_hc->cols(),
+	global_to_local_hp(api, hc_index, api->hp_to_hc->cols(),"cols",
 		hp_to_hc.cols_i,
 		hp_to_hc.cols_j,
 		hp_to_hc.cols_k);
@@ -348,7 +387,12 @@ printf("Translating: Done With Rows!\n");
 	std::vector<double> const &mvals(api->hp_to_hc->vals());
 	for (int i=0; i<mvals.size(); ++i) hp_to_hc.vals(i+1) = mvals[i];
 
+	// Do not add identity matrix (for hp=1) to this matrix
+	// Instead, manually copy hp=1 in the subroutine that
+	// applies the matrix.  (See HP2HC.F90 in ModelE source)
+
 	// ======================= fhp_approx
+printf("BEGIN fhp_approx...\n");
 //	giss::SparseAccumulator<std::pair<int,int>,double> fhc1h_a;
 	glint2::SparseAccumulator1hc fhc1h_a;
 	for (auto ii=fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii)
@@ -370,11 +414,22 @@ printf("Translating: Done With Rows!\n");
 		domain.global_to_local(i1, lindex);
 		if (!domain.in_domain(lindex)) continue;
 
-		fhp_approx1h(lindex[0], lindex[1], ihc+1) = val;
+		// +1 for C-to-Fortran conversion
+		// +1 because lowest HP/HC is reserved
+		fhp_approx1h(lindex[0], lindex[1], ihc+2) = val
+			* (1.0d - fhc1h(lindex[0], lindex[1],1));
 	}
 
+	// Copy FHC to FHP for non-model ice
+	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
+	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
+		fhp_approx1h(i,j,1) = fhc1h(i,j,1);
+	}}
+
+printf("END fhp_approx...\n");
 	// ======================= Free temporary storage
 	api->hp_to_hc.reset();
+printf("END glint2_modele_init_landice_com_part2\n");
 }
 // -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields

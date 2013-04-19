@@ -44,13 +44,13 @@ struct glint2_modele_matrix_f {
 
 	glint2_modele_matrix to_blitz() {
 		glint2_modele_matrix mat;
-		mat.rows_i = rows_i_f.to_blitz();
-		mat.rows_j = rows_j_f.to_blitz();
-		mat.rows_k = rows_k_f.to_blitz();
-		mat.cols_i = cols_i_f.to_blitz();
-		mat.cols_j = cols_j_f.to_blitz();
-		mat.cols_k = cols_k_f.to_blitz();
-		mat.vals = vals_f.to_blitz();
+		mat.rows_i.reference(rows_i_f.to_blitz());
+		mat.rows_j.reference(rows_j_f.to_blitz());
+		mat.rows_k.reference(rows_k_f.to_blitz());
+		mat.cols_i.reference(cols_i_f.to_blitz());
+		mat.cols_j.reference(cols_j_f.to_blitz());
+		mat.cols_k.reference(cols_k_f.to_blitz());
+		mat.vals.reference(vals_f.to_blitz());
 		return mat;
 	}
 
@@ -86,8 +86,11 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 
 extern "C" void glint2_modele_delete(glint2::modele::glint2_modele *&api);
 
+/** @param replace_fgice_b Should we replace existing fgice1 values with new ones, where the ice sheet overlaps the GCM grid? */
 extern "C"
 void glint2_modele_compute_fgice_c(glint2::modele::glint2_modele *api,
+	int replace_fgice_b,
+	giss::F90Array<double, 2> &fgice1_glint2_f,		// OUT
 	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT
 	giss::F90Array<double, 2> &fgrnd1_f,		// OUT
 	giss::F90Array<double, 2> &focean1_f,
@@ -98,6 +101,11 @@ int glint2_modele_init_landice_com_part1(glint2::modele::glint2_modele *api);
 
 extern "C"
 void glint2_modele_init_landice_com_part2(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 2> &zatmo1_f,	// IN
+	double const BYGRAV,					// IN
+	giss::F90Array<double, 2> &fgice1_glint2_f,	// IN
+	giss::F90Array<double, 2> &fgice1_f,	// IN
+	giss::F90Array<int,3> &used1h_f,					// IN/OUT
 	giss::F90Array<double, 3> &fhc1h_f,				// IN/OUT
 	giss::F90Array<double, 3> &elevhc_f,			// IN/OUT
 	glint2::modele::glint2_modele_matrix_f &hp_to_hc_f,				// OUT

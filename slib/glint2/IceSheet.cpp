@@ -64,6 +64,26 @@ void IceSheet::realize()
 }
 
 // -----------------------------------------------------
+#if 0
+/** Adds to the set of ice-involved cells in grid1 */
+void IceSheet::accum_used(std::unordered_set<int> &used)
+{
+	for (auto ii = overlap_m->begin(); ii != overlap_m->end(); ++ii) {
+		int i1 = ii.row();
+
+		if (ii.val() == 0) continue;
+#if 0
+	int lindex[domain.num_local_indices];
+		if (domain) {
+			domain->global_to_local(i1, lindex);
+			if (!domain->in_domain(lindex)) continue;
+		}
+#endif
+		used.insert(ii.row());
+	}
+}
+#endif
+// -----------------------------------------------------
 /** Made for binding... */
 static bool in_good(std::unordered_set<int> const *set, int index_c)
 {

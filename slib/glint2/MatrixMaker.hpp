@@ -85,6 +85,8 @@ public:
 	int nhp() const { return hpdefs.size(); }
 	int n1() const { return grid1->ndata(); }
 
+//	std::vector<int> get_used1();
+
 	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
 	Ice sheets cannot overlap each other (although their grids can, if we're
 	guaranteed that ice-filled grid cells will never overlap). */
