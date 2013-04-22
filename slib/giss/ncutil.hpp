@@ -139,13 +139,22 @@ boost::function<void ()> netcdf_define(
 	std::vector<NcDim *> const &ddims = {})
 {
 
+#if 0
+	// See if we're doing a Fortran-style array maybe..?
+	blitz::Array<T,rank> const *valp;
+	if (rank >= 2 && val.stride(0) == 1) {
+	}
+#endif
+
 	// Type-check for unit strides
 	int stride = 1;
 	for (int i=rank-1; i>=0; --i) {
 		if (val.stride(i) != stride) {
-			fprintf(stderr, "Unexpected stride of %d in dimension %d (extent=%d) of %s (rank=%d)\n", val.stride(i), i, val.extent(i), vname.c_str(), rank);
+			fprintf(stderr, "Unexpected stride of %d (should be %d) in dimension %d (extent=%d) of %s (rank=%d)\n", val.stride(i), stride, i, val.extent(i), vname.c_str(), rank);
+			fprintf(stderr, "Are you trying to write a Fortran-style array?  Use f_to_c() in blitz.hpp first\n");
 			throw std::exception();
 		}
+//printf("(stride=%d) *= (val.extent[%d]=%d)\n", stride, i, val.extent(i));
 		stride *= val.extent(i);
 	}
 

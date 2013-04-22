@@ -91,7 +91,19 @@ void glint2_modele_compute_fgice_c(glint2_modele *api,
 	giss::F90Array<double, 2> &flake1_f			// IN
 )
 {
+printf("BEGIN glint2_modele_compute_fgice_c()\n");
 	ModelEDomain &domain(*api->domain);
+
+#if 0
+{
+NcFile nc("fgice1_0.nc", NcFile::Replace);
+auto fgice1(fgice1_f.to_blitz());
+auto fgice1_c(giss::f_to_c(fgice1));
+auto a(giss::netcdf_define(nc, "fgice1", fgice1_c));
+a();
+nc.close();
+}
+#endif
 
 #if 0
 printf("domain: (%d %d) (%d %d %d %d) (%d %d %d %d) (%d %d)\n",
@@ -102,6 +114,8 @@ domain.j0s_f, domain.j1s_f);
 
 printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 #endif
+
+//printf("Addresses:\n%p\n%p\n%p\n%p\n%p\n", fgice1_glint2_f.base, fgice1_f.base, fgrnd1_f.base, focean1_f.base, flake1_f.base);
 
 	// Reconstruct arrays, using Fortran conventions
 	// (smallest stride first, whatever-based indexing it came with)
@@ -134,14 +148,14 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 		for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
 			int ix_i = std::get<0>(*ii);
 			int ix_j = std::get<1>(*ii);
-			double val = std::get<2>(*ii);
+			// double val = std::get<2>(*ii);
 
 			fgice1(ix_i, ix_j) = 0;
 		}
 	}
 
 	// Zero out the GLINT2-only version completely
-	auto fgice1_glint2(fgice1_f.to_blitz());
+	auto fgice1_glint2(fgice1_glint2_f.to_blitz());
 	fgice1_glint2 = 0;
 
 	// Replace with our values
@@ -160,7 +174,25 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 	auto flake1(flake1_f.to_blitz());
 	fgrnd1 = 1.0 - focean1 - flake1 - fgice1;
 
+#if 0
+printf("AA1\n");
+printf("fgrnd1: (%d %d) - (%d %d) [%d %d]\n",
+	fgrnd1.lbound(0), fgrnd1.lbound(1),
+	fgrnd1.ubound(0), fgrnd1.ubound(1),
+	fgrnd1.extent(0), fgrnd1.extent(1));
+
+NcFile nc("fgice1_1.nc", NcFile::Replace);
+auto fgice1_c(giss::f_to_c(fgice1));
+auto fgice1_glint2_c(giss::f_to_c(fgice1_glint2));
+auto a(giss::netcdf_define(nc, "fgice1", fgice1_c));
+auto b(giss::netcdf_define(nc, "fgice1_glint2", fgice1_glint2_c));
+a();
+b();
+nc.close();
+#endif
+
 	// -----------------------------------------------------
+printf("END glint2_modele_compute_fgice_c()\n");
 }
 // -----------------------------------------------------
 static std::unique_ptr<giss::VectorSparseMatrix> filter_matrix_hp(
@@ -228,7 +260,7 @@ static void global_to_local_hp(
 	blitz::Array<int,1> &rows_j,
 	blitz::Array<int,1> &rows_k)		// height point index
 {
-//printf("BEGIN global_to_local_hp %p %p %p %p\n", &grows[0], rows_i.data(), rows_j.data(), rows_k.data());
+printf("BEGIN global_to_local_hp %p %p %p %p\n", &grows[0], rows_i.data(), rows_j.data(), rows_k.data());
 	// Copy the rows while translating
 	// auto rows_k(rows_k_f.to_blitz());
 	//std::vector<double> &grows = *api->hp_to_hc.rows();
@@ -243,7 +275,7 @@ static void global_to_local_hp(
 		// +1 because lowest HP/HC is reserved
 		rows_k(i+1) = ihc+2;
 	}
-//printf("END global_to_local_hp\n");
+printf("END global_to_local_hp\n");
 }
 // -----------------------------------------------------
 extern "C"
@@ -258,14 +290,16 @@ void glint2_modele_init_landice_com_part2(glint2_modele *api,
 	glint2::modele::glint2_modele_matrix_f &hp_to_hc_f,				// OUT
 	giss::F90Array<double, 3> &fhp_approx1h_f)		// OUT
 {
+printf("init_landice_com_part2 1\n");
+
 	// =================== elev1hp
 	// Just copy out of hpdefs array, elevation points are the same
 	// on all grid cells.
 
 	auto elev1hp(elev1hp_f.to_blitz());
-	int nhc = api->maker->nhc();
+	int nhc = api->maker->nhc() + 1;	// Add non-model HP
 	if (nhc != elev1hp.extent(2)) {
-		fprintf(stderr, "glint2_modele_get_elev1hp: Inconsistent nhc (%d vs %d)\n", elev1hp.extent(2), api->maker->nhc());
+		fprintf(stderr, "glint2_modele_get_elev1hp: Inconsistent nhc (%d vs %d)\n", elev1hp.extent(2), nhc);
 		throw std::exception();
 	}
 
@@ -287,6 +321,7 @@ void glint2_modele_init_landice_com_part2(glint2_modele *api,
 		elev1hp(i,j,1) = zatmo1(i,j) * BYGRAV;
 	}}
 
+printf("init_landice_com_part2 2\n");
 	// ======================= fhc(:,:,1)
 	auto fgice1(fgice1_f.to_blitz());
 	auto fgice1_glint2(fgice1_glint2_f.to_blitz());
@@ -299,6 +334,7 @@ void glint2_modele_init_landice_com_part2(glint2_modele *api,
 		}
 	}}
 
+printf("init_landice_com_part2 3\n");
 	// ======================= fhc(:,:,hp>1)
 	ModelEDomain &domain(*api->domain);
 
@@ -330,9 +366,11 @@ void glint2_modele_init_landice_com_part2(glint2_modele *api,
 			val * (1.0d - fhc1h(lindex[0], lindex[1],1));
 	}
 
+printf("init_landice_com_part2 4\n");
 	// ====================== used
 	auto used1hp(used1hp_f.to_blitz());
 	used1hp = 0;
+
 	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
 	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
 		// Nothing to do if there's no ice in this grid cell
@@ -362,6 +400,7 @@ void glint2_modele_init_landice_com_part2(glint2_modele *api,
 		for (int k=mink; k<maxk; ++k) used1hp(i,j,k) = 1;
 	}}
 
+printf("init_landice_com_part2 5\n");
 	// ======================= hp_to_hc (computed from part1)
 	glint2_modele_matrix hp_to_hc(hp_to_hc_f.to_blitz());
 
@@ -391,6 +430,7 @@ printf("Translating: Done With Rows!\n");
 	// Instead, manually copy hp=1 in the subroutine that
 	// applies the matrix.  (See HP2HC.F90 in ModelE source)
 
+printf("init_landice_com_part2 6\n");
 	// ======================= fhp_approx
 printf("BEGIN fhp_approx...\n");
 //	giss::SparseAccumulator<std::pair<int,int>,double> fhc1h_a;
@@ -427,6 +467,7 @@ printf("BEGIN fhp_approx...\n");
 	}}
 
 printf("END fhp_approx...\n");
+printf("init_landice_com_part2 7\n");
 	// ======================= Free temporary storage
 	api->hp_to_hc.reset();
 printf("END glint2_modele_init_landice_com_part2\n");

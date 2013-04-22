@@ -91,7 +91,7 @@ INTERFACE
 	use glint2_modele_types
 		type(c_ptr), value :: api
 		type(arr_spec_2) :: zatmo1_f
-		real*8 :: BYGRAV
+		real*8, value :: BYGRAV
 		type(arr_spec_2) :: fgice1_glint2_f
 		type(arr_spec_2) :: fgice1_f
 		type(arr_spec_3) :: used1h_f
@@ -138,8 +138,8 @@ real*8, dimension(i0h:,j0h:) :: fgrnd1, focean1, flake1	! INOUT
 	if (replace_fgice) replace_fgice_b = 1
 
 	! Grab array descriptors
-	call get_spec_double_2(fgice1, i0h, j0h, fgice1_f)
 	call get_spec_double_2(fgice1_glint2, i0h, j0h, fgice1_glint2_f)
+	call get_spec_double_2(fgice1, i0h, j0h, fgice1_f)
 	call get_spec_double_2(fgrnd1, i0h, j0h, fgrnd1_f)
 	call get_spec_double_2(focean1, i0h, j0h, focean1_f)
 	call get_spec_double_2(flake1, i0h, j0h, flake1_f)
