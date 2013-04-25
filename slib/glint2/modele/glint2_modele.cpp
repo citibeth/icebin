@@ -329,8 +329,14 @@ printf("init_landice_com_part2 2\n");
 	fhc1h = 0;
 	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
 	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
+//		double fg1 = fgice1(i,j);
+//		double fg1g = fgice1_glint2(i,j);
+//
+//		if ((fg1 > 0) && (fg1 != fg1g)) {
 		if (fgice1(i,j) > 0) {
-			fhc1h(i,j,1) = 1.0d - fgice1_glint2(i,j) / fgice1(i,j);
+			double val = 1.0d - fgice1_glint2(i,j) / fgice1(i,j);
+			if (std::abs(val) < 1e-13) val = 0;
+			fhc1h(i,j,1) = val;
 		}
 	}}
 
