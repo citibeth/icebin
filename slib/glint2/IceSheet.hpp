@@ -19,6 +19,8 @@ protected:
 
 	MatrixMaker *gcm;
 
+	enum class Overlap {ICE, EXCH};
+
 public:
 	int index;
 
@@ -35,15 +37,39 @@ public:
 
 	// ============== Volatile / Compute Variables
 
-	/** The overlap matrix, derived from exgrid.
-	NOTE: This sparse matrix has its elements in the same order as in exgrid. */
-	std::unique_ptr<giss::VectorSparseMatrix> overlap_raw;	/// Overlap matrix between grid1 and grid2
+	// ---------------------------------------------------
+protected:
+	std::unique_ptr<giss::VectorSparseMatrix> _overlap13_m;
+	virtual void compute_overlap13_m();
 
-	/** Masked with mask1 and mask2. */
-	std::unique_ptr<giss::VectorSparseMatrix> overlap_m;
-
-	/** Multiply by this each ice timestep to compute SMB */
+public:
+	/** Overlap matrix between GCM (1) and exchange (3) grids.
+	Masked with mask1 and mask2. */
+	giss::VectorSparseMatrix &overlap13_m() {
+		if (!_overlap13_m.get()) compute_overlap13_m();
+		return *_overlap13_m;
+	}
+	// ---------------------------------------------------
+protected:
 	std::unique_ptr<giss::VectorSparseMatrix> _hp_to_ice;
+	virtual void compute_hp_to_ice() = 0;
+public:
+	/** Multiply by this each ice timestep to compute SMB. [nhc*n1] -> [n2] */
+	giss::VectorSparseMatrix &hp_to_ice() {
+		if (!_hp_to_ice.get()) compute_hp_to_ice();
+		return *_hp_to_ice;
+	}
+	// ---------------------------------------------------
+protected:
+	std::unique_ptr<giss::VectorSparseMatrix> _hp_to_exch;
+	virtual void compute_hp_to_exch() = 0;
+public:
+	/** Multiply by this each ice timestep to compute SMB. [nhc*n1] -> [n3] */
+	giss::VectorSparseMatrix &hp_to_exch() {
+		if (!_hp_to_exch.get()) compute_hp_to_exch();
+		return *_hp_to_exch;
+	}
+	// ---------------------------------------------------
 
 	// ===================================================
 
@@ -68,12 +94,7 @@ public:
 	/** Make matrix to go from
 		height points [nhc*n1] to ice grid [n2].
 	This is used on each ice timestep to generate SMB. */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> compute_hp_to_ice() = 0;
 
-	giss::VectorSparseMatrix &hp_to_ice() {
-		if (!_hp_to_ice.get()) _hp_to_ice = compute_hp_to_ice();
-		return *_hp_to_ice;
-	}
 
 protected:
 	/** Make matrix to go from
@@ -82,6 +103,14 @@ protected:
 	SMB for the atmosphere.  (It is later multiplied by FHC). */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc(
 		giss::SparseAccumulator<int,double> &area1_m_hc) = 0;
+
+	/** Make matrix to go from
+		ide grid [n2] to height classes [nhc*n1].
+	The matrix hp2ice * ice2hc is used every GCM timestep to generate
+	SMB for the atmosphere.  (It is later multiplied by FHC). */
+	virtual std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_atm(
+		giss::SparseAccumulator<int,double> &area1_m) = 0;
+
 public:
 
 	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;

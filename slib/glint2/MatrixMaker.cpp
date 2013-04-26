@@ -88,7 +88,7 @@ void MatrixMaker::compute_fgice(
 
 		// Local area1_m just for this ice sheet
 		giss::SparseAccumulator<int,double> larea1_m;
-		sheet->accum_areas(larea1_m, area1_m_hc);
+		sheet->accum_areas(larea1_m);
 
 		// Use the local area1_m to contribute to fgice1
 		giss::Proj2 proj;
@@ -108,42 +108,6 @@ void MatrixMaker::compute_fgice(
 
 	printf("END compute_fgice()\n");
 }
-
-/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
-void MatrixMaker::compute_fhc(
-	giss::CooVector<std::pair<int,int>,double> &fhc1h)	// std::pair<i1, hc>
-{
-
-	// Accumulate areas over all ice sheets
-	giss::SparseAccumulator<int,double> area1_m;
-	giss::SparseAccumulator<int,double> area1_m_hc;
-	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-		sheet->accum_areas(area1_m, area1_m_hc);
-	}
-
-	// Summing duplicates on area1_m and area1_m_hc not needed
-	// because the unordered_map sums them automatically.
-
-	// Compute fhc1h.  Unlike fgice1, this does NOT need to be done
-	// separately for each ice sheet.
-	fhc1h.clear();
-	HCIndex hc_index(n1());
-	for (auto ii = area1_m_hc.begin(); ii != area1_m_hc.end(); ++ii) {
-		int i1hc = ii->first;
-
-		// Separate out into grid cell and height class
-		int i1, hc;
-		hc_index.index_to_ik(i1hc, i1, hc);
-
-		fhc1h.add(std::make_pair(i1, hc), ii->second / area1_m[i1]);
-	}
-	fhc1h.sort();
-
-	printf("END compute_fhc()\n");
-}
-
-
-
 
 /** TODO: This doesn't account for spherical earth */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
@@ -189,35 +153,38 @@ printf("Done Writing hp2hc ret = %p\n", ret.get());
 	return ret;
 }
 // --------------------------------------------------------------
-/** @return fhpmat[i, (j, hp)]: the amount of area that the height
-           point hp of cell j contributes to cell i in height-class
-           space. */
-std::unique_ptr<giss::VectorSparseMatrix>  MatrixMaker::compute_fhpmat(
-	giss::VectorSparseMatrix const &hp_to_hc,
-	SparseAccumulator1hc const &fhc1h) const
-//	giss::SparseAccumulator<std::pair<int,int>, double> const &fhc1h) const
+/** TODO: This doesn't account for spherical earth */
+std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
 {
-	int const n1 = grid1->ndata();
-	std::unique_ptr<giss::VectorSparseMatrix> fhpmat(
-		new giss::VectorSparseMatrix(giss::SparseDescr(n1, n1*nhp())));
+	int n1 = grid1->ndata();
+	int nhp = nhp();
+	std::unique_ptr<giss::VectorSparseMatrix> ret(
+		new giss::VectorSparseMatrix(
+		giss::SparseDescr(n1, n1 * nhp)));
 
-	HCIndex hc_index(n1);
-	for (auto ii = hp_to_hc.begin(); ii != hp_to_hc.end(); ++ii) {
-		// Separate out into grid cell and height point / class
-		int i0, hp0;		// Columns (domain of linear transformation)
-		hc_index.index_to_ik(ii.col(), i0, hp0);
-		int i1, hc1;		// Rows (range)
-		hc_index.index_to_ik(ii.row(), i1, hc1);
+	// Compute the hp->ice and ice->hc transformations for each ice sheet
+	// and combine into one hp->hc matrix for all ice sheets.
+	giss::SparseAccumulator<int,double> area1_m;
+	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
+printf("***** sheet: %s\n", sheet->name.c_str());
+		giss::VectorSparseMatrix &hp_to_exch = sheet->hp_to_exch();
+		auto exch_to_atm(sheet->exch_to_atm(area1_m));
 
-		// See if there IS an fhc number for this
-		auto fhc_ptr(fhc1h.find(std::pair<int,int>(i1, hc1)));
-		if (fhc_ptr == fhc1h.end()) continue;
-
-		// Collapse down height classes, and multiply by fractional area of each
-		fhpmat->add(i1, ii.col(), ii.val() * fhc_ptr->second);
+		ret->append(*multiply(*exch_to_atm, hp_to_exch));
 	}
-	fhpmat->sum_duplicates(giss::SparseMatrix::SortOrder::ROW_MAJOR);
-	return fhpmat;
+
+	giss::SparseAccumulator<int,double> area1_m_inv;
+	divide_by(*ret, area1_m, area1_m_inv);
+printf("After divide_by: %ld %d\n", area1_m.size(), area1_m_inv.size());
+	ret->sum_duplicates();
+
+printf("Writing hp2atm ret = %p\n", ret.get());
+NcFile nc("hp2hc.nc", NcFile::Replace);
+ret->netcdf_define(nc, "hp2atm")();
+nc.close();
+printf("Done Writing hp2hc ret = %p\n", ret.get());
+
+	return ret;
 }
 // --------------------------------------------------------------
 

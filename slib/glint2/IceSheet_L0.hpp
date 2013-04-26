@@ -12,9 +12,6 @@ public:
 	long n1() const { return exgrid->grid1_ncells_full; }
 	long n2() const { return exgrid->grid2_ncells_full; }
 
-	/** Masked and then height classified */
-	std::unique_ptr<giss::VectorSparseMatrix> overlap_m_hc;
-
 	/** Uses: elev2, hpdefs, overlap */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> compute_hp_to_ice();
 

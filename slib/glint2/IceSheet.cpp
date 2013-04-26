@@ -49,40 +49,43 @@ void IceSheet::realize()
 			name.c_str(), elev2.extent(0), n2);
 		throw std::exception();
 	}
-
-
-	// Compute overlap matrix from exchange grid
-	overlap_raw.reset(new giss::VectorSparseMatrix(
-		giss::SparseDescr(exgrid->grid1_ncells_full, exgrid->grid2_ncells_full)));
-	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell)
-		overlap_raw->add(cell->i, cell->j, area_of_polygon(*cell));
-
-	// Mask out unused cells
-	// TODO: How will this work on L1 grids?  Is mask2 for vetices or just cells?
-	overlap_m = mask_out(
-		giss::BlitzSparseMatrix(*overlap_raw), gcm->mask1.get(), mask2.get());
 }
 
 // -----------------------------------------------------
-#if 0
-/** Adds to the set of ice-involved cells in grid1 */
-void IceSheet::accum_used(std::unordered_set<int> &used)
+void IceSheet::compute_overlap13_m()
 {
-	for (auto ii = overlap_m->begin(); ii != overlap_m->end(); ++ii) {
-		int i1 = ii.row();
-
-		if (ii.val() == 0) continue;
-#if 0
-	int lindex[domain.num_local_indices];
-		if (domain) {
-			domain->global_to_local(i1, lindex);
-			if (!domain->in_domain(lindex)) continue;
-		}
-#endif
-		used.insert(ii.row());
-	}
+	_overlap13_m = get_overlap_m(Overlap::EXCH);
 }
-#endif
+// -----------------------------------------------------
+std::unique_ptr<giss::VectorSparseMatrix> IceSheet::get_overlap_m(
+	Overlap overlap_type)
+{
+	int n1 = exgrid->grid1_ncells_full;
+	int n2 = exgrid->grid2_ncells_full;
+	int nx = (overlap_type == Overlap::ICE ? n2 : exgrid->ncells_full());
+
+	blitz::Array<int,1> const *mask1(gcm->mask1.get());
+	blitz::Array<int,1> const *mask2(mask2.get());
+
+	// Check consistency on array sizes
+	if (mask1) gassert(mask1->extent(0) == n1);
+	if (mask2) gassert(mask2->extent(0) == n2);
+
+	// Compute overlap matrix from exchange grid
+	std::unique_ptr<giss::VectorSparseMatrix> overlap_m(
+		new giss::VectorSparseMatrix(giss::SparseDescr(n1, nx)));
+	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
+		int i1 = cell->i;
+		int i2 = cell->j;
+		int ix = (overlap_type == Overlap::ICE ? i2 : cell->index);
+
+		if (mask1 && (*mask1)(i1)) continue;
+		if (mask2 && (*mask2)(i2)) continue;
+
+		overlap_m->add(i1, ix, area_of_polygon(*cell));
+	}
+	return overlap_m;
+}
 // -----------------------------------------------------
 /** Made for binding... */
 static bool in_good(std::unordered_set<int> const *set, int index_c)
