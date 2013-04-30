@@ -167,7 +167,7 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_ndata,
 		exvcache->add_vertex(excell, x, y);
 	}
 
-	// Compute its area
+	// Compute its area (we will need this)
 	excell.area = area_of_polygon(excell);
 
 	// Add it to the grid

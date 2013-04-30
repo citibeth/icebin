@@ -35,42 +35,6 @@ public:
 	/** Elevation of each cell (L0) or vertex (L1) in the ice model */
 	blitz::Array<double,1> elev2;	// [n2]
 
-	// ============== Volatile / Compute Variables
-
-	// ---------------------------------------------------
-protected:
-	std::unique_ptr<giss::VectorSparseMatrix> _overlap13_m;
-	virtual void compute_overlap13_m();
-
-public:
-	/** Overlap matrix between GCM (1) and exchange (3) grids.
-	Masked with mask1 and mask2. */
-	giss::VectorSparseMatrix &overlap13_m() {
-		if (!_overlap13_m.get()) compute_overlap13_m();
-		return *_overlap13_m;
-	}
-	// ---------------------------------------------------
-protected:
-	std::unique_ptr<giss::VectorSparseMatrix> _hp_to_ice;
-	virtual void compute_hp_to_ice() = 0;
-public:
-	/** Multiply by this each ice timestep to compute SMB. [nhc*n1] -> [n2] */
-	giss::VectorSparseMatrix &hp_to_ice() {
-		if (!_hp_to_ice.get()) compute_hp_to_ice();
-		return *_hp_to_ice;
-	}
-	// ---------------------------------------------------
-protected:
-	std::unique_ptr<giss::VectorSparseMatrix> _hp_to_exch;
-	virtual void compute_hp_to_exch() = 0;
-public:
-	/** Multiply by this each ice timestep to compute SMB. [nhc*n1] -> [n3] */
-	giss::VectorSparseMatrix &hp_to_exch() {
-		if (!_hp_to_exch.get()) compute_hp_to_exch();
-		return *_hp_to_exch;
-	}
-	// ---------------------------------------------------
-
 	// ===================================================
 
 	// -------------------------------------------
@@ -85,30 +49,18 @@ public:
 	virtual ~IceSheet();
 
 	// ------------------------------------------------
-//	virtual void accum_used(std::unordered_set<int> &used);
 
+	/** Adds up the (ice-covered) area of each GCM grid cell */
 	virtual void accum_areas(
-		giss::SparseAccumulator<int,double> &area1_m,
-		giss::SparseAccumulator<int,double> &area1_m_hc) = 0;
+		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
-	/** Make matrix to go from
-		height points [nhc*n1] to ice grid [n2].
-	This is used on each ice timestep to generate SMB. */
+	/** Computes matrix to go from height-point space [nhp * n1] to ice grid [n2] */
+	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice() = 0;
 
-
-protected:
-	/** Make matrix to go from
-		ide grid [n2] to height classes [nhc*n1].
-	The matrix hp2ice * ice2hc is used every GCM timestep to generate
-	SMB for the atmosphere.  (It is later multiplied by FHC). */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_hc(
-		giss::SparseAccumulator<int,double> &area1_m_hc) = 0;
-
-	/** Make matrix to go from
-		ide grid [n2] to height classes [nhc*n1].
-	The matrix hp2ice * ice2hc is used every GCM timestep to generate
-	SMB for the atmosphere.  (It is later multiplied by FHC). */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_atm(
+	/** Computes matrix to go from height-point space [nhp * n1] to atmosphere grid [n1]
+	@param area1_m IN/OUT: Area of each GCM cell covered by
+		(non-masked-out) ice sheet. */
+	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
 public:

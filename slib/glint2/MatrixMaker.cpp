@@ -55,29 +55,9 @@ printf("MatrixMaker: %p.sheetno = %d\n", &*sheet, sheet->index);
 	return index;
 }
 
-#if 0
-// NOT fully filtered.
-std::vector<int> MatrixMaker::get_used1()
-{
-	std::unordered_set<int> used;
-	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-//		sheet->accum_used(used, domain.get());
-		sheet->accum_used(used);
-	}
-
-	// Return sorted vector
-	std::vector<int> ret;
-	ret.reserve(used.size());
-	for (auto ii = used.begin(); ii != used.end(); ++ii) ret.push_back(*ii);
-	std::sort(ret.begin(), ret.end());
-
-	return ret;
-}
-#endif
-
-
+// --------------------------------------------------------------
 /** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
-void MatrixMaker::compute_fgice(
+void MatrixMaker::fgice(
 	giss::CooVector<int,double> &fgice1)
 {
 
@@ -87,13 +67,13 @@ void MatrixMaker::compute_fgice(
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 
 		// Local area1_m just for this ice sheet
-		giss::SparseAccumulator<int,double> larea1_m;
-		sheet->accum_areas(larea1_m);
+		giss::SparseAccumulator<int,double> area1_m;
+		sheet->accum_areas(area1_m);
 
 		// Use the local area1_m to contribute to fgice1
 		giss::Proj2 proj;
 		grid1->get_ll_to_xy(proj, sheet->grid2->sproj);
-		for (auto ii = larea1_m.begin(); ii != larea1_m.end(); ++ii) {
+		for (auto ii = area1_m.begin(); ii != area1_m.end(); ++ii) {
 			int const i1 = ii->first;
 			double ice_covered_area = ii->second;
 			Cell *cell = grid1->get_cell(i1);
@@ -109,49 +89,6 @@ void MatrixMaker::compute_fgice(
 	printf("END compute_fgice()\n");
 }
 
-/** TODO: This doesn't account for spherical earth */
-std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_hc()
-{
-	int n1_nhc = grid1->ndata() * nhc();
-	std::unique_ptr<giss::VectorSparseMatrix> ret(
-		new giss::VectorSparseMatrix(
-		giss::SparseDescr(n1_nhc, n1_nhc)));
-
-	// Compute the hp->ice and ice->hc transformations for each ice sheet
-	// and combine into one hp->hc matrix for all ice sheets.
-	giss::SparseAccumulator<int,double> area1_m_hc;
-	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-printf("***** sheet: %s\n", sheet->name.c_str());
-		giss::VectorSparseMatrix &hp_to_ice = sheet->hp_to_ice();
-		auto ice_to_hc(sheet->ice_to_hc(area1_m_hc));
-
-#if 0
-std::vector<boost::function<void ()>> fns;
-giss::SparseAccumulator<int,double> area1_m_hc_inv;
-NcFile nc("i2hc.nc", NcFile::Replace);
-divide_by(*ice_to_hc, area1_m_hc, area1_m_hc_inv);
-fns.push_back(hp_to_ice.netcdf_define(nc, "hp2i"));
-fns.push_back(ice_to_hc->netcdf_define(nc, "i2hc"));
-for (auto ii=fns.begin(); ii != fns.end(); ++ii) (*ii)();
-nc.close();
-#endif
-
-		ret->append(*multiply(*ice_to_hc, hp_to_ice));
-	}
-
-	giss::SparseAccumulator<int,double> area1_m_hc_inv;
-	divide_by(*ret, area1_m_hc, area1_m_hc_inv);
-printf("After divide_by: %ld %d\n", area1_m_hc.size(), area1_m_hc_inv.size());
-	ret->sum_duplicates();
-
-printf("Writing hp2hc ret = %p\n", ret.get());
-NcFile nc("hp2hc.nc", NcFile::Replace);
-ret->netcdf_define(nc, "hp2hc")();
-nc.close();
-printf("Done Writing hp2hc ret = %p\n", ret.get());
-
-	return ret;
-}
 // --------------------------------------------------------------
 /** TODO: This doesn't account for spherical earth */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
@@ -166,11 +103,7 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
 	// and combine into one hp->hc matrix for all ice sheets.
 	giss::SparseAccumulator<int,double> area1_m;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-printf("***** sheet: %s\n", sheet->name.c_str());
-		giss::VectorSparseMatrix &hp_to_exch = sheet->hp_to_exch();
-		auto exch_to_atm(sheet->exch_to_atm(area1_m));
-
-		ret->append(*multiply(*exch_to_atm, hp_to_exch));
+		ret->append(*sheet->hp_to_atm(area1_m));
 	}
 
 	giss::SparseAccumulator<int,double> area1_m_inv;
@@ -187,61 +120,6 @@ printf("Done Writing hp2hc ret = %p\n", ret.get());
 	return ret;
 }
 // --------------------------------------------------------------
-
-/** Computes the relative contribution of one height point to
-the total ice-covered area of a GCM cell, and the total area of a GCM cell,
-respectively.  These are APPROXIMATE, since ice grid cells that overlap other
-GCM cells are IGNORED.
-
-@param hp_to_hc MUST BE SORTED ROW_MAJOR!!!
-@return Indexed by (n1, nhc)
-*/
-giss::CooVector<std::pair<int,int>,double> MatrixMaker::compute_fhp_approx(
-	giss::VectorSparseMatrix const &hp_to_hc,
-	giss::VectorSparseMatrix const &fhpmat)
-{
-	giss::CooVector<std::pair<int,int>,double> fhp_approx;
-
-	HCIndex hc_index(n1());
-	auto rbegin(get_row_beginnings(fhpmat));
-
-	// For each row of matrix
-	for (int ri=0; ri<rbegin.size()-1; ++ri) {
-		double sum_row = 0;	
-		double sum_inrow = 0;
-
-		// Get sums of this row
-		for (int i=rbegin[ri]; i<rbegin[i+1]; ++i) {
-			int const row = hp_to_hc.rows()[i];
-			int const col = hp_to_hc.cols()[i];
-			double const val = hp_to_hc.vals()[i];
-
-			int i0, hp0;		// Columns (domain of linear transformation)
-			hc_index.index_to_ik(hp_to_hc.cols()[i], i0, hp0);
-			int const i1 = row;
-
-			sum_row += val;
-			if (i0 == i1) sum_inrow += val;
-		}
-
-		// Scale for portions of this row outside the gridcell
-		double scale_factor = sum_row / sum_inrow;
-		for (int i=rbegin[ri]; i<rbegin[i+1]; ++i) {
-			int const row = hp_to_hc.rows()[i];
-			int const col = hp_to_hc.cols()[i];
-			double const val = hp_to_hc.vals()[i];
-
-			int i0, hp0;		// Columns (domain of linear transformation)
-			hc_index.index_to_ik(hp_to_hc.cols()[i], i0, hp0);
-			int const i1 = row;
-
-			if (i0 == i1) fhp_approx.add(
-				std::make_pair(i0,hp0),   val * scale_factor);
-		}
-	}
-
-	return fhp_approx;
-}
 // --------------------------------------------------------------
 // --------------------------------------------------------------
 // ==============================================================

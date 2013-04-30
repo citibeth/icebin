@@ -5,10 +5,11 @@
 
 namespace glint2 {
 
+// -----------------------------------------------------
 IceSheet::IceSheet() : name("icesheet") {}
 
 IceSheet::~IceSheet() {}
-
+// -----------------------------------------------------
 void IceSheet::clear()
 {
 	grid2.reset();
@@ -18,7 +19,7 @@ void IceSheet::clear()
 	overlap_raw.reset();
 	overlap_m.reset();
 }
-
+// -----------------------------------------------------
 /** Call this after you've set data members, to finish construction. */
 void IceSheet::realize()
 {
@@ -50,42 +51,6 @@ void IceSheet::realize()
 		throw std::exception();
 	}
 }
-
-// -----------------------------------------------------
-void IceSheet::compute_overlap13_m()
-{
-	_overlap13_m = get_overlap_m(Overlap::EXCH);
-}
-// -----------------------------------------------------
-std::unique_ptr<giss::VectorSparseMatrix> IceSheet::get_overlap_m(
-	Overlap overlap_type)
-{
-	int n1 = exgrid->grid1_ncells_full;
-	int n2 = exgrid->grid2_ncells_full;
-	int nx = (overlap_type == Overlap::ICE ? n2 : exgrid->ncells_full());
-
-	blitz::Array<int,1> const *mask1(gcm->mask1.get());
-	blitz::Array<int,1> const *mask2(mask2.get());
-
-	// Check consistency on array sizes
-	if (mask1) gassert(mask1->extent(0) == n1);
-	if (mask2) gassert(mask2->extent(0) == n2);
-
-	// Compute overlap matrix from exchange grid
-	std::unique_ptr<giss::VectorSparseMatrix> overlap_m(
-		new giss::VectorSparseMatrix(giss::SparseDescr(n1, nx)));
-	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
-		int i1 = cell->i;
-		int i2 = cell->j;
-		int ix = (overlap_type == Overlap::ICE ? i2 : cell->index);
-
-		if (mask1 && (*mask1)(i1)) continue;
-		if (mask2 && (*mask2)(i2)) continue;
-
-		overlap_m->add(i1, ix, area_of_polygon(*cell));
-	}
-	return overlap_m;
-}
 // -----------------------------------------------------
 /** Made for binding... */
 static bool in_good(std::unordered_set<int> const *set, int index_c)
@@ -95,7 +60,6 @@ static bool in_good(std::unordered_set<int> const *set, int index_c)
 
 void IceSheet::filter_cells1(boost::function<bool (int)> const &include_cell1)
 {
-
 	// Remove unneeded cells from exgrid
 	// Figure out which cells in grid2 to keep
 	std::unordered_set<int> good_index2;

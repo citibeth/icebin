@@ -121,9 +121,9 @@ protected :
 public:
 
 	long ncells_full() const
-		{ return _ncells_full >= 0 ? _ncells_full : _max_realized_cell_index; }
+		{ return _ncells_full >= 0 ? _ncells_full : _max_realized_cell_index+1; }
 	long nvertices_full() const
-		{ return _nvertices_full >= 0 ? _nvertices_full : _max_realized_vertex_index; }
+		{ return _nvertices_full >= 0 ? _nvertices_full : _max_realized_vertex_index+1; }
 
 	/** Projection, if any, used to transform this grid from its
 	"native" form to the one it's currently in.
