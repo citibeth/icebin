@@ -58,10 +58,7 @@ public:
 	std::unique_ptr<blitz::Array<int,1>> mask1;
 
 	/** Position of height points in elevation space (same for all GCM grid cells) */
-	std::vector<double> hpdefs;	// [nhc]
-
-	/** Upper boundary of each height class (a, b] */
-	blitz::Array<double,1> hcmax;	// [nhc-1]
+	std::vector<double> hpdefs;	// [nhp]
 
 	// ------------------------------------------------------
 	void clear();
@@ -78,10 +75,6 @@ public:
 	IceSheet *operator[](std::string const &name)
 		{ return sheets[name]; }
 
-	/** @return The height class of the given point in gridcell #index1. */
-	int get_hc(int index1, double elev);
-
-	int nhc() const { return hpdefs.size(); }
 	int nhp() const { return hpdefs.size(); }
 	int n1() const { return grid1->ndata(); }
 
@@ -90,45 +83,9 @@ public:
 	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
 	Ice sheets cannot overlap each other (although their grids can, if we're
 	guaranteed that ice-filled grid cells will never overlap). */
-	void compute_fgice(
-		giss::CooVector<int,double> &fgice1);
+	void fgice(giss::CooVector<int,double> &fgice1);
 
-	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
-	Ice sheets cannot overlap each other (although their grids can, if we're
-	guaranteed that ice-filled grid cells will never overlap). */
-	void compute_fhc(
-		giss::CooVector<std::pair<int,int>,double> &fhc1h);	// std::pair<i1, hc>
-
-
-	std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc();
-
-	/** @return fhpmat[i, (j, hp)]: the amount of area that the height
-           point hp of cell j contributes to cell i in height-class
-           space. */
-	std::unique_ptr<giss::VectorSparseMatrix>  compute_fhpmat(
-		giss::VectorSparseMatrix const &hp_to_hc,
-		SparseAccumulator1hc const &fhc1h) const;
-//		giss::SparseAccumulator<std::pair<int,int>, double> const &fhc1h) const;
-
-	/** Computes the relative contribution of one height point to
-	the total ice-covered area of a GCM cell, and the total area of a GCM cell,
-	respectively.  These are APPROXIMATE, since ice grid cells that overlap other
-	GCM cells are IGNORED.
-
-	@param hp_to_hc MUST BE SORTED ROW_MAJOR!!!
-	@return Indexed by (n1, nhc)
-	*/
-	giss::CooVector<std::pair<int,int>,double> compute_fhp_approx(
-		giss::VectorSparseMatrix const &hp_to_hc,
-		giss::VectorSparseMatrix const &fhpmat);
-
-	size_t ice_matrices_size() {
-		size_t nele = 0;
-		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
-			nele += ii->hp_to_ice().size();
-		return nele;
-	}
-
+	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm();
 
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

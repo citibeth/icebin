@@ -232,6 +232,7 @@ void IJMatrixMaker::add_weights(
 	}
 }
 // =====================================================================
+#if 0
 /** We only really expect this to work for Greenland.  Don't worry
 about south pole in lon/lat coordinates and Antarctica.
 [n2 x (nhc * n1)] sparse matrix */
@@ -381,6 +382,7 @@ blitz::Array<bool,1> const &mask2)
 
 	return std::move(mmat.M);
 }
+#endif
 // =====================================================================
 
 

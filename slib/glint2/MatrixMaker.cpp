@@ -26,13 +26,6 @@ void MatrixMaker::realize() {
 		throw std::exception();
 	}
 
-	long nhc = hpdefs.size();
-	if (hcmax.extent(0) != nhc) {
-		fprintf(stderr, "hcmax for %s has wrong size: %d (vs %d expected)\n",
-			mask1->extent(0), n1);
-		throw std::exception();
-	}
-
 	// ------------- Realize the ice sheets
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet)
 		sheet->realize();
@@ -57,8 +50,7 @@ printf("MatrixMaker: %p.sheetno = %d\n", &*sheet, sheet->index);
 
 // --------------------------------------------------------------
 /** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
-void MatrixMaker::fgice(
-	giss::CooVector<int,double> &fgice1)
+void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
 {
 
 	// Accumulate areas over all ice sheets
@@ -94,10 +86,9 @@ void MatrixMaker::fgice(
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
 {
 	int n1 = grid1->ndata();
-	int nhp = nhp();
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
 		new giss::VectorSparseMatrix(
-		giss::SparseDescr(n1, n1 * nhp)));
+		giss::SparseDescr(n1, n1 * nhp())));
 
 	// Compute the hp->ice and ice->hc transformations for each ice sheet
 	// and combine into one hp->hc matrix for all ice sheets.
@@ -156,7 +147,6 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 	if (mask1.get())
 		fns.push_back(giss::netcdf_define(nc, vname + "mask1", *mask1));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hpdefs", hpdefs));
-	fns.push_back(giss::netcdf_define(nc, vname + ".hcmax", hcmax));
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 		fns.push_back(sheet->netcdf_define(nc, vname + "." + sheet->name));
 	}
@@ -213,7 +203,6 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 		giss::read_blitz<int,1>(nc, vname + ".mask1")));
 	}
 	hpdefs = giss::read_vector<double>(nc, vname + ".hpdefs");
-	hcmax.reference(giss::read_blitz<double,1>(nc, vname + ".hcmax"));
 
 	printf("MatrixMaker::read_from_netcdf(%s) 2\n", vname.c_str());
 

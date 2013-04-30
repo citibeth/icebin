@@ -16,12 +16,12 @@ public:
 protected:
 
 	/** Tells whether a cell in the exchange grid is masked out or not */
-	bool masked(HashDict<int, Cell>::iterator const &it)
-	bool masked(HashDict<int, Cell>::const_iterator const &it)
+	bool masked(giss::HashDict<int, Cell>::iterator const &it);
+	bool masked(giss::HashDict<int, Cell>::const_iterator const &it);
 
 	/** Builds an interpolation matrix to go from height points to ice/exchange grid.
 	@param overlap_type Controls matrix output to ice or exchange grid. */
-	std::unique_ptr<giss::VectorSparseMatrix> hp_interp(Overlap overlap_type)
+	std::unique_ptr<giss::VectorSparseMatrix> hp_interp(Overlap overlap_type);
 
 public:
 

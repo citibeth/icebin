@@ -16,8 +16,6 @@ void IceSheet::clear()
 	exgrid.reset();
 	mask2.reset();
 	// elev2.clear();	// Don't know how to do this!
-	overlap_raw.reset();
-	overlap_m.reset();
 }
 // -----------------------------------------------------
 /** Call this after you've set data members, to finish construction. */

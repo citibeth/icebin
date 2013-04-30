@@ -1,25 +1,6 @@
-module glint2_modele_types
-use f90blitz
-
-type glint2_modele_matrix
-	! k = height point/class dimension
-	integer, dimension(:), allocatable :: rows_i, rows_j, rows_k
-	integer, dimension(:), allocatable :: cols_i, cols_j, cols_k
-	real*8, dimension(:), allocatable :: vals
-end type glint2_modele_matrix
-
-type, bind(c) :: glint2_modele_matrix_f
-	type(arr_spec_1) :: rows_i_f, rows_j_f, rows_k_f	! int
-	type(arr_spec_1) :: cols_i_f, cols_j_f, cols_k_f	! int
-	type(arr_spec_1) :: vals_f							! double
-end type
-
-end module
-
 module glint2_modele
 use f90blitz
 use iso_c_binding
-use glint2_modele_types
 !use MpiSupport_mod
 implicit none
 
@@ -56,11 +37,11 @@ INTERFACE
 		type(c_ptr) :: api		! NOT VALUE here.
 	end subroutine
 
-	function glint2_modele_nhc(api) bind(c)
+	function glint2_modele_nhp(api) bind(c)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_nhc
+		integer(c_int) :: glint2_modele_nhp
 	end function
 
 	subroutine glint2_modele_compute_fgice_c(api, &
@@ -77,18 +58,11 @@ INTERFACE
 		type(arr_spec_2) :: flake1_f
 	end subroutine
 
-	function glint2_modele_init_landice_com_part1(api) bind(c)
-		use iso_c_binding
-		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_init_landice_com_part1
-	end function
-
-	subroutine glint2_modele_init_landice_com_part2(api, &
+	subroutine glint2_modele_init_landice_com_c(api, &
 		zatmo1_f, BYGRAV, fgice1_glint2_f, fgice1_f, &
-		used1h_f, fhc1h_f, elevhp_f, hp_to_hc_f, fhp_approx1h_f) bind(c)
+		used1h_f, fhc1h_f, elev1h_f, hp_to_hc_f, fhp_approx1h_f) bind(c)
 	use iso_c_binding
 	use f90blitz
-	use glint2_modele_types
 		type(c_ptr), value :: api
 		type(arr_spec_2) :: zatmo1_f
 		real*8, value :: BYGRAV
@@ -96,9 +70,7 @@ INTERFACE
 		type(arr_spec_2) :: fgice1_f
 		type(arr_spec_3) :: used1h_f
 		type(arr_spec_3) :: fhc1h_f
-		type(arr_spec_3) :: elevhp_f
-		type(glint2_modele_matrix_f) :: hp_to_hc_f
-		type(arr_spec_3) :: fhp_approx1h_f
+		type(arr_spec_3) :: elev1h_f
 	end subroutine
 
 	subroutine glint2_modele_couple_to_ice(api, smb1hp_f, seb1hp_f) bind(c)
@@ -151,7 +123,7 @@ end subroutine
 
 subroutine glint2_modele_init_landice_com(api, &
 	zatmo1, BYGRAV, fgice1_glint2, fgice1, &
-	used1h, fhc1h, elevhp, hp_to_hc, fhp_approx1h, &
+	used1h, fhc1h, elev1h, &
 	i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
@@ -160,45 +132,18 @@ real*8, INTENT(IN) :: BYGRAV
 real*8, dimension(i0h:,j0h:) :: fgice1_glint2, fgice1
 integer, dimension(i0h:,j0h:,:) :: used1h					! OUT
 real*8, dimension(i0h:,j0h:,:) :: fhc1h					! OUT
-real*8, dimension(i0h:,j0h:,:) :: elevhp
-type(glint2_modele_matrix) :: hp_to_hc
-real*8, dimension(i0h:,j0h:,:) :: fhp_approx1h
-
+real*8, dimension(i0h:,j0h:,:) :: elev1h
 
 	integer :: n
 
 	! ------------------- local vars
-	type(glint2_modele_matrix_f) :: mat_f
 	type(arr_spec_2) :: zatmo1_f
 	type(arr_spec_2) :: fgice1_glint2_f, fgice1_f
 	type(arr_spec_3) :: used1h_f
 	type(arr_spec_3) :: fhc1h_f
-	type(arr_spec_3) :: elevhp_f
-	type(glint2_modele_matrix_f) :: hp_to_hc_f
-	type(arr_spec_3) :: fhp_approx1h_f
+	type(arr_spec_3) :: elev1h_f
 
 	! ------------------- subroutine body
-
-	! -------- Part 1: Figure out how big we must make the arrays
-	n = glint2_modele_init_landice_com_part1(api)
-
-	! -------- Allocate those arrays
-	allocate(hp_to_hc%rows_i(n))
-	allocate(hp_to_hc%rows_j(n))
-	allocate(hp_to_hc%rows_k(n))
-	allocate(hp_to_hc%cols_i(n))
-	allocate(hp_to_hc%cols_j(n))
-	allocate(hp_to_hc%cols_k(n))
-	allocate(hp_to_hc%vals(n))
-
-	! -------- Grab array descriptors from arrays we just allocated
-	call get_spec_int_1(hp_to_hc%rows_i, 1, hp_to_hc_f%rows_i_f)
-	call get_spec_int_1(hp_to_hc%rows_j, 1, hp_to_hc_f%rows_j_f)
-	call get_spec_int_1(hp_to_hc%rows_k, 1, hp_to_hc_f%rows_k_f)
-	call get_spec_int_1(hp_to_hc%cols_i, 1, hp_to_hc_f%cols_i_f)
-	call get_spec_int_1(hp_to_hc%cols_j, 1, hp_to_hc_f%cols_j_f)
-	call get_spec_int_1(hp_to_hc%cols_k, 1, hp_to_hc_f%cols_k_f)
-	call get_spec_double_1(hp_to_hc%vals, 1, hp_to_hc_f%vals_f)
 
 
 	! Grab array descriptors
@@ -207,13 +152,12 @@ real*8, dimension(i0h:,j0h:,:) :: fhp_approx1h
 	call get_spec_double_2(fgice1, i0h, j0h, fgice1_f)
 	call get_spec_int_3(used1h, i0h, j0h, 1, used1h_f)
 	call get_spec_double_3(fhc1h, i0h, j0h, 1, fhc1h_f)
-	call get_spec_double_3(elevhp, i0h, j0h, 1, elevhp_f)
-	call get_spec_double_3(fhp_approx1h, i0h, j0h, 1, fhp_approx1h_f)
+	call get_spec_double_3(elev1h, i0h, j0h, 1, elev1h_f)
 
 	! Call the C-side of the interface
 	call glint2_modele_init_landice_com_part2(api, &
 		zatmo1_f, BYGRAV, fgice1_glint2_f, fgice1_f, &
-		used1h_f, fhc1h_f, elevhp_f, hp_to_hc_f, fhp_approx1h_f)
+		used1h_f, fhc1h_f, elev1h_f)
 
 print *,'END glint2_modele_init_landice_com()'
 end subroutine

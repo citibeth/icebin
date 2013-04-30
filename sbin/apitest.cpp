@@ -89,19 +89,19 @@ int main(int argc, char **argv)
 		// int comm_f, int root;
 		MPI_Comm_c2f(comm), 0);
 
-	int nhc = api->maker->nhc();
+	int nhp = api->maker->nhp();
 
 	auto used1h = blitz::Array<int,3>(
 		blitz::Range(1,im),
 		blitz::Range(1,jm),
-		blitz::Range(1,nhc),
+		blitz::Range(1,nhp),
 		blitz::fortranArray);
 	giss::F90Array<int,3> used1h_f(used1h);
 
 	auto fhc1h = blitz::Array<double,3>(
 		blitz::Range(1,im),
 		blitz::Range(1,jm),
-		blitz::Range(1,nhc),
+		blitz::Range(1,nhp),
 		blitz::fortranArray);
 	giss::F90Array<double,3> fhc1h_f(fhc1h);
 
@@ -150,21 +150,16 @@ int main(int argc, char **argv)
 
 	// ----------------------------------------------------------
 	// Try the HP-to-HC matrix
-	int n = glint2_modele_init_landice_com_part1(api);
-
-	modele::glint2_modele_matrix hp_to_hc(n);
-	glint2_modele_matrix_f hp_to_hc_f(hp_to_hc);
-
 	blitz::Array<double,3> elevhc(
 		blitz::Range(1,im),
 		blitz::Range(1,jm),
-		blitz::Range(1,nhc),
+		blitz::Range(1,nhp),
 		blitz::fortranArray);
 	giss::F90Array<double, 3> elevhc_f(elevhc);
 	blitz::Array<double,3> fhp_approx1h(
 		blitz::Range(1,im),
 		blitz::Range(1,jm),
-		blitz::Range(1,nhc),
+		blitz::Range(1,nhp),
 		blitz::fortranArray);
 	giss::F90Array<double, 3> fhp_approx1h_f(fhp_approx1h);
 
@@ -176,9 +171,9 @@ int main(int argc, char **argv)
 
 	zatmo1 = 0;
 
-	glint2_modele_init_landice_com_part2(api,
+	glint2_modele_init_landice_com_c(api,
 		zatmo1_f, 1.0, fgice1_glint2_f, fgice1_f,
-		used1h_f, fhc1h_f, elevhc_f, hp_to_hc_f, fhp_approx1h_f);
+		used1h_f, fhc1h_f, elevhc_f);
 
 	// ----------------------------------------------------------
 	// Save it to a netCDF file so we can tell if it's correct
@@ -190,13 +185,13 @@ int main(int argc, char **argv)
 	std::vector<boost::function<void ()>> fns;
 	NcDim *im_dim = ncout.add_dim("im", im);
 	NcDim *jm_dim = ncout.add_dim("jm", jm);
-	NcDim *nhc_dim = ncout.add_dim("nhc", nhc);
+	NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
 
 	auto used1h_c(used1h.transpose(1,0));	// Re-order dimensions for netCDF standard
-	fns.push_back(giss::netcdf_define(ncout, "used1h", used1h_c, {nhc_dim, jm_dim, im_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "used1h", used1h_c, {nhp_dim, jm_dim, im_dim}));
 
 	auto fhc1h_c(fhc1h.transpose(2,1,0));	// Re-order dimensions for netCDF standard
-	fns.push_back(giss::netcdf_define(ncout, "fhc1h", fhc1h_c, {nhc_dim, jm_dim, im_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "fhc1h", fhc1h_c, {nhp_dim, jm_dim, im_dim}));
 
 	auto fgice1_c(fgice1.transpose(1,0));
 	fns.push_back(giss::netcdf_define(ncout, "fgice1", fgice1_c, {jm_dim, im_dim}));
@@ -254,26 +249,6 @@ int main(int argc, char **argv)
 
 
 	// --------------------------------------------------------
-
-	// Write it out
-//	NcFile hphcnc("hphc.nc", NcFile::Replace);
-
-//	std::vector<boost::function<void ()>> fns2;
-	NcDim *n_dim = ncout.add_dim("n_hphc", n);
-
-	fns.push_back(giss::netcdf_define(ncout, "rows_i", hp_to_hc.rows_i, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "rows_j", hp_to_hc.rows_j, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "rows_k", hp_to_hc.rows_k, {n_dim}));
-
-	fns.push_back(giss::netcdf_define(ncout, "cols_i", hp_to_hc.cols_i, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "cols_j", hp_to_hc.cols_j, {n_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "cols_k", hp_to_hc.cols_k, {n_dim}));
-
-	fns.push_back(giss::netcdf_define(ncout, "vals", hp_to_hc.vals, {n_dim}));
-
-//	for (auto ii = fns2.begin(); ii != fns2.end(); ++ii) (*ii)();
-
-//	hphcnc.close();
 
 	// --------------------------------------------------------
 	// Write it out

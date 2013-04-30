@@ -54,8 +54,6 @@ extern "C" glint2_modele *glint2_modele_new(
 	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
 	nc.close();
 
-
-
 	// TODO: Test that im and jm are consistent with the grid read.
 
 	printf("***** END glint2_modele()\n");
@@ -71,13 +69,13 @@ extern "C" void glint2_modele_delete(glint2_modele *&api)
 }
 // -----------------------------------------------------
 extern "C"
-int glint2_modele_nhc(glint2_modele *api)
+int glint2_modele_nhp(glint2_modele *api)
 {
-	int ret = api->maker->nhc();
+	int ret = api->maker->nhp();
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
     // (not part of GLINT2)
 	ret += 1;
-	printf("glint2_modele_nhc() returning %d\n", ret);
+	printf("glint2_modele_nhp() returning %d\n", ret);
 	return ret;
 }
 // -----------------------------------------------------
@@ -123,7 +121,7 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 	// Get the sparse vector values
 	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
 	giss::CooVector<int,double> fgice1_s;
-	api->maker->compute_fgice(fgice1_s);
+	api->maker->fgice(fgice1_s);
 
 	// Translate the sparse vectors to the ModelE data structures
 	std::vector<std::tuple<int, int, double>> fgice1_vals;
@@ -195,62 +193,6 @@ nc.close();
 printf("END glint2_modele_compute_fgice_c()\n");
 }
 // -----------------------------------------------------
-static std::unique_ptr<giss::VectorSparseMatrix> filter_matrix_hp(
-	HCIndex const &hc_index,
-	GridDomain const &domain1,
-	GridDomain const &domain2,
-	giss::VectorSparseMatrix const &mat)
-{
-	std::unique_ptr<giss::VectorSparseMatrix> ret(
-		new giss::VectorSparseMatrix((giss::SparseDescr)mat));
-
-	int lindex1[domain1.num_local_indices];
-	int lindex2[domain2.num_local_indices];
-	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
-
-		// Output of linear transformation: Only include
-		// if it's part of our domain.
-		int hc1, i1;
-		hc_index.index_to_ik(ii.row(), i1, hc1);
-		domain1.global_to_local(i1, lindex1);
-		if (!domain1.in_domain(lindex1)) {
-//printf("Throwing out of domain: %d %d\n", lindex1[0], lindex1[1]);
-			continue;
-		}
-
-		// Input of linear transformation: must be in halo
-		int hc2, i2;
-		hc_index.index_to_ik(ii.col(), i2, hc2);
-		domain2.global_to_local(i2, lindex2);
-		if (!domain2.in_halo(lindex2)) {
-			fprintf(stderr, "Error filtering matrix: grid cell %d (", ii.col());
-			for (int i=0; i<domain2.num_local_indices; ++i) fprintf(stderr, "%d ", lindex2[i]);
-			fprintf(stderr, ") in input (column) is not available in the halo.\n");
-			throw std::exception();
-		}
-
-		ret->add(ii.row(), ii.col(), ii.val());
-	}
-
-printf("filter_matrix_hp went from size %ld to %ld\n", mat.size(), ret->size());
-	return ret;
-}
-
-
-
-/** Call this to figure out how to dimension arrays.
-@return Number of elements in the sparse matrix hp_to_hc */
-extern "C"
-int glint2_modele_init_landice_com_part1(glint2_modele *api)
-{
-	auto mat(api->maker->hp_to_hc());
-	HCIndex hc_index(api->maker->n1());
-	api->hp_to_hc = filter_matrix_hp(hc_index, *api->domain, *api->domain, *mat);
-printf("Filtered matrix at %p (from %p)\n", api->hp_to_hc.get(), mat.get());
-	// api->hp_to_hc = std::move(mat);	// debugging
-	return api->hp_to_hc->size();
-}
-// -----------------------------------------------------
 static void global_to_local_hp(
 	glint2_modele *api,	
 	HCIndex const &hc_index,
@@ -278,47 +220,54 @@ printf("BEGIN global_to_local_hp %p %p %p %p\n", &grows[0], rows_i.data(), rows_
 printf("END global_to_local_hp\n");
 }
 // -----------------------------------------------------
+/**
+@param zatmo1_f ZATMO from ModelE (Elevation of bottom of atmosphere * GRAV)
+@param BYGRAV 1/GRAV = 1/(9.8 m/s^2)
+@param fgice1_glint2_f Amount of GLINT2-related ground ice in each GCM grid cell
+@param fgice1_f Total amount of ground ice in each GCM grid cell
+@param used1h_f Height point mask
+@param fhc1h_f Weights to average height points into GCM grid.
+@param elev1h_f Elevation of each height point
+*/
 extern "C"
-void glint2_modele_init_landice_com_part2(glint2_modele *api,
+void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &zatmo1_f,	// IN
 	double const BYGRAV,					// IN
 	giss::F90Array<double, 2> &fgice1_glint2_f,	// IN
 	giss::F90Array<double, 2> &fgice1_f,	// IN
-	giss::F90Array<int,3> &used1hp_f,		// IN/OUT
-	giss::F90Array<double, 3> &fhc1h_f,		// IN/OUT
-	giss::F90Array<double, 3> &elev1hp_f,	// IN/OUT
-	glint2::modele::glint2_modele_matrix_f &hp_to_hc_f,				// OUT
-	giss::F90Array<double, 3> &fhp_approx1h_f)		// OUT
+	giss::F90Array<int,3> &used1h_f,		// IN/OUT
+	giss::F90Array<double, 3> &fhc1h_f,		// OUT: hp-to-atmosphere
+	giss::F90Array<double, 3> &elev1h_f)	// IN/OUT
 {
 printf("init_landice_com_part2 1\n");
 
-	// =================== elev1hp
+	// =================== elev1h
 	// Just copy out of hpdefs array, elevation points are the same
 	// on all grid cells.
 
-	auto elev1hp(elev1hp_f.to_blitz());
-	int nhc = api->maker->nhc() + 1;	// Add non-model HP
-	if (nhc != elev1hp.extent(2)) {
-		fprintf(stderr, "glint2_modele_get_elev1hp: Inconsistent nhc (%d vs %d)\n", elev1hp.extent(2), nhc);
+	auto elev1h(elev1h_f.to_blitz());
+	int nhp = api->maker->nhp() + 1;	// Add non-model HP
+	if (nhp != elev1h.extent(2)) {
+		fprintf(stderr, "glint2_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp);
 		throw std::exception();
 	}
 
-	// Copy 1-D height point definitions to elev1hp
-	for (int k=0; k < nhc; ++k) {
+	// Copy 1-D height point definitions to elev1h
+	for (int k=0; k < nhp; ++k) {
 		double val = api->maker->hpdefs[k];
-		for (int j=elev1hp.lbound(1); j <= elev1hp.ubound(1); ++j) {
-		for (int i=elev1hp.lbound(0); i <= elev1hp.ubound(0); ++i) {
+		for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
+		for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {
 			// +1 for C-to-Fortran conversion
 			// +1 because lowest HP/HC is reserved
-			elev1hp(i,j,k+2) = val;
+			elev1h(i,j,k+2) = val;
 		}}
 	}
 
 	// Copy zatmo to elevation of reserved height point
 	auto zatmo1(zatmo1_f.to_blitz());
-	for (int j=elev1hp.lbound(1); j <= elev1hp.ubound(1); ++j) {
-	for (int i=elev1hp.lbound(0); i <= elev1hp.ubound(0); ++i) {
-		elev1hp(i,j,1) = zatmo1(i,j) * BYGRAV;
+	for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
+	for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {
+		elev1h(i,j,1) = zatmo1(i,j) * BYGRAV;
 	}}
 
 printf("init_landice_com_part2 2\n");
@@ -342,40 +291,40 @@ printf("init_landice_com_part2 2\n");
 
 printf("init_landice_com_part2 3\n");
 	// ======================= fhc(:,:,hp>1)
+	HCIndex hc_index(api->maker->n1());
+	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->maker->hp_to_atm());
 	ModelEDomain &domain(*api->domain);
 
-	// Reconstruct arrays, using Fortran conventions
-	// (smallest stride first, whatever-based indexing it came with)
+	// Filter this array, and convert to fhc format
+	for (auto ii = hp_to_atm->begin(); ii != hp_to_atm->end(); ++ii) {
+		int lindex1a[domain.num_local_indices];
 
-	// Get the sparse vector values
-	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
-	api->maker->compute_fhc(fhc1h_s);
-
-	// ----- Filter fhc1h, and re-index to (i, j, hc) indexing
-	std::vector<std::tuple<int, int, int, double>> fhc1h_vals;
-	for (auto ii = fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii) {
-		int i1 = ii->first.first;
-		int hc = ii->first.second;		// zero-based
-		double val = ii->second;
-
-		// Filter out things not in our domain
-		// (we'll get the answer for our halo via a halo update)
-
-		// Convert to local (ModelE 2-D + height class) indexing convention
+		// Input: HP space
 		int lindex[domain.num_local_indices];
-		domain.global_to_local(i1, lindex);
+		int hp1b, i1b;
+		hc_index.index_to_ik(ii.col(), i1b, hp1b);
+		domain.global_to_local(i1b, lindex);
 		if (!domain.in_domain(lindex)) continue;
 
+		// Output: GCM grid
+		int i1a = ii.row();
+		if (i1a != i1b) {
+			fprintf(stderr, "HP2ATM matrix is non-local!\n");
+			throw std::exception();
+		}
+
+		// Now fill in FHC
 		// +1 for C-to-Fortran conversion
 		// +1 because lowest HP/HC is reserved for non-model ice
-		fhc1h(lindex[0], lindex[1], hc+2) +=
-			val * (1.0d - fhc1h(lindex[0], lindex[1],1));
+		fhc1h(lindex[0], lindex[1], hp1b+2) +=
+			ii.val() * (1.0d - fhc1h(lindex[0], lindex[1],1));
 	}
+	hp_to_atm.release();
 
 printf("init_landice_com_part2 4\n");
 	// ====================== used
-	auto used1hp(used1hp_f.to_blitz());
-	used1hp = 0;
+	auto used1h(used1h_f.to_blitz());
+	used1h = 0;
 
 	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
 	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
@@ -383,7 +332,7 @@ printf("init_landice_com_part2 4\n");
 		if (fgice1(i,j) == 0) continue;
 
 		// Set used for the legacy height point
-		used1hp(i,j,1) = (fhc1h(i,j,1) > 0 ? 1 : 0);
+		used1h(i,j,1) = (fhc1h(i,j,1) > 0 ? 1 : 0);
 
 		// Min & max height point used for each grid cell
 		int mink = std::numeric_limits<int>::max();
@@ -391,7 +340,7 @@ printf("init_landice_com_part2 4\n");
 
 		// Loop over HP's (but not the reserved ones) to find
 		// range of HP's used on this grid cell.
-		for (int k=2; k <= nhc; ++k) {
+		for (int k=2; k <= nhp; ++k) {
 			if (fhc1h(i,j,k) > 0) {
 				mink = std::min(mink, k);
 				maxk = std::max(maxk, k);
@@ -400,82 +349,47 @@ printf("init_landice_com_part2 4\n");
 
 		// Add a couple of HPs around it!
 		mink = std::max(2, mink-2);
-		maxk = std::min(nhc, maxk+2);
+		maxk = std::min(nhp, maxk+2);
 
 		// Set everything from mink to maxk as used
-		for (int k=mink; k<maxk; ++k) used1hp(i,j,k) = 1;
+		for (int k=mink; k<maxk; ++k) used1h(i,j,k) = 1;
 	}}
 
-printf("init_landice_com_part2 5\n");
-	// ======================= hp_to_hc (computed from part1)
-	glint2_modele_matrix hp_to_hc(hp_to_hc_f.to_blitz());
+	// ====================== hp_to_ices
+	api->hp_to_ices.clear();
+	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
 
-	// Array bounds checking not needed, it's done
-	// in lower-level subroutines that we call.
+		// Get matrix for HP2ICE
+		std::unique_ptr<giss::VectorSparseMatrix> imat(sheet->hp_to_ice());
+		if (imat->size() == 0) continue;
 
-	HCIndex hc_index(api->maker->n1());
+		// Convert to GCM coordinates
+		std::vector<hp_to_ice_rec> omat;
+		omat.reserve(imat->size());
+		for (auto ii=imat->begin(); ii != imat->end(); ++ii) {
+			// Get index in HP space
+			int lindex[domain.num_local_indices];
+			int hp1, i1;
+			hc_index.index_to_ik(ii.col(), i1, hp1);
+			domain.global_to_local(i1, lindex);
+			if (!domain.in_domain(lindex)) continue;
 
-printf("Translating matrix at %p\n", api->hp_to_hc.get());
-	// Translate rows and cols
-	global_to_local_hp(api, hc_index, api->hp_to_hc->rows(),"rows",
-		hp_to_hc.rows_i,
-		hp_to_hc.rows_j,
-		hp_to_hc.rows_k);
-printf("Translating: Done With Rows!\n");
+			// Write to output matrix
+			// +1 for C-to-Fortran conversion
+			// +1 because lowest HP/HC is reserved for non-model ice
+			omat.push_back(hp_to_ice_rec(
+				ii.row(),
+				lindex[0], lindex[1], hp1+2,
+				ii.val()));
+		}
 
-	global_to_local_hp(api, hc_index, api->hp_to_hc->cols(),"cols",
-		hp_to_hc.cols_i,
-		hp_to_hc.cols_j,
-		hp_to_hc.cols_k);
-
-	// Copy the values, just a simple vector copy
-	std::vector<double> const &mvals(api->hp_to_hc->vals());
-	for (int i=0; i<mvals.size(); ++i) hp_to_hc.vals(i+1) = mvals[i];
-
-	// Do not add identity matrix (for hp=1) to this matrix
-	// Instead, manually copy hp=1 in the subroutine that
-	// applies the matrix.  (See HP2HC.F90 in ModelE source)
-
-printf("init_landice_com_part2 6\n");
-	// ======================= fhp_approx
-printf("BEGIN fhp_approx...\n");
-//	giss::SparseAccumulator<std::pair<int,int>,double> fhc1h_a;
-	glint2::SparseAccumulator1hc fhc1h_a;
-	for (auto ii=fhc1h_s.begin(); ii != fhc1h_s.end(); ++ii)
-		fhc1h_a.add(ii->first, ii->second);
-
-	auto fhpmat(api->maker->compute_fhpmat(*api->hp_to_hc, fhc1h_a));
-	// giss::CooVector<std::pair<int,int>,double> fhp_approx
-	auto fhp_approx_s(api->maker->compute_fhp_approx(*api->hp_to_hc, *fhpmat));
-
-	// Store into Fortran arrays
-	auto fhp_approx1h(fhp_approx1h_f.to_blitz());
-	fhp_approx1h = 0;		// Clear full array
-	for (auto ii=fhp_approx_s.begin(); ii != fhp_approx_s.end(); ++ii) {
-		int i1 = ii->first.first;
-		int ihc = ii->first.second;
-		double val = ii->second;
-
-		int lindex[domain.num_local_indices];
-		domain.global_to_local(i1, lindex);
-		if (!domain.in_domain(lindex)) continue;
-
-		// +1 for C-to-Fortran conversion
-		// +1 because lowest HP/HC is reserved
-		fhp_approx1h(lindex[0], lindex[1], ihc+2) = val
-			* (1.0d - fhc1h(lindex[0], lindex[1],1));
+		// Store away
+		api->hp_to_ices[sheet->index] = std::move(omat);
 	}
 
-	// Copy FHC to FHP for non-model ice
-	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
-	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
-		fhp_approx1h(i,j,1) = fhc1h(i,j,1);
-	}}
 
-printf("END fhp_approx...\n");
-printf("init_landice_com_part2 7\n");
-	// ======================= Free temporary storage
-	api->hp_to_hc.reset();
+printf("init_landice_com_part2 5\n");
+
 printf("END glint2_modele_init_landice_com_part2\n");
 }
 // -----------------------------------------------------
@@ -484,20 +398,23 @@ printf("END glint2_modele_init_landice_com_part2\n");
 extern "C"
 void glint2_modele_couple_to_ice(
 glint2_modele *api,
-giss::F90Array<double,3> &smb1hp_f,
-giss::F90Array<double,3> &seb1hp_f)
+giss::F90Array<double,3> &smb1h_f,
+giss::F90Array<double,3> &seb1h_f)
 {
 	std::vector<IceField> fields =
 		{IceField::MASS_FLUX, IceField::ENERGY_FLUX};
 //	std::vector<blitz::Array<double,3>> vals1hp =
-//		{smb1hp_f.to_blitz(), seb1hp_f.to_blitz()};
+//		{smb1h_f.to_blitz(), seb1h_f.to_blitz()};
 
-	auto smb1hp(smb1hp_f.to_blitz());
-	auto seb1hp(seb1hp_f.to_blitz());
+	auto smb1h(smb1h_f.to_blitz());
+	auto seb1h(seb1h_f.to_blitz());
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
-	int nele_l = api->maker->ice_matrices_size();
+	int nele_l = 0; //api->maker->ice_matrices_size();
+	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
+		nele_l += ii->second.size();
+	}
 
 	// Allocate buffer for that amount of stuff
 	int nfields = fields.size();
@@ -507,32 +424,25 @@ giss::F90Array<double,3> &seb1hp_f)
 	// (while translating indices to local coordinates)
 	HCIndex hc_index(api->maker->n1());
 	int nmsg = 0;
-	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
-		int sheetno = sheet->index;
-//printf("glint2_modele: %p.sheetno = %d\n", &*sheet, sheetno);
-		giss::VectorSparseMatrix &mat(sheet->hp_to_ice());
+	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
+		int sheetno = ii->first;
+		std::vector<hp_to_ice_rec> &mat(ii->second);
 
 		// Skip if we have nothing to do for this ice sheet
 		if (mat.size() == 0) continue;
 
 		// Do the multiplication
-		for (auto ii=mat.begin(); ii != mat.end(); ++ii) {
+		for (int j=0; j < mat.size(); ++j) {
+			hp_to_ice_rec &jj(mat[j]);
+
 			SMBMsg &msg = sbuf[nmsg];
 			msg.sheetno = sheetno;
-			msg.i2 = ii.row();
+			msg.i2 = jj.row;
 
-			int i1, ihc;
-			hc_index.index_to_ik(ii.col(), i1, ihc);
-			int lindex[api->domain->num_local_indices];
-			api->domain->global_to_local(i1, lindex);
-			if (!api->domain->in_domain(lindex)) {
-				fprintf(stderr, "glint2_modele_couple_to_ice(): Index not in domain: %d -> (%d, %d)\n", i1, lindex[0], lindex[1]);
-				throw std::exception();
-			}
+			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
+			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
 
-			msg[0] = ii.val() * smb1hp(lindex[0], lindex[1], ihc+1);
-			msg[1] = ii.val() * seb1hp(lindex[0], lindex[1], ihc+1);
-//printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1hp(lindex[0], lindex[1], ihc+1), seb1hp(lindex[0], lindex[1], ihc+1));
+//printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1h(lindex[0], lindex[1], ihc+1), seb1h(lindex[0], lindex[1], ihc+1));
 
 			++nmsg;
 		}

@@ -7,14 +7,14 @@ namespace glint2 {
 
 // --------------------------------------------------------
 /** Tells whether a cell in the exchange grid is masked out or not */
-bool IceSheet_L0::masked(HashDict<int, Cell>::iterator const &it)
+bool IceSheet_L0::masked(giss::HashDict<int, Cell>::iterator const &it)
 {
 	if (gcm->mask1.get() && (*gcm->mask1)(it->i)) return true;
 	if (mask2.get() && (*mask2)(it->j)) return true;
 	return false;
 }
 /** Tells whether a cell in the exchange grid is masked out or not */
-bool IceSheet_L0::masked(HashDict<int, Cell>::const_iterator const &it)
+bool IceSheet_L0::masked(giss::HashDict<int, Cell>::const_iterator const &it)
 {
 	if (gcm->mask1.get() && (*gcm->mask1)(it->i)) return true;
 	if (mask2.get() && (*mask2)(it->j)) return true;
@@ -53,7 +53,6 @@ static void linterp_1d(
 std::unique_ptr<giss::VectorSparseMatrix> 
 IceSheet_L0::hp_interp(Overlap overlap_type)
 {
-	int nhc = gcm->hpdefs.size();
 	int nx = (overlap_type == Overlap::ICE ? n2() : n3());
 
 	// Sum overlap matrix by column (ice grid cell)
@@ -65,7 +64,7 @@ IceSheet_L0::hp_interp(Overlap overlap_type)
 
 	HCIndex hc_index(n1());
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
-		giss::SparseDescr(nx, nhp * n1())));
+		giss::SparseDescr(nx, gcm->nhp() * n1())));
 
 	// Interpolate in the vertical
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
@@ -105,13 +104,13 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_atm(
 {
 	// ============= hp_to_exch
 	// Interpolate (for now) in height points but not X/Y
-	auto hp_to_ice(hp_interp(Overlap::EXCH));
+	auto hp_to_exch(hp_interp(Overlap::EXCH));
 
 	// ============= exch_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to GCM grid is equal
 	// to scaled version of overlap matrix.
 	std::unique_ptr<giss::VectorSparseMatrix> exch_to_atm(
-		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n3()));
+		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n3())));
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
 		if (masked(cell)) continue;
 
@@ -134,9 +133,8 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_atm(
 void IceSheet_L0::accum_areas(
 giss::SparseAccumulator<int,double> &area1_m)
 {
-printf("BEGIN accum_area(%s) %p\n", name.c_str(), overlap_m_hc.get());
+printf("BEGIN accum_area(%s)\n", name.c_str());
 
-	ExGridMasker masked(gcm->mask1.get(), mask2.get());
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
 		if (masked(cell)) continue;
 

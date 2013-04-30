@@ -89,9 +89,6 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 			giss::py_to_blitz<int,1>(mask1_py, "mask1", {n1})));
 
 		maker->hpdefs = giss::py_to_vector<double>(hpdefs_py, "hpdefs", -1);
-		int nhc = maker->hpdefs.size();
-
-		maker->hcmax.reference(giss::py_to_blitz<double,1>(hcmax_py, "hcmax", {nhc}));
 
 		// Move it to Python MatrixMaker object.
 		self->init(std::move(maker));

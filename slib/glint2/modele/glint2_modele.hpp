@@ -11,50 +11,18 @@ namespace glint2 {
 namespace modele {
 
 
-struct glint2_modele_matrix {
-	blitz::Array<int, 1> rows_i, rows_j, rows_k;
-	blitz::Array<int, 1> cols_i, cols_j, cols_k;
-	blitz::Array<double, 1> vals;
+// ------------------------------------------------------
+/** Make a sparse matrix with a vector of theses. */
+struct hp_to_ice_rec {
+	int row;
+	int col_i, col_j, col_k;
+	double val;
 
-	glint2_modele_matrix() {}
-
-	explicit glint2_modele_matrix(int n) :
-		rows_i(blitz::Range(1,n)), rows_j(blitz::Range(1,n)), rows_k(blitz::Range(1,n)),
-		cols_i(blitz::Range(1,n)), cols_j(blitz::Range(1,n)), cols_k(blitz::Range(1,n)),
-		vals(blitz::Range(1,n)) {}
-
-
-//	explicit glint2_modele_matrix(glint2_modele_matrix_f const &f);
-};
-
-
-struct glint2_modele_matrix_f {
-	giss::F90Array<int, 1> rows_i_f;
-	giss::F90Array<int, 1> rows_j_f;
-	giss::F90Array<int, 1> rows_k_f;
-	giss::F90Array<int, 1> cols_i_f;
-	giss::F90Array<int, 1> cols_j_f;
-	giss::F90Array<int, 1> cols_k_f;
-	giss::F90Array<double, 1> vals_f;
-
-	explicit glint2_modele_matrix_f(glint2_modele_matrix &mat) :
-		rows_i_f(mat.rows_i), rows_j_f(mat.rows_j), rows_k_f(mat.rows_k),
-		cols_i_f(mat.cols_i), cols_j_f(mat.cols_j), cols_k_f(mat.cols_k),
-		vals_f(mat.vals) {}
-
-	glint2_modele_matrix to_blitz() {
-		glint2_modele_matrix mat;
-		mat.rows_i.reference(rows_i_f.to_blitz());
-		mat.rows_j.reference(rows_j_f.to_blitz());
-		mat.rows_k.reference(rows_k_f.to_blitz());
-		mat.cols_i.reference(cols_i_f.to_blitz());
-		mat.cols_j.reference(cols_j_f.to_blitz());
-		mat.cols_k.reference(cols_k_f.to_blitz());
-		mat.vals.reference(vals_f.to_blitz());
-		return mat;
-	}
+	hp_to_ice_rec(int _row, int _col_i, int _col_j, int _col_k, double _val) :
+		row(_row), col_i(_col_i), col_j(_col_j), col_k(_col_k), val(_val) {}
 
 };
+// ------------------------------------------------------
 
 struct glint2_modele {
 	std::unique_ptr<MatrixMaker> maker;
@@ -62,10 +30,8 @@ struct glint2_modele {
 
 	std::unique_ptr<GCMCoupler_MPI> gcm_coupler;
 
-	// Temporary, until we return the matrix back to the GCM
-	std::unique_ptr<giss::VectorSparseMatrix> hp_to_hc;
+	std::map<int, std::vector<hp_to_ice_rec>> hp_to_ices;
 
-	// Permanent, used to compute ice sheet SMB
 };
 }}	// namespace glint2::modele
 // ================================================
@@ -97,19 +63,14 @@ void glint2_modele_compute_fgice_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &flake1_f);
 
 extern "C"
-int glint2_modele_init_landice_com_part1(glint2::modele::glint2_modele *api);
-
-extern "C"
-void glint2_modele_init_landice_com_part2(glint2::modele::glint2_modele *api,
+void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &zatmo1_f,	// IN
 	double const BYGRAV,					// IN
 	giss::F90Array<double, 2> &fgice1_glint2_f,	// IN
 	giss::F90Array<double, 2> &fgice1_f,	// IN
-	giss::F90Array<int,3> &used1h_f,					// IN/OUT
-	giss::F90Array<double, 3> &fhc1h_f,				// IN/OUT
-	giss::F90Array<double, 3> &elevhc_f,			// IN/OUT
-	glint2::modele::glint2_modele_matrix_f &hp_to_hc_f,				// OUT
-	giss::F90Array<double, 3> &fhp_approx1h_f);		// OUT
+	giss::F90Array<int,3> &used1h_f,		// IN/OUT
+	giss::F90Array<double, 3> &fhc1h_f,		// OUT: hp-to-atmosphere
+	giss::F90Array<double, 3> &elev1h_f);	// IN/OUT
 
 extern "C"
 void glint2_modele_couple_to_ice(
