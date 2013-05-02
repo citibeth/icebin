@@ -74,14 +74,15 @@ IceSheet_L0::hp_interp(Overlap overlap_type)
 		int i2 = cell->j;
 		int ix = (overlap_type == Overlap::ICE ? i2 : cell->index);
 
-		double overlap_ratio = cell->area / area2[i2];
+		double overlap_ratio =
+			(overlap_type == Overlap::ICE ? cell->area / area2[i2] : 1.0);
 		double elevation = std::max(elev2(i2), 0.0);
 
 		// Interpolate in height points
 		int ihps[2];
 		double whps[2];	
 		linterp_1d(gcm->hpdefs, elevation, ihps, whps);
-//		printf("%d %f %f (%d : %f), (%d : %f)\n", i2, elev2(i2), overlap_ratio, ihps[0], whps[0], ihps[1], whps[1]);
+//printf("LINTERP %d %f %f (%d : %f), (%d : %f)\n", i2, elev2(i2), overlap_ratio, ihps[0], whps[0], ihps[1], whps[1]);
 		ret->add(ix, hc_index.ik_to_index(i1, ihps[0]),
 			overlap_ratio * whps[0]);
 		ret->add(ix, hc_index.ik_to_index(i1, ihps[1]),
@@ -102,9 +103,18 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_ice()
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_atm(
 	giss::SparseAccumulator<int,double> &area1_m)
 {
+printf("BEGIN IceSheet_L0::hp_to_atm %ld %ld\n", n1(), n3());
+
 	// ============= hp_to_exch
 	// Interpolate (for now) in height points but not X/Y
 	auto hp_to_exch(hp_interp(Overlap::EXCH));
+
+#if 0
+printf("Writing hp2exch\n");
+NcFile nc("hp2exch.nc", NcFile::Replace);
+hp_to_exch->netcdf_define(nc, "hp2exch")();
+nc.close();
+#endif
 
 	// ============= exch_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to GCM grid is equal
@@ -124,6 +134,7 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_atm(
 //	proj_to_native(*gcm->grid1, proj, *exch_to_atm);
 
 	// ============= hp_to_atm
+printf("ENDing IceSheet_L0::hp_to_atm()\n");
 	return multiply(*exch_to_atm, *hp_to_exch);
 }
 // --------------------------------------------------------

@@ -158,7 +158,8 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_ndata,
 	Cell excell;	// Exchange Cell
 	excell.i = ocell1->cell->index;
 	excell.j = ocell2->cell->index;
-	excell.index = excell.i * grid2_ndata + excell.j;	// guarantee unique
+//	excell.index = excell.i * grid2_ndata + excell.j;	// guarantee unique
+	excell.index = -1;		// Get an index assigned...
 
 	// Add the vertices of the polygon outline
 	for (auto vertex = expoly.vertices_begin(); vertex != expoly.vertices_end(); ++vertex) {
@@ -224,7 +225,8 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 	long n2 = grid2.ncells_full();
 	exgrid->grid1_ncells_full = n1;
 	exgrid->grid2_ncells_full = n2;
-	exgrid->_ncells_full = n1 * n2;
+//	exgrid->_ncells_full = n1 * n2;
+	exgrid->_ncells_full = -1;		// Not specified
 	exgrid->_nvertices_full = -1;	// Not specified
 	VertexCache exvcache(exgrid);
 

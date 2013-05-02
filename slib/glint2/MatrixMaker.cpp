@@ -86,6 +86,7 @@ void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
 {
 	int n1 = grid1->ndata();
+printf("BEGIN hp_to_atm() %d %d\n", n1, nhp());
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
 		new giss::VectorSparseMatrix(
 		giss::SparseDescr(n1, n1 * nhp())));
@@ -102,12 +103,15 @@ std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
 printf("After divide_by: %ld %d\n", area1_m.size(), area1_m_inv.size());
 	ret->sum_duplicates();
 
+#if 0
 printf("Writing hp2atm ret = %p\n", ret.get());
-NcFile nc("hp2hc.nc", NcFile::Replace);
+NcFile nc("hp2atm.nc", NcFile::Replace);
 ret->netcdf_define(nc, "hp2atm")();
 nc.close();
 printf("Done Writing hp2hc ret = %p\n", ret.get());
+#endif
 
+printf("END hp_to_atm()\n");
 	return ret;
 }
 // --------------------------------------------------------------

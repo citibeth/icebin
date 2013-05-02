@@ -60,7 +60,7 @@ INTERFACE
 
 	subroutine glint2_modele_init_landice_com_c(api, &
 		zatmo1_f, BYGRAV, fgice1_glint2_f, fgice1_f, &
-		used1h_f, fhc1h_f, elev1h_f, hp_to_hc_f, fhp_approx1h_f) bind(c)
+		used1h_f, fhc1h_f, elev1h_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
@@ -155,7 +155,7 @@ real*8, dimension(i0h:,j0h:,:) :: elev1h
 	call get_spec_double_3(elev1h, i0h, j0h, 1, elev1h_f)
 
 	! Call the C-side of the interface
-	call glint2_modele_init_landice_com_part2(api, &
+	call glint2_modele_init_landice_com_c(api, &
 		zatmo1_f, BYGRAV, fgice1_glint2_f, fgice1_f, &
 		used1h_f, fhc1h_f, elev1h_f)
 

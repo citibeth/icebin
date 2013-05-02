@@ -50,7 +50,6 @@ std::unique_ptr<giss::VectorSparseMatrix> grid1_to_grid2(
 // ==================================================================
 // Geometric and Projection Error in Spherical/Cartesian Grids
 
-extern std::vector<double> get_proj_area(Grid const &grid1, giss::Proj2 const &proj);
 
 /** Converts from values for projected grid1 to values for native grid1.
 Diagonal matrix.
@@ -63,46 +62,15 @@ extern std::vector<double> proj_native_area_correct(Grid const &grid1, std::stri
 // ==================================================================
 // Interpolate Height Points in Height Space Only: (nhc, n1) --> (n2)
 
-
-
-/**
-		overlap[n1, n2] (scipy.sparse.coo_matrix):
-			The overlap matrix between grid1 (GCM) and grid2 (ice).
-			Unused cells in grid2 (and maybe also grid1h) should already be masked out.
-		_elev1h[nhc, n1] (np.array):
-			Set of elevation points in each grid cell we're computing on.
-			Frequently, elevation points are the same for all grid cells.
-			(may be any shape, as long as shape[0]=nhc and shape[1:] = n1)
-		_elev2[n2] (np.array):
-			Elevation of each ice grid cell (or grid point)
-			(may be any shape, as long as it has n2 elements)
-		_mask2[n2] (np.array, dtype=bool):
-			True for gridcells in ice grid that have ice.
-			(may be any shape, as long as it has n2 elements)
-			NOTE: The sense of this mask is SAME that used in numpy.ma (true = masked out)
-
-*/
-std::unique_ptr<giss::VectorSparseMatrix> 
-hp_interp(
-giss::BlitzSparseMatrix const &overlap,
-blitz::Array<double,1> const &elev2,
-std::vector<double> const &hpdefs);
-
 // ===================================================================
 // CESM-Style Bi-linear Interpolation
 
 static std::vector<double> boundaries_to_centers(
 std::vector<double> const &boundaries);
 
-/** Gives weights for linear interpolation with a bunch of points.
-If our point is off the end of the range, just continue the slope in extrapolation. */
-static void indices_1d(
-	std::vector<double> const &xpoints,
-	double xx,
-	int *indices);	// Size-2 arrays
-
 // -----------------------------------------------------------------
 
+#if 0
 /** We only really expect this to work for Greenland.  Don't worry
 about south pole in lon/lat coordinates and Antarctica.
 [n2 x (nhc * n1)] sparse matrix
@@ -119,6 +87,7 @@ blitz::Array<double,1> const &hpdefs,
 blitz::Array<double,1> const &elev2,
 blitz::Array<bool,1> const &mask1,		// [n1] Shows where we will / will not expect landice
 blitz::Array<bool,1> const &mask2);
+#endif
 
 } // namespace glint2
 

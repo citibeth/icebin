@@ -246,6 +246,7 @@ printf("init_landice_com_part2 1\n");
 	// on all grid cells.
 
 	auto elev1h(elev1h_f.to_blitz());
+	int nhp_glint2 = api->maker->nhp();
 	int nhp = api->maker->nhp() + 1;	// Add non-model HP
 	if (nhp != elev1h.extent(2)) {
 		fprintf(stderr, "glint2_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp);
@@ -253,7 +254,7 @@ printf("init_landice_com_part2 1\n");
 	}
 
 	// Copy 1-D height point definitions to elev1h
-	for (int k=0; k < nhp; ++k) {
+	for (int k=0; k < nhp_glint2; ++k) {
 		double val = api->maker->hpdefs[k];
 		for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
 		for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {

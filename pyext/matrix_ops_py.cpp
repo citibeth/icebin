@@ -299,41 +299,6 @@ PyObject *multiply_bydiag_py(PyObject *self, PyObject *args)
 	}
 }
 
-PyObject *hp_interp_py(PyObject *self, PyObject *args)
-{
-	PyObject *ret_py = NULL;
-	try {
-		// Get Arguments
-		PyObject *overlap_py;
-		PyObject *elev2_py;
-		PyObject *hpdefs_py;
-		if (!PyArg_ParseTuple(args, "OOO",
-			&overlap_py, &elev2_py, &hpdefs_py))
-		{
-			PyErr_SetString(PyExc_ValueError,
-				"hp_interp_py() called with invalid arguments.");
-			return NULL;
-		}
-
-		// Check arrays and copy to giss::VectorSparseMatrix
-		auto overlap(giss::py_to_BlitzSparseMatrix(overlap_py, "overlap"));
-		int dims[1] = {overlap.ncol};	// |grid2|
-		auto elev2(giss::py_to_blitz<double,1>(elev2_py, "elev2", 1, dims));
-		auto hpdefs(giss::py_to_vector<double>(hpdefs_py, "hpdefs", -1));
-
-		// Do the call
-		std::unique_ptr<giss::VectorSparseMatrix> ret_c(
-			glint2::hp_interp(overlap, elev2, hpdefs));
-
-		// Create an output tuple of Numpy arrays
-		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
-		return ret_py;
-	} catch(...) {
-		if (ret_py) Py_DECREF(ret_py);
-		return NULL;
-	}
-}
-
 
 
 
@@ -351,8 +316,6 @@ PyMethodDef matrix_ops_functions[] = {
 	{"proj_native_area_correct", (PyCFunction)proj_native_area_correct_py, METH_VARARGS,
 		""},
 	{"multiply_bydiag", (PyCFunction)multiply_bydiag_py, METH_VARARGS,
-		""},
-	{"hp_interp", (PyCFunction)hp_interp_py, METH_VARARGS,
 		""},
 
 	{NULL}     /* Sentinel - marks the end of this structure */
