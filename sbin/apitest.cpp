@@ -1,3 +1,4 @@
+#include <mpi.h>		// Must come first for Intel MPI
 #include <boost/function.hpp>
 #include <netcdfcpp.h>
 #include <glint2/modele/glint2_modele.hpp>

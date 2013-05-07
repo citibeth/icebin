@@ -7,7 +7,7 @@ AC_PROG_CXX
 
 m4_include([m4/boost.m4])
 #m4_include([m4/ax_python.m4])
-m4_include([m4/ax_lib_cgal_core.m4])
+#m4_include([m4/ax_lib_cgal_core.m4])
 m4_include([m4/ax_prog_doxygen.m4])
 
 # check if the source folder is correct
@@ -24,7 +24,7 @@ LT_INIT([disable-static])
 
 # check for C++ compiler and the library compiler
 AC_PROG_CXX
-AC_PROG_RANLIB
+#AC_PROG_RANLIB
 
 
 AC_SUBST([AM_CXXFLAGS], [-frounding-math])
@@ -72,16 +72,28 @@ AC_CONFIG_FILES([pyext/Makefile])
 AC_CONFIG_FILES([glint2.pc])
 
 # Libraries expected to be available via pkg-config (or otherwise automatically)
-PKG_CHECK_MODULES([NETCDF], [netcdf])
+#PKG_CHECK_MODULES([NETCDF], [netcdf])
+AC_SUBST([NETCDF_CFLAGS])
+AC_SUBST([NETCDF_LIBS])
+
 #PKG_CHECK_MODULES([NETCDFF], [netcdf-fortran])
 AC_SUBST([NETCDFF_CFLAGS])
 AC_SUBST([NETCDFF_LIBS])
-PKG_CHECK_MODULES([PROJ], [proj])
+AC_SUBST([NETCDFCXX_CFLAGS])
+AC_SUBST([NETCDFCXX_LIBS])
+#PKG_CHECK_MODULES([PROJ], [proj])
+AC_SUBST([PROJ_CFLAGS])
+AC_SUBST([PROJ_LIBS])
+
 BOOST_REQUIRE([1.47])
 BOOST_THREADS
 BOOST_FILESYSTEM
-PKG_CHECK_MODULES([GMP], [gmp])
-PKG_CHECK_MODULES([MPFR], [mpfr])
+#PKG_CHECK_MODULES([GMP], [gmp])
+AC_SUBST([GMP_CFLAGS])
+AC_SUBST([GMP_LIBS])
+#PKG_CHECK_MODULES([MPFR], [mpfr])
+AC_SUBST([MPFR_CFLAGS])
+AC_SUBST([MPFR_LIBS])
 
 AC_CHECK_FILE($EIGEN_DIR/Eigen/Core)
 AC_SUBST([EIGEN_CFLAGS])
@@ -104,11 +116,17 @@ AC_SUBST([MPI_LIBS])
 #AC_CHECK_LIB(mpfr, mpfr_init, , AC_MSG_ERROR([GNU MPFR not found]) )
 #AC_CHECK_LIB(gmp, __gmpz_init, , AC_MSG_ERROR([GNU MP not found, see http://gmplib.org]) )
 #PKG_CHECK_MODULES([CGAL], [cgal])
-AX_LIB_CGAL_CORE(, AC_MSG_ERROR([Unable to find CGAL Library]))
+AC_SUBST([CGAL_CFLAGS])
+AC_SUBST([CGAL_LIBS])
+
+#AX_LIB_CGAL_CORE(, AC_MSG_ERROR([Unable to find CGAL Library]))
 
 
 # Libraries expected to require manual intervention
-PKG_CHECK_MODULES([BLITZ], [blitz])
+#PKG_CHECK_MODULES([BLITZ], [blitz])
+AC_SUBST([BLITZ_CFLAGS])
+AC_SUBST([BLITZ_LIBS])
+
 AM_PATH_PYTHON
 #python
 #galahad

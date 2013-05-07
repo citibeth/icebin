@@ -42,6 +42,9 @@ libglint2_la_SOURCES = \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
 	glint2/read_matrixmaker.cpp \
+	$(FORTRAN_SOURCES)
+
+FORTRAN_SOURCES = \
 	giss/f90blitz_f.f90 \
 	glint2/modele/glint2_modele_f.f90
 
@@ -69,20 +72,9 @@ f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
 # See ../f90_mod_deps.py
 #libglint2_la_HEADERS = f90blitz.mod glint2_modele.mod $(shell find -E . -regex '.*\.(hpp|h)' )
 
-nobase_include_HEADERS = $(shell \
-		find -E . -regex '.*\.(hpp|h|mod)' \
-	)
-
-
+nobase_include_HEADERS = \
+	$(shell find . -name '*.hpp') \
+	$(shell find . -name '*.h') \
+	$(shell find . -name '*.mod')
 
 libglint2_ladir = $(includedir)
-# # ------------------------------------------------------
-
-
-
-# PY_SOURCES = pyutil.cpp Grid_py.cpp Rasterizer_py.cpp Glint2_py.cpp glint2_module_py.cpp
-
-
-# libglint2_la_SOURCES = $(shell find -E . -regex '.*\.(cpp|c|f90|F90|f|F)')
-						
-###############################################################################

@@ -1,3 +1,4 @@
+#include <mpi.h>	// For Intel MPI, mpi.h must be included before stdio.h
 #include <netcdfcpp.h>
 #include <giss/blitz.hpp>
 #include <giss/f90blitz.hpp>

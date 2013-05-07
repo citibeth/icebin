@@ -1,8 +1,8 @@
 #pragma once
 
+#include <mpi.h>
 #include <cstdio>
 #include <blitz/array.h>
-#include <mpi.h>
 
 namespace giss {
 

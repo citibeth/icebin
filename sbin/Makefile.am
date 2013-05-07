@@ -8,7 +8,9 @@ AM_LDFLAGS += @BOOST_FILESYSTEM_LIBS@
 # THE PROGRAMS TO BUILD
 ###############################################################################
 
-AM_LDFLAGS += $(top_builddir)/slib/libglint2.la \
+#-L$(top_builddir)/slib -lglint2
+
+AM_LDFLAGS += -L$(DESTDIR)$(libdir) -lglint2 \
 	$(PYTHON_LDFLAGS) $(NUMPY_LDFLAGS)
 
 # the program to build (the names of the final binaries)
