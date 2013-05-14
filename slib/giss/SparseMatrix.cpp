@@ -62,6 +62,9 @@ printf("VectorSparseMatrix::sort(%d, %ld)\n", sort_order, size());
 void VectorSparseMatrix::sum_duplicates(
 	SparseMatrix::SortOrder sort_order) // = SparseMatrix::SortOrder::ROW_MAJOR
 {
+	// Nothing to do for zero-size matrices (or ones with just one element)
+	if (size() <= 1) return;
+
 	// Decide on how we'll sort
 	CmpIndex2 cmp;
 	switch(sort_order) {

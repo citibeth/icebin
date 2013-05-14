@@ -69,16 +69,13 @@ void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
 			int const i1 = ii->first;
 			double ice_covered_area = ii->second;
 			Cell *cell = grid1->get_cell(i1);
+			if (!cell) continue;	// Ignore cells in the halo
 			double area1 = area_of_proj_polygon(*cell, proj);
-//printf("area1(%d) = %f\n", i1, area1);
 			fgice1.add(i1, ice_covered_area / area1);
 
 		}
 	}
 	fgice1.sort();
-
-
-	printf("END compute_fgice()\n");
 }
 
 // --------------------------------------------------------------
