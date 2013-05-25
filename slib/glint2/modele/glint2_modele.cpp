@@ -334,7 +334,10 @@ printf("init_landice_com_part2 4\n");
 		if (fgice1(i,j) == 0) continue;
 
 		// Set used for the legacy height point
-		used1h(i,j,1) = (fhc1h(i,j,1) > 0 ? 1 : 0);
+		// Compute legacy height point for ALL cells with ice
+		used1h(i,j,1) = 1;
+		// Compute legacy height point just for cells with non-model ice
+		// used1h(i,j,1) = (fhc1h(i,j,1) > 0 ? 1 : 0);
 
 		// Min & max height point used for each grid cell
 		int mink = std::numeric_limits<int>::max();
