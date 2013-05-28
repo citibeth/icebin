@@ -81,6 +81,10 @@ export CGAL_HOME=$HOME_OPT/cgal-4.0.2
 export CGAL_CFLAGS="-I $CGAL_HOME/include"
 export CGAL_LIBS="-L$CGAL_HOME/lib -lCGAL"
 
+# Link fortran libraries into Python extension.  Other linking steps are
+# done with the $(FCC), so this is not needed.
+#export FORTRAN_LIBS="-lgfortran"
+
 # ===================================================================
 # Special rounding is required for CGAL
 # -fp-model strict for intel

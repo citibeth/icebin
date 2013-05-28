@@ -16,19 +16,24 @@ AM_LDFLAGS += -L$(DESTDIR)$(libdir) -lglint2 \
 # the program to build (the names of the final binaries)
 bin_PROGRAMS = \
 	hires \
-	searise searise50 searise100 \
+	searise_a searise_g searise50 searise100 \
 	greenland_4x5 greenland_2x2_5 \
+	ga_2x2_5 \
 	overlap \
 	apitest blitztest smulttest
 
 hires_SOURCES = hires.cpp
 
-searise_SOURCES = searise.cpp
+searise_g_SOURCES = searise_g.cpp
+searise_a_SOURCES = searise_a.cpp
+
 searise50_SOURCES = searise50.cpp
 searise100_SOURCES = searise100.cpp
 
 greenland_4x5_SOURCES = greenland_4x5.cpp
 greenland_2x2_5_SOURCES = greenland_2x2_5.cpp
+
+ga_2x2_5_SOURCES = greenland_2x2_5.cpp
 
 overlap_SOURCES = overlap.cpp
 

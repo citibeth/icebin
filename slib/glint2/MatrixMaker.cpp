@@ -49,7 +49,7 @@ printf("MatrixMaker: %p.sheetno = %d\n", &*sheet, sheet->index);
 }
 
 // --------------------------------------------------------------
-/** NOTE: Does not necessarily assume that ice sheets do not overlap on the same GCM grid cell */
+/** NOTE: Allows for multiple ice sheets overlapping the same grid cell (as long as they do not overlap each other, which would make no physical sense). */
 void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
 {
 

@@ -16,11 +16,9 @@ AM_FCFLAGS = @NETCDFF_CFLAGS@ -I$(top_srcdir)/slib
 
 AM_LDFLAGS = \
 	@NETCDF_LIBS@ @NETCDFCXX_LIBS@ @NETCDFF_LIBS@  @PROJ_LIBS@   @GMP_LIBS@   @BLITZ_LIBS@ \
-	@CGAL_LIBS@  @AM_LDFLAGS@ @MPI_LIBS@ \
+	@CGAL_LIBS@  @AM_LDFLAGS@ @MPI_LIBS@ @FORTRAN_LIBS@ \
 	@BOOST_SYSTEM_LDFLAGS@ @BOOST_THREAD_LIBS@ \
 	@AM_LDFLAGS@
-
-# -lgfortran
 
 # if HAVE_GALAHAD
 # AM_LDFLAGS += -L@GALAHAD_LIB_DIR@ -lgalahad -lgalahad_hsl -lgalahad_pardiso -lgalahad_wsmp -lgalahad_metis -lgalahad_lapack -lgalahad_blas -lgomp
