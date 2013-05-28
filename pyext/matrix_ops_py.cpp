@@ -58,19 +58,28 @@ PyObject *height_classify_py(PyObject *self, PyObject *args)
 	}
 }
 
-PyObject *coo_matvec_py(PyObject *self, PyObject *args)
+PyObject *coo_matvec_py(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	try {
 		PyObject *mat_py = NULL;
 		PyObject *xx_py = NULL;
 		PyObject *yy_py = NULL;
-		if (!PyArg_ParseTuple(args, "OOO",
-			&mat_py, &xx_py, &yy_py))
+		int ignore_nan = 0;
+
+		static char const *keyword_list[] =
+			{"mat", "xx", "yy", "ignore_nan", NULL};
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "OOO|i",
+			const_cast<char **>(keyword_list),
+			&mat_py, &xx_py, &yy_py, &ignore_nan))
 		{
 			PyErr_SetString(PyExc_ValueError,
 				"coo_matvec_py() called with invalid arguments.");
 			return NULL;
 		}
+
+printf("ignore_nan = %d\n", ignore_nan);
+int nancount = 0;
 
 		// Cast and typecheck arguments
 		giss::BlitzSparseMatrix mat(giss::py_to_BlitzSparseMatrix(mat_py, "mat"));
@@ -87,6 +96,11 @@ PyObject *coo_matvec_py(PyObject *self, PyObject *args)
 			int col = mat.cols()(n);
 			double val = mat.vals()(n);
 
+			// Ignore NaN in input vector
+			if ((ignore_nan != 0) && std::isnan(xx(col))) {
+				continue;
+			}
+
 			// Just do Snowdrift-style "REPLACE".  "MERGE" was never used.
 			double old_yy;
 			if (written[row]) {
@@ -97,6 +111,8 @@ PyObject *coo_matvec_py(PyObject *self, PyObject *args)
 			}
 			yy(row) = old_yy + val * xx(col);
 		}
+
+printf("nancount = %d\n", nancount);
 	} catch(...) {
 		return NULL;	// Error
 	}
@@ -305,7 +321,7 @@ PyObject *multiply_bydiag_py(PyObject *self, PyObject *args)
 PyMethodDef matrix_ops_functions[] = {
 	{"height_classify", (PyCFunction)height_classify_py, METH_VARARGS,
 		""},
-	{"coo_matvec", (PyCFunction)coo_matvec_py, METH_VARARGS,
+	{"coo_matvec", (PyCFunction)coo_matvec_py, METH_KEYWORDS,
 		"Compute M*x, taking care with unspecified elements in M"},
 	{"grid1_to_grid2", (PyCFunction)grid1_to_grid2_py, METH_VARARGS,
 		""},
