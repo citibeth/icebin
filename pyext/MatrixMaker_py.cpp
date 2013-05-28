@@ -52,7 +52,7 @@ static int MatrixMaker__init(PyMatrixMaker *self, PyObject *args, PyObject *kwds
 	}
 }
 
-/** Read from a file */
+/** Use this to generate GLINT2 config file */
 static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
 	try {
@@ -176,6 +176,69 @@ static PyObject *MatrixMaker_realize(PyMatrixMaker *self, PyObject *args)
 	}
 }
 
+static PyObject *MatrixMaker_hp_to_ice(PyMatrixMaker *self, PyObject *args)
+{
+	PyObject *ret_py = NULL;
+	try {
+
+		// Get arguments
+		const char *ice_sheet_name_py;
+		if (!PyArg_ParseTuple(args, "s", &ice_sheet_name_py)) {
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"hp_to_ice() called without a valid string as argument.");
+			return 0;
+		}
+		glint2::MatrixMaker *maker = self->maker.get();
+		std::string const ice_sheet_name(ice_sheet_name_py);
+
+		// Look up the ice sheet
+		IceSheet *sheet = (*maker)[ice_sheet_name];
+		if (!sheet) {
+			PyErr_SetString(PyExc_ValueError,
+				("Could not find ice sheet named " + ice_sheet_name).c_str());
+			return 0;
+		}
+
+		// Get the hp_to_ice matrix from it
+		auto ret_c(sheet->hp_to_ice());
+
+		// Create an output tuple of Numpy arrays
+		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_hp_to_ice()");
+		return 0;
+	}
+}
+
+static PyObject *MatrixMaker_hp_to_atm(PyMatrixMaker *self, PyObject *args)
+{
+	PyObject *ret_py = NULL;
+	try {
+
+		// Get arguments
+		if (!PyArg_ParseTuple(args, "")) {
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"hp_to_atm() does not take arguments.");
+			return 0;
+		}
+
+		// Get the hp_to_ice matrix from it
+		auto ret_c(self->maker->hp_to_atm());
+
+		// Create an output tuple of Numpy arrays
+		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_hp_to_atm()");
+		return 0;
+	}
+}
+
 /** Read from a file */
 static PyObject *MatrixMaker_write(PyMatrixMaker *self, PyObject *args)
 {
@@ -241,6 +304,10 @@ static PyMethodDef MatrixMaker_methods[] = {
 	{"init", (PyCFunction)MatrixMaker_init, METH_KEYWORDS,
 		""},
 	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS,
+		""},
+	{"hp_to_ice", (PyCFunction)MatrixMaker_hp_to_ice, METH_KEYWORDS,
+		""},
+	{"hp_to_atm", (PyCFunction)MatrixMaker_hp_to_atm, METH_KEYWORDS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
 		""},
