@@ -360,6 +360,14 @@ printf("init_landice_com_part2 4\n");
 		for (int k=mink; k<maxk; ++k) used1h(i,j,k) = 1;
 	}}
 
+	// ModelE hack: ModelE disregards used1h, it turns on a height point
+	// iff fhc != 0.  So make sure fhc is non-zero everywhere usedhp is set.
+	for (int k=fhc1h.lbound(2); k <= fhc1h.ubound(2); ++k) {
+	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
+	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
+		if (used1h(i,j,k) && (fhc1h(i,j,k) == 0)) fhc1h(i,j,k) = 1e-30;
+	}}}
+
 	// ====================== hp_to_ices
 	api->hp_to_ices.clear();
 	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
