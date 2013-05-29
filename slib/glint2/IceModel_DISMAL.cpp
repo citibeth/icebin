@@ -8,7 +8,7 @@ namespace glint2 {
 void IceModel_DISMAL::get_required_fields(std::set<IceField> &fields)
 {
 	fields.insert(IceField::MASS_FLUX);
-	fields.insert(IceField::ENERGY_FLUX);
+//	fields.insert(IceField::ENERGY_FLUX);
 }
 
 
@@ -58,7 +58,7 @@ void IceModel_DISMAL::run_timestep(
 {
 	printf("DISMAL: Run Timestep\n");
 	auto mass(decode(indices, vals2.find(IceField::MASS_FLUX)->second));
-	auto energy(decode(indices, vals2.find(IceField::ENERGY_FLUX)->second));
+//	auto energy(decode(indices, vals2.find(IceField::ENERGY_FLUX)->second));
 
 	NcFile ncout("dismal.nc", NcFile::Replace);
 
@@ -69,8 +69,8 @@ void IceModel_DISMAL::run_timestep(
 	fns.push_back(giss::netcdf_define(ncout,
 		"mass", mass, {ny_dim, nx_dim}));
 
-	fns.push_back(giss::netcdf_define(ncout,
-		"energy", energy, {ny_dim, nx_dim}));
+//	fns.push_back(giss::netcdf_define(ncout,
+//		"energy", energy, {ny_dim, nx_dim}));
 
 	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
 

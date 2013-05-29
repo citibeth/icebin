@@ -409,18 +409,18 @@ printf("END glint2_modele_init_landice_com_part2\n");
 /** @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide. */
 extern "C"
-void glint2_modele_couple_to_ice(
+void glint2_modele_couple_to_ice_c(
 glint2_modele *api,
-giss::F90Array<double,3> &smb1h_f,
-giss::F90Array<double,3> &seb1h_f)
+giss::F90Array<double,3> &smb1h_f)
+//giss::F90Array<double,3> &seb1h_f)
 {
 	std::vector<IceField> fields =
-		{IceField::MASS_FLUX, IceField::ENERGY_FLUX};
+		{IceField::MASS_FLUX}; //, IceField::ENERGY_FLUX};
 //	std::vector<blitz::Array<double,3>> vals1hp =
 //		{smb1h_f.to_blitz(), seb1h_f.to_blitz()};
 
 	auto smb1h(smb1h_f.to_blitz());
-	auto seb1h(seb1h_f.to_blitz());
+//	auto seb1h(seb1h_f.to_blitz());
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
@@ -453,7 +453,7 @@ giss::F90Array<double,3> &seb1h_f)
 			msg.i2 = jj.row;
 
 			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
-			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
+//			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
 
 //printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1h(lindex[0], lindex[1], ihc+1), seb1h(lindex[0], lindex[1], ihc+1));
 

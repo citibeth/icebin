@@ -73,7 +73,7 @@ void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 3> &elev1h_f);	// IN/OUT
 
 extern "C"
-void glint2_modele_couple_to_ice(
+void glint2_modele_couple_to_ice_c(
 glint2::modele::glint2_modele *api,
-giss::F90Array<double,3> &smb1hp_f,
-giss::F90Array<double,3> &seb1hp_f);
+giss::F90Array<double,3> &smb1hp_f);
+//giss::F90Array<double,3> &seb1hp_f);

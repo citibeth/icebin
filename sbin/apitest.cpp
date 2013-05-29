@@ -243,7 +243,8 @@ int main(int argc, char **argv)
 		imph(blitz::Range::all(), j, blitz::Range::all()) = 0;
 	}
 
-	glint2_modele_couple_to_ice(api, impm_f, imph_f);
+//	glint2_modele_couple_to_ice(api, impm_f, imph_f);
+	glint2_modele_couple_to_ice_c(api, impm_f);
 	
 	ijhc_nc.close();
 
