@@ -52,15 +52,17 @@ blitz::Array<double,2> IceModel_DISMAL::decode(
 /** @param index Index of each grid value.
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
-void IceModel_DISMAL::run_timestep(
+void IceModel_DISMAL::run_timestep(int itime,
 	blitz::Array<int,1> const &indices,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
 {
-	printf("DISMAL: Run Timestep\n");
+	printf("DISMAL: Run Timestep (sizes = %ld %ld)\n", indices.size(),vals2.find(IceField::MASS_FLUX)->second.size());
 	auto mass(decode(indices, vals2.find(IceField::MASS_FLUX)->second));
 //	auto energy(decode(indices, vals2.find(IceField::ENERGY_FLUX)->second));
 
-	NcFile ncout("dismal.nc", NcFile::Replace);
+	char fname[100];
+	sprintf(fname, "dismal-%d.nc", itime);
+	NcFile ncout(fname, NcFile::Replace);
 
 	std::vector<boost::function<void ()>> fns;
 	NcDim *nx_dim = ncout.add_dim("nx", nx);

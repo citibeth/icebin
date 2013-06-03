@@ -37,7 +37,9 @@ protected :
 	// Rank of the root process, which will receive data on the ice grid
 	int root;
 
-	void call_ice_model(
+	/** @param itime Some kind of representation of the current GCM timestep.
+	Helps with debugging. */
+	void call_ice_model(int itime,
 		giss::DynArray<SMBMsg> &rbuf,
 		std::vector<IceField> const &fields,
 		SMBMsg *begin, SMBMsg *end);
@@ -46,8 +48,10 @@ public :
 	GCMCoupler_MPI(MPI_Comm _comm, int _root) :
 		comm(_comm), root(_root) {}
 
-	/** @param sbuf the (filled) array of ice grid values for this MPI node. */
-	void couple_to_ice(
+	/** @param sbuf the (filled) array of ice grid values for this MPI node.
+	@param itime Some kind of representation of the current GCM timestep.
+	Helps with debugging. */
+	void couple_to_ice(int itime,
 		std::vector<IceField> const &fields,
 		giss::DynArray<SMBMsg> &sbuf);
 
@@ -55,6 +59,7 @@ public :
 		std::vector<std::string> const &sheet_names,
 	    giss::MapDict<std::string, IceSheet> const &sheets);
 
+	virtual int rank();
 };
 
 }

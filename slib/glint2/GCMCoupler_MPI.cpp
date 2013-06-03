@@ -33,7 +33,7 @@ int SMBMsg::compar(void const *a, void const *b)
 // ===================================================
 // GCMCoupler_MPI
 
-void GCMCoupler_MPI::call_ice_model(
+void GCMCoupler_MPI::call_ice_model(int itime,
 	giss::DynArray<SMBMsg> &rbuf,
 	std::vector<IceField> const &fields,
 	SMBMsg *begin, SMBMsg *end)
@@ -41,10 +41,10 @@ void GCMCoupler_MPI::call_ice_model(
 	int nfields = fields.size();
 	int sheetno = begin->sheetno;
 
-printf("call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size());
+printf("BEGIN call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size());
 
 	// Construct indices vector
-	blitz::TinyVector<int,1> shape(rbuf.size);
+	blitz::TinyVector<int,1> shape(rbuf.diff(end, begin));
 	blitz::TinyVector<int,1> stride(rbuf.ele_size / sizeof(int));
 	blitz::Array<int,1> indices(&begin->i2,
 		shape, stride, blitz::neverDeleteData);
@@ -60,13 +60,14 @@ printf("call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size());
 				shape, stride, blitz::neverDeleteData)));
 	}
 
-	models[sheetno]->run_timestep(indices, vals2);
+	models[sheetno]->run_timestep(itime, indices, vals2);
+printf("END call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size());
 };
 
 
 
 /** @param sbuf the (filled) array of ice grid values for this MPI node. */
-void GCMCoupler_MPI::couple_to_ice(
+void GCMCoupler_MPI::couple_to_ice(int itime,
 std::vector<IceField> const &fields,
 giss::DynArray<SMBMsg> &sbuf)
 {
@@ -81,6 +82,8 @@ giss::DynArray<SMBMsg> &sbuf)
 	std::unique_ptr<int[]> rcounts;
 //	if (rank == root)
 		rcounts.reset(new int[num_mpi_nodes]);
+	for (int i=0; i<num_mpi_nodes; ++i) rcounts[i] = 0;
+
 #if 0
 for (int i=0; i<sbuf.size; ++i) {
 	printf("sscan1 = %d %d %f %f\n", sbuf[i].sheetno, sbuf[i].i2, (sbuf[i])[0], (sbuf[i])[1]);
@@ -92,7 +95,7 @@ for (SMBMsg *sscan = sbuf.begin(); sscan < sbuf.end(); sbuf.incr(sscan)) {
 #endif
 
 	int nele_l = sbuf.size;
-printf("[%d] MPI_Gather\n", rank);
+printf("[%d] MPI_Gather sbuf.size=%ld\n", rank, sbuf.size);
 	MPI_Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, root, comm);
 printf("[%d] DONE MPI_Gather\n", rank);
 
@@ -106,15 +109,20 @@ printf("[%d] CC\n", rank);
 		displs.reset(new int[num_mpi_nodes+1]);
 		displs[0] = 0;
 		for (int i=0; i<num_mpi_nodes; ++i) displs[i+1] = displs[i] + rcounts[i];
+#if 0
+if (rank == 0) {
+for (int i=0; i<num_mpi_nodes; ++i) printf("[%d] rcounts[%d] = %d\n", rank, i, rcounts[i]);
 for (int i=0; i<=num_mpi_nodes; ++i) printf("[%d] displs[%d] = %d\n", rank, i, displs[i]);
+}
+#endif
 		int nele_g = displs[num_mpi_nodes];
 
 		// Create receive buffer, and gather into it
 		// (There's an extra item in the array for a sentinel)
+//printf("[%d] nfields=%d, SMBMsg::size(nfields)=%ld, nele_g=%d\n", rank, nfields, SMBMsg::size(nfields), nele_g);
 		rbuf.reset(new giss::DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
-printf("[%d] CC\n", rank);
+//printf("[%d] rbuf->size = %ld\n", rank, rbuf->size);
 //	}
-printf("[%d] AA\n", rank);
 
 	MPI_Datatype mpi_type(SMBMsg::new_MPI_struct(nfields));
 printf("[%d] MPI_Gatherv: %p, %ld, %p, %p, %p, %p\n", rank, sbuf.begin(), sbuf.size, mpi_type, rbuf->begin(), &rcounts[0], &displs[0]);
@@ -135,23 +143,35 @@ printf("[%d] MPI_Gatherv DONE\n", rank);
 		std::set<int> sheets_remain;
 		for (auto sheet=models.begin(); sheet != models.end(); ++sheet)
 			sheets_remain.insert(sheet.key());
-printf("BB\n");
+#if 0
+printf("[%d] BB1\n", rank);
+int nprt=0;
+for (int i=0; i<rbuf->size; ++i) {
+	SMBMsg &msg((*rbuf)[i]);
+	if (msg.vals[0] != 0.0 || msg.i2 > 168860) {
+		printf("    msg %d: %d %d %f\n", i, msg.sheetno, msg.i2, msg.vals[0]);
+		++nprt;
+		if (nprt == 10) break;
+	}
+}
+#endif
 
 		// Call each ice sheet (that we have data for)
+printf("[%d] rbuf->begin()=%p, rbuf->end()=%p\n", rank, rbuf->begin(), rbuf->end());
 		SMBMsg *lscan = rbuf->begin();
 		SMBMsg *rscan = lscan;
 		while (rscan < rbuf->end()) {
 //printf("rscan = %d %d %f %f (%p %p)\n", rscan->sheetno, rscan->i2, (*rscan)[0], (*rscan)[1], rscan, rbuf->end());
 			if (rscan->sheetno != lscan->sheetno) {
-printf("rscan = =========================================\n");
+printf("[%d] rscan = =========================================\n", rank);
 				int sheetno = lscan->sheetno;
-				call_ice_model(*rbuf, fields, lscan, rscan);
+				call_ice_model(itime, *rbuf, fields, lscan, rscan);
 				sheets_remain.erase(sheetno);
 				lscan = rscan;
 			}
 			rbuf->incr(rscan);
 		}
-printf("BB\n");
+printf("[%d] BB2\n", rank);
 
 		// Call the ice sheets we don't have data for
 		for (auto sheet=sheets_remain.begin(); sheet != sheets_remain.end(); ++sheet) {
@@ -159,10 +179,10 @@ printf("BB\n");
 			std::vector<int> indices;
 			std::map<IceField, blitz::Array<double,1>> vals2;
 			// Run with null data
-			models[sheetno]->run_timestep(
+			models[sheetno]->run_timestep(itime,
 				giss::vector_to_blitz(indices), vals2);
 		}
-printf("BB\n");
+printf("[%d] BB\n", rank);
 	}		// if (rank == root)
 }
 
@@ -179,6 +199,11 @@ void GCMCoupler_MPI::read_from_netcdf(NcFile &nc, std::string const &vname,
 	GCMCoupler::read_from_netcdf(nc, vname, sheet_names, sheets);
 }
 
-
+int GCMCoupler_MPI::rank()
+{
+	int ret;
+	MPI_Comm_rank(comm, &ret);
+	return ret;
+}
 
 } 	// namespace glint2

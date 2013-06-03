@@ -41,6 +41,11 @@ public:
 			reinterpret_cast<char *>(ptr) - ele_size);
 	}
 
+	/** Computes a-b */
+	size_t diff(T *a, T*b) {
+		size_t bdiff = reinterpret_cast<char *>(a) - reinterpret_cast<char *>(b);
+		return bdiff / ele_size;
+	}
 };
 
 }

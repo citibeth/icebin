@@ -73,10 +73,17 @@ INTERFACE
 		type(arr_spec_3) :: elev1h_f
 	end subroutine
 
-	subroutine glint2_modele_couple_to_ice_c(api, smb1hp_f) bind(c)
+	subroutine glint2_modele_init_hp_to_ices(api) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
+	end subroutine
+
+	subroutine glint2_modele_couple_to_ice_c(api, itime, smb1hp_f) bind(c)
+	use iso_c_binding
+	use f90blitz
+		type(c_ptr), value :: api
+		integer(c_int), value :: itime
 		type(arr_spec_3) :: smb1hp_f !, seb1hp_f
 	end subroutine
 
@@ -163,11 +170,12 @@ print *,'END glint2_modele_init_landice_com()'
 end subroutine
 
 subroutine glint2_modele_couple_to_ice(api, &
-	smb1h, &
+	itime, smb1h, &
 	i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
 real*8, dimension(i0h:,j0h:,:) :: smb1h
+integer, value :: itime
 
 	integer :: n
 
@@ -181,7 +189,7 @@ print *,'BEGIN glint2_modele_couple_to_ice()'
 	call get_spec_double_3(smb1h, i0h, j0h, 1, smb1h_f)
 
 	! Call the C-side of the interface
-	call glint2_modele_couple_to_ice_c(api, smb1h_f)
+	call glint2_modele_couple_to_ice_c(api, itime, smb1h_f)
 
 print *,'END glint2_modele_couple_to_ice()'
 end subroutine

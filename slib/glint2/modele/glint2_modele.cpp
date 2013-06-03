@@ -368,6 +368,17 @@ printf("init_landice_com_part2 4\n");
 		if (used1h(i,j,k) && (fhc1h(i,j,k) == 0)) fhc1h(i,j,k) = 1e-30;
 	}}}
 
+
+printf("END glint2_modele_init_landice_com_part2\n");
+}
+
+extern "C"
+void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api)
+{
+printf("BEGIN glint2_modele_init_hp_to_ices\n");
+	ModelEDomain &domain(*api->domain);
+	HCIndex hc_index(api->maker->n1());
+
 	// ====================== hp_to_ices
 	api->hp_to_ices.clear();
 	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
@@ -400,10 +411,7 @@ printf("init_landice_com_part2 4\n");
 		api->hp_to_ices[sheet->index] = std::move(omat);
 	}
 
-
-printf("init_landice_com_part2 5\n");
-
-printf("END glint2_modele_init_landice_com_part2\n");
+printf("END glint2_modele_init_hp_to_ices\n");
 }
 // -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields
@@ -411,9 +419,12 @@ printf("END glint2_modele_init_landice_com_part2\n");
 extern "C"
 void glint2_modele_couple_to_ice_c(
 glint2_modele *api,
+int itime,
 giss::F90Array<double,3> &smb1h_f)
 //giss::F90Array<double,3> &seb1h_f)
 {
+int rank = api->gcm_coupler->rank();	// debugging
+
 	std::vector<IceField> fields =
 		{IceField::MASS_FLUX}; //, IceField::ENERGY_FLUX};
 //	std::vector<blitz::Array<double,3>> vals1hp =
@@ -437,10 +448,12 @@ giss::F90Array<double,3> &smb1h_f)
 	// (while translating indices to local coordinates)
 	HCIndex hc_index(api->maker->n1());
 	int nmsg = 0;
+printf("[%d] hp_to_ices.size() = %ld\n", rank, api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
 		int sheetno = ii->first;
 		std::vector<hp_to_ice_rec> &mat(ii->second);
 
+printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		// Skip if we have nothing to do for this ice sheet
 		if (mat.size() == 0) continue;
 
@@ -467,5 +480,5 @@ giss::F90Array<double,3> &smb1h_f)
 		throw std::exception();
 	}
 
-	api->gcm_coupler->couple_to_ice(fields, sbuf);
+	api->gcm_coupler->couple_to_ice(itime, fields, sbuf);
 }

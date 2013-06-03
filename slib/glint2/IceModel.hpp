@@ -27,8 +27,10 @@ public:
 
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
-	TODO: More params need to be added.  Time, return values, etc. */
-	virtual void run_timestep(
+	TODO: More params need to be added.  Time, return values, etc.
+	@param itime Some kind of representation of the current GCM timestep.
+	Helps with debugging. */
+	virtual void run_timestep(int itime,
 		blitz::Array<int,1> const &indices,
 		std::map<IceField, blitz::Array<double,1>> const &vals2) = 0;
 

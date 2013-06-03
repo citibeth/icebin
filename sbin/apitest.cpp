@@ -244,7 +244,7 @@ int main(int argc, char **argv)
 	}
 
 //	glint2_modele_couple_to_ice(api, impm_f, imph_f);
-	glint2_modele_couple_to_ice_c(api, impm_f);
+	glint2_modele_couple_to_ice_c(api, 17, impm_f);
 	
 	ijhc_nc.close();
 
