@@ -4,6 +4,7 @@
 #include <giss/f90blitz.hpp>
 #include <glint2/HCIndex.hpp>
 #include <glint2/modele/glint2_modele.hpp>
+#include <glint2/IceModel_TConv.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
@@ -24,7 +25,10 @@ extern "C" glint2_modele *glint2_modele_new(
 	int j0s, int j1s,
 
 	// MPI Stuff
-	int comm_f, int root)
+	int comm_f, int root,
+
+	// Constants from ModelE
+	double LHM, double SHI)
 {
 	printf("***** BEGIN glint2_modele()\n");
 
@@ -56,6 +60,26 @@ extern "C" glint2_modele *glint2_modele_new(
 	nc.close();
 
 	// TODO: Test that im and jm are consistent with the grid read.
+
+	// Add adapters to the ice models, if needed
+	for (auto ii=api->gcm_coupler->models.super::begin();
+		ii != api->gcm_coupler->models.super::end(); ++ii)
+	{
+		std::set<IceField> fields;
+		ii->second->get_required_fields(fields);
+		if (fields.find(IceField::SURFACE_T) != fields.end()) {
+			IceModel_Decode *imd = dynamic_cast<IceModel_Decode *>(&*(ii->second));
+			if (!imd) continue;
+
+			// This ice model wants SURFACE_T... add an adapter
+			ii->second.release();
+			std::unique_ptr<IceModel> model(std::move(ii->second));
+			ii->second.reset(new IceModel_TConv(
+				std::unique_ptr<IceModel_Decode>(imd),
+				LHM, SHI));
+		}
+	}
+
 
 	printf("***** END glint2_modele()\n");
 
@@ -420,18 +444,21 @@ extern "C"
 void glint2_modele_couple_to_ice_c(
 glint2_modele *api,
 int itime,
-giss::F90Array<double,3> &smb1h_f)
-//giss::F90Array<double,3> &seb1h_f)
+giss::F90Array<double,3> &smb1h_f,
+giss::F90Array<double,3> &seb1h_f,
+giss::F90Array<double,3> &tg21h_f)
 {
-int rank = api->gcm_coupler->rank();	// debugging
+	GCMCoupler_MPI &coupler(*api->gcm_coupler);
+int rank = coupler.rank();	// debugging
 
 	std::vector<IceField> fields =
-		{IceField::MASS_FLUX}; //, IceField::ENERGY_FLUX};
+		{IceField::MASS_FLUX, IceField::ENERGY_FLUX, IceField::TG2};
 //	std::vector<blitz::Array<double,3>> vals1hp =
 //		{smb1h_f.to_blitz(), seb1h_f.to_blitz()};
 
 	auto smb1h(smb1h_f.to_blitz());
-//	auto seb1h(seb1h_f.to_blitz());
+	auto seb1h(seb1h_f.to_blitz());
+	auto tg21h(tg21h_f.to_blitz());
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
@@ -466,7 +493,8 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 			msg.i2 = jj.row;
 
 			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
-//			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
+			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
+			msg[2] = jj.val * tg21h(jj.col_i, jj.col_j, jj.col_k);
 
 //printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1h(lindex[0], lindex[1], ihc+1), seb1h(lindex[0], lindex[1], ihc+1));
 
@@ -480,5 +508,5 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		throw std::exception();
 	}
 
-	api->gcm_coupler->couple_to_ice(itime, fields, sbuf);
+	coupler.couple_to_ice(itime, fields, sbuf);
 }

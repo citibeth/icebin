@@ -112,8 +112,8 @@ public:
 	std::string name;
 
 protected :
-	long _ncells_full;		// Maximum possible index (-1)
-	long _nvertices_full;	// Maximum possible index (-1)
+	long _ncells_full;		// Maximum possible index (+1)
+	long _nvertices_full;	// Maximum possible index (+1)
 
 	// These are kept in line, with add_cell() and add_vertex()
 	long _max_realized_cell_index;		// Maximum index of realized cells

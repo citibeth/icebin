@@ -59,15 +59,14 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 		// Get arguments
 		const char *grid1_fname_py = NULL;
 		PyObject *hpdefs_py = NULL;
-		PyObject *hcmax_py = NULL;
 		PyObject *mask1_py = NULL;
 
-		static char const *keyword_list[] = {"grid1_fname", "hpdefs", "hcmax", "mask1", NULL};
+		static char const *keyword_list[] = {"grid1_fname", "hpdefs", "mask1", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "sOO|O",
+			args, kwds, "sO|O",
 			const_cast<char **>(keyword_list),
-			&grid1_fname_py, &hpdefs_py, &hcmax_py, &mask1_py))
+			&grid1_fname_py, &hpdefs_py, &mask1_py))
 		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,

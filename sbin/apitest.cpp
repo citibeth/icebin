@@ -7,6 +7,12 @@
 using namespace glint2;
 using namespace glint2::modele;
 
+// !@param shi heat capacity of pure ice (at 0 C) (2060 J/kg C)
+const double SHI  = 2060.;
+//@param lhm   latent heat of melt at 0 C (334590 J/kg)
+const double LHM = 3.34e5;
+
+
 // --------------------------------------------------------
 int main(int argc, char **argv)
 {
@@ -88,7 +94,10 @@ int main(int argc, char **argv)
 
 		// MPI Stuff
 		// int comm_f, int root;
-		MPI_Comm_c2f(comm), 0);
+		MPI_Comm_c2f(comm), 0,
+
+		// Constants
+		LHM, SHI);
 
 	int nhp = api->maker->nhp();
 
@@ -243,8 +252,7 @@ int main(int argc, char **argv)
 		imph(blitz::Range::all(), j, blitz::Range::all()) = 0;
 	}
 
-//	glint2_modele_couple_to_ice(api, impm_f, imph_f);
-	glint2_modele_couple_to_ice_c(api, 17, impm_f);
+	glint2_modele_couple_to_ice_c(api, 17, impm_f, imph_f, imph_f);
 	
 	ijhc_nc.close();
 

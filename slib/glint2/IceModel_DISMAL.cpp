@@ -8,77 +8,53 @@ namespace glint2 {
 void IceModel_DISMAL::get_required_fields(std::set<IceField> &fields)
 {
 	fields.insert(IceField::MASS_FLUX);
-//	fields.insert(IceField::ENERGY_FLUX);
+	fields.insert(IceField::ENERGY_FLUX);
+	fields.insert(IceField::SURFACE_T);
+	fields.insert(IceField::TG2);
 }
 
-
-static double const nan = std::numeric_limits<double>::quiet_NaN();
-
-blitz::Array<double,2> IceModel_DISMAL::decode(
-	blitz::Array<int,1> const &indices,
-	blitz::Array<double,1> const &vals)
-{
-	blitz::Array<double,2> ret(ny, nx);
-	ret = nan;
-
-	// Make a 1-D alias of this array, and copy into it
-	int extent = ny*nx;
-	blitz::Array<double,1> ret_1d(ret.data(),
-		blitz::shape(extent), blitz::neverDeleteData);
-
-	int n = indices.size();
-	for (int i=0; i < n; ++i) {
-		int ix = indices(i);
-		// Do our own bounds checking!
-		if (ix < 0 || ix >= extent) {
-			fprintf(stderr, "IceModel_DISMAL: index %d out of range [0, %d)\n", ix, extent);
-			throw std::exception();
-		}
-
-		// Sanity check for NaN coming through
-		if (std::isnan(vals(i))) {
-			fprintf(stderr, "IceModel_DISMAL::decode: vals[%d] (index=%d) is NaN!\n", i, ix);
-			throw std::exception();
-		}
-		double &oval = ret_1d(ix);
-		if (std::isnan(oval)) oval = vals(i);
-		else oval += vals(i);
-	}
-
-	return ret;
-}
 
 
 /** @param index Index of each grid value.
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
-void IceModel_DISMAL::run_timestep(int itime,
-	blitz::Array<int,1> const &indices,
+void IceModel_DISMAL::run_decoded(long itime,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
 {
-	printf("DISMAL: Run Timestep (sizes = %ld %ld)\n", indices.size(),vals2.find(IceField::MASS_FLUX)->second.size());
-	auto mass(decode(indices, vals2.find(IceField::MASS_FLUX)->second));
-//	auto energy(decode(indices, vals2.find(IceField::ENERGY_FLUX)->second));
+	auto mass(get_field(vals2, IceField::MASS_FLUX));
+	auto energy(get_field(vals2, IceField::ENERGY_FLUX));
+	auto surfacet(get_field(vals2, IceField::SURFACE_T));
+	auto tg2(get_field(vals2, IceField::TG2));
+#if 0
+	// Re-shape the arrays
+	blitz::Array<double,2> const mass(
+		const_cast<double *>(vals2.find(IceField::MASS_FLUX)->second.data()),
+		blitz::shape(ny,nx), blitz::neverDeleteData);
+	blitz::Array<double,2> const energy(
+		const_cast<double *>(vals2.find(IceField::ENERGY_FLUX)->second.data()),
+		blitz::shape(ny,nx), blitz::neverDeleteData);
+	blitz::Array<double,2> surfacet(
+		const_cast<double *>(vals2.find(IceField::SURFACE_T)->second.data()),
+		blitz::shape(ny,nx), blitz::neverDeleteData);
+#endif
 
 	char fname[100];
-	sprintf(fname, "dismal-%d.nc", itime);
+	sprintf(fname, "dismal-%ld.nc", itime);
 	NcFile ncout(fname, NcFile::Replace);
 
 	std::vector<boost::function<void ()>> fns;
 	NcDim *nx_dim = ncout.add_dim("nx", nx);
 	NcDim *ny_dim = ncout.add_dim("ny", ny);
 
-	fns.push_back(giss::netcdf_define(ncout,
-		"mass", mass, {ny_dim, nx_dim}));
+	// Define variables
+	fns.push_back(giss::netcdf_define(ncout, "mass", mass, {ny_dim, nx_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "energy", energy, {ny_dim, nx_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "T", surfacet, {ny_dim, nx_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "TG2", tg2, {ny_dim, nx_dim}));
 
-//	fns.push_back(giss::netcdf_define(ncout,
-//		"energy", energy, {ny_dim, nx_dim}));
-
+	// Write data to netCDF file
 	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
-
 	ncout.close();
-
-
 }
 
 

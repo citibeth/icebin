@@ -26,7 +26,8 @@ NETCDF_HOME=/opt/local
 export NETCDF_CFLAGS="-I $NETCDF_HOME/include"
 export NETCDF_LIBS="-L$NETCDF_HOME/lib -lnetcdf"
 
-NETCDFF_HOME=$HOME/opt/netcdf-fortran
+#NETCDFF_HOME=$HOME/opt/netcdf-fortran
+NETCDFF_HOME=/opt/local
 export NETCDFF_CFLAGS="-I $NETCDFF_HOME/include"
 export NETCDFF_LIBS="-L$NETCDFF_HOME/lib -lnetcdff"
 

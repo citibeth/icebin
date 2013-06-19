@@ -32,6 +32,8 @@ libglint2_la_SOURCES = \
 	glint2/GridDomain_Listed.cpp \
 	glint2/gridutil.cpp \
 	glint2/HeightClassifier.cpp \
+	glint2/IceModel_Decode.cpp \
+	glint2/IceModel_TConv.cpp \
 	glint2/IceModel_DISMAL.cpp \
 	glint2/IceSheet.cpp \
 	glint2/IceSheet_L0.cpp \

@@ -17,7 +17,8 @@ INTERFACE
 		i0h,i1h,j0h,j1h, &
 		i0,i1,j0,j1, &
 		j0s,j1s, &
-		comm_f, root) bind(c)
+		comm_f, root, &
+		LHM, SHI) bind(c)
 	use iso_c_binding
 		character(c_char) :: maker_fname_f(*)
 		integer(c_int), value :: maker_fname_len
@@ -28,6 +29,7 @@ INTERFACE
 		integer(c_int), value :: i0,i1,j0,j1
 		integer(c_int), value :: j0s,j1s
 		integer(c_int), value :: comm_f, root
+		real(c_double), value :: LHM, SHI
 		type(c_ptr) :: glint2_modele_new
 	end function
 
@@ -65,7 +67,7 @@ INTERFACE
 	use f90blitz
 		type(c_ptr), value :: api
 		type(arr_spec_2) :: zatmo1_f
-		real*8, value :: BYGRAV
+		real(c_double), value :: BYGRAV
 		type(arr_spec_2) :: fgice1_glint2_f
 		type(arr_spec_2) :: fgice1_f
 		type(arr_spec_3) :: used1h_f
@@ -79,12 +81,12 @@ INTERFACE
 		type(c_ptr), value :: api
 	end subroutine
 
-	subroutine glint2_modele_couple_to_ice_c(api, itime, smb1hp_f) bind(c)
+	subroutine glint2_modele_couple_to_ice_c(api, itime, smb1hp_f, seb1hp_f, tg21hp_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
 		integer(c_int), value :: itime
-		type(arr_spec_3) :: smb1hp_f !, seb1hp_f
+		type(arr_spec_3) :: smb1hp_f, seb1hp_f, tg21hp_f
 	end subroutine
 
 END INTERFACE
@@ -170,26 +172,28 @@ print *,'END glint2_modele_init_landice_com()'
 end subroutine
 
 subroutine glint2_modele_couple_to_ice(api, &
-	itime, smb1h, &
+	itime, smb1h, seb1h, tg21h, &
 	i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
-real*8, dimension(i0h:,j0h:,:) :: smb1h
+real*8, dimension(i0h:,j0h:,:) :: smb1h, seb1h, tg21h
 integer, value :: itime
 
 	integer :: n
 
 	! ------------------- local vars
-	type(arr_spec_3) :: smb1h_f
+	type(arr_spec_3) :: smb1h_f, seb1h_f, tg21h_f
 
 	! ------------------- subroutine body
 print *,'BEGIN glint2_modele_couple_to_ice()'
 
 	! Grab array descriptors
 	call get_spec_double_3(smb1h, i0h, j0h, 1, smb1h_f)
+	call get_spec_double_3(seb1h, i0h, j0h, 1, seb1h_f)
+	call get_spec_double_3(tg21h, i0h, j0h, 1, tg21h_f)
 
 	! Call the C-side of the interface
-	call glint2_modele_couple_to_ice_c(api, itime, smb1h_f)
+	call glint2_modele_couple_to_ice_c(api, itime, smb1h_f, seb1h_f, tg21h_f)
 
 print *,'END glint2_modele_couple_to_ice()'
 end subroutine

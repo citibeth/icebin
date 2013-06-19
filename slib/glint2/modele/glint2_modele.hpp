@@ -48,7 +48,10 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 	int j0s, int j1s,
 
 	// MPI Stuff
-	int comm_f, int root);
+	int comm_f, int root,
+
+	// Constants from ModelE
+	double LHM, double SHI);
 
 extern "C" void glint2_modele_delete(glint2::modele::glint2_modele *&api);
 
@@ -76,5 +79,6 @@ extern "C"
 void glint2_modele_couple_to_ice_c(
 glint2::modele::glint2_modele *api,
 int itime,
-giss::F90Array<double,3> &smb1hp_f);
-//giss::F90Array<double,3> &seb1hp_f);
+giss::F90Array<double,3> &smb1hp_f,
+giss::F90Array<double,3> &seb1hp_,
+giss::F90Array<double,3> &tg21hp_f);

@@ -132,27 +132,27 @@ printf("[%d] MPI_Gatherv: %p, %ld, %p, %p, %p, %p\n", rank, sbuf.begin(), sbuf.s
 printf("[%d] MPI_Gatherv DONE\n", rank);
 	MPI_Type_free(&mpi_type);
 	if (rank == root) {
+		// Add a sentinel
+		(*rbuf)[rbuf->size-1].sheetno = 999999;
+
 		// Sort the receive buffer so items in same ice sheet
 		// are found together
 		qsort(rbuf->begin(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
-
-		// Add a sentinel
-		(*rbuf)[rbuf->size-1].sheetno = 999999;
 
 		// Make a set of all the ice sheets in this model run
 		std::set<int> sheets_remain;
 		for (auto sheet=models.begin(); sheet != models.end(); ++sheet)
 			sheets_remain.insert(sheet.key());
-#if 0
+#if 1
 printf("[%d] BB1\n", rank);
 int nprt=0;
 for (int i=0; i<rbuf->size; ++i) {
 	SMBMsg &msg((*rbuf)[i]);
-	if (msg.vals[0] != 0.0 || msg.i2 > 168860) {
+//	if (msg.vals[0] != 0.0 || msg.i2 > 168860) {
 		printf("    msg %d: %d %d %f\n", i, msg.sheetno, msg.i2, msg.vals[0]);
 		++nprt;
 		if (nprt == 10) break;
-	}
+//	}
 }
 #endif
 
