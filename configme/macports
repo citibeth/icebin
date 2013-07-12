@@ -35,7 +35,7 @@ export NETCDFCXX_HOME=/opt/local
 export NETCDFCXX_CFLAGS="-I$NETCDFCXX_HOME/include"
 export NETCDFCXX_LIBS="""-L$NETCDFCXX_HOME/lib -lnetcdf_c++"
 
-MPI_HOME=$HOME/opt/openmpi
+MPI_HOME=$HOME/opt/openmpi-1.6.4
 export MPI_INCLUDE="$MPI_HOME/include"
 export MPI_CFLAGS="-I $MPI_INCLUDE"
 export MPI_LIBS="-L$MPI_HOME/lib -lmpi -lmpi_cxx"
@@ -71,5 +71,25 @@ export FORTRAN_LIBS="-lgfortran"
 # -fp-model strict for intel
 export CPPFLAGS="-frounding-math"
 
+PETSC_HOME=$HOME/opt/petsc-3.3-p7
+PETSC_ARCH=$PETSC_HOME/arch-darwin-c-opt
+export PETSC_CFLAGS="-I$PETSC_ARCH/include -I$PETSC_HOME/include"
+export PETSC_LIBS="-L$PETSC_ARCH/lib -lpetsc"
 
-./configure --prefix=$DEST_PREFIX
+export FFTW_HOME=/opt/local
+export FFTW_CFLAGS="-I $FFTW_HOME/include"
+export FFTW_LIBS="-L$FFTW_HOME/lib -lfftw3"
+
+export GSL_HOME=/opt/local
+export GSL_CFLAGS="-I $GSL_HOME/include"
+export GSL_LIBS="-L$GSL_HOME/lib -lgslcblas"
+
+
+PISM_SRC=$HOME/git/pism/src
+PISM_HOME=$HOME/opt/pism
+export PISM_CFLAGS="$PETSC_CFLAGS -I$PISM_SRC/base -I$PISM_SRC/base/stressbalance -I$PISM_SRC/base/util -I$PISM_SRC/base/util/io -I$PISM_SRC/base/energy -I$PISM_SRC/base/rheology -I$PISM_SRC/base/basal_strength -I$PISM_SRC/earth -I$PISM_SRC/coupler -I$PISM_SRC/coupler/atmosphere -I$PISM_SRC/coupler/surface -I$PISM_SRC/coupler/ocean -I$PISM_SRC/coupler/util -I$PISM_SRC/udunits"
+export PISM_LIBS="$PETSC_LIBS -L$PISM_HOME/lib/pism -lpismbase -lpismearth -lpismboundary -lpismstressbalance -lpismflowlaws -lpismutil -lpismudunits $PISM_SRC/../build/src/libpismrevision.a $GSL_LIBS"
+
+
+./configure --prefix=$DEST_PREFIX --with-pism
+

@@ -39,11 +39,17 @@ overlap_SOURCES = overlap.cpp
 
 apitest_SOURCES = apitest.cpp
 
-test_grid2_SOURCES = test_grid2.cpp
-test_grid1_SOURCES = test_grid1.cpp
+#test_grid2_SOURCES = test_grid2.cpp
+#test_grid1_SOURCES = test_grid1.cpp
 
 blitztest_SOURCES = blitztest.cpp
 
 smulttest_SOURCES = smulttest.cpp
+
+if USE_PISM
+bin_PROGRAMS += pismr pismconfig
+pismr_SOURCES = pismr.cpp
+pismconfig_SOURCES = pismconfig.cpp
+endif
 
 ###############################################################################

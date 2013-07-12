@@ -128,6 +128,33 @@ AC_SUBST([FORTRAN_LIBS])
 AC_SUBST([BLITZ_CFLAGS])
 AC_SUBST([BLITZ_LIBS])
 
+# ========================================
+# Add optional libraries.  See:
+# http://stackoverflow.com/questions/5176929/autoconf-automake-conditional-compilation-based-on-presence-of-library
+# http://www.gnu.org/savannah-checkouts/gnu/autoconf/manual/autoconf-2.69/html_node/External-Software.html
+
+AC_ARG_WITH([pism],
+  [AS_HELP_STRING([--with-pism],
+    [support coupling to PISM @<:@default=check@:>@])],
+  [with_pism=yes],
+  [with_pism=no])
+
+#AS_IF([test "x$with_pism" != xno],
+#	[AC_SUBST([PISM_CFLAGS])])
+
+AC_SUBST([PISM_CFLAGS])
+AC_SUBST([PISM_LIBS])
+
+# AC_SUBST([PISM_LIBS])]
+#AS_CASE(["$with_pism"],
+#  [yes], 
+#  [no], [],
+#  [])
+
+AM_CONDITIONAL([USE_PISM], [test "$with_pism" != no])
+# ========================================
+
+
 AM_PATH_PYTHON
 #python
 #galahad

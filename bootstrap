@@ -6,4 +6,4 @@ autoconf
 automake -a -c
 
 # Make up for bug in libtool on linux
-sed -i 's/-soname \$wl/-soname=/g' configure
+sed -i.bak 's/-soname \$wl/-soname=/g' configure

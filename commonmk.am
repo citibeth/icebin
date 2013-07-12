@@ -24,3 +24,11 @@ AM_LDFLAGS = \
 # AM_LDFLAGS += -L@GALAHAD_LIB_DIR@ -lgalahad -lgalahad_hsl -lgalahad_pardiso -lgalahad_wsmp -lgalahad_metis -lgalahad_lapack -lgalahad_blas -lgomp
 # AM_FCFLAGS += -I @GALAHAD_INC_DIR@ @NETCDFF_CFLAGS@
 # endif
+
+
+if USE_PISM
+#AM_CPPFLAGS += -DUSE_PISM
+AM_CXXFLAGS += -DUSE_PISM @PISM_CFLAGS@
+AM_LDFLAGS += @PISM_LIBS@
+# libdev_la_SOURCES += png.c     # For use in individual makefiles
+endif
