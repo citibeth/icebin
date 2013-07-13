@@ -14,8 +14,8 @@ lib_LTLIBRARIES = libglint2.la
 
 # the sources to add to the library and to add to the source distribution
 libglint2_la_SOURCES = \
+	$(FORTRAN_SOURCES) \
 	giss/geodesy.cpp \
-	giss/hsl_zd11_x.cpp \
 	giss/IndexTranslator.cpp \
 	giss/ncutil.cpp \
 	giss/Proj2.cpp \
@@ -43,12 +43,20 @@ libglint2_la_SOURCES = \
 	glint2/modele/glint2_modele.cpp \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
-	glint2/read_matrixmaker.cpp \
-	$(FORTRAN_SOURCES)
+	glint2/read_matrixmaker.cpp
 
 FORTRAN_SOURCES = \
 	giss/f90blitz_f.f90 \
 	glint2/modele/glint2_modele_f.f90
+
+if USE_GALAHAD
+FORTRAN_SOURCES += \
+	galahad/eqp_f.f90 \
+	galahad/ncutil_f.f90 \
+	galahad/qpt_f.f90 \
+	galahad/x_loc_f.f90 \
+	galahad/zd11_f.f90
+endif
 
 # # ------------------------------------------------------
 giss/f90blitz_f.f90 giss/f90blitz_f.h : giss/f90blitz_f.py

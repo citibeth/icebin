@@ -4,10 +4,10 @@
 DEST_PREFIX=$HOME/opt/glint2
 
 ## ----- Where is your GALAHAD installation?
-#GALAHAD_HOME=$HOME/opt/galahad
-#GALAHAD_ARCH=mac64.osx.gfo
-#export GALAHAD_INC_DIR="$GALAHAD_HOME/modules/$GALAHAD_ARCH/double"
-#export GALAHAD_LIB_DIR="$GALAHAD_HOME/objects/$GALAHAD_ARCH/double"
+GALAHAD_HOME=$HOME/opt/galahad
+GALAHAD_ARCH=mac64.osx.gfo
+export GALAHAD_INC_DIR="$GALAHAD_HOME/modules/$GALAHAD_ARCH/double"
+export GALAHAD_LIB_DIR="$GALAHAD_HOME/objects/$GALAHAD_ARCH/double"
 
 
 # =========================================================
@@ -84,12 +84,8 @@ export GSL_HOME=/opt/local
 export GSL_CFLAGS="-I $GSL_HOME/include"
 export GSL_LIBS="-L$GSL_HOME/lib -lgslcblas"
 
+export PISM_SRC=$HOME/git/pism/src
+export PISM_HOME=$HOME/opt/pism
 
-PISM_SRC=$HOME/git/pism/src
-PISM_HOME=$HOME/opt/pism
-export PISM_CFLAGS="$PETSC_CFLAGS -I$PISM_SRC/base -I$PISM_SRC/base/stressbalance -I$PISM_SRC/base/util -I$PISM_SRC/base/util/io -I$PISM_SRC/base/energy -I$PISM_SRC/base/rheology -I$PISM_SRC/base/basal_strength -I$PISM_SRC/earth -I$PISM_SRC/coupler -I$PISM_SRC/coupler/atmosphere -I$PISM_SRC/coupler/surface -I$PISM_SRC/coupler/ocean -I$PISM_SRC/coupler/util -I$PISM_SRC/udunits"
-export PISM_LIBS="$PETSC_LIBS -L$PISM_HOME/lib/pism -lpismbase -lpismearth -lpismboundary -lpismstressbalance -lpismflowlaws -lpismutil -lpismudunits $PISM_SRC/../build/src/libpismrevision.a $GSL_LIBS"
-
-
-./configure --prefix=$DEST_PREFIX --with-pism
+./configure --prefix=$DEST_PREFIX --with-galahad #--with-pism
 

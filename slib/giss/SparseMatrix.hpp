@@ -3,7 +3,7 @@
 #include <map>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
-#include "hsl_zd11_x.hpp"
+#include <galahad/zd11_c.hpp>
 #include "ncutil.hpp"
 #include "IndexTranslator.hpp"
 #include <giss/blitz.hpp>
@@ -354,12 +354,12 @@ protected:
 	int _nnz_cur;
 
 	// Pointers/references to main storage
-	ZD11 *_zd11;
+	galahad::zd11_c *_zd11;
 
 	ZD11SparseMatrix0(SparseDescr const &descr) : SparseMatrix(descr) {}
 public:
 
-	ZD11 &zd11() const { return *_zd11; }
+	galahad::zd11_c &zd11() const { return *_zd11; }
 
 	// --------------------------------------------------
 	/** Standard STL-type iterator for iterating through a ZD11SparseMatrix. */
@@ -434,18 +434,18 @@ class ZD11SparseMatrix : public SparseMatrix1<ZD11SparseMatrix0>
 {
 public:
 	/** Call this after ZD11 has been initialized.
-	@param _zd11 C++ peer of Fortran hsl_zd11_double::zd11_type sparse matrix structure.
+	@param zd11 C++ peer of Fortran hsl_zd11d::zd11_f sparse matrix structure.
 	@param nnz_cur The number of non-zero elements currently held in _zd11.  Set to zero to clear the matrix.  <b>NOTE:</b> The sparse matrix must be filled with exactly ZD11::ne elements before it may be considered valid and passed to a Fortran subroutine.
  */
-	ZD11SparseMatrix(ZD11 &__zd11, int nnz_cur,
+	ZD11SparseMatrix(galahad::zd11_c &zd11, int nnz_cur,
 		MatrixStructure matrix_structure = MatrixStructure::GENERAL,
 		TriangularType triangular_type = TriangularType::GENERAL,
 		MainDiagonalType main_diagonal_type = MainDiagonalType::NON_UNIT)
-	: SparseMatrix1<ZD11SparseMatrix0>(SparseDescr(__zd11.m, __zd11.n, 1,
+	: SparseMatrix1<ZD11SparseMatrix0>(SparseDescr(zd11.m, zd11.n, 1,
 	matrix_structure, triangular_type, main_diagonal_type))
 	{
 		_nnz_cur = nnz_cur;
-		_zd11 = &__zd11;
+		_zd11 = &zd11;
 	}
 };
 // ==================================================================

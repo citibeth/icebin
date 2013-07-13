@@ -50,6 +50,28 @@ void IceSheet::realize()
 	}
 }
 // -----------------------------------------------------
+std::unique_ptr<giss::VectorSparseMatrix>
+IceSheet::atm_proj_correct(ProjCorrect direction)
+{
+	int n1 = gcm->n1();
+	std::unique_ptr<giss::VectorSparseMatrix> ret(
+		new giss::VectorSparseMatrix(
+		giss::SparseDescr(n1, n1)));
+
+	giss::Proj2 proj;
+	gcm->grid1->get_ll_to_xy(proj, grid2->sproj);
+
+	for (auto cell = gcm->grid1->cells_begin(); cell != gcm->grid1->cells_end(); ++cell) {
+		double native_area = cell->area;
+		double proj_area = area_of_proj_polygon(*cell, proj);
+		ret->add(cell->index, cell->index,
+			direction == ProjCorrect::NATIVE_TO_PROJ ?
+				native_area / proj_area : proj_area / native_area);
+	}
+
+	return ret;
+}
+// -----------------------------------------------------
 /** Made for binding... */
 static bool in_good(std::unordered_set<int> const *set, int index_c)
 {

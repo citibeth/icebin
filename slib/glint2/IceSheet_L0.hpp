@@ -7,9 +7,13 @@ namespace glint2 {
 class IceSheet_L0 : public IceSheet
 {		// For ice model with level-value grid cells
 public:
-
+	/** Number of grid cells in the atmosphere grid */
 	long n1() const { return exgrid->grid1_ncells_full; }
+
+	/** Number of grid cells in the ice grid */
 	long n2() const { return exgrid->grid2_ncells_full; }
+
+	/** Number of grid cells in the exchange grid */
 	long n3() const { return exgrid->ncells_full(); }
 
 protected:
@@ -36,6 +40,10 @@ public:
 		(non-masked-out) ice sheet. */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(
 		giss::SparseAccumulator<int,double> &area1_m);
+
+	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_atm(
+		giss::SparseAccumulator<int,double> &area1_m);
+
 
 	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

@@ -133,6 +133,21 @@ AC_SUBST([BLITZ_LIBS])
 # http://stackoverflow.com/questions/5176929/autoconf-automake-conditional-compilation-based-on-presence-of-library
 # http://www.gnu.org/savannah-checkouts/gnu/autoconf/manual/autoconf-2.69/html_node/External-Software.html
 
+AC_ARG_WITH([galahad],
+  [AS_HELP_STRING([--with-galahad],
+    [support coupling to GALAHAD @<:@default=check@:>@])],
+  [with_galahad=yes],
+  [with_galahad=no])
+
+AC_SUBST([GALAHAD_INC_DIR])
+AC_SUBST([GALAHAD_LIB_DIR])
+
+AM_CONDITIONAL([USE_GALAHAD], [test "$with_galahad" != no])
+# ========================================
+# Add optional libraries.  See:
+# http://stackoverflow.com/questions/5176929/autoconf-automake-conditional-compilation-based-on-presence-of-library
+# http://www.gnu.org/savannah-checkouts/gnu/autoconf/manual/autoconf-2.69/html_node/External-Software.html
+
 AC_ARG_WITH([pism],
   [AS_HELP_STRING([--with-pism],
     [support coupling to PISM @<:@default=check@:>@])],
@@ -142,8 +157,13 @@ AC_ARG_WITH([pism],
 #AS_IF([test "x$with_pism" != xno],
 #	[AC_SUBST([PISM_CFLAGS])])
 
-AC_SUBST([PISM_CFLAGS])
-AC_SUBST([PISM_LIBS])
+AC_SUBST([PISM_SRC])
+AC_SUBST([PISM_HOME])
+AC_SUBST([FFTW_CFLAGS])
+AC_SUBST([FFTW_LIBS])
+AC_SUBST([GSL_CFLAGS])
+AC_SUBST([GSL_LIBS])
+
 
 # AC_SUBST([PISM_LIBS])]
 #AS_CASE(["$with_pism"],

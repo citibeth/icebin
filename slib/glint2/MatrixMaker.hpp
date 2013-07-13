@@ -19,7 +19,6 @@ C: See get_fhc() below, then multiply by FHC in ModelE code.
 
 namespace glint2 {
 
-
 typedef giss::SparseAccumulator<std::pair<int,int>, double, giss::HashPair<int,int>> SparseAccumulator1hc;
 
 /** Generates the matrices required in the GCM */
@@ -84,6 +83,7 @@ public:
 	Ice sheets cannot overlap each other (although their grids can, if we're
 	guaranteed that ice-filled grid cells will never overlap). */
 	void fgice(giss::CooVector<int,double> &fgice1);
+
 
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm();
 

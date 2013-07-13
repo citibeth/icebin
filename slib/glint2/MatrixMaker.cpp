@@ -82,11 +82,11 @@ void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
 /** TODO: This doesn't account for spherical earth */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
 {
-	int n1 = grid1->ndata();
-printf("BEGIN hp_to_atm() %d %d\n", n1, nhp());
+//	int n1 = grid1->ndata();
+printf("BEGIN hp_to_atm() %d %d\n", n1(), nhp());
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
 		new giss::VectorSparseMatrix(
-		giss::SparseDescr(n1, n1 * nhp())));
+		giss::SparseDescr(n1(), n1() * nhp())));
 
 	// Compute the hp->ice and ice->hc transformations for each ice sheet
 	// and combine into one hp->hc matrix for all ice sheets.

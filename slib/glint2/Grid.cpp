@@ -421,7 +421,7 @@ printf("get_ll_to_xy(sproj=%s)\n", sproj.c_str());
 	if (coordinates == Coordinates::LONLAT) {
 		proj.init(sproj, giss::Proj2::Direction::LL2XY);
 	} else {
-		fprintf(stderr, "proj_to_native() only makes sense for grids in Lon/Lat Coordinates!");
+		fprintf(stderr, "get_ll_to_xy() only makes sense for grids in Lon/Lat Coordinates!");
 		throw std::exception();
 	}
 }

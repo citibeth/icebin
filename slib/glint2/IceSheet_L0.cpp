@@ -117,7 +117,7 @@ nc.close();
 #endif
 
 	// ============= exch_to_atm (with area1 scaling factor)
-	// Area-weighted remapping from exchange to GCM grid is equal
+	// Area-weighted remapping from exchange to atmosphere grid is equal
 	// to scaled version of overlap matrix.
 	std::unique_ptr<giss::VectorSparseMatrix> exch_to_atm(
 		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n3())));
@@ -125,17 +125,49 @@ nc.close();
 		if (masked(cell)) continue;
 
 		// Exchange Grid is in Cartesian coordinates
+		// cell->i = index in atmosphere grid
+		// cell->j = index in ice grid
+		// cell->index = index in exchange grid
 		double area = cell->area;	// Computed in ExchangeGrid::overlap_callback()
 		exch_to_atm->add(cell->i, cell->index, area);
 		area1_m.add(cell->i, area);
 	}
 
-// TODO: Fix up projection stuff, then un-comment line below.
-//	proj_to_native(*gcm->grid1, proj, *exch_to_atm);
-
 	// ============= hp_to_atm
 printf("ENDing IceSheet_L0::hp_to_atm()\n");
-	return multiply(*exch_to_atm, *hp_to_exch);
+	auto tmp(multiply(*exch_to_atm, *hp_to_exch));
+	return multiply(
+		*atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
+		*tmp);
+}
+// --------------------------------------------------------
+std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_atm(
+	giss::SparseAccumulator<int,double> &area1_m)
+{
+printf("BEGIN IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n3());
+
+	// ============= exch_to_atm (with area1 scaling factor)
+	// Area-weighted remapping from exchange to atmosphere grid is equal
+	// to scaled version of overlap matrix.
+	std::unique_ptr<giss::VectorSparseMatrix> ice_to_atm(
+		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n2())));
+	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
+		if (masked(cell)) continue;
+
+		// Exchange Grid is in Cartesian coordinates
+		// cell->i = index in atmosphere grid
+		// cell->j = index in ice grid
+		// cell->index = index in exchange grid
+		double area = cell->area;	// Computed in ExchangeGrid::overlap_callback()
+		ice_to_atm->add(cell->i, cell->j, area);
+		area1_m.add(cell->i, area);
+	}
+
+	//ice_to_atm->sum_duplicates();
+
+	return multiply(
+		*atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
+		*ice_to_atm);
 }
 // --------------------------------------------------------
 /**
@@ -154,6 +186,17 @@ printf("BEGIN accum_area(%s)\n", name.c_str());
 printf("END accum_area(%s)\n", name.c_str());
 }
 // -------------------------------------------------------------
+
+
+/** @param f2 Some field on the ice grid */
+giss::CooVector<int, double>
+ice_to_atmosphere(blitz::Array<double,1> &f2)
+{
+}
+
+// -------------------------------------------------------------
+
+
 // ==============================================================
 boost::function<void ()> IceSheet_L0::netcdf_define(NcFile &nc, std::string const &vname) const
 {

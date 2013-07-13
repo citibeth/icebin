@@ -125,12 +125,6 @@ public:
 	long nvertices_full() const
 		{ return _nvertices_full >= 0 ? _nvertices_full : _max_realized_vertex_index+1; }
 
-	/** Projection, if any, used to transform this grid from its
-	"native" form to the one it's currently in.
-	Does transform(proj[0], proj[1]).
-	sproj[0] == sproj[1] == "" if no projection used. */
-//	std::string srpoj[2];
-
 	/** If scoord == "xy": The projection that relates x,y coordinates
 	here to a specific point on the globe (as a Proj.4 String). */
 	std::string sproj;

@@ -10,6 +10,8 @@
 
 namespace glint2 {
 
+enum class ProjCorrect {NATIVE_TO_PROJ, PROJ_TO_NATIVE};
+
 class MatrixMaker;
 class IceCoupler;
 
@@ -49,6 +51,11 @@ public:
 	virtual ~IceSheet();
 
 	// ------------------------------------------------
+	/** Diagonal matrix converts values from native atmosphere grid to projected atmosphere grid (or vice versa)
+	@param direction Direction to convert vectors (NATIVE_TO_PROJ or PROJ_TO_NATIVE) */
+	std::unique_ptr<giss::VectorSparseMatrix> atm_proj_correct(ProjCorrect direction);
+
+	// ------------------------------------------------
 
 	/** Adds up the (ice-covered) area of each GCM grid cell */
 	virtual void accum_areas(
@@ -59,8 +66,11 @@ public:
 
 	/** Computes matrix to go from height-point space [nhp * n1] to atmosphere grid [n1]
 	@param area1_m IN/OUT: Area of each GCM cell covered by
-		(non-masked-out) ice sheet. */
+		(non-masked-out) ice sheet.  Must divide result by this number. */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(
+		giss::SparseAccumulator<int,double> &area1_m) = 0;
+
+	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_atm(
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
 public:
