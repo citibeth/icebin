@@ -85,6 +85,7 @@ f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
 nobase_include_HEADERS = \
 	$(shell find . -name '*.hpp') \
 	$(shell find . -name '*.h') \
-	$(shell find . -name '*.mod')
+	$(shell find . -name '*.mod') \
+	ncutil_mod.mod qpt_x.mod c_loc_x.mod hsl_zd11d.mod zd11_x.mod
 
 libglint2_ladir = $(includedir)

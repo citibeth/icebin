@@ -2,7 +2,7 @@
 ! Calls the EQP subroutine
 ! This function is meant to be called from C/C++
 function eqp_solve_simple(p, infinity) bind(C)
-use iso_binding
+use iso_c_binding
 use qpt_x
 ! USE GALAHAD_QP_double
 ! USE GALAHAD_QPT_double		! Debugging

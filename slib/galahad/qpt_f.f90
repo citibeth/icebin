@@ -38,7 +38,7 @@ USE qpt_x
 use c_loc_x
 use, intrinsic :: iso_c_binding
 IMPLICIT NONE
-type(QPT_problem_c) :: self
+type(c_ptr) :: self_c			! qpt_problem *
 type(QPT_problem_type), target :: main
 integer(c_int), value :: m, n
 integer(c_int), value :: A_ne		! # of elements in A (constraint) matrix

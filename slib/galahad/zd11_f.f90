@@ -117,6 +117,8 @@ END MODULE HSL_ZD11D
 
 module zd11_x
 
+use, intrinsic :: iso_c_binding
+
 	!> Fortran side of the C++ peer class to zd11_type
 	!! @see giss::ZD11
 	type ZD11_c
@@ -190,13 +192,19 @@ end module zd11_x
 !subroutine ZD11_c_destroy(self)
 
 !> Helper function for giss::ZD11::put_type()
-function ZD11_put_type_c(self, string, l) bind(c)
-use HSL_ZD11_double
+function ZD11_put_type_c(self_c, string, l) bind(c)
+	use HSL_ZD11_double
+	use, intrinsic :: iso_c_binding
 implicit none
-type(zd11_type) :: self				! ZD11_c *
+type(c_ptr) :: self_c				! zd11_f *
 character, dimension(*) :: string	! char *
 integer :: l						! strlen(str)
 integer :: ZD11_put_type_c
+
+	type(zd11_type), pointer :: self
+
+	call c_f_pointer(self_c, self)
+
 
      if (allocated(self%type)) then
         deallocate(self%type,stat=ZD11_put_type_c)
