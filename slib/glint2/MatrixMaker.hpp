@@ -53,7 +53,7 @@ public:
 	std::shared_ptr<glint2::Grid> grid1;		/// GCM Grid
 
 	// Blitz++ arrays are reference counted internally
-	// TODO: This should cover only GCM grid cells in our domain.
+	// TODO: This should cover only GCM grid cells that live on our local MPI node.
 	std::unique_ptr<blitz::Array<int,1>> mask1;
 
 	/** Position of height points in elevation space (same for all GCM grid cells) */
@@ -66,7 +66,7 @@ public:
 	/** Call this after you've set everything up, added all ice sheets, etc. */
 	void realize();
 
-	IceSheet *operator[](int ix) {
+	IceSheet *operator[](int const ix) {
 		auto ii = sheets_by_id.find(ix);
 		if (ii == sheets_by_id.end()) return NULL;
 		return ii->second;
@@ -74,9 +74,12 @@ public:
 	IceSheet *operator[](std::string const &name)
 		{ return sheets[name]; }
 
-	int nhp() const { return hpdefs.size(); }
+//	int nhp() const { return hpdefs.size(); }
 	int n1() const { return grid1->ndata(); }
+	int n3() const { return n1() * hpdefs.size(); }
 
+	/** @return Number of elevation points for a given grid cell */
+	int nhp(int i1) const { return hpdefs.size(); }
 //	std::vector<int> get_used1();
 
 	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
@@ -84,8 +87,14 @@ public:
 	guaranteed that ice-filled grid cells will never overlap). */
 	void fgice(giss::CooVector<int,double> &fgice1);
 
-
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm();
+
+	/** @params f2 Some field on each ice grid (referenced by ID)
+	TODO: This only works on one ice sheet.  Will need to be extended
+	for multiple ice sheets. */
+	giss::CooVector<int, double> ice_to_hp(
+		std::map<int, blitz::Array<double,1>> &f2s);
+
 
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
 

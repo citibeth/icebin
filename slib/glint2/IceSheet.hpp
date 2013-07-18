@@ -7,6 +7,7 @@
 #include <giss/SparseMatrix.hpp>
 #include <glint2/ExchangeGrid.hpp>
 #include <giss/SparseAccumulator.hpp>
+#include <giss/CooVector.hpp>
 
 namespace glint2 {
 
@@ -49,6 +50,13 @@ public:
 	void filter_cells1(boost::function<bool (int)> const &include_cell1);
 
 	virtual ~IceSheet();
+
+	// ------------------------------------------------
+	/** Number of dimensions of atmosphere vector space */
+	virtual size_t n1() const;
+
+	/** Number of dimensions of ice vector space */
+	virtual size_t n2() const = 0;
 
 	// ------------------------------------------------
 	/** Diagonal matrix converts values from native atmosphere grid to projected atmosphere grid (or vice versa)

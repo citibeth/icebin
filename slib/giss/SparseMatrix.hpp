@@ -580,8 +580,6 @@ public:
 
 };
 // ====================================================================
-class VectorSparseMatrix;
-
 class BlitzSparseMatrix0 : public SparseMatrix
 {
 protected:
@@ -861,6 +859,16 @@ void copy(SparseMatrixT1 &a, SparseMatrixT2 &b, SparseMatrix::DuplicatePolicy du
 	b.clear();
 	for (typename SparseMatrixT1::iterator ii = a.begin(); ii != a.end(); ++ii) {
 		b.set(ii.row(), ii.col(), ii.val(), dups);
+	}
+}
+// ------------------------------------------------------------
+/** Copy a to b while transposing.  Does not clear b. */
+template<class SparseMatrixT1, class SparseMatrixT2>
+void transpose(SparseMatrixT1 &a, SparseMatrixT2 &b, SparseMatrix::DuplicatePolicy dups = SparseMatrix::DuplicatePolicy::REPLACE)
+{
+	b.clear();
+	for (typename SparseMatrixT1::iterator ii = a.begin(); ii != a.end(); ++ii) {
+		b.set(ii.col(), ii.row(), ii.val(), dups);
 	}
 }
 // ------------------------------------------------------------

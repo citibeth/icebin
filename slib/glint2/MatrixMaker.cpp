@@ -3,6 +3,10 @@
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet_L0.hpp>
 #include <glint2/HCIndex.hpp>
+#include <giss/IndexTranslator.hpp>
+#include <giss/IndexTranslator2.hpp>
+#include <galahad/qpt_c.hpp>
+#include <galahad/eqp_c.hpp>
 
 namespace glint2 {
 
@@ -79,14 +83,218 @@ void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
 }
 
 // --------------------------------------------------------------
+/** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete.
+TODO: This only works on one ice sheet.  Will need to be extended
+for multiple ice sheets. */
+giss::CooVector<int, double>
+MatrixMaker::ice_to_hp(
+std::map<int, blitz::Array<double,1>> &f2s)
+{
+	// =============== Set up basic vector spaces for optimization problem
+	std::set<int> used1, used3;
+	std::set<std::pair<int,int>> used2;
+
+	// Used in constraints
+	std::unique_ptr<giss::VectorSparseMatrix> RM(hp_to_atm());	// 3->1
+	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
+		used1.insert(ii.row());
+		used3.insert(ii.col());
+	}
+
+
+	giss::SparseAccumulator<int,double> area1;
+	giss::MapDict<int, giss::VectorSparseMatrix> Ss;
+	giss::MapDict<int, giss::VectorSparseMatrix> XMs;
+	std::map<int, size_t> size2;	// Size of each ice vector space
+	for (auto f2i=f2s.begin(); f2i != f2s.end(); ++f2i) {
+		IceSheet *sheet = (*this)[f2i->first];
+
+		std::unique_ptr<giss::VectorSparseMatrix> S(
+			sheet->ice_to_atm(area1));		// 2 -> 1
+		for (auto ii = S->begin(); ii != S->end(); ++ii) {
+			used1.insert(ii.row());
+			used2.insert(std::make_pair(sheet->index, ii.col()));
+		}
+
+		std::unique_ptr<giss::VectorSparseMatrix> XM(
+			sheet->hp_to_ice());				// 3 -> 2
+		for (auto ii = S->begin(); ii != S->end(); ++ii) {
+			used2.insert(std::make_pair(sheet->index, ii.row()));
+			used3.insert(ii.col());
+		}
+
+		size2[sheet->index] = sheet->n2();
+
+		// Store away for later reference
+		Ss.insert(sheet->index, std::move(S));
+		XMs.insert(sheet->index, std::move(XM));
+	}
+
+	giss::IndexTranslator trans_1_1p;
+		trans_1_1p.init(n1(), used1);
+	giss::IndexTranslator2 trans_2_2p;
+		trans_2_2p.init(std::move(size2), used2);
+	giss::IndexTranslator trans_3_3p;
+		trans_3_3p.init(n3(), used3);
+
+	int n1p = trans_1_1p.nb();
+	int n2p = trans_2_2p.nb();
+	int n3p = trans_3_3p.nb();
+
+	// Translate to new matrices
+	giss::VectorSparseMatrix RMp(giss::SparseDescr(n1p, n3p));
+	giss::VectorSparseMatrix Sp(giss::SparseDescr(n1p, n2p));
+	giss::VectorSparseMatrix XMp(giss::SparseDescr(n2p, n3p));
+
+	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
+		RMp.add(
+			trans_1_1p.a2b(ii.row()),
+			trans_3_3p.a2b(ii.col()), ii.val());
+	}
+
+
+	for (auto f2i=f2s.begin(); f2i != f2s.end(); ++f2i) {
+		int const index = f2i->first;
+		IceSheet *sheet = (*this)[index];
+
+		giss::VectorSparseMatrix *S(Ss[index]);
+		giss::VectorSparseMatrix *XM(XMs[index]);
+
+		for (auto ii = S->begin(); ii != S->end(); ++ii) {
+			Sp.add(
+				trans_1_1p.a2b(ii.row()),
+				trans_2_2p.a2b(std::make_pair(index, ii.col())),
+				ii.val());
+		}
+
+		for (auto ii = S->begin(); ii != S->end(); ++ii) {
+			XMp.add(
+				trans_2_2p.a2b(std::make_pair(index, ii.row())),
+				trans_3_3p.a2b(ii.col()),
+				ii.val());
+		}
+	}
+
+	// -------- Translate f2 -> f2p
+	// Ignore elements NOT listed in the translation
+	blitz::Array<double,1> f2p(n2p);
+	f2p = 0;
+	for (int i2p = 0; i2p < n2p; ++i2p) {
+		std::pair<int,int> const &a(trans_2_2p.b2a(i2p));
+		int index = a.first;
+		int i2 = a.second;
+		f2p(i2p) = f2s[index](i2);
+	}
+
+	// ----------- Translate area1 -> area1p
+	blitz::Array<double,1> area1p_inv(n1p);
+	area1p_inv = 0;
+	for (auto ii = area1.begin(); ii != area1.end(); ++ii) {
+		int i1 = ii->first;
+		int i1p = trans_1_1p.a2b(i1);
+		area1p_inv(i1p) += ii->second;
+	}
+	for (int i1p=0; i1p<n1p; ++i1p) {
+		if (area1p_inv(i1p) != 0) area1p_inv(i1p) = 1.0d / area1p_inv(i1p);
+	}
+
+	// ---------- Divide Sp by area1p to complete the regridding matrix
+	for (auto ii = Sp.begin(); ii != Sp.end(); ++ii) {
+		int i1p = ii.row();
+		ii.val() *= area1p_inv(i1p);
+	}
+
+	// ========================================================
+	// ========================================================
+
+ 	// ---------- Allocate the QPT problem
+	// m = # constraints = n1p (size of atmosphere grid)
+	// n = # variabeles = n3p
+	galahad::qpt_problem_c qpt(n1p, n3p, true);
+
+	// ================ Objective Function
+	// 1/2 (A F_E - F_I)^2    where A = XM = (Ice->Exch)(Elev->Ice)
+	// qpt%H = A^T A,    qpt%G = f_I \cdot A,        qpt%f = f_I \cdot f_I
+
+	// -------- H = 2 * XMp^T XMp
+	giss::VectorSparseMatrix XMp_T(giss::SparseDescr(XMp.ncol, XMp.nrow));
+	transpose(XMp, XMp_T);
+	std::unique_ptr<giss::VectorSparseMatrix> H(multiply(XMp_T, XMp));	// n3xn3
+	qpt.alloc_H(H->size());
+	giss::ZD11SparseMatrix H_zd11(qpt.H, 0);
+	for (auto ii = H->begin(); ii != H->end(); ++ii)
+		H_zd11.add(ii.row(), ii.col(), 2.0d * ii.val());
+
+	// -------- Linear term of obj function
+	// G = -2*f2p \cdot XMp
+	for (int i=0; i < qpt.n; ++i) qpt.G[i] = 0;
+	for (auto ii = XMp.begin(); ii != XMp.end(); ++ii) {
+		qpt.G[ii.col()] -= 2.0d * f2p(ii.row()) * ii.val();
+	}
+
+	// --------- Constant term of objective function
+	// f = f2p \cdot f2p
+	qpt.f = 0;
+	for (int i2p=0; i2p<n2p; ++i2p) {
+		qpt.f += f2p(i2p) * f2p(i2p);
+	}
+
+	// De-allocate...
+	H.reset();
+	XMp.clear();
+	XMp_T.clear();
+
+	// ============================ Constraints
+	// RM x = Sp f2p
+
+	// qpt.A = constraints matrix = RMp
+	qpt.alloc_A(RMp.size());
+	giss::ZD11SparseMatrix A_zd11(qpt.A, 0);
+	copy(RMp, A_zd11);
+
+	// qpt.C = equality constraints RHS = Sp * f2p
+	for (int i=0; i<n1p; ++i) qpt.C[i] = 0;
+	for (auto ii = Sp.begin(); ii != Sp.end(); ++ii) {
+		int i1p = ii.row();		// Atm
+		int i2p = ii.col();		// Ice
+		qpt.C[i1p] += f2p(i2p) * ii.val();
+	}
+
+	// De-allocate
+	RMp.clear();
+
+	// =========================== Initial guess at solution
+	for (int i=0; i<n3p; ++i) qpt.X[i] = 0;	// we have no idea
+
+	// =========================== Solve the Problem!
+	double infinity = 1e20;
+	eqp_solve_simple(qpt.this_f, infinity);
+
+
+
+	// ========================================================
+	// ========================================================
+
+	// --------- Pick out the answer and convert back to standard vector space
+	giss::CooVector<int, double> ret;
+	for (int i3p=0; i3p<n3p; ++i3p) {
+		int i3 = trans_3_3p.b2a(i3p);
+		ret.add(i3, qpt.X[i3p]);
+	}
+
+	return ret;
+}
+
+
+// --------------------------------------------------------------
 /** TODO: This doesn't account for spherical earth */
 std::unique_ptr<giss::VectorSparseMatrix> MatrixMaker::hp_to_atm()
 {
 //	int n1 = grid1->ndata();
-printf("BEGIN hp_to_atm() %d %d\n", n1(), nhp());
+printf("BEGIN hp_to_atm() %d %d\n", n1(), n3());
 	std::unique_ptr<giss::VectorSparseMatrix> ret(
 		new giss::VectorSparseMatrix(
-		giss::SparseDescr(n1(), n1() * nhp())));
+		giss::SparseDescr(n1(), n3())));
 
 	// Compute the hp->ice and ice->hc transformations for each ice sheet
 	// and combine into one hp->hc matrix for all ice sheets.

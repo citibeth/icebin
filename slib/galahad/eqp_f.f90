@@ -1,17 +1,18 @@
 ! -------------------------------------------------------------------
 ! Calls the EQP subroutine
 ! This function is meant to be called from C/C++
-function eqp_solve_simple(p, infinity) bind(C)
+function eqp_solve_simple(p_c, infinity) bind(C)
 use iso_c_binding
 use qpt_x
 ! USE GALAHAD_QP_double
 ! USE GALAHAD_QPT_double		! Debugging
 USE GALAHAD_EQP_double
 IMPLICIT NONE
-type(QPT_problem_type) :: p
+type(c_ptr), value :: p_c		! QPT_problem_type
 real(c_double), value :: infinity
-logical :: eqp_solve_simple
+logical(kind=c_bool) :: eqp_solve_simple
 
+	type(QPT_problem_type), pointer :: p
 	integer :: errcode
 
 	integer :: time0_ms, time1_ms
@@ -26,6 +27,7 @@ logical :: eqp_solve_simple
 	TYPE ( EQP_inform_type ) :: inform
 
 	! --------------------------------
+	call c_f_pointer(p_c, p)
 
 !	ALLOCATE( B_stat( p%n ), C_stat( p%m ) )
 	p%new_problem_structure = .TRUE.

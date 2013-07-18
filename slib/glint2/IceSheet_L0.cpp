@@ -53,7 +53,7 @@ static void linterp_1d(
 std::unique_ptr<giss::VectorSparseMatrix> 
 IceSheet_L0::hp_interp(Overlap overlap_type)
 {
-	int nx = (overlap_type == Overlap::ICE ? n2() : n3());
+	int nx = (overlap_type == Overlap::ICE ? n2() : n4());
 
 	// Sum overlap matrix by column (ice grid cell)
 	std::vector<double> area2(n2());
@@ -64,7 +64,7 @@ IceSheet_L0::hp_interp(Overlap overlap_type)
 
 	HCIndex hc_index(n1());
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
-		giss::SparseDescr(nx, gcm->nhp() * n1())));
+		giss::SparseDescr(nx, gcm->n3())));
 
 	// Interpolate in the vertical
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
@@ -103,7 +103,7 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_ice()
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_atm(
 	giss::SparseAccumulator<int,double> &area1_m)
 {
-printf("BEGIN IceSheet_L0::hp_to_atm %ld %ld\n", n1(), n3());
+printf("BEGIN IceSheet_L0::hp_to_atm %ld %ld\n", n1(), n4());
 
 	// ============= hp_to_exch
 	// Interpolate (for now) in height points but not X/Y
@@ -120,7 +120,7 @@ nc.close();
 	// Area-weighted remapping from exchange to atmosphere grid is equal
 	// to scaled version of overlap matrix.
 	std::unique_ptr<giss::VectorSparseMatrix> exch_to_atm(
-		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n3())));
+		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n4())));
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
 		if (masked(cell)) continue;
 
@@ -144,7 +144,7 @@ printf("ENDing IceSheet_L0::hp_to_atm()\n");
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_atm(
 	giss::SparseAccumulator<int,double> &area1_m)
 {
-printf("BEGIN IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n3());
+printf("BEGIN IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n4());
 
 	// ============= exch_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to atmosphere grid is equal
@@ -187,17 +187,6 @@ printf("END accum_area(%s)\n", name.c_str());
 }
 // -------------------------------------------------------------
 
-
-/** @param f2 Some field on the ice grid */
-giss::CooVector<int, double>
-ice_to_atmosphere(blitz::Array<double,1> &f2)
-{
-}
-
-// -------------------------------------------------------------
-
-
-// ==============================================================
 boost::function<void ()> IceSheet_L0::netcdf_define(NcFile &nc, std::string const &vname) const
 {
 	auto ret = IceSheet::netcdf_define(nc, vname);

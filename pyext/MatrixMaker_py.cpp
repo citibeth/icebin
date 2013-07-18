@@ -238,6 +238,62 @@ static PyObject *MatrixMaker_hp_to_atm(PyMatrixMaker *self, PyObject *args)
 	}
 }
 
+static PyObject *MatrixMaker_ice_to_hp(PyMatrixMaker *self, PyObject *args)
+{
+	PyObject *ret_py = NULL;
+	try {
+
+		// Get arguments
+		PyObject *f2s_py;		// Should be [(1 : [...]), (2 : [...])]
+		if (!PyArg_ParseTuple(args, "O", &f2s_py)) {
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"Bad arguments for ice_to_hp().");
+			return 0;
+		}
+
+		if (!PyDict_Check(f2s_py)) return 0;
+
+
+		// Convert the Python dict to a C++ dict
+		std::map<int, blitz::Array<double,1>> f2s;
+		Py_ssize_t len = PyList_Size(f2s_py);
+		for (int i=0; i < len; ++i) {
+			PyObject *ii = PyList_GetItem(f2s_py, i);
+			if (!PyTuple_Check(ii)) return 0;
+			char *sheetname_py;
+			PyObject *f2_py;
+			PyArg_ParseTuple(ii, "sO", &sheetname_py, &f2_py);
+printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
+			IceSheet *sheet = (*self->maker)[std::string(sheetname_py)];
+
+			int dims[1] = {sheet->n2()};
+			auto f2(giss::py_to_blitz<double,1>(f2_py, "f2", 1, dims));
+
+			f2s.insert(std::make_pair(sheet->index, f2));
+
+		}
+
+		// Call!
+		giss::CooVector<int, double> f3(self->maker->ice_to_hp(f2s));
+
+		blitz::Array<double,1> ret(self->maker->n3());
+		ret = 0;
+		for (auto ii = f3.begin(); ii != f3.end(); ++ii) {
+			int i3 = ii->first;
+			double val = ii->second;
+			ret(i3) = val;
+		}
+
+		ret_py = giss::blitz_to_py(ret);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_hp_to_atm()");
+		return 0;
+	}
+}
+
 /** Read from a file */
 static PyObject *MatrixMaker_write(PyMatrixMaker *self, PyObject *args)
 {
@@ -304,9 +360,11 @@ static PyMethodDef MatrixMaker_methods[] = {
 		""},
 	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS,
 		""},
-	{"hp_to_ice", (PyCFunction)MatrixMaker_hp_to_ice, METH_KEYWORDS,
+	{"hp_to_ice", (PyCFunction)MatrixMaker_hp_to_ice, METH_VARARGS,
 		""},
 	{"hp_to_atm", (PyCFunction)MatrixMaker_hp_to_atm, METH_KEYWORDS,
+		""},
+	{"ice_to_hp", (PyCFunction)MatrixMaker_ice_to_hp, METH_KEYWORDS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
 		""},

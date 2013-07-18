@@ -164,6 +164,28 @@ PyObject *vector_to_py(std::vector<T> const &vec)
 	}
 }
 
+template<class T, int N>
+PyObject *blitz_to_py(blitz::Array<T,N> const &array)
+{
+	PyObject *array_py = NULL;
+	try {
+		int dims[N];
+		for (int i=0; i<N; ++i) dims[i] = array.extent(i);
+		PyObject *array_py = PyArray_FromDims(N, dims, get_type_num<T>());
+
+		// Wrap as blitz for convenience
+		auto array_bl(py_to_blitz<T,N>(array_py, "array_py", 1, dims));
+
+		// Copy from the arraytor to the Blitz array
+		array_bl = array;
+		return array_py;
+	} catch(...) {
+		// De-allocated since we're not returning
+		if (array_py) Py_DECREF(array_py);
+		throw std::exception();
+	}
+}
+
 // ======================================================================
 
 PyObject *VectorSparseMatrix_to_py(giss::VectorSparseMatrix const &mat);

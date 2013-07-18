@@ -9,6 +9,10 @@ namespace glint2 {
 IceSheet::IceSheet() : name("icesheet") {}
 
 IceSheet::~IceSheet() {}
+
+/** Number of dimensions of atmosphere vector space */
+size_t IceSheet::n1() const { return gcm->n1(); }
+
 // -----------------------------------------------------
 void IceSheet::clear()
 {

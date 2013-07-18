@@ -99,7 +99,7 @@ int main(int argc, char **argv)
 		// Constants
 		LHM, SHI);
 
-	int nhp = api->maker->nhp();
+	int nhp = api->maker->nhp(-1);
 
 	auto used1h = blitz::Array<int,3>(
 		blitz::Range(1,im),

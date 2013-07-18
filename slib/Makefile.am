@@ -17,6 +17,7 @@ libglint2_la_SOURCES = \
 	$(FORTRAN_SOURCES) \
 	giss/geodesy.cpp \
 	giss/IndexTranslator.cpp \
+	giss/IndexTranslator2.cpp \
 	giss/ncutil.cpp \
 	giss/Proj2.cpp \
 	giss/SparseMatrix.cpp \
@@ -56,6 +57,11 @@ FORTRAN_SOURCES += \
 	galahad/qpt_f.f90 \
 	galahad/x_loc_f.f90 \
 	galahad/zd11_f.f90
+
+libglint2_la_SOURCES += \
+	galahad/zd11_c.cpp \
+	galahad/qpt_c.cpp
+
 endif
 
 # # ------------------------------------------------------
@@ -86,6 +92,6 @@ nobase_include_HEADERS = \
 	$(shell find . -name '*.hpp') \
 	$(shell find . -name '*.h') \
 	$(shell find . -name '*.mod') \
-	ncutil_mod.mod qpt_x.mod c_loc_x.mod hsl_zd11d.mod zd11_x.mod
+	ncutil_mod.mod qpt_x.mod c_loc_x.mod zd11_x.mod
 
 libglint2_ladir = $(includedir)

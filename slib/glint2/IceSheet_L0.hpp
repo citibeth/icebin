@@ -7,14 +7,11 @@ namespace glint2 {
 class IceSheet_L0 : public IceSheet
 {		// For ice model with level-value grid cells
 public:
-	/** Number of grid cells in the atmosphere grid */
-	long n1() const { return exgrid->grid1_ncells_full; }
-
 	/** Number of grid cells in the ice grid */
-	long n2() const { return exgrid->grid2_ncells_full; }
+	size_t n2() const { return exgrid->grid2_ncells_full; }
 
 	/** Number of grid cells in the exchange grid */
-	long n3() const { return exgrid->ncells_full(); }
+	size_t n4() const { return exgrid->ncells_full(); }
 
 protected:
 

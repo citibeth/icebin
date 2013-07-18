@@ -1,32 +1,28 @@
 #pragma once
 
 #include <boost/function.hpp>
-#include "hsl_zd11_x.hpp"
-
-namespace galahad {
-
-class qtp_problem_f;		// Fortran type, opaque
-class qtp_problem_c;			// C++ class
-
-}
+#include <galahad/zd11_c.hpp>
 
 class NcFile;
 
-// =============== Fortran Subroutines
-extern "C" galahad::qtp_problem_f *qpt_problem_new_c();
-extern "C" void qpt_problem_delete_c(galahad::qtp_problem_f *ptr);
-extern "C" void qpt_problem_c_init(
-		galahad::qtp_problem_c *self, galahad::qtp_problem_f *main,
-		int m, int n,
-		int A_ne, int H_ne, int eqp_bool);
-// =============== C++ Peer Classes
+namespace galahad {
+	class qpt_problem_f;		// Fortran type, opaque
+	class qpt_problem_c;		// Forward declaration for functions below
+}
+
+extern "C" void qpt_problem_alloc_h(
+	galahad::qpt_problem_c *this_c, int H_ne);
+
+extern "C" void qpt_problem_alloc_a(
+	galahad::qpt_problem_c *this_c, int A_ne);
+
 
 namespace galahad {
 
 /** C++ peer to GALAHAD's derived type galahad_qpt_double::qpt_problem_type. */
-class qtp_problem_c {
+class qpt_problem_c {
 public :
-	qtp_problem_f &main;	/// galahad_qpt_double::qpt_problem_type
+	qpt_problem_f &this_f;	/// galahad_qpt_double::qpt_problem_type
 	int &m;					/// Number of constraints
 	int &n;					/// Number of variables
 	double &f;				/// constant term in objective function
@@ -51,12 +47,19 @@ public :
 	@param A_ne Number of elements in the constraint matrix.
 	@param H_ne Number of elements in the Hessian matrix (the function to be minimized).
 	@param eqp Are we preparing for a problem with equality-only constraints? */
-	qtp_problem_c(
+	qpt_problem_c(
 		int m, int n,
-		int A_ne, int H_ne, bool eqp);
+		bool eqp);
+
+	void alloc_H(int H_ne)
+		{ qpt_problem_alloc_h(this, H_ne); }
+
+	void alloc_A(int A_ne)
+		{ qpt_problem_alloc_a(this, A_ne); }
+
 
 	/** Deallocates the underlying istance of galahad_qpt_double::qpt_problem_type. */
-	~qtp_problem_c();
+	~qpt_problem_c();
 
 	/** Used to write this data structure to a netCDF file.
 	Defines the required variables.  Call the returned boost::function

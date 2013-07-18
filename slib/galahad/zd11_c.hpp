@@ -3,14 +3,13 @@
 #include <string>
 #include <boost/function.hpp>
 
+class NcFile;
+
+
 namespace galahad {
 
-class zd11_f;		// Fortran type, opaque
-class zd11_c;		// C type, not opaque to us
-
+	class zd11_f;		// Fortran type, opaque
 }
-
-class NcFile;
 
 extern "C" int zd11_put_type_c(galahad::zd11_f &, char const *, int);
 

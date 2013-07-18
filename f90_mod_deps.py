@@ -119,12 +119,17 @@ def get_deps_and_mods(filename, opts):
 def write_deps(outf, filename, deps, mods):
 	filebase, fileext = os.path.splitext(filename)
 	dir,leafbase = os.path.split(filebase)
-	outf.write("%s%s%s.lo: %s %s\n" %
-		(" ".join(mods),
-		("" if len(mods) == 0 else " "),
-		leafbase, filename, " ".join(deps)))
-	outf.write("\t$(LTFCCOMPILE) -c -o %s.lo $<\n\n" %
-		filebase)
+	outf.write('%s : %s.lo\n' % (' '.join(mods), leafbase))
+	outf.write('%s.lo : %s %s\n' % (leafbase, filename, ' '.join(deps)))
+
+
+
+# 	outf.write("%s%s%s.lo : %s %s\n" %
+# 		(" ".join(mods),
+# 		("" if len(mods) == 0 else " "),
+# 		leafbase, filename, " ".join(deps)))
+# 	outf.write("\t$(LTFCCOMPILE) -c -o %s.lo $<\n\n" %
+# 		leafbase)
 
 def process_args():
 	try:

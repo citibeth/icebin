@@ -96,7 +96,7 @@ extern "C" void glint2_modele_delete(glint2_modele *&api)
 extern "C"
 int glint2_modele_nhp(glint2_modele *api)
 {
-	int ret = api->maker->nhp();
+	int ret = api->maker->nhp(-1);	// Assume all grid cells have same # EP
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
     // (not part of GLINT2)
 	ret += 1;
@@ -271,8 +271,8 @@ printf("init_landice_com_part2 1\n");
 	// on all grid cells.
 
 	auto elev1h(elev1h_f.to_blitz());
-	int nhp_glint2 = api->maker->nhp();
-	int nhp = api->maker->nhp() + 1;	// Add non-model HP
+	int nhp_glint2 = api->maker->nhp(-1);
+	int nhp = api->maker->nhp(-1) + 1;	// Add non-model HP
 	if (nhp != elev1h.extent(2)) {
 		fprintf(stderr, "glint2_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp);
 		throw std::exception();

@@ -1,11 +1,12 @@
 MODULE qpt_x
 	use, intrinsic :: iso_c_binding
+	use hsl_zd11_double
 	use zd11_x
 
 IMPLICIT NONE
 
 	type QPT_problem_c
-		type(c_ptr) :: main			! QTP_problem_type
+		type(c_ptr) :: this_fc		! QTP_problem_type * (peer)
 
 	    type(c_ptr) :: m       ! int &; number of constraints
 	    type(c_ptr) :: n       ! int &; number of variables
@@ -29,59 +30,108 @@ END MODULE qpt_x
 ! ======================================================
 ! Functions to be called from C, so they're outside of a module
 
-
+! ----------------------------------------------------------
 ! @param m Number of constraints
 ! @param n Number of variables
-subroutine QPT_problem_c_init(self, main, m, n, A_ne, H_ne, eqp_bool) bind(c)
+!subroutine QPT_problem_init_c(this_cc, this_fc, m, n, A_ne, H_ne, eqp) bind(c)
+subroutine QPT_problem_init_c(this_cc, this_fc, m, n, eqp) bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
+use zd11_x
 use c_loc_x
 use, intrinsic :: iso_c_binding
 IMPLICIT NONE
-type(c_ptr) :: self_c			! qpt_problem *
-type(QPT_problem_type), target :: main
+type(c_ptr), value :: this_cc			! qpt_problem_c *
+	type(qpt_problem_c), pointer :: this_c
+type(c_ptr), value :: this_fc			! qpt_problem_type *
+	type(QPT_problem_type), pointer :: this_f
 integer(c_int), value :: m, n
-integer(c_int), value :: A_ne		! # of elements in A (constraint) matrix
+!integer(c_int), value :: A_ne		! # of elements in A (constraint) matrix
+!integer(c_int), value :: H_ne		! # of elements in H (Hessian) matrix
+logical(kind=c_bool), value :: eqp		! Are we preparing for a problem w/ equality constraints?
+
+	call c_f_pointer(this_fc, this_f)
+	call c_f_pointer(this_cc, this_c)
+
+
+		this_f%m = m
+		this_f%n = n
+
+		this_c%this_fc = c_loc(this_f)
+
+		this_c%m = c_loc(this_f%m)
+		this_c%n = c_loc(this_f%n)
+		this_c%f = c_loc(this_f%f)
+
+		allocate(this_f%G(n), this_f%X_l(n), this_f%X_u(n))
+		this_c%G = c_loc_array_double(this_f%G)
+		this_c%X_l = c_loc_array_double(this_f%X_l)
+		this_c%X_u = c_loc_array_double(this_f%X_u)
+
+	! write(6,*) 'QPT_problem-c_init() eqp=', eqp
+		if (eqp) then
+			allocate(this_f%C(m))
+			this_c%C = c_loc_array_double(this_f%C)
+	! write(6,*) 'this_c%C=', this_c%C
+		else
+			allocate(this_f%C_l(m), this_f%C_u(m))
+			this_c%C_l = c_loc_array_double(this_f%C_l)
+			this_c%C_u = c_loc_array_double(this_f%C_u)
+	! write(6,*) 'this_c%C_u=', this_c%C_u
+		end if
+
+		allocate(this_f%X(n), this_f%Y(m), this_f%Z(n))
+		this_c%X = c_loc_array_double(this_f%X)
+		this_c%Y = c_loc_array_double(this_f%Y)
+		this_c%Z = c_loc_array_double(this_f%Z)
+
+!print *, c_loc(this_f%A)
+!write(6,*) 'ZD11_init(this_c%A)', A_ne
+!		ptr => this_f%A
+!		call ZD11_init_f(this_c%A, ptr, m, n, A_ne)
+!write(6,*) 'ZD11_init(this_c%H)'
+!		call ZD11_init_f(this_c%H, this_f%H, n, n, H_ne)
+
+end subroutine QPT_problem_init_c
+! ----------------------------------------------------------
+subroutine QPT_problem_alloc_H(this_cc, H_ne) bind(c)
+use GALAHAD_QPT_double
+USE qpt_x
+use zd11_x
+use c_loc_x
+use, intrinsic :: iso_c_binding
+IMPLICIT NONE
+type(c_ptr), value :: this_cc			! qpt_problem_c *
+	type(qpt_problem_c), pointer :: this_c
+type(QPT_problem_type), pointer :: this_f
 integer(c_int), value :: H_ne		! # of elements in H (Hessian) matrix
-integer(c_int), value :: eqp_bool		! Are we preparing for a problem w/ equality constraints? (1=true, 0=false)
 
-	main%m = m
-	main%n = n
+	call c_f_pointer(this_cc, this_c)
+	call c_f_pointer(this_c%this_fc, this_f)
+	write(6,*) 'ZD11_init(this_c%H)'
+	call ZD11_init_f(this_c%H, this_f%H, this_f%n, this_f%n, H_ne)
 
-	self%main = c_loc(main)
+end subroutine QPT_problem_alloc_H
+! ----------------------------------------------------------
+subroutine QPT_problem_alloc_A(this_cc, A_ne) bind(c)
+use GALAHAD_QPT_double
+USE qpt_x
+use zd11_x
+use c_loc_x
+use, intrinsic :: iso_c_binding
+IMPLICIT NONE
+type(c_ptr), value :: this_cc			! qpt_problem_c *
+	type(qpt_problem_c), pointer :: this_c
+type(QPT_problem_type), pointer :: this_f
+integer(c_int), value :: A_ne		! # of elements in A (constraints) matrix
 
-	self%m = c_loc(main%m)
-	self%n = c_loc(main%n)
-	self%f = c_loc(main%f)
+	call c_f_pointer(this_cc, this_c)
+	call c_f_pointer(this_c%this_fc, this_f)
+	write(6,*) 'ZD11_init(this_c%A)'
+	call ZD11_init_f(this_c%A, this_f%A, this_f%m, this_f%n, A_ne)
 
-	allocate(main%G(n), main%X_l(n), main%X_u(n))
-	self%G = c_loc_array_double(main%G)
-	self%X_l = c_loc_array_double(main%X_l)
-	self%X_u = c_loc_array_double(main%X_u)
-
-! write(6,*) 'QPT_problem-c_init() eqp_bool=', eqp_bool
-	if (eqp_bool /= 0) then
-		allocate(main%C(m))
-		self%C = c_loc_array_double(main%C)
-! write(6,*) 'self%C=', self%C
-	else
-		allocate(main%C_l(m), main%C_u(m))
-		self%C_l = c_loc_array_double(main%C_l)
-		self%C_u = c_loc_array_double(main%C_u)
-! write(6,*) 'self%C_u=', self%C_u
-	end if
-
-	allocate(main%X(n), main%Y(m), main%Z(n))
-	self%X = c_loc_array_double(main%X)
-	self%Y = c_loc_array_double(main%Y)
-	self%Z = c_loc_array_double(main%Z)
-
-write(6,*) 'ZD11_c_init(self%A)', A_ne
-	call ZD11_c_init(self%A, main%A, m, n, A_ne)
-write(6,*) 'ZD11_c_init(self%H)'
-	call ZD11_c_init(self%H, main%H, n, n, H_ne)
-end subroutine QPT_problem_c_init
-
+end subroutine QPT_problem_alloc_A
+! ----------------------------------------------------------
 function QPT_problem_new_c() bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
@@ -95,15 +145,15 @@ type(c_ptr) :: QPT_problem_new_c
 	allocate(main)
 	QPT_problem_new_c = c_loc(main)
 end function QPT_problem_new_c
-
-subroutine QPT_problem_delete_c(main_c) bind(c)
+! ---------------------------------------------------------------------
+subroutine QPT_problem_delete_c(this_fc) bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
 use, intrinsic :: iso_c_binding
 IMPLICIT NONE
-type(c_ptr), value :: main_c
-	type(QPT_problem_type), pointer :: main
+type(c_ptr), value :: this_fc
+	type(QPT_problem_type), pointer :: this_f
 
-	call c_f_pointer(main_c, main)
-	deallocate(main)
+	call c_f_pointer(this_fc, this_f)
+	deallocate(this_f)
 end subroutine QPT_problem_delete_c
