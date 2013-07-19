@@ -93,7 +93,9 @@ public:
 	TODO: This only works on one ice sheet.  Will need to be extended
 	for multiple ice sheets. */
 	giss::CooVector<int, double> ice_to_hp(
-		std::map<int, blitz::Array<double,1>> &f2s);
+		std::map<int, blitz::Array<double,1>> &f2s,
+		blitz::Array<double,1> &initial);
+
 
 
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;

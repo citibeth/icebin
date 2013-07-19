@@ -34,7 +34,7 @@ print 'impm2', impm2.shape
 
 f2s = dict()
 f2s['greenland'] = impm2
-impm3b = mm.ice_to_hp(f2s).reshape(impm3.shape)
+impm3b = mm.ice_to_hp(f2s, impm3.reshape(-1)).reshape(impm3.shape)
 
 nc = netCDF4.Dataset('./ice_to_hp.nc', 'w')
 print impm3.shape

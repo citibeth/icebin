@@ -246,7 +246,8 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 
 		// Get arguments
 		PyObject *f2s_py;		// Should be [(1 : [...]), (2 : [...])]
-		if (!PyArg_ParseTuple(args, "O", &f2s_py)) {
+		PyObject *initial_py;		// array[n3]
+		if (!PyArg_ParseTuple(args, "OO", &f2s_py, &initial_py)) {
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
 				"Bad arguments for ice_to_hp().");
@@ -283,9 +284,15 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 
 		}
 
-		// Call!
-		giss::CooVector<int, double> f3(self->maker->ice_to_hp(f2s));
+		// Get the blitz array from python
+		int dims[] = {self->maker->n3()};
+		auto initial(giss::py_to_blitz<double,1>(initial_py, "initial", 1, dims));
 
+		// Call!
+		giss::CooVector<int, double> f3(
+			self->maker->ice_to_hp(f2s, initial));
+
+		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
 		ret = 0;
 		for (auto ii = f3.begin(); ii != f3.end(); ++ii) {

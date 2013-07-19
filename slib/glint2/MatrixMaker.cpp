@@ -83,23 +83,96 @@ void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
 }
 
 // --------------------------------------------------------------
+/** Change this to a boost function later
+@param trans_2_2p Tells us which columns of conserv (i2) are active,
+       after masking with mask1, mask1h and mask2.
+*/
+static std::unique_ptr<giss::VectorSparseMatrix> remove_small_constraints(
+giss::VectorSparseMatrix const &in_constraints_const,
+int min_row_count)
+{
+	// Const cast because we don't know how to do const_iterator() right in VectorSparseMatrix
+	auto in_constraints(const_cast<giss::VectorSparseMatrix &>(in_constraints_const));
+
+	std::set<int> delete_row;		// Rows to delete
+	std::set<int> delete_col;		// Cols to delete
+
+	// Make sure there are no constraints (rows) with too few variables (columns).
+	// Uses an iterative process
+	std::vector<int> row_count(in_constraints.nrow);
+	for (;;) {
+		// Count rows
+		row_count.clear(); row_count.resize(in_constraints.nrow);
+		for (auto oi = in_constraints.begin(); oi != in_constraints.end(); ++oi) {
+			int i2 = oi.col();
+
+			// Loop if it's already in our delete_row and delete_col sets
+			if (delete_row.find(oi.row()) != delete_row.end()) continue;
+			if (delete_col.find(i2) != delete_col.end()) continue;
+
+			++row_count[oi.row()];
+		}
+
+
+		// Add to our deletion set
+		int num_deleted = 0;
+		for (auto oi = in_constraints.begin(); oi != in_constraints.end(); ++oi) {
+			int i2 = oi.col();
+
+			// Loop if it's already in our delete_row and delete_col sets
+			if (delete_row.find(oi.row()) != delete_row.end()) continue;
+			if (delete_col.find(i2) != delete_col.end()) continue;
+
+			if (row_count[oi.row()] < min_row_count) {
+				++num_deleted;
+				delete_row.insert(oi.row());
+				delete_col.insert(i2);
+			}
+		}
+
+		// Terminate if we didn't remove anything on this round
+printf("num_deleted = %d\n", num_deleted);
+		if (num_deleted == 0) break;
+	}
+
+
+	// Copy over the matrix, deleting rows and columns as planned
+	std::unique_ptr<giss::VectorSparseMatrix> out_constraints(
+		new giss::VectorSparseMatrix(giss::SparseDescr(in_constraints)));
+	for (auto oi = in_constraints.begin(); oi != in_constraints.end(); ++oi) {
+		int i2 = oi.col();
+
+		// Loop if it's already in our delete_row and delete_col sets
+		if (delete_row.find(oi.row()) != delete_row.end()) continue;
+		if (delete_col.find(i2) != delete_col.end()) continue;
+
+		out_constraints->set(oi.row(), i2, oi.val());
+	}
+	return out_constraints;
+}
+// -------------------------------------------------------------
 /** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete.
 TODO: This only works on one ice sheet.  Will need to be extended
 for multiple ice sheets. */
 giss::CooVector<int, double>
 MatrixMaker::ice_to_hp(
-std::map<int, blitz::Array<double,1>> &f2s)
+std::map<int, blitz::Array<double,1>> &f2s,
+blitz::Array<double,1> &initial)
 {
 	// =============== Set up basic vector spaces for optimization problem
 	std::set<int> used1, used3;
 	std::set<std::pair<int,int>> used2;
 
 	// Used in constraints
-	std::unique_ptr<giss::VectorSparseMatrix> RM(hp_to_atm());	// 3->1
-	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
+	std::unique_ptr<giss::VectorSparseMatrix> RM0(hp_to_atm());	// 3->1
+	for (auto ii = RM0->begin(); ii != RM0->end(); ++ii) {
 		used1.insert(ii.row());
 		used3.insert(ii.col());
 	}
+
+	std::unique_ptr<giss::VectorSparseMatrix> RM(
+		remove_small_constraints(*RM0, 2));
+	RM0.reset();
 
 
 	giss::SparseAccumulator<int,double> area1;
@@ -277,7 +350,11 @@ printf("H: (%d x %d) = %d elements\n", H->nrow, H->ncol, H->size());
 	RMp.clear();
 
 	// =========================== Initial guess at solution
-	for (int i=0; i<n3p; ++i) qpt.X[i] = 0;	// we have no idea
+	for (int i3p=0; i3p<n3p; ++i3p) {
+		int i3 = trans_3_3p.b2a(i3p);
+		qpt.X[i3p] = initial(i3);
+//		qpt.X[i3p] = 0;	// we have no idea
+	}
 
 	// =========================== Solve the Problem!
 	double infinity = 1e20;
