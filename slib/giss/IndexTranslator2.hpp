@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 #include <set>
 #include <cstdio>
@@ -11,11 +12,13 @@ namespace giss {
 
 /** Used to translated row and column matrix indices between spaces related by removal of dimensions. */
 class IndexTranslator2 {
-
+	std::string _name;	// For debugging
 	std::map<int, size_t> _size_a;
 	std::unordered_map<std::pair<int,int>, int, giss::HashPair<int,int>> _a2b;
 	std::vector<std::pair<int,int>> _b2a;
 public:
+	IndexTranslator2(std::string const &name) : _name(name) {}
+
 	/** Set up the translation.
 	Translation is done between indices in space A and space B.
 	@param n Size of space A (indices run [0...n-1])

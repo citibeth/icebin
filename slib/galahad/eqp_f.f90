@@ -121,7 +121,7 @@ print *,'H%m,H%n,H%ne',p%H%m,p%H%n,p%H%ne
 		inform%SBLS_inform%SLS_inform%condition_number_2
 	IF ( inform%status /= 0 ) THEN	! Error
 		eqp_solve_simple = .false.
-		WRITE( 6, "( ' QP_solve exit status = ', I6 ) " ) inform%status
+		WRITE( 6, "( ' EQP_solve exit status = ', I6 ) " ) inform%status
 		select case(inform%status)
 !			case(-10)
 !				write(6, "( ' inform%sils_factorize_status = ', I6 ) " ) inform%sils_factorize_status

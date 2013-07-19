@@ -240,6 +240,7 @@ static PyObject *MatrixMaker_hp_to_atm(PyMatrixMaker *self, PyObject *args)
 
 static PyObject *MatrixMaker_ice_to_hp(PyMatrixMaker *self, PyObject *args)
 {
+printf("BEGIN MatrixMaker_ice_to_hp()\n");
 	PyObject *ret_py = NULL;
 	try {
 
@@ -252,7 +253,11 @@ static PyObject *MatrixMaker_ice_to_hp(PyMatrixMaker *self, PyObject *args)
 			return 0;
 		}
 
-		if (!PyDict_Check(f2s_py)) return 0;
+		if (!PyList_Check(f2s_py)) {
+			PyErr_SetString(PyExc_ValueError,
+				"Argument must be a list.");
+			return 0;
+		}
 
 
 		// Convert the Python dict to a C++ dict
@@ -260,7 +265,11 @@ static PyObject *MatrixMaker_ice_to_hp(PyMatrixMaker *self, PyObject *args)
 		Py_ssize_t len = PyList_Size(f2s_py);
 		for (int i=0; i < len; ++i) {
 			PyObject *ii = PyList_GetItem(f2s_py, i);
-			if (!PyTuple_Check(ii)) return 0;
+			if (!PyTuple_Check(ii)) {
+				PyErr_SetString(PyExc_ValueError,
+					"List must contain tuples");
+				return 0;
+			}
 			char *sheetname_py;
 			PyObject *f2_py;
 			PyArg_ParseTuple(ii, "sO", &sheetname_py, &f2_py);

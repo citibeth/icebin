@@ -165,6 +165,7 @@ printf("BEGIN IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n4());
 
 	//ice_to_atm->sum_duplicates();
 
+printf("END IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n4());
 	return multiply(
 		*atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
 		*ice_to_atm);

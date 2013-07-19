@@ -106,19 +106,23 @@ std::map<int, blitz::Array<double,1>> &f2s)
 	giss::MapDict<int, giss::VectorSparseMatrix> Ss;
 	giss::MapDict<int, giss::VectorSparseMatrix> XMs;
 	std::map<int, size_t> size2;	// Size of each ice vector space
+printf("f2s.size() = %d\n", f2s.size());
 	for (auto f2i=f2s.begin(); f2i != f2s.end(); ++f2i) {
 		IceSheet *sheet = (*this)[f2i->first];
 
 		std::unique_ptr<giss::VectorSparseMatrix> S(
 			sheet->ice_to_atm(area1));		// 2 -> 1
+printf("S->size() = %d\n", S->size());
 		for (auto ii = S->begin(); ii != S->end(); ++ii) {
 			used1.insert(ii.row());
+//printf("used.insert-a: %d %d\n", sheet->index, ii.col());
 			used2.insert(std::make_pair(sheet->index, ii.col()));
 		}
 
 		std::unique_ptr<giss::VectorSparseMatrix> XM(
 			sheet->hp_to_ice());				// 3 -> 2
-		for (auto ii = S->begin(); ii != S->end(); ++ii) {
+		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
+//printf("used.insert-b: %d %d\n", sheet->index, ii.row());
 			used2.insert(std::make_pair(sheet->index, ii.row()));
 			used3.insert(ii.col());
 		}
@@ -130,11 +134,12 @@ std::map<int, blitz::Array<double,1>> &f2s)
 		XMs.insert(sheet->index, std::move(XM));
 	}
 
-	giss::IndexTranslator trans_1_1p;
+	giss::IndexTranslator trans_1_1p("trans_1_1p");
 		trans_1_1p.init(n1(), used1);
-	giss::IndexTranslator2 trans_2_2p;
+printf("used2.size() = %d\n", used2.size());
+	giss::IndexTranslator2 trans_2_2p("trans_2_2p");
 		trans_2_2p.init(std::move(size2), used2);
-	giss::IndexTranslator trans_3_3p;
+	giss::IndexTranslator trans_3_3p("trans_3_3p");
 		trans_3_3p.init(n3(), used3);
 
 	int n1p = trans_1_1p.nb();
@@ -146,6 +151,9 @@ std::map<int, blitz::Array<double,1>> &f2s)
 	giss::VectorSparseMatrix Sp(giss::SparseDescr(n1p, n2p));
 	giss::VectorSparseMatrix XMp(giss::SparseDescr(n2p, n3p));
 
+printf("n1p=%d, n2p=%d, n3p=%d\n", n1p, n2p, n3p);
+
+printf("Translating RM\n");
 	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
 		RMp.add(
 			trans_1_1p.a2b(ii.row()),
@@ -160,6 +168,7 @@ std::map<int, blitz::Array<double,1>> &f2s)
 		giss::VectorSparseMatrix *S(Ss[index]);
 		giss::VectorSparseMatrix *XM(XMs[index]);
 
+printf("Translating S: %d\n", index);
 		for (auto ii = S->begin(); ii != S->end(); ++ii) {
 			Sp.add(
 				trans_1_1p.a2b(ii.row()),
@@ -167,7 +176,8 @@ std::map<int, blitz::Array<double,1>> &f2s)
 				ii.val());
 		}
 
-		for (auto ii = S->begin(); ii != S->end(); ++ii) {
+printf("Translating XM: %d\n", index);
+		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
 			XMp.add(
 				trans_2_2p.a2b(std::make_pair(index, ii.row())),
 				trans_3_3p.a2b(ii.col()),
@@ -219,7 +229,10 @@ std::map<int, blitz::Array<double,1>> &f2s)
 	// -------- H = 2 * XMp^T XMp
 	giss::VectorSparseMatrix XMp_T(giss::SparseDescr(XMp.ncol, XMp.nrow));
 	transpose(XMp, XMp_T);
+printf("XMp: (%d x %d) = %d elements\n", XMp.nrow, XMp.ncol, XMp.size());
+printf("XMp_T: (%d x %d) = %d elements\n", XMp_T.nrow, XMp_T.ncol, XMp_T.size());
 	std::unique_ptr<giss::VectorSparseMatrix> H(multiply(XMp_T, XMp));	// n3xn3
+printf("H: (%d x %d) = %d elements\n", H->nrow, H->ncol, H->size());
 	qpt.alloc_H(H->size());
 	giss::ZD11SparseMatrix H_zd11(qpt.H, 0);
 	for (auto ii = H->begin(); ii != H->end(); ++ii)

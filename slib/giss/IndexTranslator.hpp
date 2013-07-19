@@ -3,14 +3,18 @@
 #include <vector>
 #include <set>
 #include <cstdio>
+#include <string>
 
 namespace giss {
 
 /** Used to translated row and column matrix indices between spaces related by removal of dimensions. */
 class IndexTranslator {
+	std::string _name;	// For debugging
 	std::vector<int> _a2b;
 	std::vector<int> _b2a;
 public:
+	IndexTranslator(std::string const &name) : _name(name) {}
+
 	/** Set up the translation.
 	Translation is done between indices in space A and space B.
 	@param n Size of space A (indices run [0...n-1])
@@ -49,7 +53,7 @@ inline int IndexTranslator::a2b(int a, bool check_result) const {
 	}
 	int b = _a2b[a];
 	if (check_result && b < 0) {
-		fprintf(stderr, "a=%d produces invalid b=%d\n", a, b);
+		fprintf(stderr, "%s: a=%d produces invalid b=%d\n", _name.c_str(), a, b);
 		throw std::exception();
 	}
 	return b;
@@ -62,7 +66,7 @@ inline int IndexTranslator::b2a(int b, bool check_result) const {
 	}
 	int a = _b2a[b];
 	if (check_result && a < 0) {
-		fprintf(stderr, "b=%d produces invalid a=%d\n", b, a);
+		fprintf(stderr, "%s: b=%d produces invalid a=%d\n", _name.c_str(), b, a);
 		throw std::exception();
 	}
 	return a;

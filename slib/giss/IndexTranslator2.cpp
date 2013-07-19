@@ -20,18 +20,18 @@ void IndexTranslator2::init(std::map<int, size_t> &&size_a, std::set<std::pair<i
 int IndexTranslator2::a2b(std::pair<int,int> a, bool check_result) const {
 	int aindex = a.first;
 	if (aindex < 0 || aindex >= nindex()) {
-		fprintf(stderr, "aindex=%d is out of range (%d, %d)\n", aindex, 0, nindex());
+		fprintf(stderr, "%s: aindex=%d is out of range (%d, %d)\n", _name.c_str(), aindex, 0, nindex());
 		throw std::exception();
 	}
 
 	int agrid = a.second;
 	if (agrid < 0 || agrid >= na(aindex)) {
-		fprintf(stderr, "a=%d is out of range (%d, %d)\n", a, 0, na(aindex));
+		fprintf(stderr, "%s: a=%d is out of range (%d, %d)\n", _name.c_str(), a, 0, na(aindex));
 		throw std::exception();
 	}
 	auto ib = _a2b.find(a);
 	if (check_result && ib == _a2b.end()) {
-		fprintf(stderr, "a=(%d,%d) not found\n", a.first, a.second);
+		fprintf(stderr, "%s: a=(%d,%d) not found\n", _name.c_str(), a.first, a.second);
 		throw std::exception();
 	}
 	return ib->second;
@@ -40,12 +40,12 @@ int IndexTranslator2::a2b(std::pair<int,int> a, bool check_result) const {
 
 std::pair<int,int> IndexTranslator2::b2a(int b, bool check_result) const {
 	if (b < 0 || b >= nb()) {
-		fprintf(stderr, "b=%d is out of range (%d, %d)\n", b, 0, nb());
+		fprintf(stderr, "%s: b=%d is out of range (%d, %d)\n", _name.c_str(), b, 0, nb());
 		throw std::exception();
 	}
 	std::pair<int,int> a = _b2a[b];
 	if (check_result && a.first < 0) {
-		fprintf(stderr, "b=%d produces invalid a=(%d,%d)\n", b, a.first,a.second);
+		fprintf(stderr, "%s: b=%d produces invalid a=(%d,%d)\n", _name.c_str(), b, a.first,a.second);
 		throw std::exception();
 	}
 	return a;

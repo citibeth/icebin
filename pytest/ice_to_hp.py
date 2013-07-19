@@ -34,6 +34,18 @@ print 'impm2', impm2.shape
 
 f2s = dict()
 f2s['greenland'] = impm2
-impm3 = mm.ice_to_hp(f2s)
+impm3b = mm.ice_to_hp(f2s).reshape(impm3.shape)
 
-print impm2 - impm3
+nc = netCDF4.Dataset('./ice_to_hp.nc', 'w')
+print impm3.shape
+nc.createDimension('nhc', impm3.shape[0])
+nc.createDimension('jm', impm3.shape[1])
+nc.createDimension('im', impm3.shape[2])
+
+dims = ('nhc', 'jm', 'im')
+nc.createVariable('impm3', 'd', dims)[:] = impm3[:]
+nc.createVariable('impm3b', 'd', dims)[:] = impm3b[:]
+
+nc.close()
+
+#print impm3b - impm3
