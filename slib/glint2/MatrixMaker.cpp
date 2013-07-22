@@ -1,3 +1,4 @@
+#include <cmath>
 #include <giss/CooVector.hpp>
 #include <giss/ncutil.hpp>
 #include <glint2/MatrixMaker.hpp>
@@ -157,18 +158,30 @@ for multiple ice sheets. */
 giss::CooVector<int, double>
 MatrixMaker::ice_to_hp(
 std::map<int, blitz::Array<double,1>> &f2s,
-blitz::Array<double,1> &initial)
+blitz::Array<double,1> &initial3)
 {
 	// =============== Set up basic vector spaces for optimization problem
 	std::set<int> used1, used3;
 	std::set<std::pair<int,int>> used2;
 
+//std::set<int> nan3 = { 36775, 49735, 50171, 62695, 63131, 75655, 76091, 88615, 88905, 89051, 101575, 101865, 102011, 114535, 114971};
+
 	// Used in constraints
 	std::unique_ptr<giss::VectorSparseMatrix> RM0(hp_to_atm());	// 3->1
 	for (auto ii = RM0->begin(); ii != RM0->end(); ++ii) {
+//if (nan3.find(ii.col()) != nan3.end()) printf("used RM0: (%d, %d)\n", ii.row(), ii.col());
 		used1.insert(ii.row());
 		used3.insert(ii.col());
 	}
+
+#if 0
+std::vector<int> nan3 = { 36775, 49735, 50171, 62695, 63131, 75655, 76091, 88615, 88905, 89051, 101575, 101865, 102011, 114535, 114971};
+for (int ix=0; ix<nan3.size(); ++ix) {
+	if (used3.find(nan3[ix]) != used3.end()) {
+		printf("nan-a: %d\n", nan3[ix]);
+	}
+}
+#endif
 
 	std::unique_ptr<giss::VectorSparseMatrix> RM(
 		remove_small_constraints(*RM0, 2));
@@ -179,13 +192,13 @@ blitz::Array<double,1> &initial)
 	giss::MapDict<int, giss::VectorSparseMatrix> Ss;
 	giss::MapDict<int, giss::VectorSparseMatrix> XMs;
 	std::map<int, size_t> size2;	// Size of each ice vector space
-printf("f2s.size() = %d\n", f2s.size());
+//printf("f2s.size() = %d\n", f2s.size());
 	for (auto f2i=f2s.begin(); f2i != f2s.end(); ++f2i) {
 		IceSheet *sheet = (*this)[f2i->first];
 
 		std::unique_ptr<giss::VectorSparseMatrix> S(
 			sheet->ice_to_atm(area1));		// 2 -> 1
-printf("S->size() = %d\n", S->size());
+//printf("S->size() = %d\n", S->size());
 		for (auto ii = S->begin(); ii != S->end(); ++ii) {
 			used1.insert(ii.row());
 //printf("used.insert-a: %d %d\n", sheet->index, ii.col());
@@ -196,6 +209,7 @@ printf("S->size() = %d\n", S->size());
 			sheet->hp_to_ice());				// 3 -> 2
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
 //printf("used.insert-b: %d %d\n", sheet->index, ii.row());
+//if (nan3.find(ii.col()) != nan3.end()) printf("used XM: (%d, %d)\n", ii.row(), ii.col());
 			used2.insert(std::make_pair(sheet->index, ii.row()));
 			used3.insert(ii.col());
 		}
@@ -209,7 +223,7 @@ printf("S->size() = %d\n", S->size());
 
 	giss::IndexTranslator trans_1_1p("trans_1_1p");
 		trans_1_1p.init(n1(), used1);
-printf("used2.size() = %d\n", used2.size());
+//printf("used2.size() = %d\n", used2.size());
 	giss::IndexTranslator2 trans_2_2p("trans_2_2p");
 		trans_2_2p.init(std::move(size2), used2);
 	giss::IndexTranslator trans_3_3p("trans_3_3p");
@@ -224,7 +238,7 @@ printf("used2.size() = %d\n", used2.size());
 	giss::VectorSparseMatrix Sp(giss::SparseDescr(n1p, n2p));
 	giss::VectorSparseMatrix XMp(giss::SparseDescr(n2p, n3p));
 
-printf("n1p=%d, n2p=%d, n3p=%d\n", n1p, n2p, n3p);
+//printf("n1p=%d, n2p=%d, n3p=%d\n", n1p, n2p, n3p);
 
 printf("Translating RM\n");
 	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
@@ -352,7 +366,8 @@ printf("H: (%d x %d) = %d elements\n", H->nrow, H->ncol, H->size());
 	// =========================== Initial guess at solution
 	for (int i3p=0; i3p<n3p; ++i3p) {
 		int i3 = trans_3_3p.b2a(i3p);
-		qpt.X[i3p] = initial(i3);
+		qpt.X[i3p] = initial3(i3);
+if (std::isnan(initial3(i3))) printf("nan: %d %d\n", i3, i3p);
 //		qpt.X[i3p] = 0;	// we have no idea
 	}
 

@@ -128,6 +128,12 @@ int main(int argc, char **argv)
 	FRAC_VAR(focean1);
 	FRAC_VAR(flake1);
 
+
+	fgice1 = 0;
+	fgrnd1 = 0;
+	focean1 = 0;
+	flake1 = 0;
+#if 0
 	{
 		NcFile nc("Z2HX2fromZ1QX1N_hc.nc");
 		long counts[2] = {jm, im};
@@ -137,7 +143,7 @@ int main(int argc, char **argv)
 		nc.get_var("flake")->get(flake1.data(), counts);
 		nc.close();
 	}
-
+#endif
 	for (int j=1; j<j0; ++j) {
 		fgice1_glint2(blitz::Range::all(), j) = 0;
 		fgice1(blitz::Range::all(), j) = 0;
@@ -157,6 +163,8 @@ int main(int argc, char **argv)
 	glint2_modele_compute_fgice_c(api, 1 /*true*/,
 		fgice1_glint2_f,
 		fgice1_f, fgrnd1_f, focean1_f, flake1_f);
+
+printf("A: fgice1(56, 76) = %g\n", fgice1(56,76));
 
 	// ----------------------------------------------------------
 	// Try the HP-to-HC matrix
@@ -185,6 +193,7 @@ int main(int argc, char **argv)
 		zatmo1_f, 1.0, fgice1_glint2_f, fgice1_f,
 		used1h_f, fhc1h_f, elevhc_f);
 
+printf("B: fgice1(56, 76) = %g\n", fgice1(56,76));
 	// ----------------------------------------------------------
 	// Save it to a netCDF file so we can tell if it's correct
 	char fname[50];
@@ -218,7 +227,7 @@ int main(int argc, char **argv)
 	// ----------------------------------------------------------
 	// -------- Test regridding to the ice model
 //	NcFile ijhc_nc("JUL1952.ijhcncar225.nc");
-	NcFile ijhc_nc("JUL1950.ijhchc1k225.nc");
+	NcFile ijhc_nc("data/JUL1950.ijhchc1k225.nc");
 
 	auto impm_c(giss::read_blitz<double,3>(ijhc_nc, "impm_lndice"));
 	auto impm(giss::c_to_f(impm_c));	// Fortran-style array

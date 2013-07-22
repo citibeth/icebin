@@ -9,6 +9,13 @@ namespace glint2 {
 /** Tells whether a cell in the exchange grid is masked out or not */
 bool IceSheet_L0::masked(giss::HashDict<int, Cell>::iterator const &it)
 {
+#if 0
+if (it->i == 10855) {
+	bool m1 = (gcm->mask1.get() && (*gcm->mask1)(it->i));
+	bool m2 = (mask2.get() && (*mask2)(it->j));
+	printf("masked(i1=10855): %d %d\n", m1, m2);
+}
+#endif
 	if (gcm->mask1.get() && (*gcm->mask1)(it->i)) return true;
 	if (mask2.get() && (*mask2)(it->j)) return true;
 	return false;
@@ -53,6 +60,7 @@ static void linterp_1d(
 std::unique_ptr<giss::VectorSparseMatrix> 
 IceSheet_L0::hp_interp(Overlap overlap_type)
 {
+printf("BEGIN hp_interp(%d)\n", overlap_type);
 	int nx = (overlap_type == Overlap::ICE ? n2() : n4());
 
 	// Sum overlap matrix by column (ice grid cell)
@@ -61,6 +69,9 @@ IceSheet_L0::hp_interp(Overlap overlap_type)
 		if (masked(cell)) continue;
 		area2[cell->j] += cell->area;
 	}
+
+
+printf("MID hp_interp(%d)\n", overlap_type);
 
 	HCIndex hc_index(n1());
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
@@ -89,6 +100,7 @@ IceSheet_L0::hp_interp(Overlap overlap_type)
 			overlap_ratio * whps[1]);
 	}
 
+printf("END hp_interp(%d)\n", overlap_type);
 
 	return ret;
 }
