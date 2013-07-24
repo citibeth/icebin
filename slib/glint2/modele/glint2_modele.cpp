@@ -359,6 +359,7 @@ printf("init_landice_com_part2 4\n");
 
 		// Set used for the legacy height point
 		// Compute legacy height point for ALL cells with ice
+		// (This allows us to easily compare running with/without height points)
 		used1h(i,j,1) = 1;
 		// Compute legacy height point just for cells with non-model ice
 		// used1h(i,j,1) = (fhc1h(i,j,1) > 0 ? 1 : 0);
@@ -380,8 +381,8 @@ printf("init_landice_com_part2 4\n");
 		mink = std::max(2, mink-2);
 		maxk = std::min(nhp, maxk+2);
 
-		// Set everything from mink to maxk as used
-		for (int k=mink; k<maxk; ++k) used1h(i,j,k) = 1;
+		// Set everything from mink to maxk (inclusive) as used
+		for (int k=mink; k<=maxk; ++k) used1h(i,j,k) = 1;
 	}}
 
 	// ModelE hack: ModelE disregards used1h, it turns on a height point
