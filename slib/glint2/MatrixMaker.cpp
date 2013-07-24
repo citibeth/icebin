@@ -160,6 +160,7 @@ MatrixMaker::ice_to_hp(
 std::map<int, blitz::Array<double,1>> &f2s,
 blitz::Array<double,1> &initial3)
 {
+printf("BEGIN MatrixMaker::ice_to_hp()\n");
 	// =============== Set up basic vector spaces for optimization problem
 	std::set<int> used1, used3;
 	std::set<std::pair<int,int>> used2;
@@ -168,11 +169,14 @@ blitz::Array<double,1> &initial3)
 
 	// Used in constraints
 	std::unique_ptr<giss::VectorSparseMatrix> RM0(hp_to_atm());	// 3->1
+printf("MatrixMaker::ice_to_hp() 1\n");
 	for (auto ii = RM0->begin(); ii != RM0->end(); ++ii) {
 //if (nan3.find(ii.col()) != nan3.end()) printf("used RM0: (%d, %d)\n", ii.row(), ii.col());
+if (ii.col() == 11427) printf("used3.insert RM: (%d, %d)\n", ii.row(), ii.col());
 		used1.insert(ii.row());
 		used3.insert(ii.col());
 	}
+printf("MatrixMaker::ice_to_hp() 2\n");
 
 #if 0
 std::vector<int> nan3 = { 36775, 49735, 50171, 62695, 63131, 75655, 76091, 88615, 88905, 89051, 101575, 101865, 102011, 114535, 114971};
@@ -207,12 +211,15 @@ for (int ix=0; ix<nan3.size(); ++ix) {
 
 		std::unique_ptr<giss::VectorSparseMatrix> XM(
 			sheet->hp_to_ice());				// 3 -> 2
+printf("MatrixMaker::ice_to_hp() 3\n");
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
 //printf("used.insert-b: %d %d\n", sheet->index, ii.row());
 //if (nan3.find(ii.col()) != nan3.end()) printf("used XM: (%d, %d)\n", ii.row(), ii.col());
+if (ii.col() == 11427) printf("used3.insert XM: (%d, %d)\n", ii.row(), ii.col());
 			used2.insert(std::make_pair(sheet->index, ii.row()));
 			used3.insert(ii.col());
 		}
+printf("MatrixMaker::ice_to_hp() 4\n");
 
 		size2[sheet->index] = sheet->n2();
 
@@ -373,7 +380,7 @@ if (std::isnan(initial3(i3))) printf("nan: %d %d\n", i3, i3p);
 
 	// =========================== Solve the Problem!
 	double infinity = 1e20;
-	eqp_solve_simple(qpt.this_f, infinity);
+//	eqp_solve_simple(qpt.this_f, infinity);
 
 
 
