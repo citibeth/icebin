@@ -152,6 +152,25 @@ printf("num_deleted = %d\n", num_deleted);
 	return out_constraints;
 }
 // -------------------------------------------------------------
+/** Checksums an interpolation matrix, to ensure that the sume of weights
+for each output grid cell is 1.  This should always be the case, no
+matter what kind of interpolation is used. */
+static bool checksum_interp(giss::VectorSparseMatrix &mat, std::string const &name,
+double epsilon)
+{
+	bool ret = true;
+	auto rowsums(mat.sum_per_row_map());
+	for (auto ii = rowsums.begin(); ii != rowsums.end(); ++ii) {
+		int row = ii->first;
+		double sum = ii->second;
+		if (std::abs(sum - 1.0d) > epsilon) {
+			printf("rowsum != 1 at %s: %d %g\n", name.c_str(), row, sum);
+			ret = false;
+		}
+	}
+	return false;
+}
+// -------------------------------------------------------------
 /** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete.
 TODO: This only works on one ice sheet.  Will need to be extended
 for multiple ice sheets. */
@@ -165,57 +184,46 @@ printf("BEGIN MatrixMaker::ice_to_hp()\n");
 	std::set<int> used1, used3;
 	std::set<std::pair<int,int>> used2;
 
-//std::set<int> nan3 = { 36775, 49735, 50171, 62695, 63131, 75655, 76091, 88615, 88905, 89051, 101575, 101865, 102011, 114535, 114971};
-
 	// Used in constraints
 	std::unique_ptr<giss::VectorSparseMatrix> RM0(hp_to_atm());	// 3->1
-printf("MatrixMaker::ice_to_hp() 1\n");
 	for (auto ii = RM0->begin(); ii != RM0->end(); ++ii) {
-//if (nan3.find(ii.col()) != nan3.end()) printf("used RM0: (%d, %d)\n", ii.row(), ii.col());
-if (ii.col() == 11427) printf("used3.insert RM: (%d, %d)\n", ii.row(), ii.col());
 		used1.insert(ii.row());
 		used3.insert(ii.col());
 	}
-printf("MatrixMaker::ice_to_hp() 2\n");
 
+// In some cases in the past, QP optimization has not worked well
+// when there are grid cells with very few entries in the
+// constraints matrix.  Not an issue here now.
 #if 0
-std::vector<int> nan3 = { 36775, 49735, 50171, 62695, 63131, 75655, 76091, 88615, 88905, 89051, 101575, 101865, 102011, 114535, 114971};
-for (int ix=0; ix<nan3.size(); ++ix) {
-	if (used3.find(nan3[ix]) != used3.end()) {
-		printf("nan-a: %d\n", nan3[ix]);
-	}
-}
-#endif
-
 	std::unique_ptr<giss::VectorSparseMatrix> RM(
 		remove_small_constraints(*RM0, 2));
 	RM0.reset();
-
+#else
+	std::unique_ptr<giss::VectorSparseMatrix> RM(std::move(RM0));
+#endif
 
 	giss::SparseAccumulator<int,double> area1;
 	giss::MapDict<int, giss::VectorSparseMatrix> Ss;
 	giss::MapDict<int, giss::VectorSparseMatrix> XMs;
 	std::map<int, size_t> size2;	// Size of each ice vector space
-//printf("f2s.size() = %d\n", f2s.size());
 	for (auto f2i=f2s.begin(); f2i != f2s.end(); ++f2i) {
 		IceSheet *sheet = (*this)[f2i->first];
 
 		std::unique_ptr<giss::VectorSparseMatrix> S(
-			sheet->ice_to_atm(area1));		// 2 -> 1
-//printf("S->size() = %d\n", S->size());
+			sheet->ice_to_projatm(area1));		// 2 -> 1
+		if (_correct_area1) S = multiply(
+			*sheet->atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
+			*S);
 		for (auto ii = S->begin(); ii != S->end(); ++ii) {
 			used1.insert(ii.row());
-//printf("used.insert-a: %d %d\n", sheet->index, ii.col());
 			used2.insert(std::make_pair(sheet->index, ii.col()));
 		}
 
 		std::unique_ptr<giss::VectorSparseMatrix> XM(
 			sheet->hp_to_ice());				// 3 -> 2
-printf("MatrixMaker::ice_to_hp() 3\n");
+//		checksum_interp(*XM, "XM");
+
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
-//printf("used.insert-b: %d %d\n", sheet->index, ii.row());
-//if (nan3.find(ii.col()) != nan3.end()) printf("used XM: (%d, %d)\n", ii.row(), ii.col());
-if (ii.col() == 11427) printf("used3.insert XM: (%d, %d)\n", ii.row(), ii.col());
 			used2.insert(std::make_pair(sheet->index, ii.row()));
 			used3.insert(ii.col());
 		}
@@ -230,7 +238,6 @@ printf("MatrixMaker::ice_to_hp() 4\n");
 
 	giss::IndexTranslator trans_1_1p("trans_1_1p");
 		trans_1_1p.init(n1(), used1);
-//printf("used2.size() = %d\n", used2.size());
 	giss::IndexTranslator2 trans_2_2p("trans_2_2p");
 		trans_2_2p.init(std::move(size2), used2);
 	giss::IndexTranslator trans_3_3p("trans_3_3p");
@@ -245,7 +252,6 @@ printf("MatrixMaker::ice_to_hp() 4\n");
 	giss::VectorSparseMatrix Sp(giss::SparseDescr(n1p, n2p));
 	giss::VectorSparseMatrix XMp(giss::SparseDescr(n2p, n3p));
 
-//printf("n1p=%d, n2p=%d, n3p=%d\n", n1p, n2p, n3p);
 
 printf("Translating RM\n");
 	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
@@ -317,20 +323,27 @@ printf("Translating XM: %d\n", index);
 	galahad::qpt_problem_c qpt(n1p, n3p, true);
 
 	// ================ Objective Function
-	// 1/2 (A F_E - F_I)^2    where A = XM = (Ice->Exch)(Elev->Ice)
-	// qpt%H = A^T A,    qpt%G = f_I \cdot A,        qpt%f = f_I \cdot f_I
+	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+	// qpt%H = (XM)^T (XM),    qpt%G = f_I \cdot (XM),        qpt%f = f_I \cdot f_I
 
 	// -------- H = 2 * XMp^T XMp
 	giss::VectorSparseMatrix XMp_T(giss::SparseDescr(XMp.ncol, XMp.nrow));
 	transpose(XMp, XMp_T);
-printf("XMp: (%d x %d) = %d elements\n", XMp.nrow, XMp.ncol, XMp.size());
-printf("XMp_T: (%d x %d) = %d elements\n", XMp_T.nrow, XMp_T.ncol, XMp_T.size());
 	std::unique_ptr<giss::VectorSparseMatrix> H(multiply(XMp_T, XMp));	// n3xn3
-printf("H: (%d x %d) = %d elements\n", H->nrow, H->ncol, H->size());
-	qpt.alloc_H(H->size());
-	giss::ZD11SparseMatrix H_zd11(qpt.H, 0);
+
+	// Count items in H lower triangle
+	size_t ltri = 0;
 	for (auto ii = H->begin(); ii != H->end(); ++ii)
-		H_zd11.add(ii.row(), ii.col(), 2.0d * ii.val());
+		if (ii.row() >= ii.col()) ++ltri;
+
+	// Copy ONLY the lower triangle items to GALAHAD
+	// (otherwise, GALAHAD won't work)
+	qpt.alloc_H(ltri);
+	giss::ZD11SparseMatrix H_zd11(qpt.H, 0);
+	for (auto ii = H->begin(); ii != H->end(); ++ii) {
+		if (ii.row() >= ii.col())
+			H_zd11.add(ii.row(), ii.col(), 2.0d * ii.val());
+	}
 
 	// -------- Linear term of obj function
 	// G = -2*f2p \cdot XMp
@@ -347,9 +360,9 @@ printf("H: (%d x %d) = %d elements\n", H->nrow, H->ncol, H->size());
 	}
 
 	// De-allocate...
-	H.reset();
-	XMp.clear();
-	XMp_T.clear();
+//	H.reset();
+//	XMp.clear();
+//	XMp_T.clear();
 
 	// ============================ Constraints
 	// RM x = Sp f2p
@@ -364,23 +377,110 @@ printf("H: (%d x %d) = %d elements\n", H->nrow, H->ncol, H->size());
 	for (auto ii = Sp.begin(); ii != Sp.end(); ++ii) {
 		int i1p = ii.row();		// Atm
 		int i2p = ii.col();		// Ice
-		qpt.C[i1p] += f2p(i2p) * ii.val();
+		qpt.C[i1p] -= f2p(i2p) * ii.val();
 	}
 
 	// De-allocate
 	RMp.clear();
 
 	// =========================== Initial guess at solution
+	bool nanerr = false;
 	for (int i3p=0; i3p<n3p; ++i3p) {
 		int i3 = trans_3_3p.b2a(i3p);
-		qpt.X[i3p] = initial3(i3);
-if (std::isnan(initial3(i3))) printf("nan: %d %d\n", i3, i3p);
-//		qpt.X[i3p] = 0;	// we have no idea
+		double val = initial3(i3);
+		if (std::isnan(val)) {
+			fprintf(stderr, "ERROR: ice_to_hp(), NaN in initial guess, i3=%d\n", i3);
+			nanerr = true;
+			qpt.X[i3p] = 0;
+		} else {
+			qpt.X[i3p] = val;
+		}
 	}
+
+	// =========================== Verify the objective function
+#if 0
+	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+	printf("objective value1 = %g\n", qpt.eval_objective(qpt.X));
+
+
+	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+	printf("objective value = %g\n", qpt.eval_objective(qpt.X));
+	{
+		// Initial2p = XMp * initial3p
+		blitz::Array<double,1> initial2p(n2p);
+		initial2p = 0;
+		for (auto ii = XMp.begin(); ii != XMp.end(); ++ii) {
+			int i3p = ii.col();
+			int i3 = trans_3_3p.b2a(i3p);
+			int i2p = ii.row();
+	//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
+			initial2p(i2p) += ii.val() * qpt.X[i3p];
+		}
+
+		// Sum it up!
+		double obj = 0;
+		for (int i2p=0; i2p<n2p; ++i2p) {
+			double val = initial2p(i2p) - f2p(i2p);
+			obj += val*val;
+		}
+
+		printf("objective value2 = %g\n", obj);
+	}
+
+	{
+		// Initial2p = XMp * initial3p
+		blitz::Array<double,1> initial2p(n2p);
+		initial2p = 0;
+		for (auto ii = XMp_T.begin(); ii != XMp_T.end(); ++ii) {
+			int i3p = ii.row();
+			int i3 = trans_3_3p.b2a(i3p);
+			int i2p = ii.col();
+	//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
+			initial2p(i2p) += ii.val() * qpt.X[i3p];
+		}
+
+		// Sum it up!
+		double obj = 0;
+		for (int i2p=0; i2p<n2p; ++i2p) {
+			double val = initial2p(i2p) - f2p(i2p);
+			obj += val*val;
+		}
+
+		printf("objective value3 = %g\n", obj);
+	}
+
+
+	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+	printf("objective value = %g\n", qpt.eval_objective(qpt.X));
+	{
+		int const index = 0;
+		// Initial2 = XM * initial3
+		auto sheet(sheets_by_id.find(index)->second);
+		blitz::Array<double,1> initial2(sheet->n2());
+		initial2 = 0;
+		giss::VectorSparseMatrix *XM(XMs[index]);
+		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
+			int i3 = ii.col();
+			int i2 = ii.row();
+			initial2(i2) += ii.val() * initial3(i3);
+		}
+
+		// Sum it up!
+		double obj = 0;
+		for (int i2=0; i2<sheet->n2(); ++i2) {
+			double val = initial2(i2) - f2s[index](i2);
+			if (std::isnan(val)) continue;
+			obj += val*val;
+		}
+
+		printf("objective value4 = %g\n", obj);
+	}
+#endif
+
 
 	// =========================== Solve the Problem!
 	double infinity = 1e20;
-//	eqp_solve_simple(qpt.this_f, infinity);
+	eqp_solve_simple(qpt.this_f, infinity);
 
 
 
@@ -412,21 +512,16 @@ printf("BEGIN hp_to_atm() %d %d\n", n1(), n3());
 	// and combine into one hp->hc matrix for all ice sheets.
 	giss::SparseAccumulator<int,double> area1_m;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
-		ret->append(*sheet->hp_to_atm(area1_m));
+		auto hp2proj(sheet->hp_to_projatm(area1_m));
+		if (_correct_area1) hp2proj = multiply(
+			*sheet->atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
+			*hp2proj);
+		ret->append(*hp2proj);
 	}
 
 	giss::SparseAccumulator<int,double> area1_m_inv;
 	divide_by(*ret, area1_m, area1_m_inv);
-printf("After divide_by: %ld %d\n", area1_m.size(), area1_m_inv.size());
 	ret->sum_duplicates();
-
-#if 0
-printf("Writing hp2atm ret = %p\n", ret.get());
-NcFile nc("hp2atm.nc", NcFile::Replace);
-ret->netcdf_define(nc, "hp2atm")();
-nc.close();
-printf("Done Writing hp2hc ret = %p\n", ret.get());
-#endif
 
 printf("END hp_to_atm()\n");
 	return ret;

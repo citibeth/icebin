@@ -33,8 +33,15 @@ public:
 protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;
+	bool _correct_area1;		/// Should we correct for projection and geometric error?
 public:
-	MatrixMaker(std::unique_ptr<GridDomain> &&_domain = std::unique_ptr<GridDomain>(new GridDomain_Identity())) :  _next_sheet_index(0), domain(std::move(_domain)) {}
+	MatrixMaker(
+		bool correct_area1=true,
+		std::unique_ptr<GridDomain> &&_domain
+			= std::unique_ptr<GridDomain>(new GridDomain_Identity()))
+		: _next_sheet_index(0),
+		domain(std::move(_domain)),
+		_correct_area1(correct_area1) {}
 
 //	std::vector<std::unique_ptr<IceSheet>> sheets;
 	

@@ -3,6 +3,7 @@
 #include <mpi.h>
 #include <cstdio>
 #include <blitz/array.h>
+#include <iostream>
 
 namespace giss {
 
@@ -45,5 +46,23 @@ struct F90Array {
 	}
 
 };
+
+/** Print details of array */
+template<class ArrT, int rank>
+std::ostream& operator<<(std::ostream& os, F90Array<ArrT, rank> const &arr_f)
+{
+	char buf[32];
+	sprintf(buf, "%p", arr_f.base);
+
+	os << "F90Array(" << std::string(buf) << " [";
+	for (int i=0; i<rank; ++i) os << (arr_f.deltas[i] - arr_f.base) << " ";
+	os << "] : [";
+	for (int i=0; i<rank; ++i) os << arr_f.lbounds[i] << " ";
+	os << "] -- [";
+	for (int i=0; i<rank; ++i) os << arr_f.ubounds[i] << " ";
+	os << "])";
+    return os;
+}
+
 
 }	// namespace giss

@@ -61,6 +61,11 @@ public :
 	/** Deallocates the underlying istance of galahad_qpt_double::qpt_problem_type. */
 	~qpt_problem_c();
 
+	/** Evaluates the objective function, apart from GALAHAD.
+	@param x x[n] Pointer to array holding vector value at which
+	objective function is to be evaluated. */
+	double eval_objective(double const *x);
+
 	/** Used to write this data structure to a netCDF file.
 	Defines the required variables.  Call the returned boost::function
 	later to write the data.

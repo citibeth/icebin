@@ -73,7 +73,8 @@ void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &fgice1_f,	// IN
 	giss::F90Array<int,3> &used1h_f,		// IN/OUT
 	giss::F90Array<double, 3> &fhc1h_f,		// OUT: hp-to-atmosphere
-	giss::F90Array<double, 3> &elev1h_f);	// IN/OUT
+	giss::F90Array<double, 3> &elev1h_f,	// IN/OUT
+	int const i0, int const j0, int const i1, int const j1);			// Array bound to write in
 
 extern "C"
 void glint2_modele_couple_to_ice_c(

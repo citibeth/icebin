@@ -62,7 +62,8 @@ INTERFACE
 
 	subroutine glint2_modele_init_landice_com_c(api, &
 		zatmo1_f, BYGRAV, fgice1_glint2_f, fgice1_f, &
-		used1h_f, fhc1h_f, elev1h_f) bind(c)
+		used1h_f, fhc1h_f, elev1h_f, &
+		i0, j0, i1, j1) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
@@ -73,6 +74,7 @@ INTERFACE
 		type(arr_spec_3) :: used1h_f
 		type(arr_spec_3) :: fhc1h_f
 		type(arr_spec_3) :: elev1h_f
+		integer(kind=c_int) :: i0, j0, i1, j1
 	end subroutine
 
 	subroutine glint2_modele_init_hp_to_ices(api) bind(c)
@@ -133,9 +135,11 @@ end subroutine
 subroutine glint2_modele_init_landice_com(api, &
 	zatmo1, BYGRAV, fgice1_glint2, fgice1, &
 	used1h, fhc1h, elev1h, &
-	i0h, j0h)
+	i0h, j0h, &
+	i0, i1, j0, j1)
 type(c_ptr), value :: api
-integer :: i0h, j0h
+integer, value :: i0h, j0h
+integer, value :: i0, i1, j0, j1
 real*8, dimension(i0h:,j0h:) :: zatmo1
 real*8, INTENT(IN) :: BYGRAV
 real*8, dimension(i0h:,j0h:) :: fgice1_glint2, fgice1
@@ -166,7 +170,8 @@ real*8, dimension(i0h:,j0h:,:) :: elev1h
 	! Call the C-side of the interface
 	call glint2_modele_init_landice_com_c(api, &
 		zatmo1_f, BYGRAV, fgice1_glint2_f, fgice1_f, &
-		used1h_f, fhc1h_f, elev1h_f)
+		used1h_f, fhc1h_f, elev1h_f, &
+		i0, i1, j0, j1)
 
 print *,'END glint2_modele_init_landice_com()'
 end subroutine

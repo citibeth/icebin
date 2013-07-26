@@ -39,6 +39,23 @@ qpt_problem_c::~qpt_problem_c()
 	qpt_problem_delete_c(&this_f);
 }
 
+//	double eval_objective(blitz::Array<double,1> const &x)
+double qpt_problem_c::eval_objective(double const *x)
+{
+
+	// Compute 1/2 x^T H x
+	double sum2 = 0;
+	for (int i=0; i<H.ne; ++i)
+		sum2 += x[H.row[i]] * H.val[i] * x[H.col[i]];
+	sum2 *= .5;
+
+	// Compute g^t x
+	double sum1 = 0;
+	for (int i=0; i<n; ++i) sum1 += G[i] * x[i];
+
+	return sum2 + sum1 + f;
+}
+
 static void netcdf_write(qpt_problem_c *qp,
 	NcFile *nc, std::string const &vname,
 	boost::function<void()> const &A_write,

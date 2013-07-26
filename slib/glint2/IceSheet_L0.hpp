@@ -35,10 +35,10 @@ public:
 	/** Computes matrix to go from height-point space [nhp * n1] to atmosphere grid [n1]
 	@param area1_m IN/OUT: Area of each GCM cell covered by
 		(non-masked-out) ice sheet. */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(
+	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_projatm(
 		giss::SparseAccumulator<int,double> &area1_m);
 
-	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_atm(
+	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_projatm(
 		giss::SparseAccumulator<int,double> &area1_m);
 
 

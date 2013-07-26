@@ -39,9 +39,29 @@ static PyObject *MatrixMaker_new(PyTypeObject *type, PyObject *args, PyObject *k
 /** Read from a file */
 static int MatrixMaker__init(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
+
 	try {
+
+
+		// Get arguments
+		int correct_area1 = true;
+
+		static char const *keyword_list[] = {"correct_area1", NULL};
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "|i",
+			const_cast<char **>(keyword_list),
+			&correct_area1))
+		{
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"MatrixMaker__init() called without valid arguments.");
+			return 0;
+		}
+
+
 		// Instantiate C++ Ice Maker
-		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker);
+		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(correct_area1));
 
 		// Move it to Python MatrixMaker object.
 		self->init(std::move(maker));
@@ -60,23 +80,24 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 		const char *grid1_fname_py = NULL;
 		PyObject *hpdefs_py = NULL;
 		PyObject *mask1_py = NULL;
+		int correct_area1 = true;
 
-		static char const *keyword_list[] = {"grid1_fname", "hpdefs", "mask1", NULL};
+		static char const *keyword_list[] = {"grid1_fname", "hpdefs", "mask1", "correct_area1", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "sO|O",
+			args, kwds, "sO|Oi",
 			const_cast<char **>(keyword_list),
-			&grid1_fname_py, &hpdefs_py, &mask1_py))
+			&grid1_fname_py, &hpdefs_py, &mask1_py, &correct_area1))
 		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
-				"MatrixMaker__init() called without valid arguments.");
+				"MatrixMaker_init() called without valid arguments.");
 			return 0;
 		}
 
 
 		// Instantiate C++ Ice Maker
-		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker);
+		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(correct_area1));
 
 		{NcFile nc(grid1_fname_py, NcFile::ReadOnly);
 			maker->grid1 = read_grid(nc, "grid");
@@ -93,7 +114,7 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 		self->init(std::move(maker));
 		return Py_None;
 	} catch(...) {
-		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker__init()");
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_init()");
 		return 0;
 	}
 }

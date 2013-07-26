@@ -1003,7 +1003,8 @@ extern std::unique_ptr<VectorSparseMatrix> multiply_eigen_algorithm(VectorSparse
 extern std::unique_ptr<VectorSparseMatrix> multiply_giss_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b);
 
 inline std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparseMatrix &b)
-	{ return multiply_eigen_algorithm(a, b); }
+	{ return multiply_giss_algorithm(a, b); }
+//	{ return multiply_eigen_algorithm(a, b); }		// Seemed to return the wrong answer in ice_to_hp() tests
 
 extern std::vector<int> get_rowcol_beginnings(
 	VectorSparseMatrix const &a,

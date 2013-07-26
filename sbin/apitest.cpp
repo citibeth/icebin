@@ -191,7 +191,8 @@ printf("A: fgice1(56, 76) = %g\n", fgice1(56,76));
 
 	glint2_modele_init_landice_com_c(api,
 		zatmo1_f, 1.0, fgice1_glint2_f, fgice1_f,
-		used1h_f, fhc1h_f, elevhc_f);
+		used1h_f, fhc1h_f, elevhc_f,
+		1, im, 1, jm);
 
 printf("B: fgice1(56, 76) = %g\n", fgice1(56,76));
 	// ----------------------------------------------------------

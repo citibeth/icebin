@@ -6,10 +6,13 @@ import netCDF4
 import numpy as np
 import giss.modele
 import sys
+import os.path
 
-mm = glint2.MatrixMaker()
+#mm = glint2.MatrixMaker(correct_area1=False)
+mm = glint2.MatrixMaker(correct_area1=True)
+
 print '***** Reading new MatrixMaker'
-mm.load('../data/mmx.nc', 'm')
+mm.load('/Users/rpfische/cmrun/rpfische/modele_ll_g2x2_5-searise_g20-40-DISMAL.nc', 'm')
 
 XM = mm.hp_to_ice('greenland')
 print 'XM', XM.shape, XM.nnz
@@ -25,97 +28,52 @@ print 'PP', PP.shape, PP.nnz
 #print 'PP', PP.shape, PP.nnz
 
 
+RUNDIR1='/Users/rpfische/savedisk/e4f40-hc40'
+RUNDIR2='/Users/rpfische/savedisk/e4f40-hc40'
 
 #nc = netCDF4.Dataset('../data/JUL1950.ijhchc1k225.nc')
 #nc = netCDF4.Dataset('../data/JUL1956.ijhce4f40-hc40.nc')
-nc = netCDF4.Dataset('../data/JUL1950.ijhce4f40-hc40.nc')
+nc = netCDF4.Dataset(os.path.join(RUNDIR1, 'JUN1950.ijhce4f40-hc40.nc'))
 impm3 = giss.modele.read_ncvar(nc, 'impm_lndice')
-impm3 = impm3[1:,:]			# Remove legacy height point
+impm3 = impm3[1:,:,:]			# Remove legacy height point
 frac3 = giss.modele.read_ncvar(nc, 'frac')
-frac3 = frac3[1:,:]			# Remove legacy height point
+frac3 = frac3[1:,:,:]			# Remove legacy height point
 print 'frac3.shape = ', frac3.shape
 nc.close()
-
-nc = netCDF4.Dataset('../data/fgice1_1.nc')
-fgice1 = nc.variables['fgice1'][1:91,:]
-fgice1_glint2 = nc.variables['fgice1_glint2'][1:91,:]
-nc.close()
-#print fgice1.shape
-
-
-if False :
-	nc = netCDF4.Dataset('../data/fort.2.nc')
-	fhc = nc.variables['fhc'][:]
-	nc.close()
-
-	#print np.where(fhc == 1e-30)
-
-	for jj,ii in [(75,55), (76,55)] :
-		print ' --------------------- %d %d' % (jj,ii)
-		print 'impm3[:,jj,ii] = ', impm3[:,jj,ii]
-		print 'fhc[:,jj,ii] = ', fhc[:,jj,ii]
-		print 'sum(fhc[:,jj,ii]) = ', np.sum(fhc[:,jj,ii])
-		print 'fgice1[jj,ii] = %g' % fgice1[jj,ii]
-		print 'fgice1_glint2[jj,ii] = %g' % fgice1_glint2[jj,ii]
-
-	sys.exit(0)
-
-
-
-
-#nc = netCDF4.Dataset('../data/mmx.nc')
-#nc.close()
 
 
 impm2 = glint2.coo_multiply(XM, impm3)
 print 'impm2', impm2.shape
-
 f2s = dict()
 f2s['greenland'] = impm2
+
+print 'impm2.shape',impm2.shape
+print 'impm3.shape',impm3.shape
+
+impm3r = impm3.reshape(-1)
+impm2b = np.zeros(impm2.shape)
+for row,col,val in zip(XM.row, XM.col, XM.data) :
+	impm2b[row] += impm3r[col] * val
+#	print 'XM-A,row,col,val,impm3r[col]'
+
+#for i in range(0,impm2.shape[0]) :
+#	print impm2[i], impm2b[i],impm2[i] - impm2b[i]
+
+#sys.exit(0)
+
+
+#initial = (impm3 + np.random.normal(scale=1e-6,size=impm3.shape)).reshape(-1)
 initial = impm3.reshape(-1)
-print initial[initial != 0]
+#initial[:] = 0
 impm3b = mm.ice_to_hp(f2s, initial).reshape(impm3.shape)
 #impm3b = impm3
 
+
 # ------------------------------------------------------
-# Plot our list of nan
-idx3 = [36775, 49735, 50171, 62695, 63131, 75655, 76091, 88615, 88905, 89051, 101575, 101865, 102011, 114535, 114971 ]
+RM = mm.hp_to_atm()
 
-idx3 = [38213, 38214, 49732, 50019, 50168, 50170, 50171, 50315, 50316, 50460, 51023, 51170, 51173, 51174, 51319, 51320, 63128, 63130, 63131, 63274, 63275, 63420, 63835, 63979, 64000, 64133, 64134, 64278, 64279, 64280, 76088, 76370, 76380, 76524, 76939, 77093, 77238, 77240, 88905, 89049, 89340, 89341]
-
-
-
-
-
-nan3 = np.zeros(initial.shape, dtype='d')
-nan3[idx3] = 1
-nan3 = nan3.reshape(impm3.shape)
-
-nhc = impm3.shape[0]
-jm = impm3.shape[1]
-im = impm3.shape[2]
-n1 = im*jm
-for i3 in idx3 :
-	ihc = i3 / n1
-	i2 = i3 - ihc * n1
-	jj = i2 / im
-	ii = i2 - jj * im
-
-	print '%d -> (%d, %d): fgice1=%g, fgice1_glint2=%g' % (i2, jj, ii, fgice1[jj,ii], fgice1_glint2[jj, ii])
-
-#	x = i3 / im
-#	ii = i3 - x*im
-#	ihc = x / jm
-#	jj = x - ihc*jm
-#	ii = 59
-#	jj = 81
-	print '%d -> (%d, %d=(%d, %d))' % (i3, ihc,i2,jj,ii)
-#	sys.stdout.write('    ')
-#	for f in frac3[:,jj,ii] :
-#		sys.stdout.write('%e ' % f)
-#	print
-	print '    ',frac3[:,jj,ii]
-	print '    ',impm3[:,jj,ii]
+conserv1 = glint2.coo_multiply(RM, impm3)
+conserv1b = glint2.coo_multiply(RM, impm3b)
 
 # ------------------------------------------------------
 nc = netCDF4.Dataset('./ice_to_hp.nc', 'w')
@@ -125,9 +83,40 @@ nc.createDimension('jm', impm3.shape[1])
 nc.createDimension('im', impm3.shape[2])
 
 dims = ('nhc', 'jm', 'im')
-nc.createVariable('impm3', 'd', dims)[:] = impm3[:]
-nc.createVariable('impm3b', 'd', dims)[:] = impm3b[:]
-nc.createVariable('nan3', 'd', dims)[:] = nan3[:]
+v = nc.createVariable('impm3', 'd', dims)
+v[:] = impm3[:]
+v.missing_value = -1e30
+
+v = nc.createVariable('impm3b', 'd', dims)
+v[:] = impm3b[:]
+v.missing_value = -1e30
+
+diff = impm3b - impm3
+v = nc.createVariable('diff', 'd', dims)
+v[:] = diff[:]
+v.missing_value = -1e30
+
+
+dims = ('jm', 'im')
+v = nc.createVariable('conserv1', 'd', dims)
+v[:] = conserv1[:]
+v.missing_value = -1e30
+
+v = nc.createVariable('conserv1b', 'd', dims)
+v[:] = conserv1b[:]
+v.missing_value = -1e30
+
+conserv_diff = conserv1b - conserv1
+v = nc.createVariable('conserv_diff', 'd', dims)
+v[:] = conserv_diff[:]
+v.missing_value = -1e30
+
+
+
+
+#v = nc.createVariable('nan3', 'd', dims)
+#v[:] = nan3[:]
+#v.missing_value = -1e30
 
 nc.close()
 

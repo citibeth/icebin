@@ -49,7 +49,7 @@ extern "C" glint2_modele *glint2_modele_new(
 
 	// Load the MatrixMaker	(filtering by our domain, of course)
 	// Also load the ice sheets
-	api->maker.reset(new MatrixMaker(std::move(mdomain)));
+	api->maker.reset(new MatrixMaker(true, std::move(mdomain)));
 	NcFile nc(maker_fname.c_str(), NcFile::ReadOnly);
 	api->maker->read_from_netcdf(nc, maker_vname);
 	api->maker->realize();
@@ -115,6 +115,9 @@ void glint2_modele_compute_fgice_c(glint2_modele *api,
 )
 {
 printf("BEGIN glint2_modele_compute_fgice_c()\n");
+std::cout << "fgice1_f: " << fgice1_f << std::endl;
+std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
+
 	ModelEDomain &domain(*api->domain);
 
 #if 0
@@ -195,15 +198,11 @@ printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
 	auto fgrnd1(fgrnd1_f.to_blitz());
 	auto focean1(focean1_f.to_blitz());
 	auto flake1(flake1_f.to_blitz());
-	fgrnd1 = 1.0 - focean1 - flake1 - fgice1;
+// This correction is taken care of in ModelE (for now)
+// See: FLUXES.f
+//	fgrnd1 = 1.0 - focean1 - flake1 - fgice1;
 
 #if 0
-printf("AA1\n");
-printf("fgrnd1: (%d %d) - (%d %d) [%d %d]\n",
-	fgrnd1.lbound(0), fgrnd1.lbound(1),
-	fgrnd1.ubound(0), fgrnd1.ubound(1),
-	fgrnd1.extent(0), fgrnd1.extent(1));
-
 NcFile nc("fgice1_1.nc", NcFile::Replace);
 auto fgice1_c(giss::f_to_c(fgice1));
 auto fgice1_glint2_c(giss::f_to_c(fgice1_glint2));
@@ -262,7 +261,8 @@ void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &fgice1_f,	// IN
 	giss::F90Array<int,3> &used1h_f,		// IN/OUT
 	giss::F90Array<double, 3> &fhc1h_f,		// OUT: hp-to-atmosphere
-	giss::F90Array<double, 3> &elev1h_f)	// IN/OUT
+	giss::F90Array<double, 3> &elev1h_f,	// IN/OUT
+	int const i0, int const j0, int const i1, int const j1)			// Array bound to write in
 {
 printf("init_landice_com_part2 1\n");
 
@@ -328,9 +328,13 @@ printf("init_landice_com_part2 3\n");
 		// Input: HP space
 		int lindex[domain.num_local_indices];
 		int hp1b, i1b;
-		hc_index.index_to_ik(ii.col(), i1b, hp1b);
+		int i3b = ii.col();
+		hc_index.index_to_ik(i3b, i1b, hp1b);
 		domain.global_to_local(i1b, lindex);
-		if (!domain.in_domain(lindex)) continue;
+		if (!domain.in_domain(lindex)) {
+			//printf("Not in domain: i3b=%d (%d, %d, %d)\n", i3b, lindex[0], lindex[1], hp1b);
+			continue;
+		}
 
 		// Output: GCM grid
 		int i1a = ii.row();

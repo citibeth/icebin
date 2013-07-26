@@ -89,6 +89,7 @@ public:
 		lindex[1] = j_c + 1;
 	}
 
+#if 1
 	bool in_domain(int *lindex) const
 		{ return (lindex[1] >= j0_f) && (lindex[1] <= j1_f); }
 
@@ -99,7 +100,17 @@ public:
 
 		return ret;
 	}
+#else
+	// Test, in case you think the domain is causing things
+	// to drop out.
 
+	bool in_domain(int *lindex) const
+		{ return true; }
+
+	bool in_halo(int *lindex) const
+		{ return true; }
+
+#endif
 };
 // ------------------------------------------------
 

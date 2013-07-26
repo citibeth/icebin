@@ -112,21 +112,14 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_ice()
 	return hp_interp(Overlap::ICE);
 }
 // --------------------------------------------------------
-std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_atm(
+std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_projatm(
 	giss::SparseAccumulator<int,double> &area1_m)
 {
-printf("BEGIN IceSheet_L0::hp_to_atm %ld %ld\n", n1(), n4());
+printf("BEGIN IceSheet_L0::hp_to_projatm %ld %ld\n", n1(), n4());
 
 	// ============= hp_to_exch
 	// Interpolate (for now) in height points but not X/Y
 	auto hp_to_exch(hp_interp(Overlap::EXCH));
-
-#if 0
-printf("Writing hp2exch\n");
-NcFile nc("hp2exch.nc", NcFile::Replace);
-hp_to_exch->netcdf_define(nc, "hp2exch")();
-nc.close();
-#endif
 
 	// ============= exch_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to atmosphere grid is equal
@@ -145,23 +138,21 @@ nc.close();
 		area1_m.add(cell->i, area);
 	}
 
-	// ============= hp_to_atm
-printf("ENDing IceSheet_L0::hp_to_atm()\n");
-	auto tmp(multiply(*exch_to_atm, *hp_to_exch));
-	return multiply(
-		*atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
-		*tmp);
+	// ============= hp_to_projatm
+	auto ret(multiply(*exch_to_atm, *hp_to_exch));
+printf("END IceSheet_L0::hp_to_projatm()\n");
+	return ret;
 }
 // --------------------------------------------------------
-std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_atm(
+std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_projatm(
 	giss::SparseAccumulator<int,double> &area1_m)
 {
-printf("BEGIN IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n4());
+printf("BEGIN IceSheet_L0::ice_to_projatm %ld %ld\n", n1(), n4());
 
 	// ============= exch_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to atmosphere grid is equal
 	// to scaled version of overlap matrix.
-	std::unique_ptr<giss::VectorSparseMatrix> ice_to_atm(
+	std::unique_ptr<giss::VectorSparseMatrix> ice_to_projatm(
 		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n2())));
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
 		if (masked(cell)) continue;
@@ -171,16 +162,13 @@ printf("BEGIN IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n4());
 		// cell->j = index in ice grid
 		// cell->index = index in exchange grid
 		double area = cell->area;	// Computed in ExchangeGrid::overlap_callback()
-		ice_to_atm->add(cell->i, cell->j, area);
+		ice_to_projatm->add(cell->i, cell->j, area);
 		area1_m.add(cell->i, area);
 	}
 
-	//ice_to_atm->sum_duplicates();
+	//ice_to_projatm->sum_duplicates();
 
-printf("END IceSheet_L0::ice_to_atm %ld %ld\n", n1(), n4());
-	return multiply(
-		*atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
-		*ice_to_atm);
+	return ice_to_projatm;
 }
 // --------------------------------------------------------
 /**
