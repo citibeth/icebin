@@ -9,10 +9,7 @@ import sys
 import os.path
 
 #mm = glint2.MatrixMaker(correct_area1=False)
-mm = glint2.MatrixMaker(correct_area1=True)
-
-print '***** Reading new MatrixMaker'
-mm.load('/Users/rpfische/cmrun/rpfische/modele_ll_g2x2_5-searise_g20-40-DISMAL.nc', 'm')
+mm = glint2.MatrixMaker('/Users/rpfische/cmrun/rpfische/modele_ll_g2x2_5-searise_g20-40-DISMAL.nc', 'm', correct_area1=True)
 
 XM = mm.hp_to_ice('greenland')
 print 'XM', XM.shape, XM.nnz

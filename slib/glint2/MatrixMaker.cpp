@@ -3,7 +3,6 @@
 #include <giss/ncutil.hpp>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet_L0.hpp>
-#include <glint2/HCIndex.hpp>
 #include <giss/IndexTranslator.hpp>
 #include <giss/IndexTranslator2.hpp>
 #include <galahad/qpt_c.hpp>
@@ -34,6 +33,9 @@ void MatrixMaker::realize() {
 	// ------------- Realize the ice sheets
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet)
 		sheet->realize();
+
+	// ------------- Set up HCIndex
+	hc_index = HCIndex::new_HCIndex(_hptype, *this);
 }
 
 int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet)
@@ -171,6 +173,32 @@ double epsilon)
 	return false;
 }
 // -------------------------------------------------------------
+class I3XTranslator {
+	HCIndex *hc_index;
+	int nhc;
+
+public:
+
+	I3XTranslator(HCIndex *_hc_index, int _nhc) :
+		hc_index(_hc_index), nhc(_nhc) {}
+
+	int i3x_to_i3(int i3x)
+	{
+		int i1 = i3x / nhc;
+		int k = i3x - i1 * nhc;
+		return hc_index->ik_to_index(i1, k);
+	}
+
+	int i3_to_i3x(int i3)
+	{
+		int i1, k;
+		hc_index->index_to_ik(i3, i1, k);
+		int i3x = i1 * nhc + k;
+	//printf("i3=%d (%d, %d) --> i3x=%d\n", i3, i1, k, i3x);
+		return i3x;
+	}
+};
+// -------------------------------------------------------------
 /** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete.
 TODO: This only works on one ice sheet.  Will need to be extended
 for multiple ice sheets. */
@@ -188,7 +216,8 @@ printf("BEGIN MatrixMaker::ice_to_hp()\n");
 	std::unique_ptr<giss::VectorSparseMatrix> RM0(hp_to_atm());	// 3->1
 	for (auto ii = RM0->begin(); ii != RM0->end(); ++ii) {
 		used1.insert(ii.row());
-		used3.insert(ii.col());
+		int i3 = ii.col();
+		used3.insert(i3);
 	}
 
 // In some cases in the past, QP optimization has not worked well
@@ -225,7 +254,8 @@ printf("BEGIN MatrixMaker::ice_to_hp()\n");
 
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
 			used2.insert(std::make_pair(sheet->index, ii.row()));
-			used3.insert(ii.col());
+			int i3 = ii.col();
+			used3.insert(i3);
 		}
 printf("MatrixMaker::ice_to_hp() 4\n");
 
@@ -236,16 +266,33 @@ printf("MatrixMaker::ice_to_hp() 4\n");
 		XMs.insert(sheet->index, std::move(XM));
 	}
 
+	// Count the number of height points
+	// (so we can set up 3x indexing scheme)
+	int max_k = 0;		// Maximum height class index
+	for (auto p3 = used3.begin(); p3 != used3.end(); ++p3) {
+		int i1, k;
+		hc_index->index_to_ik(*p3, i1, k);
+		max_k = std::max(k, max_k);
+	}
+
+	// Convert from i3 to i3x (renumbered height class indices)
+	I3XTranslator trans3x(&*hc_index, max_k + 1);
+	std::set<int> used3x;
+	for (auto p3 = used3.begin(); p3 != used3.end(); ++p3) {
+		int i3x = trans3x.i3_to_i3x(*p3);
+		used3x.insert(i3x);
+	}
+
 	giss::IndexTranslator trans_1_1p("trans_1_1p");
 		trans_1_1p.init(n1(), used1);
 	giss::IndexTranslator2 trans_2_2p("trans_2_2p");
 		trans_2_2p.init(std::move(size2), used2);
-	giss::IndexTranslator trans_3_3p("trans_3_3p");
-		trans_3_3p.init(n3(), used3);
+	giss::IndexTranslator trans_3x_3p("trans_3x_3p");
+		trans_3x_3p.init(n3(), used3x);
 
 	int n1p = trans_1_1p.nb();
 	int n2p = trans_2_2p.nb();
-	int n3p = trans_3_3p.nb();
+	int n3p = trans_3x_3p.nb();
 
 	// Translate to new matrices
 	giss::VectorSparseMatrix RMp(giss::SparseDescr(n1p, n3p));
@@ -255,9 +302,10 @@ printf("MatrixMaker::ice_to_hp() 4\n");
 
 printf("Translating RM\n");
 	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
+		int i3x = trans3x.i3_to_i3x(ii.col());
 		RMp.add(
 			trans_1_1p.a2b(ii.row()),
-			trans_3_3p.a2b(ii.col()), ii.val());
+			trans_3x_3p.a2b(i3x), ii.val());
 	}
 
 
@@ -278,9 +326,10 @@ printf("Translating S: %d\n", index);
 
 printf("Translating XM: %d\n", index);
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
+			int i3x = trans3x.i3_to_i3x(ii.col());
 			XMp.add(
 				trans_2_2p.a2b(std::make_pair(index, ii.row())),
-				trans_3_3p.a2b(ii.col()),
+				trans_3x_3p.a2b(i3x),
 				ii.val());
 		}
 	}
@@ -386,7 +435,8 @@ printf("Translating XM: %d\n", index);
 	// =========================== Initial guess at solution
 	bool nanerr = false;
 	for (int i3p=0; i3p<n3p; ++i3p) {
-		int i3 = trans_3_3p.b2a(i3p);
+		int i3x = trans_3x_3p.b2a(i3p);
+		int i3 = trans3x.i3x_to_i3(i3x);
 		double val = initial3(i3);
 		if (std::isnan(val)) {
 			fprintf(stderr, "ERROR: ice_to_hp(), NaN in initial guess, i3=%d\n", i3);
@@ -490,7 +540,8 @@ printf("Translating XM: %d\n", index);
 	// --------- Pick out the answer and convert back to standard vector space
 	giss::CooVector<int, double> ret;
 	for (int i3p=0; i3p<n3p; ++i3p) {
-		int i3 = trans_3_3p.b2a(i3p);
+		int i3x = trans_3x_3p.b2a(i3p);
+		int i3 = trans3x.i3x_to_i3(i3x);
 		ret.add(i3, qpt.X[i3p]);
 	}
 
@@ -542,6 +593,7 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 	// ------ Attributes
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
+	info_var->add_att("hptype", _hptype.str());
 
 	// Names of the ice sheets
 	std::string sheet_names = "";
@@ -627,6 +679,11 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 
 	// Read list of ice sheets
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+
+	std::string shptype(giss::get_att(info_var, "hptype")->as_string(0));
+	_hptype = *HCIndex::Type::get_by_name(shptype.c_str());
+
+
 	std::vector<std::string> sheet_names = parse_comma_list(std::string(
 		giss::get_att(info_var, "sheetnames")->as_string(0)));
 

@@ -36,16 +36,13 @@ static PyObject *MatrixMaker_new(PyTypeObject *type, PyObject *args, PyObject *k
     return (PyObject *)self;
 }
 
-/** Read from a file */
+/** Used to construct MatrixMaker */
 static int MatrixMaker__init(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
 
 	try {
-
-
 		// Get arguments
 		int correct_area1 = true;
-
 		static char const *keyword_list[] = {"correct_area1", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
@@ -59,9 +56,10 @@ static int MatrixMaker__init(PyMatrixMaker *self, PyObject *args, PyObject *kwds
 			return 0;
 		}
 
-
 		// Instantiate C++ Ice Maker
-		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(correct_area1));
+		std::unique_ptr<GridDomain> domain(new GridDomain_Identity());
+		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(
+			correct_area1, std::move(domain)));
 
 		// Move it to Python MatrixMaker object.
 		self->init(std::move(maker));
@@ -78,16 +76,17 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 	try {
 		// Get arguments
 		const char *grid1_fname_py = NULL;
+		const char *shptype = NULL;
 		PyObject *hpdefs_py = NULL;
 		PyObject *mask1_py = NULL;
 		int correct_area1 = true;
 
-		static char const *keyword_list[] = {"grid1_fname", "hpdefs", "mask1", "correct_area1", NULL};
+		static char const *keyword_list[] = {"grid1_fname", "hptype", "hpdefs", "mask1", "correct_area1", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "sO|Oi",
+			args, kwds, "ssO|Oi",
 			const_cast<char **>(keyword_list),
-			&grid1_fname_py, &hpdefs_py, &mask1_py, &correct_area1))
+			&grid1_fname_py, &shptype, &hpdefs_py, &mask1_py, &correct_area1))
 		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
@@ -95,9 +94,18 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 			return 0;
 		}
 
-
 		// Instantiate C++ Ice Maker
-		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(correct_area1));
+		std::unique_ptr<GridDomain> domain(new GridDomain_Identity());
+		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(
+			correct_area1, std::move(domain)));
+
+		auto hptype(HCIndex::Type::get_by_name(shptype));
+		if (!hptype) {
+			PyErr_SetString(PyExc_ValueError,
+				"MatrixMaker_init(): Bad value for hptype (first argument).");
+			return 0;			
+		}
+		maker->_hptype = *hptype;
 
 		{NcFile nc(grid1_fname_py, NcFile::ReadOnly);
 			maker->grid1 = read_grid(nc, "grid");

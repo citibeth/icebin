@@ -73,7 +73,6 @@ printf("BEGIN hp_interp(%d)\n", overlap_type);
 
 printf("MID hp_interp(%d)\n", overlap_type);
 
-	HCIndex hc_index(n1());
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
 		giss::SparseDescr(nx, gcm->n3())));
 
@@ -94,9 +93,9 @@ printf("MID hp_interp(%d)\n", overlap_type);
 		double whps[2];	
 		linterp_1d(gcm->hpdefs, elevation, ihps, whps);
 //printf("LINTERP %d %f %f (%d : %f), (%d : %f)\n", i2, elev2(i2), overlap_ratio, ihps[0], whps[0], ihps[1], whps[1]);
-		ret->add(ix, hc_index.ik_to_index(i1, ihps[0]),
+		ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[0]),
 			overlap_ratio * whps[0]);
-		ret->add(ix, hc_index.ik_to_index(i1, ihps[1]),
+		ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[1]),
 			overlap_ratio * whps[1]);
 	}
 

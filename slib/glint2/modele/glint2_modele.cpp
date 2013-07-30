@@ -317,7 +317,7 @@ printf("init_landice_com_part2 2\n");
 
 printf("init_landice_com_part2 3\n");
 	// ======================= fhc(:,:,hp>1)
-	HCIndex hc_index(api->maker->n1());
+	HCIndex &hc_index(*api->maker->hc_index);
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->maker->hp_to_atm());
 	ModelEDomain &domain(*api->domain);
 
@@ -406,7 +406,7 @@ void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api)
 {
 printf("BEGIN glint2_modele_init_hp_to_ices\n");
 	ModelEDomain &domain(*api->domain);
-	HCIndex hc_index(api->maker->n1());
+	HCIndex &hc_index(*api->maker->hc_index);
 
 	// ====================== hp_to_ices
 	api->hp_to_ices.clear();
@@ -478,7 +478,7 @@ int rank = coupler.rank();	// debugging
 
 	// Fill it in by doing a sparse multiply...
 	// (while translating indices to local coordinates)
-	HCIndex hc_index(api->maker->n1());
+	HCIndex &hc_index(*api->maker->hc_index);
 	int nmsg = 0;
 printf("[%d] hp_to_ices.size() = %ld\n", rank, api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {

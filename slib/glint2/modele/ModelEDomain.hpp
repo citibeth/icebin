@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glint2/GridDomain.hpp>
+#include <glint2/HCIndex.hpp>
 
 namespace glint2 {
 namespace modele {
@@ -113,6 +114,24 @@ public:
 #endif
 };
 // ------------------------------------------------
+/** Utility to get height-classified indexing right.
+TODO: Make this more efficient by rounding n1 up to a power of 2. */
+class HCIndex_ModelE : public HCIndex {
+
+	int const n1;
+
+public:
+	HCIndex_ModelE(int _n1) : n1(_n1) {}
+
+	int ik_to_index(int i, int k) const	// k == ihc == hc
+		{ return k * n1 + i; }
+
+	void index_to_ik(int index, int &i, int &k) const
+	{
+		k = index / n1;
+		i = index - k*n1;
+	}
+};
 
 
 

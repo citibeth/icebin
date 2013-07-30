@@ -7,6 +7,7 @@
 #include <glint2/IceSheet.hpp>
 #include <glint2/GridDomain.hpp>
 #include <giss/hash.hpp>
+#include <glint2/HCIndex.hpp>
 
 /*
 Height Points (HP) [nhc*n1] --A--> Ice [n2] --B--> Height Classes (HC) [nhc*n1] --C--> GCM
@@ -30,16 +31,18 @@ public:
 //	std::vector<string> sheet_names;	// Gives numbering of ALL sheets as well as names
     giss::MapDict<std::string, IceSheet> sheets;
 	std::map<int, IceSheet *> sheets_by_id;
+	std::unique_ptr<HCIndex> hc_index;	// Methods to extract i1 and ihc from an elevation index
 protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;
 	bool _correct_area1;		/// Should we correct for projection and geometric error?
 public:
+	HCIndex::Type _hptype;
 	MatrixMaker(
-		bool correct_area1=true,
-		std::unique_ptr<GridDomain> &&_domain
-			= std::unique_ptr<GridDomain>(new GridDomain_Identity()))
+		bool correct_area1,
+		std::unique_ptr<GridDomain> &&_domain)
 		: _next_sheet_index(0),
+		_hptype(HCIndex::Type::UNKNOWN),
 		domain(std::move(_domain)),
 		_correct_area1(correct_area1) {}
 
