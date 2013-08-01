@@ -124,17 +124,50 @@ public :
 };	// class Dict
 
 // -----------------------------------------
+template<
+	template<class KeyTT, class ValTT> class BaseTpl,
+	class KeyT, class ValT>
+struct Dict_Create : public Dict<BaseTpl, KeyT, ValT>
+{
+	typedef Dict<BaseTpl, KeyT, ValT> super;
+//	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super2;
+
+	/** Creates elements as you insert them! */
+	ValT *operator[](KeyT const &key) {
+		auto ii = super::find(key);
+		if (ii == super::end()) {
+//			std::unique_ptr<ValT> ptr(new ValT());
+			auto ret = super::super::insert(std::make_pair(key, // std::move(ptr)));
+				std::unique_ptr<ValT>(new ValT())));
+			// typename super::super::iterator nw_it = ret.first;
+			return &*(ret.first->second);
+		}
+		return &*(ii->second);
+	}
+};
+// -----------------------------------------
 template<class KeyT, class ValT>
 class _MapDict_core : public std::map<KeyT, ValT> {};
 
 template<class KeyT, class ValT>
 class MapDict : public Dict<_MapDict_core, KeyT, ValT> {};
+
+template<class KeyT, class ValT>
+class MapDict_Create : public Dict_Create<_MapDict_core, KeyT, ValT> {};
 // -----------------------------------------
 template<class KeyT, class ValT>
 class _HashDict_core : public std::map<KeyT, ValT> {};
 
 template<class KeyT, class ValT>
 class HashDict : public Dict<_HashDict_core, KeyT, ValT> {};
+
+template<class KeyT, class ValT>
+class HashDict_Create : public Dict_Create<_HashDict_core, KeyT, ValT> {};
+// -----------------------------------------
+
+
+
+
 // -----------------------------------------
 
 

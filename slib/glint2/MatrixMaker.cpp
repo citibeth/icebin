@@ -179,11 +179,24 @@ class I3XTranslator {
 
 public:
 
-	I3XTranslator(HCIndex *_hc_index, int _nhc) :
-		hc_index(_hc_index), nhc(_nhc) {}
+	void init(HCIndex *_hc_index, int _nhc)
+	{
+		hc_index = _hc_index;
+		nhc = _nhc;
+	}
+
+	// Identity Transformation
+	void init_identity() {
+		hc_index = 0;
+		nhc = -1;
+	}
+
+	I3XTranslator() : hc_index(0), nhc(-1) {}
 
 	int i3x_to_i3(int i3x)
 	{
+		if (!hc_index) return i3x;		// Identity
+
 		int i1 = i3x / nhc;
 		int k = i3x - i1 * nhc;
 		return hc_index->ik_to_index(i1, k);
@@ -191,6 +204,8 @@ public:
 
 	int i3_to_i3x(int i3)
 	{
+		if (!hc_index) return i3;		// Identity
+
 		int i1, k;
 		hc_index->index_to_ik(i3, i1, k);
 		int i3x = i1 * nhc + k;
@@ -199,25 +214,76 @@ public:
 	}
 };
 // -------------------------------------------------------------
+struct UsedAll {
+	std::set<int> used1;
+	std::set<std::pair<int,int>> used2;
+	std::set<int> used3;
+	std::set<int> used3x;
+	giss::IndexTranslator trans_1_1p;
+	giss::IndexTranslator2 trans_2_2p;
+	giss::IndexTranslator trans_3x_3p;
+
+	std::unique_ptr<giss::VectorSparseMatrix> RMp;
+	std::unique_ptr<giss::VectorSparseMatrix> Sp;
+	std::unique_ptr<giss::VectorSparseMatrix> XMp;
+	blitz::Array<double,1> area1p_inv;
+
+	UsedAll() :
+		trans_1_1p("trans_1_1p"),
+		trans_2_2p("trans_2_2p"),
+		trans_3x_3p("trans_3x_3p") {}
+
+};
+
+class GetSubID {
+	QPAlgorithm _qp_algorithm;
+public:
+	GetSubID(QPAlgorithm qp_algorithm) : _qp_algorithm(qp_algorithm) {}
+	int operator()(int i1) {
+		if (_qp_algorithm == QPAlgorithm::SINGLE_QP) return 0;
+		return i1;
+	}
+};
+
+static int get_subid(int i1) { return i1; }
+
+
 /** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete.
 TODO: This only works on one ice sheet.  Will need to be extended
 for multiple ice sheets. */
 giss::CooVector<int, double>
 MatrixMaker::ice_to_hp(
 std::map<int, blitz::Array<double,1>> &f2s,
-blitz::Array<double,1> &initial3)
+blitz::Array<double,1> &initial3,
+QPAlgorithm qp_algorithm)
 {
 printf("BEGIN MatrixMaker::ice_to_hp()\n");
+	bool const convert_3_3x = false;		// Didn't seem to help
+	GetSubID get_subid(qp_algorithm);
+
+	giss::MapDict_Create<int, UsedAll> used;		// subid -> A bunch of used sets
+
 	// =============== Set up basic vector spaces for optimization problem
-	std::set<int> used1, used3;
-	std::set<std::pair<int,int>> used2;
 
 	// Used in constraints
 	std::unique_ptr<giss::VectorSparseMatrix> RM0(hp_to_atm());	// 3->1
 	for (auto ii = RM0->begin(); ii != RM0->end(); ++ii) {
-		used1.insert(ii.row());
+		int i1 = ii.row();
+		UsedAll &ua(*used[get_subid(i1)]);
+
+		// Check RM is local for MULTI_QP algorithm
 		int i3 = ii.col();
-		used3.insert(i3);
+		if (qp_algorithm == QPAlgorithm::MULTI_QP) {
+			int i1b, k;
+			hc_index->index_to_ik(i3, i1b, k);
+			if (i1b != i1) {
+				fprintf(stderr, "RM (hp2atm) matrix is non-local!\n");
+				throw std::exception();
+			}
+		}
+
+		ua.used1.insert(i1);
+		ua.used3.insert(i3);
 	}
 
 // In some cases in the past, QP optimization has not worked well
@@ -244,8 +310,10 @@ printf("BEGIN MatrixMaker::ice_to_hp()\n");
 			*sheet->atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
 			*S);
 		for (auto ii = S->begin(); ii != S->end(); ++ii) {
-			used1.insert(ii.row());
-			used2.insert(std::make_pair(sheet->index, ii.col()));
+			int i1 = ii.row();
+			UsedAll &ua(*used[get_subid(i1)]);
+			ua.used1.insert(i1);
+			ua.used2.insert(std::make_pair(sheet->index, ii.col()));
 		}
 
 		std::unique_ptr<giss::VectorSparseMatrix> XM(
@@ -253,9 +321,15 @@ printf("BEGIN MatrixMaker::ice_to_hp()\n");
 //		checksum_interp(*XM, "XM");
 
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
-			used2.insert(std::make_pair(sheet->index, ii.row()));
+			int i2 = ii.row();
+
 			int i3 = ii.col();
-			used3.insert(i3);
+			int i1, k;
+			hc_index->index_to_ik(i3, i1, k);
+
+			UsedAll &ua(*used[get_subid(i1)]);
+			ua.used2.insert(std::make_pair(sheet->index, i2));
+			ua.used3.insert(i3);
 		}
 printf("MatrixMaker::ice_to_hp() 4\n");
 
@@ -266,46 +340,66 @@ printf("MatrixMaker::ice_to_hp() 4\n");
 		XMs.insert(sheet->index, std::move(XM));
 	}
 
-	// Count the number of height points
-	// (so we can set up 3x indexing scheme)
-	int max_k = 0;		// Maximum height class index
-	for (auto p3 = used3.begin(); p3 != used3.end(); ++p3) {
-		int i1, k;
-		hc_index->index_to_ik(*p3, i1, k);
-		max_k = std::max(k, max_k);
+
+	// -------- Set up the i3 <-> i3x transformation (if we want to)
+	I3XTranslator trans_3_3x;
+	if (convert_3_3x) {
+		int max_k = 0;		// Maximum height class index
+		for (auto ua = used.begin(); ua != used.end(); ++ua) {
+
+			// Convert from i3 to i3x (renumbered height class indices)
+			for (auto p3 = ua->used3.begin(); p3 != ua->used3.end(); ++p3) {
+				int i1, k;
+				hc_index->index_to_ik(*p3, i1, k);
+				max_k = std::max(k, max_k);
+			}
+		}
+
+		trans_3_3x.init(&*hc_index, max_k + 1);
+
+		for (auto ua = used.begin(); ua != used.end(); ++ua) {
+
+			for (auto p3 = ua->used3.begin(); p3 != ua->used3.end(); ++p3) {
+				int i3x = trans_3_3x.i3_to_i3x(*p3);
+				ua->used3x.insert(i3x);
+			}
+			ua->used3.clear();		// No longer needed
+		}
+	} else {
+		trans_3_3x.init_identity();
+		for (auto ua = used.begin(); ua != used.end(); ++ua) {
+			ua->used3x = std::move(ua->used3);
+		}
 	}
 
-	// Convert from i3 to i3x (renumbered height class indices)
-	I3XTranslator trans3x(&*hc_index, max_k + 1);
-	std::set<int> used3x;
-	for (auto p3 = used3.begin(); p3 != used3.end(); ++p3) {
-		int i3x = trans3x.i3_to_i3x(*p3);
-		used3x.insert(i3x);
+
+	// -------------- Set up destination renumbered matrices
+	for (auto ua = used.begin(); ua != used.end(); ++ua) {
+		ua->trans_1_1p.init(n1(), ua->used1);
+		ua->trans_2_2p.init(&size2, ua->used2);
+		ua->trans_3x_3p.init(n3(), ua->used3x);
+
+		int n1p = ua->trans_1_1p.nb();
+		int n2p = ua->trans_2_2p.nb();
+		int n3p = ua->trans_3x_3p.nb();
+
+		// Translate to new matrices
+		ua->RMp.reset(new giss::VectorSparseMatrix(giss::SparseDescr(n1p, n3p)));
+		ua->Sp .reset(new giss::VectorSparseMatrix(giss::SparseDescr(n1p, n2p)));
+		ua->XMp.reset(new giss::VectorSparseMatrix(giss::SparseDescr(n2p, n3p)));
+		ua->area1p_inv.resize(n1p);
 	}
 
-	giss::IndexTranslator trans_1_1p("trans_1_1p");
-		trans_1_1p.init(n1(), used1);
-	giss::IndexTranslator2 trans_2_2p("trans_2_2p");
-		trans_2_2p.init(std::move(size2), used2);
-	giss::IndexTranslator trans_3x_3p("trans_3x_3p");
-		trans_3x_3p.init(n3(), used3x);
-
-	int n1p = trans_1_1p.nb();
-	int n2p = trans_2_2p.nb();
-	int n3p = trans_3x_3p.nb();
-
-	// Translate to new matrices
-	giss::VectorSparseMatrix RMp(giss::SparseDescr(n1p, n3p));
-	giss::VectorSparseMatrix Sp(giss::SparseDescr(n1p, n2p));
-	giss::VectorSparseMatrix XMp(giss::SparseDescr(n2p, n3p));
-
-
+	// ----------------- Copy data into those matrices
 printf("Translating RM\n");
 	for (auto ii = RM->begin(); ii != RM->end(); ++ii) {
-		int i3x = trans3x.i3_to_i3x(ii.col());
-		RMp.add(
-			trans_1_1p.a2b(ii.row()),
-			trans_3x_3p.a2b(i3x), ii.val());
+		int i1 = ii.row();
+		UsedAll *ua(used[get_subid(i1)]);
+
+		int i3x = trans_3_3x.i3_to_i3x(ii.col());
+		ua->RMp->add(
+			ua->trans_1_1p.a2b(i1),
+			ua->trans_3x_3p.a2b(i3x), ii.val());
 	}
 
 
@@ -313,239 +407,264 @@ printf("Translating RM\n");
 		int const index = f2i->first;
 		IceSheet *sheet = (*this)[index];
 
+		// Source matrices
 		giss::VectorSparseMatrix *S(Ss[index]);
 		giss::VectorSparseMatrix *XM(XMs[index]);
 
 printf("Translating S: %d\n", index);
 		for (auto ii = S->begin(); ii != S->end(); ++ii) {
-			Sp.add(
-				trans_1_1p.a2b(ii.row()),
-				trans_2_2p.a2b(std::make_pair(index, ii.col())),
+			int i1 = ii.row();
+			UsedAll *ua(used[get_subid(i1)]);
+			ua->Sp->add(
+				ua->trans_1_1p.a2b(i1),
+				ua->trans_2_2p.a2b(std::make_pair(index, ii.col())),
 				ii.val());
 		}
 
 printf("Translating XM: %d\n", index);
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
-			int i3x = trans3x.i3_to_i3x(ii.col());
-			XMp.add(
-				trans_2_2p.a2b(std::make_pair(index, ii.row())),
-				trans_3x_3p.a2b(i3x),
+			int i2 = ii.row();
+
+			int i3 = ii.col();
+			int i3x = trans_3_3x.i3_to_i3x(i3);
+			int i1, k;
+			hc_index->index_to_ik(i3, i1, k);
+			UsedAll *ua(used[get_subid(i1)]);
+
+			ua->XMp->add(
+				ua->trans_2_2p.a2b(std::make_pair(index, ii.row())),
+				ua->trans_3x_3p.a2b(i3x),
 				ii.val());
 		}
 	}
 
-	// -------- Translate f2 -> f2p
-	// Ignore elements NOT listed in the translation
-	blitz::Array<double,1> f2p(n2p);
-	f2p = 0;
-	for (int i2p = 0; i2p < n2p; ++i2p) {
-		std::pair<int,int> const &a(trans_2_2p.b2a(i2p));
-		int index = a.first;
-		int i2 = a.second;
-		f2p(i2p) = f2s[index](i2);
+	// ----------- Translate area1 -> area1p
+	for (auto ua = used.begin(); ua != used.end(); ++ua) {
+		int n1p = ua->trans_1_1p.nb();
+
+		ua->area1p_inv.resize(n1p);
+		ua->area1p_inv = 0;
 	}
 
-	// ----------- Translate area1 -> area1p
-	blitz::Array<double,1> area1p_inv(n1p);
-	area1p_inv = 0;
 	for (auto ii = area1.begin(); ii != area1.end(); ++ii) {
 		int i1 = ii->first;
-		int i1p = trans_1_1p.a2b(i1);
-		area1p_inv(i1p) += ii->second;
-	}
-	for (int i1p=0; i1p<n1p; ++i1p) {
-		if (area1p_inv(i1p) != 0) area1p_inv(i1p) = 1.0d / area1p_inv(i1p);
+		UsedAll *ua(used[get_subid(i1)]);
+		int i1p = ua->trans_1_1p.a2b(i1);
+		ua->area1p_inv(i1p) += ii->second;
 	}
 
-	// ---------- Divide Sp by area1p to complete the regridding matrix
-	for (auto ii = Sp.begin(); ii != Sp.end(); ++ii) {
-		int i1p = ii.row();
-		ii.val() *= area1p_inv(i1p);
-	}
+	for (auto ua = used.begin(); ua != used.end(); ++ua) {
+		int n1p = ua->trans_1_1p.nb();
 
-	// ========================================================
-	// ========================================================
+		for (int i1p=0; i1p<n1p; ++i1p) {
+			if (ua->area1p_inv(i1p) != 0) ua->area1p_inv(i1p) = 1.0d / ua->area1p_inv(i1p);
+		}
 
- 	// ---------- Allocate the QPT problem
-	// m = # constraints = n1p (size of atmosphere grid)
-	// n = # variabeles = n3p
-	galahad::qpt_problem_c qpt(n1p, n3p, true);
-
-	// ================ Objective Function
-	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
-	// qpt%H = (XM)^T (XM),    qpt%G = f_I \cdot (XM),        qpt%f = f_I \cdot f_I
-
-	// -------- H = 2 * XMp^T XMp
-	giss::VectorSparseMatrix XMp_T(giss::SparseDescr(XMp.ncol, XMp.nrow));
-	transpose(XMp, XMp_T);
-	std::unique_ptr<giss::VectorSparseMatrix> H(multiply(XMp_T, XMp));	// n3xn3
-
-	// Count items in H lower triangle
-	size_t ltri = 0;
-	for (auto ii = H->begin(); ii != H->end(); ++ii)
-		if (ii.row() >= ii.col()) ++ltri;
-
-	// Copy ONLY the lower triangle items to GALAHAD
-	// (otherwise, GALAHAD won't work)
-	qpt.alloc_H(ltri);
-	giss::ZD11SparseMatrix H_zd11(qpt.H, 0);
-	for (auto ii = H->begin(); ii != H->end(); ++ii) {
-		if (ii.row() >= ii.col())
-			H_zd11.add(ii.row(), ii.col(), 2.0d * ii.val());
-	}
-
-	// -------- Linear term of obj function
-	// G = -2*f2p \cdot XMp
-	for (int i=0; i < qpt.n; ++i) qpt.G[i] = 0;
-	for (auto ii = XMp.begin(); ii != XMp.end(); ++ii) {
-		qpt.G[ii.col()] -= 2.0d * f2p(ii.row()) * ii.val();
-	}
-
-	// --------- Constant term of objective function
-	// f = f2p \cdot f2p
-	qpt.f = 0;
-	for (int i2p=0; i2p<n2p; ++i2p) {
-		qpt.f += f2p(i2p) * f2p(i2p);
-	}
-
-	// De-allocate...
-//	H.reset();
-//	XMp.clear();
-//	XMp_T.clear();
-
-	// ============================ Constraints
-	// RM x = Sp f2p
-
-	// qpt.A = constraints matrix = RMp
-	qpt.alloc_A(RMp.size());
-	giss::ZD11SparseMatrix A_zd11(qpt.A, 0);
-	copy(RMp, A_zd11);
-
-	// qpt.C = equality constraints RHS = Sp * f2p
-	for (int i=0; i<n1p; ++i) qpt.C[i] = 0;
-	for (auto ii = Sp.begin(); ii != Sp.end(); ++ii) {
-		int i1p = ii.row();		// Atm
-		int i2p = ii.col();		// Ice
-		qpt.C[i1p] -= f2p(i2p) * ii.val();
-	}
-
-	// De-allocate
-	RMp.clear();
-
-	// =========================== Initial guess at solution
-	bool nanerr = false;
-	for (int i3p=0; i3p<n3p; ++i3p) {
-		int i3x = trans_3x_3p.b2a(i3p);
-		int i3 = trans3x.i3x_to_i3(i3x);
-		double val = initial3(i3);
-		if (std::isnan(val)) {
-			fprintf(stderr, "ERROR: ice_to_hp(), NaN in initial guess, i3=%d\n", i3);
-			nanerr = true;
-			qpt.X[i3p] = 0;
-		} else {
-			qpt.X[i3p] = val;
+		// ---------- Divide Sp by area1p to complete the regridding matrix
+		for (auto ii = ua->Sp->begin(); ii != ua->Sp->end(); ++ii) {
+			int i1p = ii.row();
+			ii.val() *= ua->area1p_inv(i1p);
 		}
 	}
 
-	// =========================== Verify the objective function
+	giss::CooVector<int, double> ret3;		// Function return value
+	for (auto ua = used.begin(); ua != used.end(); ++ua) {
+		int n1p = ua->trans_1_1p.nb();
+		int n2p = ua->trans_2_2p.nb();
+		int n3p = ua->trans_3x_3p.nb();
+
+		// -------- Translate f2 -> f2p
+		// Ignore elements NOT listed in the translation
+		blitz::Array<double,1> f2p(n2p);
+		f2p = 0;
+		for (int i2p = 0; i2p < n2p; ++i2p) {
+			std::pair<int,int> const &a(ua->trans_2_2p.b2a(i2p));
+			int index = a.first;
+			int i2 = a.second;
+			f2p(i2p) = f2s[index](i2);
+		}
+
+
+	 	// ---------- Allocate the QPT problem
+		// m = # constraints = n1p (size of atmosphere grid)
+		// n = # variabeles = n3p
+		galahad::qpt_problem_c qpt(n1p, n3p, true);
+
+		// ================ Objective Function
+		// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+		// qpt%H = (XM)^T (XM),    qpt%G = f_I \cdot (XM),        qpt%f = f_I \cdot f_I
+
+		// -------- H = 2 * XMp^T XMp
+		giss::VectorSparseMatrix XMp_T(giss::SparseDescr(ua->XMp->ncol, ua->XMp->nrow));
+		transpose(*ua->XMp, XMp_T);
+		std::unique_ptr<giss::VectorSparseMatrix> H(multiply(XMp_T, *ua->XMp));	// n3xn3
+
+		// Count items in H lower triangle
+		size_t ltri = 0;
+		for (auto ii = H->begin(); ii != H->end(); ++ii)
+			if (ii.row() >= ii.col()) ++ltri;
+
+		// Copy ONLY the lower triangle items to GALAHAD
+		// (otherwise, GALAHAD won't work)
+		qpt.alloc_H(ltri);
+		giss::ZD11SparseMatrix H_zd11(qpt.H, 0);
+		for (auto ii = H->begin(); ii != H->end(); ++ii) {
+			if (ii.row() >= ii.col())
+				H_zd11.add(ii.row(), ii.col(), 2.0d * ii.val());
+		}
+
+		// -------- Linear term of obj function
+		// G = -2*f2p \cdot XMp
+		for (int i=0; i < qpt.n; ++i) qpt.G[i] = 0;
+		for (auto ii = ua->XMp->begin(); ii != ua->XMp->end(); ++ii) {
+			qpt.G[ii.col()] -= 2.0d * f2p(ii.row()) * ii.val();
+		}
+
+		// --------- Constant term of objective function
+		// f = f2p \cdot f2p
+		qpt.f = 0;
+		for (int i2p=0; i2p<n2p; ++i2p) {
+			qpt.f += f2p(i2p) * f2p(i2p);
+		}
+
+		// De-allocate...
+//		H.reset();
+//		ua->XMp->clear();
+//		XMp_T.clear();
+
+		// ============================ Constraints
+		// RM x = Sp f2p
+
+		// qpt.A = constraints matrix = RMp
+		qpt.alloc_A(ua->RMp->size());
+		giss::ZD11SparseMatrix A_zd11(qpt.A, 0);
+		copy(*ua->RMp, A_zd11);
+
+		// qpt.C = equality constraints RHS = Sp * f2p
+		for (int i=0; i<n1p; ++i) qpt.C[i] = 0;
+		for (auto ii = ua->Sp->begin(); ii != ua->Sp->end(); ++ii) {
+			int i1p = ii.row();		// Atm
+			int i2p = ii.col();		// Ice
+			qpt.C[i1p] -= f2p(i2p) * ii.val();
+		}
+
+		// De-allocate
+		ua->RMp.reset();	// ->clear();
+
+		// =========================== Initial guess at solution
+		bool nanerr = false;
+		for (int i3p=0; i3p<n3p; ++i3p) {
+			int i3x = ua->trans_3x_3p.b2a(i3p);
+			int i3 = trans_3_3x.i3x_to_i3(i3x);
+			double val = initial3(i3);
+			if (std::isnan(val)) {
+				fprintf(stderr, "ERROR: ice_to_hp(), NaN in initial guess, i3=%d\n", i3);
+				nanerr = true;
+				qpt.X[i3p] = 0;
+			} else {
+				qpt.X[i3p] = val;
+			}
+		}
+
+		// =========================== Verify the objective function
 #if 0
-	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
-	printf("objective value1 = %g\n", qpt.eval_objective(qpt.X));
+		// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+		printf("objective value1 = %g\n", qpt.eval_objective(qpt.X));
 
 
-	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
-	printf("objective value = %g\n", qpt.eval_objective(qpt.X));
-	{
-		// Initial2p = XMp * initial3p
-		blitz::Array<double,1> initial2p(n2p);
-		initial2p = 0;
-		for (auto ii = XMp.begin(); ii != XMp.end(); ++ii) {
-			int i3p = ii.col();
-			int i3 = trans_3_3p.b2a(i3p);
-			int i2p = ii.row();
-	//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
-			initial2p(i2p) += ii.val() * qpt.X[i3p];
+		// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+		printf("objective value = %g\n", qpt.eval_objective(qpt.X));
+		{
+			// Initial2p = XMp * initial3p
+			blitz::Array<double,1> initial2p(n2p);
+			initial2p = 0;
+			for (auto ii = XMp.begin(); ii != XMp.end(); ++ii) {
+				int i3p = ii.col();
+				int i3 = trans_3_3p.b2a(i3p);
+				int i2p = ii.row();
+		//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
+				initial2p(i2p) += ii.val() * qpt.X[i3p];
+			}
+
+			// Sum it up!
+			double obj = 0;
+			for (int i2p=0; i2p<n2p; ++i2p) {
+				double val = initial2p(i2p) - f2p(i2p);
+				obj += val*val;
+			}
+
+			printf("objective value2 = %g\n", obj);
 		}
 
-		// Sum it up!
-		double obj = 0;
-		for (int i2p=0; i2p<n2p; ++i2p) {
-			double val = initial2p(i2p) - f2p(i2p);
-			obj += val*val;
+		{
+			// Initial2p = XMp * initial3p
+			blitz::Array<double,1> initial2p(n2p);
+			initial2p = 0;
+			for (auto ii = XMp_T.begin(); ii != XMp_T.end(); ++ii) {
+				int i3p = ii.row();
+				int i3 = trans_3_3p.b2a(i3p);
+				int i2p = ii.col();
+		//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
+				initial2p(i2p) += ii.val() * qpt.X[i3p];
+			}
+
+			// Sum it up!
+			double obj = 0;
+			for (int i2p=0; i2p<n2p; ++i2p) {
+				double val = initial2p(i2p) - f2p(i2p);
+				obj += val*val;
+			}
+
+			printf("objective value3 = %g\n", obj);
 		}
 
-		printf("objective value2 = %g\n", obj);
-	}
 
-	{
-		// Initial2p = XMp * initial3p
-		blitz::Array<double,1> initial2p(n2p);
-		initial2p = 0;
-		for (auto ii = XMp_T.begin(); ii != XMp_T.end(); ++ii) {
-			int i3p = ii.row();
-			int i3 = trans_3_3p.b2a(i3p);
-			int i2p = ii.col();
-	//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
-			initial2p(i2p) += ii.val() * qpt.X[i3p];
+		// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
+		printf("objective value = %g\n", qpt.eval_objective(qpt.X));
+		{
+			int const index = 0;
+			// Initial2 = XM * initial3
+			auto sheet(sheets_by_id.find(index)->second);
+			blitz::Array<double,1> initial2(sheet->n2());
+			initial2 = 0;
+			giss::VectorSparseMatrix *XM(XMs[index]);
+			for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
+				int i3 = ii.col();
+				int i2 = ii.row();
+				initial2(i2) += ii.val() * initial3(i3);
+			}
+
+			// Sum it up!
+			double obj = 0;
+			for (int i2=0; i2<sheet->n2(); ++i2) {
+				double val = initial2(i2) - f2s[index](i2);
+				if (std::isnan(val)) continue;
+				obj += val*val;
+			}
+
+			printf("objective value4 = %g\n", obj);
 		}
-
-		// Sum it up!
-		double obj = 0;
-		for (int i2p=0; i2p<n2p; ++i2p) {
-			double val = initial2p(i2p) - f2p(i2p);
-			obj += val*val;
-		}
-
-		printf("objective value3 = %g\n", obj);
-	}
-
-
-	// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
-	printf("objective value = %g\n", qpt.eval_objective(qpt.X));
-	{
-		int const index = 0;
-		// Initial2 = XM * initial3
-		auto sheet(sheets_by_id.find(index)->second);
-		blitz::Array<double,1> initial2(sheet->n2());
-		initial2 = 0;
-		giss::VectorSparseMatrix *XM(XMs[index]);
-		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
-			int i3 = ii.col();
-			int i2 = ii.row();
-			initial2(i2) += ii.val() * initial3(i3);
-		}
-
-		// Sum it up!
-		double obj = 0;
-		for (int i2=0; i2<sheet->n2(); ++i2) {
-			double val = initial2(i2) - f2s[index](i2);
-			if (std::isnan(val)) continue;
-			obj += val*val;
-		}
-
-		printf("objective value4 = %g\n", obj);
-	}
 #endif
 
 
-	// =========================== Solve the Problem!
-	double infinity = 1e20;
-	eqp_solve_simple(qpt.this_f, infinity);
+		// =========================== Solve the Problem!
+		double infinity = 1e20;
+		eqp_solve_simple(qpt.this_f, infinity);
 
 
 
-	// ========================================================
-	// ========================================================
+		// ========================================================
+		// ========================================================
 
-	// --------- Pick out the answer and convert back to standard vector space
-	giss::CooVector<int, double> ret;
-	for (int i3p=0; i3p<n3p; ++i3p) {
-		int i3x = trans_3x_3p.b2a(i3p);
-		int i3 = trans3x.i3x_to_i3(i3x);
-		ret.add(i3, qpt.X[i3p]);
+		// --------- Pick out the answer and convert back to standard vector space
+		for (int i3p=0; i3p<n3p; ++i3p) {
+			int i3x = ua->trans_3x_3p.b2a(i3p);
+			int i3 = trans_3_3x.i3x_to_i3(i3x);
+			ret3.add(i3, qpt.X[i3p]);
+		}
 	}
 
-	return ret;
+	return ret3;
 }
 
 

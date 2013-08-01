@@ -22,6 +22,11 @@ namespace glint2 {
 
 typedef giss::SparseAccumulator<std::pair<int,int>, double, giss::HashPair<int,int>> SparseAccumulator1hc;
 
+BOOST_ENUM_VALUES( QPAlgorithm, int,
+	(SINGLE_QP)		(0)
+	(MULTI_QP)		(1)
+)
+
 /** Generates the matrices required in the GCM */
 class MatrixMaker
 {
@@ -104,7 +109,8 @@ public:
 	for multiple ice sheets. */
 	giss::CooVector<int, double> ice_to_hp(
 		std::map<int, blitz::Array<double,1>> &f2s,
-		blitz::Array<double,1> &initial);
+		blitz::Array<double,1> &initial4,
+		QPAlgorithm qp_algorithm = QPAlgorithm::SINGLE_QP);
 
 
 

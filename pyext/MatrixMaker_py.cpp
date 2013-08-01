@@ -267,7 +267,7 @@ static PyObject *MatrixMaker_hp_to_atm(PyMatrixMaker *self, PyObject *args)
 	}
 }
 
-static PyObject *MatrixMaker_ice_to_hp(PyMatrixMaker *self, PyObject *args)
+static PyObject *MatrixMaker_ice_to_hp(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
 printf("BEGIN MatrixMaker_ice_to_hp()\n");
 	PyObject *ret_py = NULL;
@@ -276,11 +276,24 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 		// Get arguments
 		PyObject *f2s_py;		// Should be [(1 : [...]), (2 : [...])]
 		PyObject *initial_py;		// array[n3]
-		if (!PyArg_ParseTuple(args, "OO", &f2s_py, &initial_py)) {
+		char *sqp_algorithm = "SINGLE_QP";
+		static char const *keyword_list[] = {"f2s", "initial3", "qp_algorithm", NULL};
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "OO|s",
+			const_cast<char **>(keyword_list),
+			&f2s_py, &initial_py, &sqp_algorithm)) {
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
 				"Bad arguments for ice_to_hp().");
 			return 0;
+		}
+
+		auto qp_algorithm(QPAlgorithm::get_by_name(sqp_algorithm));
+		if (!qp_algorithm) {
+			PyErr_SetString(PyExc_ValueError,
+				"MatrixMaker_ice_to_hp(): Bad value for qp_algorithm.");
+			return 0;			
 		}
 
 		if (!PyList_Check(f2s_py)) {
@@ -319,7 +332,7 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 
 		// Call!
 		giss::CooVector<int, double> f3(
-			self->maker->ice_to_hp(f2s, initial));
+			self->maker->ice_to_hp(f2s, initial, *qp_algorithm));
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());

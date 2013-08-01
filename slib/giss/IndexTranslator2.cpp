@@ -4,9 +4,9 @@ namespace giss {
 
 /** @param n Size of space a (runs [0...n-1])
 @param used_a Set of indices that are used in space a */
-void IndexTranslator2::init(std::map<int, size_t> &&size_a, std::set<std::pair<int,int>> const &used_a)
+void IndexTranslator2::init(std::map<int, size_t> *size_a, std::set<std::pair<int,int>> const &used_a)
 {
-	_size_a = std::move(size_a);
+	_size_a = size_a;
 	_a2b.clear();
 	_b2a.clear(); _b2a.reserve(used_a.size());
 	for (auto ia_ptr = used_a.begin(); ia_ptr != used_a.end(); ++ia_ptr) {

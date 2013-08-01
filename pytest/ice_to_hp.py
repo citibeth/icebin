@@ -62,7 +62,7 @@ for row,col,val in zip(XM.row, XM.col, XM.data) :
 #initial = (impm3 + np.random.normal(scale=1e-6,size=impm3.shape)).reshape(-1)
 initial = impm3.reshape(-1)
 #initial[:] = 0
-impm3b = mm.ice_to_hp(f2s, initial).reshape(impm3.shape)
+impm3b = mm.ice_to_hp(f2s, initial, qp_algorithm='MULTI_QP').reshape(impm3.shape)
 #impm3b = impm3
 
 

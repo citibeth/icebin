@@ -13,7 +13,7 @@ namespace giss {
 /** Used to translated row and column matrix indices between spaces related by removal of dimensions. */
 class IndexTranslator2 {
 	std::string _name;	// For debugging
-	std::map<int, size_t> _size_a;
+	std::map<int, size_t> *_size_a;
 	std::unordered_map<std::pair<int,int>, int, giss::HashPair<int,int>> _a2b;
 	std::vector<std::pair<int,int>> _b2a;
 public:
@@ -25,13 +25,13 @@ public:
 	@param used Set of indices that are used in space A.
 	Indices in space B run [0...used.size()-1]. */
 	void init(
-		std::map<int, size_t> &&size_a,
+		std::map<int, size_t> *size_a,
 		std::set<std::pair<int,int>> const &used_a);
 
-	size_t nindex() const { return _size_a.size(); }
+	size_t nindex() const { return _size_a->size(); }
 
 	/** @return Size of space A. */
-	size_t na(int index) const { return _size_a.at(index); }
+	size_t na(int index) const { return _size_a->at(index); }
 
 	/** @return Size of space B. */
 	size_t nb() const { return _b2a.size(); }
