@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <unordered_set>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet.hpp>
@@ -12,6 +13,19 @@ IceSheet::~IceSheet() {}
 
 /** Number of dimensions of atmosphere vector space */
 size_t IceSheet::n1() const { return gcm->n1(); }
+
+size_t IceSheet::n4() const
+{
+	fprintf(stderr, "IceSheet::n4() is not implement by default, it only owrks for L0 ice grids.\n");
+	throw std::exception();
+}
+
+blitz::Array<double,1> IceSheet::ice_to_exch(blitz::Array<double,1> const &f2)
+{
+	fprintf(stderr, "IceSheet::ice_to_exch() is not implement by default, it only owrks for L0 ice grids.\n");
+	throw std::exception();
+}
+
 
 // -----------------------------------------------------
 void IceSheet::clear()
@@ -72,8 +86,30 @@ IceSheet::atm_proj_correct(ProjCorrect direction)
 			direction == ProjCorrect::NATIVE_TO_PROJ ?
 				native_area / proj_area : proj_area / native_area);
 	}
+	ret->sum_duplicates();
 
 	return ret;
+}
+// -----------------------------------------------------
+/** Corrects the area1_m result */
+void IceSheet::atm_proj_correct(
+	giss::SparseAccumulator<int,double> &area1_m,
+	ProjCorrect direction)
+{
+	int n1 = gcm->n1();
+
+	giss::Proj2 proj;
+	gcm->grid1->get_ll_to_xy(proj, grid2->sproj);
+
+	for (auto cell = gcm->grid1->cells_begin(); cell != gcm->grid1->cells_end(); ++cell) {
+		double native_area = cell->area;
+		double proj_area = area_of_proj_polygon(*cell, proj);
+		
+		// We'll be DIVIDING by area1_m, so correct the REVERSE of above.
+		area1_m[cell->index] *=
+			(direction == ProjCorrect::NATIVE_TO_PROJ ?
+				proj_area / native_area : native_area / proj_area);
+	}
 }
 // -----------------------------------------------------
 /** Made for binding... */

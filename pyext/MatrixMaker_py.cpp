@@ -204,14 +204,20 @@ static PyObject *MatrixMaker_realize(PyMatrixMaker *self, PyObject *args)
 	}
 }
 
-static PyObject *MatrixMaker_hp_to_ice(PyMatrixMaker *self, PyObject *args)
+static PyObject *MatrixMaker_hp_to_ice(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *ret_py = NULL;
 	try {
-
 		// Get arguments
 		const char *ice_sheet_name_py;
-		if (!PyArg_ParseTuple(args, "s", &ice_sheet_name_py)) {
+		const char *dest_py = "ICE";
+		static char const *keyword_list[] = {"sheetname", "dest", NULL};
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "s|s",
+			const_cast<char **>(keyword_list),
+			&ice_sheet_name_py, &dest_py))
+		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
 				"hp_to_ice() called without a valid string as argument.");
@@ -219,6 +225,7 @@ static PyObject *MatrixMaker_hp_to_ice(PyMatrixMaker *self, PyObject *args)
 		}
 		glint2::MatrixMaker *maker = self->maker.get();
 		std::string const ice_sheet_name(ice_sheet_name_py);
+		auto dest(*IceExch::get_by_name(dest_py));
 
 		// Look up the ice sheet
 		IceSheet *sheet = (*maker)[ice_sheet_name];
@@ -229,7 +236,7 @@ static PyObject *MatrixMaker_hp_to_ice(PyMatrixMaker *self, PyObject *args)
 		}
 
 		// Get the hp_to_ice matrix from it
-		auto ret_c(sheet->hp_to_ice());
+		auto ret_c(sheet->hp_to_ice(dest));
 
 		// Create an output tuple of Numpy arrays
 		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
@@ -240,6 +247,58 @@ static PyObject *MatrixMaker_hp_to_ice(PyMatrixMaker *self, PyObject *args)
 		return 0;
 	}
 }
+
+static PyObject *MatrixMaker_ice_to_atm(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *ret_py = NULL;
+	try {
+
+		// Get arguments
+		const char *ice_sheet_name_py;
+		const char *src_py = "ICE";
+		static char const *keyword_list[] = {"sheetname", "src", NULL};
+
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "s|s",
+			const_cast<char **>(keyword_list),
+			&ice_sheet_name_py, &src_py))
+		{
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"ice_to_atm() called without a valid string as argument.");
+			return 0;
+		}
+		glint2::MatrixMaker *maker = self->maker.get();
+		std::string const ice_sheet_name(ice_sheet_name_py);
+		auto src(*IceExch::get_by_name(src_py));
+
+		// Look up the ice sheet
+		IceSheet *sheet = (*maker)[ice_sheet_name];
+		if (!sheet) {
+			PyErr_SetString(PyExc_ValueError,
+				("Could not find ice sheet named " + ice_sheet_name).c_str());
+			return 0;
+		}
+
+		// Get the ice_to_atm matrix from it
+		giss::SparseAccumulator<int,double> area1_m, area1_m_inv;
+		auto ret_c(sheet->ice_to_projatm(area1_m, src));
+		if (maker->correct_area1)
+			sheet->atm_proj_correct(area1_m, ProjCorrect::PROJ_TO_NATIVE);
+		divide_by(*ret_c, area1_m, area1_m_inv);
+
+		// Create an output tuple of Numpy arrays
+		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_ice_to_atm()");
+		return 0;
+	}
+}
+
+
 
 static PyObject *MatrixMaker_hp_to_atm(PyMatrixMaker *self, PyObject *args)
 {
@@ -276,20 +335,22 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 		// Get arguments
 		PyObject *f2s_py;		// Should be [(1 : [...]), (2 : [...])]
 		PyObject *initial_py;		// array[n3]
-		char *sqp_algorithm = "SINGLE_QP";
-		static char const *keyword_list[] = {"f2s", "initial3", "qp_algorithm", NULL};
+		const char *src_py = "ICE";
+		const char *qp_algorithm_py = "SINGLE_QP";
+		static char const *keyword_list[] = {"f2s", "initial3", "src", "qp_algorithm", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "OO|s",
+			args, kwds, "OO|ss",
 			const_cast<char **>(keyword_list),
-			&f2s_py, &initial_py, &sqp_algorithm)) {
+			&f2s_py, &initial_py, &src_py, &qp_algorithm_py)) {
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
 				"Bad arguments for ice_to_hp().");
 			return 0;
 		}
 
-		auto qp_algorithm(QPAlgorithm::get_by_name(sqp_algorithm));
+		auto src(*IceExch::get_by_name(src_py));
+		auto qp_algorithm(QPAlgorithm::get_by_name(qp_algorithm_py));
 		if (!qp_algorithm) {
 			PyErr_SetString(PyExc_ValueError,
 				"MatrixMaker_ice_to_hp(): Bad value for qp_algorithm.");
@@ -319,7 +380,7 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 			IceSheet *sheet = (*self->maker)[std::string(sheetname_py)];
 
-			int dims[1] = {sheet->n2()};
+			int dims[1] = {src == IceExch::ICE ? sheet->n2() : sheet->n4()};
 			auto f2(giss::py_to_blitz<double,1>(f2_py, "f2", 1, dims));
 
 			f2s.insert(std::make_pair(sheet->index, f2));
@@ -327,12 +388,12 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 		}
 
 		// Get the blitz array from python
-		int dims[] = {self->maker->n3()};
+		int dims[1] = {self->maker->n3()};
 		auto initial(giss::py_to_blitz<double,1>(initial_py, "initial", 1, dims));
 
 		// Call!
 		giss::CooVector<int, double> f3(
-			self->maker->ice_to_hp(f2s, initial, *qp_algorithm));
+			self->maker->ice_to_hp(f2s, initial, src, *qp_algorithm));
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
@@ -347,10 +408,100 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 		return ret_py;
 	} catch(...) {
 		if (ret_py) Py_DECREF(ret_py);
-		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_hp_to_atm()");
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_ice_to_hp()");
 		return 0;
 	}
 }
+
+static PyObject *MatrixMaker_ice_to_exch(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
+{
+printf("BEGIN MatrixMaker_ice_to_exch()\n");
+	PyObject *ret_py = NULL;
+	try {
+
+		// Get arguments
+		const char *ice_sheet_name_py;
+		PyObject *f2_py;		// Should be [(1 : [...]), (2 : [...])]
+		static char const *keyword_list[] = {"sheetname", "f2", NULL};
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "sO",
+			const_cast<char **>(keyword_list),
+			&ice_sheet_name_py, &f2_py))
+		{
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"Bad arguments for ice_to_exch().");
+			return 0;
+		}
+
+		glint2::MatrixMaker *maker = self->maker.get();
+		std::string const ice_sheet_name(ice_sheet_name_py);
+		IceSheet *sheet = (*maker)[ice_sheet_name];
+
+		int dims[1] = {sheet->n2()};
+		auto f2(giss::py_to_blitz<double,1>(f2_py, "f2", 1, dims));
+
+		auto ret(sheet->ice_to_exch(f2));
+
+		ret_py = giss::blitz_to_py(ret);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_ice_to_hp()");
+		return 0;
+	}
+}
+
+
+static PyObject *MatrixMaker_area1(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
+{
+printf("BEGIN MatrixMaker_area1()\n");
+	PyObject *ret_py = NULL;
+	try {
+
+		// Get arguments
+		const char *ice_sheet_name_py;
+		static char const *keyword_list[] = {"sheetname", NULL};
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "s",
+			const_cast<char **>(keyword_list),
+			&ice_sheet_name_py))
+		{
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"Bad arguments for ice_to_exch().");
+			return 0;
+		}
+
+		glint2::MatrixMaker *maker = self->maker.get();
+		std::string const ice_sheet_name(ice_sheet_name_py);
+		IceSheet *sheet = (*maker)[ice_sheet_name];
+
+		giss::SparseAccumulator<int,double> area1_m;
+		sheet->accum_areas(area1_m);
+
+		blitz::Array<double,1> ret(maker->n1());
+		ret = 0;
+//printf("extent[0] = %d\n", ret.extent(0));
+		for (auto ii=area1_m.begin(); ii != area1_m.end(); ++ii) {
+//printf("%d %g\n", ii->first, ii->second);
+			ret(ii->first) = ii->second;
+		}
+
+
+		ret_py = giss::blitz_to_py(ret);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_ice_to_hp()");
+		return 0;
+	}
+}
+
+
+
 
 /** Read from a file */
 static PyObject *MatrixMaker_write(PyMatrixMaker *self, PyObject *args)
@@ -418,11 +569,17 @@ static PyMethodDef MatrixMaker_methods[] = {
 		""},
 	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS,
 		""},
-	{"hp_to_ice", (PyCFunction)MatrixMaker_hp_to_ice, METH_VARARGS,
+	{"hp_to_ice", (PyCFunction)MatrixMaker_hp_to_ice, METH_KEYWORDS,
 		""},
 	{"hp_to_atm", (PyCFunction)MatrixMaker_hp_to_atm, METH_KEYWORDS,
 		""},
+	{"ice_to_atm", (PyCFunction)MatrixMaker_ice_to_atm, METH_KEYWORDS,
+		""},
 	{"ice_to_hp", (PyCFunction)MatrixMaker_ice_to_hp, METH_KEYWORDS,
+		""},
+	{"ice_to_exch", (PyCFunction)MatrixMaker_ice_to_exch, METH_KEYWORDS,
+		""},
+	{"area1",  (PyCFunction)MatrixMaker_area1, METH_KEYWORDS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
 		""},

@@ -56,12 +56,12 @@ static void linterp_1d(
 // --------------------------------------------------------
 // --------------------------------------------------------
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
-@param overlap_type Controls matrix output to ice or exchange grid. */
+@param dest Controls matrix output to ice or exchange grid. */
 std::unique_ptr<giss::VectorSparseMatrix> 
-IceSheet_L0::hp_interp(Overlap overlap_type)
+IceSheet_L0::hp_to_ice(IceExch dest)
 {
-printf("BEGIN hp_interp(%d)\n", overlap_type);
-	int nx = (overlap_type == Overlap::ICE ? n2() : n4());
+printf("BEGIN hp_interp(%)\n", dest.str());
+	int nx = (dest == IceExch::ICE ? n2() : n4());
 
 	// Sum overlap matrix by column (ice grid cell)
 	std::vector<double> area2(n2());
@@ -71,7 +71,7 @@ printf("BEGIN hp_interp(%d)\n", overlap_type);
 	}
 
 
-printf("MID hp_interp(%d)\n", overlap_type);
+printf("MID hp_interp(%s)\n", dest.str());
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
 		giss::SparseDescr(nx, gcm->n3())));
@@ -80,12 +80,13 @@ printf("MID hp_interp(%d)\n", overlap_type);
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
 		if (masked(cell)) continue;
 
-		int i1 = cell->i;
-		int i2 = cell->j;
-		int ix = (overlap_type == Overlap::ICE ? i2 : cell->index);
+		int const i1 = cell->i;
+		int const i2 = cell->j;
+		int const i4 = cell->index;
+		int ix = (dest == IceExch::ICE ? i2 : i4);
 
 		double overlap_ratio =
-			(overlap_type == Overlap::ICE ? cell->area / area2[i2] : 1.0);
+			(dest == IceExch::ICE ? cell->area / area2[i2] : 1.0);
 		double elevation = std::max(elev2(i2), 0.0);
 
 		// Interpolate in height points
@@ -99,16 +100,24 @@ printf("MID hp_interp(%d)\n", overlap_type);
 			overlap_ratio * whps[1]);
 	}
 
-printf("END hp_interp(%d)\n", overlap_type);
+printf("END hp_interp(%s)\n", dest.str());
 
 	return ret;
 }
 // --------------------------------------------------------
 // --------------------------------------------------------
-std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_ice()
+blitz::Array<double,1> IceSheet_L0::ice_to_exch(
+	blitz::Array<double,1> const &f2)
 {
-	// Interpolate (for now) in height points but not X/Y
-	return hp_interp(Overlap::ICE);
+	blitz::Array<double,1> f4(n4());
+	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
+		if (masked(cell)) continue;
+		// cell->i = index in atmosphere grid
+		int i2 = cell->j;		// index in ice grid
+		int i4 = cell->index; 	// index in exchange grid
+		f4(i4) = f2(i2);
+	}
+	return f4;
 }
 // --------------------------------------------------------
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_projatm(
@@ -118,7 +127,7 @@ printf("BEGIN IceSheet_L0::hp_to_projatm %ld %ld\n", n1(), n4());
 
 	// ============= hp_to_exch
 	// Interpolate (for now) in height points but not X/Y
-	auto hp_to_exch(hp_interp(Overlap::EXCH));
+	auto hp_to_exch(hp_to_ice(IceExch::EXCH));
 
 	// ============= exch_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to atmosphere grid is equal
@@ -144,15 +153,17 @@ printf("END IceSheet_L0::hp_to_projatm()\n");
 }
 // --------------------------------------------------------
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_projatm(
-	giss::SparseAccumulator<int,double> &area1_m)
+	giss::SparseAccumulator<int,double> &area1_m,
+	IceExch src)
 {
 printf("BEGIN IceSheet_L0::ice_to_projatm %ld %ld\n", n1(), n4());
 
-	// ============= exch_to_atm (with area1 scaling factor)
+	// ============= ice_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to atmosphere grid is equal
 	// to scaled version of overlap matrix.
+	int nx = (src == IceExch::ICE ? n2() : n4());
 	std::unique_ptr<giss::VectorSparseMatrix> ice_to_projatm(
-		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n2())));
+		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), nx)));
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
 		if (masked(cell)) continue;
 
@@ -161,7 +172,9 @@ printf("BEGIN IceSheet_L0::ice_to_projatm %ld %ld\n", n1(), n4());
 		// cell->j = index in ice grid
 		// cell->index = index in exchange grid
 		double area = cell->area;	// Computed in ExchangeGrid::overlap_callback()
-		ice_to_projatm->add(cell->i, cell->j, area);
+		ice_to_projatm->add(cell->i,
+			src == IceExch::ICE ? cell->j : cell->index,
+			area);
 		area1_m.add(cell->i, area);
 	}
 

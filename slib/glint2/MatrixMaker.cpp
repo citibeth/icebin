@@ -7,6 +7,7 @@
 #include <giss/IndexTranslator2.hpp>
 #include <galahad/qpt_c.hpp>
 #include <galahad/eqp_c.hpp>
+#include <giss/ncutil.hpp>
 
 namespace glint2 {
 
@@ -216,11 +217,11 @@ public:
 // -------------------------------------------------------------
 struct UsedAll {
 	std::set<int> used1;
-	std::set<std::pair<int,int>> used2;
+	std::set<std::pair<int,int>> used4;
 	std::set<int> used3;
 	std::set<int> used3x;
 	giss::IndexTranslator trans_1_1p;
-	giss::IndexTranslator2 trans_2_2p;
+	giss::IndexTranslator2 trans_4_4p;
 	giss::IndexTranslator trans_3x_3p;
 
 	std::unique_ptr<giss::VectorSparseMatrix> RMp;
@@ -230,7 +231,7 @@ struct UsedAll {
 
 	UsedAll() :
 		trans_1_1p("trans_1_1p"),
-		trans_2_2p("trans_2_2p"),
+		trans_4_4p("trans_4_4p"),
 		trans_3x_3p("trans_3x_3p") {}
 
 };
@@ -253,8 +254,9 @@ TODO: This only works on one ice sheet.  Will need to be extended
 for multiple ice sheets. */
 giss::CooVector<int, double>
 MatrixMaker::ice_to_hp(
-std::map<int, blitz::Array<double,1>> &f2s,
+std::map<int, blitz::Array<double,1>> &f4s,		// Actually f2 or f4
 blitz::Array<double,1> &initial3,
+IceExch src,
 QPAlgorithm qp_algorithm)
 {
 printf("BEGIN MatrixMaker::ice_to_hp()\n");
@@ -262,6 +264,39 @@ printf("BEGIN MatrixMaker::ice_to_hp()\n");
 	GetSubID get_subid(qp_algorithm);
 
 	giss::MapDict_Create<int, UsedAll> used;		// subid -> A bunch of used sets
+
+#if 0
+{auto f2i=_f2s.begin();
+	IceSheet *sheet = (*this)[f2i->first];
+	blitz::Array<double,1> &f2(f2i->second);
+	blitz::Array<double,1> f1(n1());
+
+	giss::SparseAccumulator<int,double> area1_m;
+	auto S(sheet->ice_to_projatm(area1_m));
+	for (auto ii=S->begin(); ii != S->end(); ++ii) {
+		f1(ii.row()) += ii.val() * f2(ii.col());
+	}
+	int i1 = 10855;
+	printf("conserv[%d] = %g  (area1_m = %g)\n", i1, f1(i1) / area1_m[i1], area1_m[i1]);
+}
+
+
+	// =============== Convert from ice grids to exchange grids
+	std::map<int, blitz::Array<double,1>> f4s;
+	if (src == IceExch::ICE) {
+		for (auto f2i=_f2s.begin(); f2i != _f2s.end(); ++f2i) {
+			IceSheet *sheet = (*this)[f2i->first];
+			blitz::Array<double,1> &f2(f2i->second);
+			f4s.insert(std::make_pair(f2i->first, sheet->ice_to_exch(f2)));
+		}
+	} else {
+		for (auto f2i=_f2s.begin(); f2i != _f2s.end(); ++f2i) {
+			IceSheet *sheet = (*this)[f2i->first];
+			blitz::Array<double,1> &f2(f2i->second);
+			f4s.insert(std::make_pair(f2i->first, f2));
+		}
+	}
+#endif
 
 	// =============== Set up basic vector spaces for optimization problem
 
@@ -300,40 +335,40 @@ printf("BEGIN MatrixMaker::ice_to_hp()\n");
 	giss::SparseAccumulator<int,double> area1;
 	giss::MapDict<int, giss::VectorSparseMatrix> Ss;
 	giss::MapDict<int, giss::VectorSparseMatrix> XMs;
-	std::map<int, size_t> size2;	// Size of each ice vector space
-	for (auto f2i=f2s.begin(); f2i != f2s.end(); ++f2i) {
-		IceSheet *sheet = (*this)[f2i->first];
+	std::map<int, size_t> size4;	// Size of each ice vector space
+	for (auto f4i=f4s.begin(); f4i != f4s.end(); ++f4i) {
+		IceSheet *sheet = (*this)[f4i->first];
 
 		std::unique_ptr<giss::VectorSparseMatrix> S(
-			sheet->ice_to_projatm(area1));		// 2 -> 1
-		if (_correct_area1) S = multiply(
+			sheet->ice_to_projatm(area1, src));		// 4 -> 1
+		if (correct_area1) S = multiply(
 			*sheet->atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
 			*S);
 		for (auto ii = S->begin(); ii != S->end(); ++ii) {
 			int i1 = ii.row();
 			UsedAll &ua(*used[get_subid(i1)]);
 			ua.used1.insert(i1);
-			ua.used2.insert(std::make_pair(sheet->index, ii.col()));
+			ua.used4.insert(std::make_pair(sheet->index, ii.col()));
 		}
 
 		std::unique_ptr<giss::VectorSparseMatrix> XM(
-			sheet->hp_to_ice());				// 3 -> 2
+			sheet->hp_to_ice(src));				// 3 -> 4
 //		checksum_interp(*XM, "XM");
 
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
-			int i2 = ii.row();
+			int i4 = ii.row();
 
 			int i3 = ii.col();
 			int i1, k;
 			hc_index->index_to_ik(i3, i1, k);
 
 			UsedAll &ua(*used[get_subid(i1)]);
-			ua.used2.insert(std::make_pair(sheet->index, i2));
+			ua.used4.insert(std::make_pair(sheet->index, i4));
 			ua.used3.insert(i3);
 		}
 printf("MatrixMaker::ice_to_hp() 4\n");
 
-		size2[sheet->index] = sheet->n2();
+		size4[sheet->index] = (src == IceExch::ICE ? sheet->n2() : sheet->n4());
 
 		// Store away for later reference
 		Ss.insert(sheet->index, std::move(S));
@@ -376,17 +411,17 @@ printf("MatrixMaker::ice_to_hp() 4\n");
 	// -------------- Set up destination renumbered matrices
 	for (auto ua = used.begin(); ua != used.end(); ++ua) {
 		ua->trans_1_1p.init(n1(), ua->used1);
-		ua->trans_2_2p.init(&size2, ua->used2);
+		ua->trans_4_4p.init(&size4, ua->used4);
 		ua->trans_3x_3p.init(n3(), ua->used3x);
 
 		int n1p = ua->trans_1_1p.nb();
-		int n2p = ua->trans_2_2p.nb();
+		int n4p = ua->trans_4_4p.nb();
 		int n3p = ua->trans_3x_3p.nb();
 
 		// Translate to new matrices
 		ua->RMp.reset(new giss::VectorSparseMatrix(giss::SparseDescr(n1p, n3p)));
-		ua->Sp .reset(new giss::VectorSparseMatrix(giss::SparseDescr(n1p, n2p)));
-		ua->XMp.reset(new giss::VectorSparseMatrix(giss::SparseDescr(n2p, n3p)));
+		ua->Sp .reset(new giss::VectorSparseMatrix(giss::SparseDescr(n1p, n4p)));
+		ua->XMp.reset(new giss::VectorSparseMatrix(giss::SparseDescr(n4p, n3p)));
 		ua->area1p_inv.resize(n1p);
 	}
 
@@ -403,8 +438,8 @@ printf("Translating RM\n");
 	}
 
 
-	for (auto f2i=f2s.begin(); f2i != f2s.end(); ++f2i) {
-		int const index = f2i->first;
+	for (auto f4i=f4s.begin(); f4i != f4s.end(); ++f4i) {
+		int const index = f4i->first;
 		IceSheet *sheet = (*this)[index];
 
 		// Source matrices
@@ -417,13 +452,13 @@ printf("Translating S: %d\n", index);
 			UsedAll *ua(used[get_subid(i1)]);
 			ua->Sp->add(
 				ua->trans_1_1p.a2b(i1),
-				ua->trans_2_2p.a2b(std::make_pair(index, ii.col())),
+				ua->trans_4_4p.a2b(std::make_pair(index, ii.col())),
 				ii.val());
 		}
 
 printf("Translating XM: %d\n", index);
 		for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
-			int i2 = ii.row();
+			int i4 = ii.row();
 
 			int i3 = ii.col();
 			int i3x = trans_3_3x.i3_to_i3x(i3);
@@ -432,7 +467,7 @@ printf("Translating XM: %d\n", index);
 			UsedAll *ua(used[get_subid(i1)]);
 
 			ua->XMp->add(
-				ua->trans_2_2p.a2b(std::make_pair(index, ii.row())),
+				ua->trans_4_4p.a2b(std::make_pair(index, ii.row())),
 				ua->trans_3x_3p.a2b(i3x),
 				ii.val());
 		}
@@ -470,18 +505,19 @@ printf("Translating XM: %d\n", index);
 	giss::CooVector<int, double> ret3;		// Function return value
 	for (auto ua = used.begin(); ua != used.end(); ++ua) {
 		int n1p = ua->trans_1_1p.nb();
-		int n2p = ua->trans_2_2p.nb();
+		int n4p = ua->trans_4_4p.nb();
 		int n3p = ua->trans_3x_3p.nb();
+printf("--------------------- QP %d: n1p=%d, n4p=%d, n3p=%d\n", ua.key(), n1p, n4p, n3p);
 
-		// -------- Translate f2 -> f2p
+		// -------- Translate f4 -> f4p
 		// Ignore elements NOT listed in the translation
-		blitz::Array<double,1> f2p(n2p);
-		f2p = 0;
-		for (int i2p = 0; i2p < n2p; ++i2p) {
-			std::pair<int,int> const &a(ua->trans_2_2p.b2a(i2p));
+		blitz::Array<double,1> f4p(n4p);
+		f4p = 0;
+		for (int i4p = 0; i4p < n4p; ++i4p) {
+			std::pair<int,int> const &a(ua->trans_4_4p.b2a(i4p));
 			int index = a.first;
-			int i2 = a.second;
-			f2p(i2p) = f2s[index](i2);
+			int i4 = a.second;
+			f4p(i4p) = f4s[index](i4);
 		}
 
 
@@ -514,17 +550,17 @@ printf("Translating XM: %d\n", index);
 		}
 
 		// -------- Linear term of obj function
-		// G = -2*f2p \cdot XMp
+		// G = -2*f4p \cdot XMp
 		for (int i=0; i < qpt.n; ++i) qpt.G[i] = 0;
 		for (auto ii = ua->XMp->begin(); ii != ua->XMp->end(); ++ii) {
-			qpt.G[ii.col()] -= 2.0d * f2p(ii.row()) * ii.val();
+			qpt.G[ii.col()] -= 2.0d * f4p(ii.row()) * ii.val();
 		}
 
 		// --------- Constant term of objective function
-		// f = f2p \cdot f2p
+		// f = f4p \cdot f4p
 		qpt.f = 0;
-		for (int i2p=0; i2p<n2p; ++i2p) {
-			qpt.f += f2p(i2p) * f2p(i2p);
+		for (int i4p=0; i4p<n4p; ++i4p) {
+			qpt.f += f4p(i4p) * f4p(i4p);
 		}
 
 		// De-allocate...
@@ -533,23 +569,23 @@ printf("Translating XM: %d\n", index);
 //		XMp_T.clear();
 
 		// ============================ Constraints
-		// RM x = Sp f2p
+		// RM x = Sp f4p
 
 		// qpt.A = constraints matrix = RMp
 		qpt.alloc_A(ua->RMp->size());
 		giss::ZD11SparseMatrix A_zd11(qpt.A, 0);
 		copy(*ua->RMp, A_zd11);
 
-		// qpt.C = equality constraints RHS = Sp * f2p
+		// qpt.C = equality constraints RHS = Sp * f4p
 		for (int i=0; i<n1p; ++i) qpt.C[i] = 0;
 		for (auto ii = ua->Sp->begin(); ii != ua->Sp->end(); ++ii) {
 			int i1p = ii.row();		// Atm
-			int i2p = ii.col();		// Ice
-			qpt.C[i1p] -= f2p(i2p) * ii.val();
+			int i4p = ii.col();		// Ice
+			qpt.C[i1p] -= f4p(i4p) * ii.val();
 		}
 
 		// De-allocate
-		ua->RMp.reset();	// ->clear();
+//		ua->RMp.reset();	// ->clear();
 
 		// =========================== Initial guess at solution
 		bool nanerr = false;
@@ -575,21 +611,21 @@ printf("Translating XM: %d\n", index);
 		// 1/2 (XM F_E - F_I)^2    where XM = (Ice->Exch)(Elev->Ice)
 		printf("objective value = %g\n", qpt.eval_objective(qpt.X));
 		{
-			// Initial2p = XMp * initial3p
-			blitz::Array<double,1> initial2p(n2p);
-			initial2p = 0;
+			// Initial4p = XMp * initial3p
+			blitz::Array<double,1> initial4p(n4p);
+			initial4p = 0;
 			for (auto ii = XMp.begin(); ii != XMp.end(); ++ii) {
 				int i3p = ii.col();
 				int i3 = trans_3_3p.b2a(i3p);
-				int i2p = ii.row();
-		//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
-				initial2p(i2p) += ii.val() * qpt.X[i3p];
+				int i4p = ii.row();
+		//		initial4p(i4p) += ii.val() * initial3(i3);	// Both give same result
+				initial4p(i4p) += ii.val() * qpt.X[i3p];
 			}
 
 			// Sum it up!
 			double obj = 0;
-			for (int i2p=0; i2p<n2p; ++i2p) {
-				double val = initial2p(i2p) - f2p(i2p);
+			for (int i4p=0; i4p<n4p; ++i4p) {
+				double val = initial4p(i4p) - f4p(i4p);
 				obj += val*val;
 			}
 
@@ -597,21 +633,21 @@ printf("Translating XM: %d\n", index);
 		}
 
 		{
-			// Initial2p = XMp * initial3p
-			blitz::Array<double,1> initial2p(n2p);
-			initial2p = 0;
+			// Initial4p = XMp * initial3p
+			blitz::Array<double,1> initial4p(n4p);
+			initial4p = 0;
 			for (auto ii = XMp_T.begin(); ii != XMp_T.end(); ++ii) {
 				int i3p = ii.row();
 				int i3 = trans_3_3p.b2a(i3p);
-				int i2p = ii.col();
-		//		initial2p(i2p) += ii.val() * initial3(i3);	// Both give same result
-				initial2p(i2p) += ii.val() * qpt.X[i3p];
+				int i4p = ii.col();
+		//		initial4p(i4p) += ii.val() * initial3(i3);	// Both give same result
+				initial4p(i4p) += ii.val() * qpt.X[i3p];
 			}
 
 			// Sum it up!
 			double obj = 0;
-			for (int i2p=0; i2p<n2p; ++i2p) {
-				double val = initial2p(i2p) - f2p(i2p);
+			for (int i4p=0; i4p<n4p; ++i4p) {
+				double val = initial4p(i4p) - f4p(i4p);
 				obj += val*val;
 			}
 
@@ -623,21 +659,22 @@ printf("Translating XM: %d\n", index);
 		printf("objective value = %g\n", qpt.eval_objective(qpt.X));
 		{
 			int const index = 0;
-			// Initial2 = XM * initial3
+			// Initial4 = XM * initial3
 			auto sheet(sheets_by_id.find(index)->second);
-			blitz::Array<double,1> initial2(sheet->n2());
-			initial2 = 0;
+			blitz::Array<double,1> initial4(sheet->n4());
+			initial4 = 0;
 			giss::VectorSparseMatrix *XM(XMs[index]);
 			for (auto ii = XM->begin(); ii != XM->end(); ++ii) {
 				int i3 = ii.col();
-				int i2 = ii.row();
-				initial2(i2) += ii.val() * initial3(i3);
+				int i4 = ii.row();
+				initial4(i4) += ii.val() * initial3(i3);
 			}
 
 			// Sum it up!
 			double obj = 0;
-			for (int i2=0; i2<sheet->n2(); ++i2) {
-				double val = initial2(i2) - f2s[index](i2);
+			int nx = (src == IceExch::ICE ? sheet->n2() : sheet->n4());
+			for (int i4=0; i4<nx; ++i4) {
+				double val = initial4(i4) - f4s[index](i4);
 				if (std::isnan(val)) continue;
 				obj += val*val;
 			}
@@ -648,10 +685,53 @@ printf("Translating XM: %d\n", index);
 
 
 		// =========================== Solve the Problem!
+if (ua.key() == 10855) {	// (i,j) = (55+1,75+1)
+	char buf[100];
+	sprintf(buf, "qp%d.nc", ua.key());
+
+	NcFile nc(buf, NcFile::Replace);
+	std::vector<boost::function<void()>> write;
+
+printf("AA\n");
+	write.push_back(ua->RMp->netcdf_define(nc, "RM"));
+printf("AA\n");
+	write.push_back(ua->Sp->netcdf_define(nc, "S"));
+printf("AA\n");
+	write.push_back(ua->XMp->netcdf_define(nc, "XM"));
+printf("AA\n");
+	write.push_back(giss::netcdf_define(nc, "f4p", f4p));
+printf("AA\n");
+	write.push_back(qpt.netcdf_define(nc, "qpt"));
+printf("AA1\n");
+
+	for (auto ii = write.begin(); ii != write.end(); ++ ii) {
+printf("BB1\n");
+		(*ii)();
+printf("BB2\n");
+	}
+	nc.close();
+}
+
 		double infinity = 1e20;
 		eqp_solve_simple(qpt.this_f, infinity);
 
+if (ua.key() == 10855) {	// (i,j) = (55+1,75+1)
+	char buf[100];
+	sprintf(buf, "qp%db.nc", ua.key());
 
+	blitz::Array<double,1> answer(n3p);
+	for (int i3p=0; i3p<n3p; ++i3p) answer(i3p) = qpt.X[i3p];
+
+	NcFile nc(buf, NcFile::Replace);
+	std::vector<boost::function<void()>> write;
+
+	write.push_back(giss::netcdf_define(nc, "answer", answer));
+
+	for (auto ii = write.begin(); ii != write.end(); ++ ii) {
+		(*ii)();
+	}
+	nc.close();
+}
 
 		// ========================================================
 		// ========================================================
@@ -683,7 +763,7 @@ printf("BEGIN hp_to_atm() %d %d\n", n1(), n3());
 	giss::SparseAccumulator<int,double> area1_m;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 		auto hp2proj(sheet->hp_to_projatm(area1_m));
-		if (_correct_area1) hp2proj = multiply(
+		if (correct_area1) hp2proj = multiply(
 			*sheet->atm_proj_correct(ProjCorrect::PROJ_TO_NATIVE),
 			*hp2proj);
 		ret->append(*hp2proj);

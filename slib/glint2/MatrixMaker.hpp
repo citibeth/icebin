@@ -40,16 +40,16 @@ public:
 protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;
-	bool _correct_area1;		/// Should we correct for projection and geometric error?
 public:
+	bool const correct_area1;		/// Should we correct for projection and geometric error?
 	HCIndex::Type _hptype;
 	MatrixMaker(
-		bool correct_area1,
+		bool _correct_area1,
 		std::unique_ptr<GridDomain> &&_domain)
 		: _next_sheet_index(0),
 		_hptype(HCIndex::Type::UNKNOWN),
 		domain(std::move(_domain)),
-		_correct_area1(correct_area1) {}
+		correct_area1(_correct_area1) {}
 
 //	std::vector<std::unique_ptr<IceSheet>> sheets;
 	
@@ -109,7 +109,8 @@ public:
 	for multiple ice sheets. */
 	giss::CooVector<int, double> ice_to_hp(
 		std::map<int, blitz::Array<double,1>> &f2s,
-		blitz::Array<double,1> &initial4,
+		blitz::Array<double,1> &initial3,
+		IceExch src = IceExch::ICE,
 		QPAlgorithm qp_algorithm = QPAlgorithm::SINGLE_QP);
 
 

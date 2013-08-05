@@ -12,6 +12,10 @@
 namespace glint2 {
 
 enum class ProjCorrect {NATIVE_TO_PROJ, PROJ_TO_NATIVE};
+BOOST_ENUM_VALUES( IceExch, int,
+	(ICE)	(0)
+	(EXCH)	(1)
+)
 
 class MatrixMaker;
 class IceCoupler;
@@ -21,8 +25,6 @@ protected:
 	friend class MatrixMaker;
 
 	MatrixMaker *gcm;
-
-	enum class Overlap {ICE, EXCH};
 
 public:
 	int index;
@@ -58,10 +60,24 @@ public:
 	/** Number of dimensions of ice vector space */
 	virtual size_t n2() const = 0;
 
+	/** Number of dimensions of exchange grid vector space.
+	NOTE: This only really makes sense for L0 grids.  It will
+	throw a std::exception() on grid types for which it does
+	not make sense. */
+	virtual size_t n4() const;
+
 	// ------------------------------------------------
 	/** Diagonal matrix converts values from native atmosphere grid to projected atmosphere grid (or vice versa)
 	@param direction Direction to convert vectors (NATIVE_TO_PROJ or PROJ_TO_NATIVE) */
 	std::unique_ptr<giss::VectorSparseMatrix> atm_proj_correct(ProjCorrect direction);
+
+	/** Puts GCM grid correction factors into the area1_m variable often
+	involved in regridding matrices.  Avoides having to create a new sparse
+	matrix just for this purpose.  This subroutine is only really useful when
+	working with one ice sheet at a time. */
+	void atm_proj_correct(
+		giss::SparseAccumulator<int,double> &area1_m,
+		ProjCorrect direction);
 
 	// ------------------------------------------------
 
@@ -70,7 +86,9 @@ public:
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
 	/** Computes matrix to go from height-point space [nhp * n1] to ice grid [n2] */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice() = 0;
+	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice(IceExch dest = IceExch::ICE) = 0;
+
+	virtual blitz::Array<double,1> ice_to_exch(blitz::Array<double,1> const &f2);
 
 	/** Computes matrix to go from height-point space [nhp * n1]
 	to projected atmosphere grid [n1].  NOTE: Corrections for geometric
@@ -82,7 +100,8 @@ public:
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
 	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_projatm(
-		giss::SparseAccumulator<int,double> &area1_m) = 0;
+		giss::SparseAccumulator<int,double> &area1_m,
+		IceExch src = IceExch::ICE) = 0;
 
 public:
 
