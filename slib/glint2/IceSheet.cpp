@@ -14,18 +14,6 @@ IceSheet::~IceSheet() {}
 /** Number of dimensions of atmosphere vector space */
 size_t IceSheet::n1() const { return gcm->n1(); }
 
-size_t IceSheet::n4() const
-{
-	fprintf(stderr, "IceSheet::n4() is not implement by default, it only owrks for L0 ice grids.\n");
-	throw std::exception();
-}
-
-blitz::Array<double,1> IceSheet::ice_to_exch(blitz::Array<double,1> const &f2)
-{
-	fprintf(stderr, "IceSheet::ice_to_exch() is not implement by default, it only owrks for L0 ice grids.\n");
-	throw std::exception();
-}
-
 
 // -----------------------------------------------------
 void IceSheet::clear()
@@ -101,13 +89,17 @@ void IceSheet::atm_proj_correct(
 	giss::Proj2 proj;
 	gcm->grid1->get_ll_to_xy(proj, grid2->sproj);
 
-	for (auto cell = gcm->grid1->cells_begin(); cell != gcm->grid1->cells_end(); ++cell) {
+
+	for (auto ii = area1_m.begin(); ii != area1_m.end(); ++ii) {
+		int i1 = ii->first;
+		double area1 = ii->second;
+		glint2::Cell *cell = gcm->grid1->get_cell(i1);
+
 		double native_area = cell->area;
 		double proj_area = area_of_proj_polygon(*cell, proj);
 		
 		// We'll be DIVIDING by area1_m, so correct the REVERSE of above.
-		area1_m[cell->index] *=
-			(direction == ProjCorrect::NATIVE_TO_PROJ ?
+		ii->second *= (direction == ProjCorrect::NATIVE_TO_PROJ ?
 				proj_area / native_area : native_area / proj_area);
 	}
 }

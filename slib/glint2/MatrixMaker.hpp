@@ -107,11 +107,20 @@ public:
 	/** @params f2 Some field on each ice grid (referenced by ID)
 	TODO: This only works on one ice sheet.  Will need to be extended
 	for multiple ice sheets. */
-	giss::CooVector<int, double> ice_to_hp(
-		std::map<int, blitz::Array<double,1>> &f2s,
+	giss::CooVector<int, double> iceinterp_to_hp(
+		std::map<int, blitz::Array<double,1>> &f4s,
 		blitz::Array<double,1> &initial3,
-		IceExch src = IceExch::ICE,
+		IceInterp src,
 		QPAlgorithm qp_algorithm = QPAlgorithm::SINGLE_QP);
+
+
+
+	/** @params f2 Some field on each ice grid (referenced by ID)
+	TODO: This only works on one ice sheet.  Will need to be extended
+	for multiple ice sheets. */
+	giss::CooVector<int, double> atm_to_hp(
+		blitz::Array<double,1> f1);
+
 
 
 

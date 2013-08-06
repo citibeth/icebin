@@ -26,6 +26,8 @@ public :
 	int &m;					/// Number of constraints
 	int &n;					/// Number of variables
 	double &f;				/// constant term in objective function
+	int &Hessian_kind;		/// See QPT documenation
+
 	double * const G;		/// double[n] Linear term of objective function
 	double * const X_l;		/// double[n] Lower bound on variables
 	double * const X_u;		/// double[n] Upper bound on variables
@@ -35,6 +37,8 @@ public :
 	double * const X;		/// double[n] Value of variables (input & output)
 	double * const Y;		/// double[m]
 	double * const Z;		/// double[n]
+//	double * const WEIGHT;
+	double * const X0;		/// double[n] For weighted least square distance problem
 
 	zd11_c A;				/// m*n Constraints matrix
 	zd11_c H;				/// n*n Hessian (quadratic) matrix
@@ -49,7 +53,8 @@ public :
 	@param eqp Are we preparing for a problem with equality-only constraints? */
 	qpt_problem_c(
 		int m, int n,
-		bool eqp);
+		bool eqp,
+		int Hessian_kind = -1);
 
 	void alloc_H(int H_ne)
 		{ qpt_problem_alloc_h(this, H_ne); }

@@ -11,24 +11,25 @@ extern "C" void qpt_problem_init_c(
 		galahad::qpt_problem_c *this_c, galahad::qpt_problem_f *this_f,
 		int m, int n,
 		// int A_ne, int H_ne,
-		bool eqp);
+		bool eqp, int Hessian_kind);
 
 namespace galahad {
 
 /** @param A_ne Number of elements in the constraint matrix */
 qpt_problem_c::qpt_problem_c(
 	int m, int n,
-	bool eqp) :
+	bool eqp, int Hessian_kind) :
 this_f(*(qpt_problem_f *)0),
 m(*(int *)0),
 n(*(int *)0),
 f(*(double *)0),
-G(0), X_l(0), X_u(0), C(0), C_l(0), C_u(0), X(0), Y(0), Z(0)
+Hessian_kind(*(int *)0),
+G(0), X_l(0), X_u(0), C(0), C_l(0), C_u(0), X(0), Y(0), Z(0), X0(0)
 {
 	qpt_problem_f *this_f = qpt_problem_new_c();
 //printf("qpt_x: A_ne=%d\n", A_ne);
 //	int eqp_bool = eqp;
-	qpt_problem_init_c(this, this_f, m, n, eqp);
+	qpt_problem_init_c(this, this_f, m, n, eqp, Hessian_kind);
 }
 
 

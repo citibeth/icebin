@@ -11,6 +11,7 @@ IMPLICIT NONE
 	    type(c_ptr) :: m       ! int &; number of constraints
 	    type(c_ptr) :: n       ! int &; number of variables
 	    type(c_ptr) :: f   ! double & constant term
+		type(c_ptr) :: Hessian_kind
 
 	    type(c_ptr) :: G
 	    type(c_ptr) :: X_l
@@ -21,6 +22,8 @@ IMPLICIT NONE
 	    type(c_ptr) :: X
 	    type(c_ptr) :: Y
 	    type(c_ptr) :: Z
+!		type(c_ptr) :: WEIGHT
+		type(c_ptr) :: X0
 
 	    type(ZD11_c) :: A, H
 	end type QPT_problem_c
@@ -33,8 +36,7 @@ END MODULE qpt_x
 ! ----------------------------------------------------------
 ! @param m Number of constraints
 ! @param n Number of variables
-!subroutine QPT_problem_init_c(this_cc, this_fc, m, n, A_ne, H_ne, eqp) bind(c)
-subroutine QPT_problem_init_c(this_cc, this_fc, m, n, eqp) bind(c)
+subroutine QPT_problem_init_c(this_cc, this_fc, m, n, eqp, Hessian_kind) bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
 use zd11_x
@@ -46,9 +48,8 @@ type(c_ptr), value :: this_cc			! qpt_problem_c *
 type(c_ptr), value :: this_fc			! qpt_problem_type *
 	type(QPT_problem_type), pointer :: this_f
 integer(c_int), value :: m, n
-!integer(c_int), value :: A_ne		! # of elements in A (constraint) matrix
-!integer(c_int), value :: H_ne		! # of elements in H (Hessian) matrix
 logical(kind=c_bool), value :: eqp		! Are we preparing for a problem w/ equality constraints?
+integer, value :: Hessian_kind
 
 	call c_f_pointer(this_fc, this_f)
 	call c_f_pointer(this_cc, this_c)
@@ -62,6 +63,14 @@ logical(kind=c_bool), value :: eqp		! Are we preparing for a problem w/ equality
 		this_c%m = c_loc(this_f%m)
 		this_c%n = c_loc(this_f%n)
 		this_c%f = c_loc(this_f%f)
+		this_c%Hessian_kind = c_loc(this_f%Hessian_kind)
+		this_f%Hessian_kind = Hessian_kind
+
+		if (Hessian_kind > 0) then
+			allocate(this_f%X0(n))
+			this_c%X0 = c_loc_array_double(this_f%X0)
+		end if
+!		! NOTE: Other Hessian_kinds are not implemented
 
 		allocate(this_f%G(n), this_f%X_l(n), this_f%X_u(n))
 		this_c%G = c_loc_array_double(this_f%G)
@@ -108,7 +117,7 @@ integer(c_int), value :: H_ne		! # of elements in H (Hessian) matrix
 
 	call c_f_pointer(this_cc, this_c)
 	call c_f_pointer(this_c%this_fc, this_f)
-	write(6,*) 'ZD11_init(this_c%H)'
+	write(6,*) 'ZD11_init(this_c%H)',H_ne
 	call ZD11_init_f(this_c%H, this_f%H, this_f%n, this_f%n, H_ne)
 
 end subroutine QPT_problem_alloc_H

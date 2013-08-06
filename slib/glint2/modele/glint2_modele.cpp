@@ -413,7 +413,8 @@ printf("BEGIN glint2_modele_init_hp_to_ices\n");
 	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
 
 		// Get matrix for HP2ICE
-		std::unique_ptr<giss::VectorSparseMatrix> imat(sheet->hp_to_ice());
+		std::unique_ptr<giss::VectorSparseMatrix> imat(
+			sheet->hp_to_iceinterp(IceInterp::ICE));
 		if (imat->size() == 0) continue;
 
 		// Convert to GCM coordinates

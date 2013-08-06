@@ -11,15 +11,22 @@
 
 namespace glint2 {
 
-enum class ProjCorrect {NATIVE_TO_PROJ, PROJ_TO_NATIVE};
-BOOST_ENUM_VALUES( IceExch, int,
-	(ICE)	(0)
-	(EXCH)	(1)
+enum class ProjCorrect {NATIVE_TO_PROJ=0, PROJ_TO_NATIVE=1};
+enum class FactorUse {MULTIPLY=0, DIVIDE=1};
+
+BOOST_ENUM_VALUES( IceInterp, int,
+	(ICE)		(0)
+	(INTERP)	(1)
 )
 
 class MatrixMaker;
 class IceCoupler;
 
+/** NOTE: The Interpolation Grid (grid4) is the grid to which we
+interpolate, and which ultimately defines the basis functions in
+elevation point space.  By default, this is the Ice Grid.  But for
+L0 ice grids, we can use the Exchange Grid as the Interpolation Grid,
+in order to keep the RM matrix local. */
 class IceSheet {
 protected:
 	friend class MatrixMaker;
@@ -60,16 +67,31 @@ public:
 	/** Number of dimensions of ice vector space */
 	virtual size_t n2() const = 0;
 
-	/** Number of dimensions of exchange grid vector space.
-	NOTE: This only really makes sense for L0 grids.  It will
-	throw a std::exception() on grid types for which it does
-	not make sense. */
-	virtual size_t n4() const;
+	/** Number of dimensions of interpolation grid vector space. */
+	virtual size_t n4() const
+		{ return n2(); }
 
 	// ------------------------------------------------
 	/** Diagonal matrix converts values from native atmosphere grid to projected atmosphere grid (or vice versa)
 	@param direction Direction to convert vectors (NATIVE_TO_PROJ or PROJ_TO_NATIVE) */
 	std::unique_ptr<giss::VectorSparseMatrix> atm_proj_correct(ProjCorrect direction);
+
+#if 0
+	double IceSheet::atm_proj_correct(
+		glint2::Cell *cell,
+		ProjCorrect direction,
+		FactorUse use = FactorUse::MULTIPLY)	// How we will use the factor
+	{
+		// Has sense like direction
+		ProjCorrect xdir = (ProjCorrect)((int)direction ^ (int)use);
+
+		double native_area = cell->area;
+		double proj_area = area_of_proj_polygon(*cell, proj);
+
+		return xdir == ProjCorrect::NATIVE_TO_PROJ ?
+				native_area / proj_area : proj_area / native_area);
+	}
+#endif
 
 	/** Puts GCM grid correction factors into the area1_m variable often
 	involved in regridding matrices.  Avoides having to create a new sparse
@@ -86,9 +108,10 @@ public:
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
 	/** Computes matrix to go from height-point space [nhp * n1] to ice grid [n2] */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_ice(IceExch dest = IceExch::ICE) = 0;
+	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceinterp(IceInterp dest) = 0;
 
-	virtual blitz::Array<double,1> ice_to_exch(blitz::Array<double,1> const &f2);
+	virtual blitz::Array<double,1> const ice_to_interp(blitz::Array<double,1> const &f2)
+		{ return f2; }
 
 	/** Computes matrix to go from height-point space [nhp * n1]
 	to projected atmosphere grid [n1].  NOTE: Corrections for geometric
@@ -99,9 +122,9 @@ public:
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_projatm(
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
-	virtual std::unique_ptr<giss::VectorSparseMatrix> ice_to_projatm(
+	virtual std::unique_ptr<giss::VectorSparseMatrix> iceinterp_to_projatm(
 		giss::SparseAccumulator<int,double> &area1_m,
-		IceExch src = IceExch::ICE) = 0;
+		IceInterp src) = 0;
 
 public:
 

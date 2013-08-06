@@ -9,13 +9,6 @@ namespace glint2 {
 /** Tells whether a cell in the exchange grid is masked out or not */
 bool IceSheet_L0::masked(giss::HashDict<int, Cell>::iterator const &it)
 {
-#if 0
-if (it->i == 10855) {
-	bool m1 = (gcm->mask1.get() && (*gcm->mask1)(it->i));
-	bool m2 = (mask2.get() && (*mask2)(it->j));
-	printf("masked(i1=10855): %d %d\n", m1, m2);
-}
-#endif
 	if (gcm->mask1.get() && (*gcm->mask1)(it->i)) return true;
 	if (mask2.get() && (*mask2)(it->j)) return true;
 	return false;
@@ -58,11 +51,9 @@ static void linterp_1d(
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
 @param dest Controls matrix output to ice or exchange grid. */
 std::unique_ptr<giss::VectorSparseMatrix> 
-IceSheet_L0::hp_to_ice(IceExch dest)
+IceSheet_L0::hp_to_iceexch(IceExch dest)
 {
 printf("BEGIN hp_interp(%)\n", dest.str());
-	int nx = (dest == IceExch::ICE ? n2() : n4());
-
 	// Sum overlap matrix by column (ice grid cell)
 	std::vector<double> area2(n2());
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
@@ -72,6 +63,8 @@ printf("BEGIN hp_interp(%)\n", dest.str());
 
 
 printf("MID hp_interp(%s)\n", dest.str());
+
+	int nx = niceexch(dest);
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
 		giss::SparseDescr(nx, gcm->n3())));
@@ -106,9 +99,11 @@ printf("END hp_interp(%s)\n", dest.str());
 }
 // --------------------------------------------------------
 // --------------------------------------------------------
-blitz::Array<double,1> IceSheet_L0::ice_to_exch(
+blitz::Array<double,1> const IceSheet_L0::ice_to_interp(
 	blitz::Array<double,1> const &f2)
 {
+	if (interp_grid == IceExch::ICE) return f2;
+
 	blitz::Array<double,1> f4(n4());
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
 		if (masked(cell)) continue;
@@ -125,34 +120,20 @@ std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_projatm(
 {
 printf("BEGIN IceSheet_L0::hp_to_projatm %ld %ld\n", n1(), n4());
 
-	// ============= hp_to_exch
+	// ============= hp_to_interp
 	// Interpolate (for now) in height points but not X/Y
-	auto hp_to_exch(hp_to_ice(IceExch::EXCH));
+	auto hp_to_interp(hp_to_iceexch(interp_grid));
 
-	// ============= exch_to_atm (with area1 scaling factor)
-	// Area-weighted remapping from exchange to atmosphere grid is equal
-	// to scaled version of overlap matrix.
-	std::unique_ptr<giss::VectorSparseMatrix> exch_to_atm(
-		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), n4())));
-	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
-		if (masked(cell)) continue;
-
-		// Exchange Grid is in Cartesian coordinates
-		// cell->i = index in atmosphere grid
-		// cell->j = index in ice grid
-		// cell->index = index in exchange grid
-		double area = cell->area;	// Computed in ExchangeGrid::overlap_callback()
-		exch_to_atm->add(cell->i, cell->index, area);
-		area1_m.add(cell->i, area);
-	}
+	// ============= interp_to_projatm (with area1 scaling factor)
+	auto interp_to_projatm(iceexch_to_projatm(area1_m, interp_grid));
 
 	// ============= hp_to_projatm
-	auto ret(multiply(*exch_to_atm, *hp_to_exch));
+	auto ret(multiply(*interp_to_projatm, *hp_to_interp));
 printf("END IceSheet_L0::hp_to_projatm()\n");
 	return ret;
 }
 // --------------------------------------------------------
-std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::ice_to_projatm(
+std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::iceexch_to_projatm(
 	giss::SparseAccumulator<int,double> &area1_m,
 	IceExch src)
 {
@@ -161,7 +142,7 @@ printf("BEGIN IceSheet_L0::ice_to_projatm %ld %ld\n", n1(), n4());
 	// ============= ice_to_atm (with area1 scaling factor)
 	// Area-weighted remapping from exchange to atmosphere grid is equal
 	// to scaled version of overlap matrix.
-	int nx = (src == IceExch::ICE ? n2() : n4());
+	int nx = niceexch(src);
 	std::unique_ptr<giss::VectorSparseMatrix> ice_to_projatm(
 		new giss::VectorSparseMatrix(giss::SparseDescr(n1(), nx)));
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
@@ -206,10 +187,20 @@ boost::function<void ()> IceSheet_L0::netcdf_define(NcFile &nc, std::string cons
 
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 	info_var->add_att("parameterization", "L0");
+	info_var->add_att("interp_grid", interp_grid.str());
 
 	return ret;
 }
 // -------------------------------------------------------------
+void IceSheet_L0::read_from_netcdf(NcFile &nc, std::string const &vname)
+{
+	IceSheet::read_from_netcdf(nc, vname);
+
+	NcVar *info_var = nc.get_var((vname + ".info").c_str());
+	std::string sinterp_grid(giss::get_att(info_var, "interp_grid")->as_string(0));
+
+	interp_grid = *IceExch::get_by_name(sinterp_grid.c_str());
+}
 
 
 }	// namespace glint2
