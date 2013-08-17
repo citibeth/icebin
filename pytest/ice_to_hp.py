@@ -11,7 +11,7 @@ import giss.plot
 import matplotlib.pyplot as plt
 
 #mm = glint2.MatrixMaker(correct_area1=False)
-glint2_config_file = '/Users/rpfische/cmrun/rpfische/modele_ll_g2x2_5-searise_g20-40-DISMAL.nc'
+glint2_config_file = '/Users/rpfische/cmrun/rpfische/modele_ll_g2x2_5-searise_g5-40-DISMAL.nc'
 mm = glint2.MatrixMaker(glint2_config_file, 'm', correct_area1=True)
 
 interp_grid = 'EXCH'
@@ -20,10 +20,9 @@ mm.set_interp_grid(interp_grid)
 RUNDIR1='/Users/rpfische/savedisk/e4f40-hc40'
 RUNDIR2='/Users/rpfische/savedisk/e4f40-hc40'
 
-#nc = netCDF4.Dataset('../data/JUL1950.ijhchc1k225.nc')
-#nc = netCDF4.Dataset('../data/JUL1956.ijhce4f40-hc40.nc')
 nc = netCDF4.Dataset(os.path.join(RUNDIR1, 'JUN1950.ijhce4f40-hc40.nc'))
 impm3 = giss.modele.read_ncvar(nc, 'impm_lndice')
+#impm3 = giss.modele.read_ncvar(nc, 'runoff_lndice')
 impm3 = impm3[1:,:,:]			# Remove legacy height point
 frac3 = giss.modele.read_ncvar(nc, 'frac')
 frac3 = frac3[1:,:,:]			# Remove legacy height point

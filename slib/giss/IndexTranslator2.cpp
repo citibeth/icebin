@@ -6,6 +6,9 @@ namespace giss {
 @param used_a Set of indices that are used in space a */
 void IndexTranslator2::init(std::map<int, size_t> *size_a, std::set<std::pair<int,int>> const &used_a)
 {
+
+printf("IndexTranslator2::init(%s, size_a=%d, size_b=%ld)\n", _name.c_str(), size_a->begin()->second, used_a.size());
+
 	_size_a = size_a;
 	_a2b.clear();
 	_b2a.clear(); _b2a.reserve(used_a.size());
