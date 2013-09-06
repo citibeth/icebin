@@ -14,9 +14,18 @@ namespace glint2 {
 enum class ProjCorrect {NATIVE_TO_PROJ=0, PROJ_TO_NATIVE=1};
 enum class FactorUse {MULTIPLY=0, DIVIDE=1};
 
+/** For subroutines that can do things to/from either the ice grid or
+the interpolation grid */
 BOOST_ENUM_VALUES( IceInterp, int,
 	(ICE)		(0)
 	(INTERP)	(1)
+)
+
+/** Controls how we interpolate from elevation class space to the ice grid */
+BOOST_ENUM_VALUES( InterpStyle, int,
+	(Z_INTERP)			(0)
+	(ELEV_CLASS_INTERP)	(1)
+	(BILIN_INTERP)		(2)
 )
 
 class MatrixMaker;
@@ -35,6 +44,8 @@ protected:
 
 public:
 	int index;
+
+	InterpStyle interp_style;
 
 	std::shared_ptr<glint2::Grid> grid2;		/// Ice Grid
 	std::shared_ptr<glint2::ExchangeGrid> exgrid;	/// Exchange grid (between GCM and Ice)
@@ -132,5 +143,27 @@ public:
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname);
 
 };	// class IceSheet
+
+// ----------------------------------------------------
+
+extern void linterp_1d(
+	std::vector<double> const &xpoints,
+	double xx,
+	int *indices, double *weights);	// Size-2 arrays
+
+
+/** We only really expect this to work for Greenland.  Don't worry
+about south pole in lon/lat coordinates and Antarctica.
+[n2 x (nhc * n1)] sparse matrix */
+extern std::unique_ptr<giss::VectorSparseMatrix> 
+bilin_interp(
+MatrixMaker *gcm,
+Grid const &grid1_lonlat,
+Grid const &grid2,
+std::vector<double> const &hpdefs,
+blitz::Array<double,1> const &elev2,
+blitz::Array<int,1> const *mask1,		// [n1] Shows where we will / will not expect landice
+blitz::Array<int,1> const *mask2);
+
 
 }

@@ -16,6 +16,32 @@ inline int sgn(T val) {
 }
 
 // ---------------------------------------------------------
+std::vector<double> Grid_LonLat::latc() const
+{
+	std::vector<double> ret;
+	ret.reserve(nlat());
+
+	if (south_pole) ret.push_back(-90);
+	for (int j=0; j<latb.size()-1; ++j)
+		ret.push_back(.5 * (latb[j] + latb[j+1]));
+	if (north_pole) ret.push_back(90);
+
+	return ret;
+}
+
+std::vector<double> Grid_LonLat::lonc() const
+{
+	std::vector<double> ret;
+	ret.reserve(nlon());
+
+	for (int j=0; j<lonb.size()-1; ++j)
+		ret.push_back(.5 * (lonb[j] + lonb[j+1]));
+
+	return ret;
+}
+
+
+// ---------------------------------------------------------
 
 /** Computes the exact surface area of a lat-lon grid box on the
 surface of the sphere.

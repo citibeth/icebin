@@ -43,22 +43,6 @@ public:
 	}
 
 
-	int ll2xy(double lon0, double lat0, double &x1, double &y1) const
-	{
-		lon0 *= D2R;
-		lat0 *= D2R;
-		return giss::transform(_llproj, _proj, lon0, lat0, x1, y1);
-	}
-
-	int xy2ll(double x0, double y0, double &lon1, double &lat1) const
-	{
-		int ret = giss::transform(_proj, _llproj, x0, y0, lon1, lat1);
-		lon1 *= R2D;
-		lat1 *= R2D;
-		return ret;
-	}
-
-
 	/** Transforms a single coordinate pair
 	@param src Source coordinate system
 	@param dest Destination coordinate system.

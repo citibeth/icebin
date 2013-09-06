@@ -1,7 +1,9 @@
+#include <cstdio>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet_L0.hpp>
 #include <giss/IndexTranslator.hpp>
 #include <glint2/HCIndex.hpp>
+#include <giss/enum.hpp>
 
 namespace glint2 {
 
@@ -21,13 +23,13 @@ bool IceSheet_L0::masked(giss::HashDict<int, Cell>::const_iterator const &it)
 	return false;
 }
 // --------------------------------------------------------
-/** Gives weights for linear interpolation with a bunch of points.
-If our point is off the end of the range, just continue the slope in extrapolation.
-@param xpoints This is not blitz::Array<double,1> because Blitz++ does not (yet) implement STL-compatible iterators. */
-static void linterp_1d(
+
+/** Does elevation-class-style interpolation on height points.  Assumes
+elevation class boundaries midway between height points.
+@return Index of point in xpoints[] array that is closes to xx. */
+static int nearest_1d(
 	std::vector<double> const &xpoints,
-	double xx,
-	int *indices, double *weights)	// Size-2 arrays
+	double xx)
 {
 	int n = xpoints.size();
 
@@ -36,17 +38,27 @@ static void linterp_1d(
 	// See: http://www.cplusplus.com/reference/algorithm/lower_bound/
 	int i1 = lower_bound(xpoints.begin(), xpoints.end(), xx) - xpoints.begin();
 
-	if (i1 <= 0) i1 = 1;
-	if (i1 >= n) i1 = n-1;
+	// Convert to point NEAREST ot ours
+	if (i1 <= 0) return 0;
+	else if (i1 >= n) return n-1;
+	else {
+		int i0 = i1-1;
 
-	int i0 = i1-1;
-	indices[0] = i0;
-	indices[1] = i1;
-	double ratio = (xx - xpoints[i0]) / (xpoints[i1] - xpoints[i0]);
-	weights[0] = (1.0 - ratio);
-	weights[1] = ratio;
+		// Distance to i0 vs i1
+		double d0 = std::abs(xx - xpoints[i0]);
+		double d1 = std::abs(xpoints[i1] - xx);
+
+		if (d0 <= d1) return i0;
+		return i1;
+	}
 }
+
+
 // --------------------------------------------------------
+// =========================================================
+// Stuff for bilin_interp()
+
+
 // --------------------------------------------------------
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
 @param dest Controls matrix output to ice or exchange grid. */
@@ -54,6 +66,18 @@ std::unique_ptr<giss::VectorSparseMatrix>
 IceSheet_L0::hp_to_iceexch(IceExch dest)
 {
 printf("BEGIN hp_interp(%)\n", dest.str());
+	if (interp_style == InterpStyle::BILIN_INTERP) {
+
+		if (dest == IceExch::EXCH) {
+			fprintf(stderr, "bilin_interp() does not (yet) interpolate to exchange grid, only ice grid.  This functionality would not be hard to implement.  But it's not needed because the exchange grid is only used in cases where the RM matrix can be kept local.  bilin_interp() introduces inherent non-locality into the matrix M.\n");
+			throw std::exception();
+		}
+
+		return bilin_interp(gcm, *gcm->grid1, *grid2,
+//			dest == IceExch::ICE ? *grid2 : *exgrid,
+			gcm->hpdefs, elev2, &*gcm->mask1, &*mask2);
+	}
+
 	// Sum overlap matrix by column (ice grid cell)
 	std::vector<double> area2(n2());
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
@@ -81,16 +105,26 @@ printf("MID hp_interp(%s)\n", dest.str());
 		double overlap_ratio =
 			(dest == IceExch::ICE ? cell->area / area2[i2] : 1.0);
 		double elevation = std::max(elev2(i2), 0.0);
+//elevation = 800;
 
 		// Interpolate in height points
-		int ihps[2];
-		double whps[2];	
-		linterp_1d(gcm->hpdefs, elevation, ihps, whps);
+		switch(interp_style.index()) {
+			case InterpStyle::Z_INTERP : {
+				int ihps[2];
+				double whps[2];
+				linterp_1d(gcm->hpdefs, elevation, ihps, whps);
 //printf("LINTERP %d %f %f (%d : %f), (%d : %f)\n", i2, elev2(i2), overlap_ratio, ihps[0], whps[0], ihps[1], whps[1]);
-		ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[0]),
-			overlap_ratio * whps[0]);
-		ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[1]),
-			overlap_ratio * whps[1]);
+				ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[0]),
+					overlap_ratio * whps[0]);
+				ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[1]),
+					overlap_ratio * whps[1]);
+			} break;
+			case InterpStyle::ELEV_CLASS_INTERP : {
+				int ihps0 = nearest_1d(gcm->hpdefs, elevation);
+				ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps0),
+					overlap_ratio);
+			} break;
+		}
 	}
 
 printf("END hp_interp(%s)\n", dest.str());
@@ -199,7 +233,7 @@ void IceSheet_L0::read_from_netcdf(NcFile &nc, std::string const &vname)
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 	std::string sinterp_grid(giss::get_att(info_var, "interp_grid")->as_string(0));
 
-	interp_grid = *IceExch::get_by_name(sinterp_grid.c_str());
+	interp_grid = giss::parse_enum<IceExch>(sinterp_grid.c_str());
 }
 
 

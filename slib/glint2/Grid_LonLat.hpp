@@ -20,6 +20,7 @@ public:
 	std::vector<double> lonb;
 
 	/** Latitude of cell boundaries (degrees), sorted low to high.
+	Does NOT include the polar "cap" cells.
 	90 = north pole, -90 = south pole. */
 	std::vector<double> latb;
 
@@ -39,6 +40,36 @@ public:
 		const int south_pole_offset = (south_pole ? 1 : 0);
 		const int north_pole_offset = (north_pole ? 1 : 0);
 		return latb.size() - 1 + south_pole_offset + north_pole_offset;
+	}
+
+	/** @return [nlat()] latidue of cell centers */
+	std::vector<double> latc() const;
+	/** @return [nlon()] longitude of cell centers */
+	std::vector<double> lonc() const;
+
+	// ------------------------------------------------------
+	double centroid_lat(int j) const {
+		int nlat = latb.size();
+		if (south_pole) {
+			if (j == 0) return -90;
+			j -= 1;		// latb array doesn't include south pole
+		}
+		if (j >= nlat) {		// Out of bounds, we mean the north pole
+			return 90;
+		}
+		return .5 * (latb[j] + latb[j+1]);
+	}
+
+
+	void centroid(int i, int j, double &lon, double &lat) const {
+		lat = centroid_lat(j);
+		lon = .5 * (lonb[i] + lonb[i+1]);
+	}
+
+	void centroid(long ix, double &lon, double &lat) const {
+		int i, j;
+		index_to_ij(ix, i, j);
+		return centroid(i,j, lon, lat);
 	}
 
 	// ------------------------------------------------------
@@ -63,10 +94,10 @@ public:
 	}
 
 	/** This is the indexing scheme used in ModelE. */
-	virtual int ij_to_index(int i, int j) const
+	long ij_to_index(int i, int j) const
 		{ return j * nlon() + i; }
 
-	virtual void index_to_ij(int index, int &i, int &j) const
+	void index_to_ij(long index, int &i, int &j) const
 	{
 		int n = nlon();
 		j = index / n;

@@ -135,11 +135,16 @@ public:
 	/** @return ncells_full (for L0) or nvertices_full (for L1) */
 	long ndata() const;
 
+	/* Gets the (x,y) or (lon,lat) position of either the cell center
+	(for L0) or the vertex (for L1).
+	@param ix Range 0...ndata() */
+	virtual void centroid(long ix, double &x, double &y) const;
+
 	virtual void clear();
 
 	/** For regularly spaced grids: converts 2D (or 3D in some cases) indexing to 1-D.
 	The index will be a Cell index for L0 grids, or a Vertex index for L1 */
-	virtual int ij_to_index(int i, int j) const { return -1; }
+	virtual long ij_to_index(int i, int j) const { return -1; }
 
 	virtual void index_to_ij(long index, int &i, int &j) const { }
 
@@ -151,6 +156,7 @@ public:
 	auto cells_end() const -> decltype(_cells.end()) { return _cells.end(); }
 
 	Cell *get_cell(long index) { return _cells[index]; }
+	Cell const *get_cell(long index) const { return _cells[index]; }
 	long ncells_realized() const { return _cells.size(); }
 
 	Cell *add_cell(Cell &&cell);
@@ -169,6 +175,7 @@ public:
 		{ return _vertices.end(); }
 
 	Vertex *get_vertex(long index) { return _vertices[index]; }
+	Vertex const *get_vertex(long index) const { return _vertices[index]; }
 
 	long nvertices_realized() const { return _vertices.size(); }
 
@@ -181,6 +188,7 @@ public:
 	// ========================================
 
 	void get_ll_to_xy(giss::Proj2 &proj, std::string const &sproj) const;
+	void get_xy_to_ll(giss::Proj2 &proj, std::string const &sproj) const;
 	std::vector<double> get_proj_areas(std::string const &sproj) const;
 	std::vector<double> get_native_areas() const;
 

@@ -160,7 +160,7 @@ boost::function<void ()> netcdf_define(
 
 	// Create the required dimensions
 	NcDim const *dims[rank];
-	long counts[rank];
+//	long counts[rank];
 	for (int i=0; i<rank; ++i) {
 		if (i >= ddims.size()) {
 			char dim_name[200];
@@ -169,7 +169,7 @@ boost::function<void ()> netcdf_define(
 		} else {
 			dims[i] = ddims[i];
 		}
-		counts[i] = val.extent(i);
+//		counts[i] = val.extent(i);
 	}
 
 	// Create the variable

@@ -8,6 +8,7 @@
 #include <galahad/qpt_c.hpp>
 #include <galahad/eqp_c.hpp>
 #include <giss/ncutil.hpp>
+#include <giss/enum.hpp>
 
 namespace glint2 {
 
@@ -648,8 +649,9 @@ giss::CooVector<int, double> MatrixMaker::atm_to_hp(blitz::Array<double,1> f1)
 	}
 	std::unordered_map<int,double> sum1_inv(std::move(sum1));
 
-	// For local RM: Anser is \Lambda f1
+	// For local RM: Answer is \Lambda f1
 	// (i.e. just repeat each atmosphere value for each elevation point)
+printf("atm_to_hp: rm_local = %d\n", rm_local);
 	if (rm_local) {
 		giss::CooVector<int, double> ret;
 		for (auto p3 = used3.begin(); p3 != used3.end(); ++p3) {
@@ -860,7 +862,7 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 
 	std::string shptype(giss::get_att(info_var, "hptype")->as_string(0));
-	_hptype = *HCIndex::Type::get_by_name(shptype.c_str());
+	_hptype = giss::parse_enum<HCIndex::Type>(shptype.c_str());
 
 
 	std::vector<std::string> sheet_names = parse_comma_list(std::string(

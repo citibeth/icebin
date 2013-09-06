@@ -54,27 +54,6 @@ extern double area_of_proj_polygon(Cell const &cell, giss::Proj2 const &proj)
 	return ret;
 }
 
-/** Compute the center of a polygon in a plane.
-NOTE: Does NOT work (correctly) for lon/lat coordinates
-http://stackoverflow.com/questions/5271583/center-of-gravity-of-a-polygon */
-extern void center_of_polygon(Cell const &cell, double &x, double &y)
-{
-	double A = area_of_polygon(cell);
-	double Cx = 0;
-	double Cy = 0;
-	auto v0(cell.begin());
-	auto v1(v0);
-	for (++ v1; v1 != cell.end(); v0=v1,++v1) {
-		double cross = (v0->x * v1->y - v1->x * v0->y);
-		Cx += (v0->x + v1->x) * cross;
-		Cy += (v0->y + v1->y) * cross;
-	}
-
-	double fact = 1.0 / (6.0 * A);
-	x= Cx * fact;
-	y = Cy * fact;
-}
-
 // ------------------------------------------------------------
 Grid::Grid(Type _type) :
 	type(_type),
@@ -89,6 +68,45 @@ long Grid::ndata() const
 		return nvertices_full();
 	}
 	return ncells_full();
+}
+
+void Grid::centroid(long ix, double &x, double &y) const
+{
+	switch(parameterization.index()) {
+		case Grid::Parameterization::L0 : {
+			/** Compute the center of a polygon in a plane.
+			NOTE: Does NOT work (correctly) for lon/lat coordinates
+			http://stackoverflow.com/questions/5271583/center-of-gravity-of-a-polygon */
+			Cell const *cell = get_cell(ix);
+			double A = area_of_polygon(*cell);
+			double Cx = 0;
+			double Cy = 0;
+			auto v0(cell->begin());
+			auto v1(v0);
+			for (++ v1; v1 != cell->end(); v0=v1,++v1) {
+				double cross = (v0->x * v1->y - v1->x * v0->y);
+				Cx += (v0->x + v1->x) * cross;
+				Cy += (v0->y + v1->y) * cross;
+			}
+
+			{	// Do it for the last segment as well!
+				auto v1(cell->begin());
+				double cross = (v0->x * v1->y - v1->x * v0->y);
+				Cx += (v0->x + v1->x) * cross;
+				Cy += (v0->y + v1->y) * cross;
+			}
+
+
+			double fact = 1.0 / (6.0 * A);
+			x= Cx * fact;
+			y = Cy * fact;
+		} break;
+		case Grid::Parameterization::L1 : {
+			Vertex const *vertex = get_vertex(ix);
+			x = vertex->x;
+			y = vertex->y;
+		} break;
+	}
 }
 
 void Grid::clear()
@@ -422,6 +440,18 @@ printf("get_ll_to_xy(sproj=%s)\n", sproj.c_str());
 		proj.init(sproj, giss::Proj2::Direction::LL2XY);
 	} else {
 		fprintf(stderr, "get_ll_to_xy() only makes sense for grids in Lon/Lat Coordinates!");
+		throw std::exception();
+	}
+}
+
+void Grid::get_xy_to_ll(giss::Proj2 &proj, std::string const &sproj) const
+{
+printf("get_xy_to_ll(sproj=%s)\n", sproj.c_str());
+	// Set up the projection
+	if (coordinates == Coordinates::LONLAT) {
+		proj.init(sproj, giss::Proj2::Direction::XY2LL);
+	} else {
+		fprintf(stderr, "get_xy_to_ll() only makes sense for grids in Lon/Lat Coordinates!");
 		throw std::exception();
 	}
 }

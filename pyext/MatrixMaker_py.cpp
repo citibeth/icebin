@@ -10,6 +10,7 @@
 #include <giss/memory.hpp>
 #include "PyClass.hpp"
 #include <glint2/IceSheet_L0.hpp>
+#include <giss/enum.hpp>
 
 using namespace glint2;
 
@@ -100,13 +101,7 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(
 			correct_area1, std::move(domain)));
 
-		auto hptype(HCIndex::Type::get_by_name(shptype));
-		if (!hptype) {
-			PyErr_SetString(PyExc_ValueError,
-				"MatrixMaker_init(): Bad value for hptype (first argument).");
-			return 0;			
-		}
-		maker->_hptype = *hptype;
+		maker->_hptype = giss::parse_enum<HCIndex::Type>(shptype);
 
 		{NcFile nc(grid1_fname_py, NcFile::ReadOnly);
 			maker->grid1 = read_grid(nc, "grid");
@@ -226,7 +221,7 @@ static PyObject *MatrixMaker_hp_to_iceinterp(PyMatrixMaker *self, PyObject *args
 		}
 		glint2::MatrixMaker *maker = self->maker.get();
 		std::string const ice_sheet_name(ice_sheet_name_py);
-		auto dest(*IceInterp::get_by_name(dest_py));
+		auto dest(giss::parse_enum<IceInterp>(dest_py));
 
 		// Look up the ice sheet
 		IceSheet *sheet = (*maker)[ice_sheet_name];
@@ -272,7 +267,7 @@ static PyObject *MatrixMaker_iceinterp_to_atm(PyMatrixMaker *self, PyObject *arg
 		}
 		glint2::MatrixMaker *maker = self->maker.get();
 		std::string const ice_sheet_name(ice_sheet_name_py);
-		auto src(*IceInterp::get_by_name(src_py));
+		auto src(giss::parse_enum<IceInterp>(src_py));
 
 		// Look up the ice sheet
 		IceSheet *sheet = (*maker)[ice_sheet_name];
@@ -389,13 +384,8 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 			return 0;
 		}
 
-		auto src(*IceInterp::get_by_name(src_py));
-		auto qp_algorithm(QPAlgorithm::get_by_name(qp_algorithm_py));
-		if (!qp_algorithm) {
-			PyErr_SetString(PyExc_ValueError,
-				"MatrixMaker_ice_to_hp(): Bad value for qp_algorithm.");
-			return 0;			
-		}
+		auto src(giss::parse_enum<IceInterp>(src_py));
+		auto qp_algorithm(giss::parse_enum<QPAlgorithm>(qp_algorithm_py));
 
 		if (!PyList_Check(f2s_py)) {
 			PyErr_SetString(PyExc_ValueError,
@@ -433,7 +423,7 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 
 		// Call!
 		giss::CooVector<int, double> f3(
-			self->maker->iceinterp_to_hp(f2s, initial, src, *qp_algorithm));
+			self->maker->iceinterp_to_hp(f2s, initial, src, qp_algorithm));
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
@@ -557,11 +547,44 @@ static PyObject *MatrixMaker_set_interp_grid(PyMatrixMaker *self, PyObject *args
 			return 0;
 		}
 		glint2::MatrixMaker *maker = self->maker.get();
-		auto interp_grid(*IceExch::get_by_name(interp_grid_py));
+		auto interp_grid(giss::parse_enum<IceExch>(interp_grid_py));
 
 		for (auto sheet = maker->sheets.begin(); sheet != maker->sheets.end(); ++sheet) {
 			IceSheet_L0 *sheet0 = dynamic_cast<IceSheet_L0 *>(&*sheet);
 			if (sheet0) sheet0->interp_grid = interp_grid;
+		}
+
+		return Py_None;
+	} catch(...) {
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_hp_to_iceinterp()");
+		return 0;
+	}
+}
+
+// ---------------------------------------------------------
+static PyObject *MatrixMaker_set_interp_style(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *ret_py = NULL;
+	try {
+		// Get arguments
+		const char *interp_style_py = "Z_INTERP";
+		static char const *keyword_list[] = {"interp_style", NULL};
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "s",
+			const_cast<char **>(keyword_list),
+			&interp_style_py))
+		{
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"set_interp_style() called without a valid string as argument.");
+			return 0;
+		}
+		glint2::MatrixMaker *maker = self->maker.get();
+		auto interp_style(giss::parse_enum<InterpStyle>(interp_style_py));
+
+		for (auto sheet = maker->sheets.begin(); sheet != maker->sheets.end(); ++sheet) {
+			sheet->interp_style = interp_style;
 		}
 
 		return Py_None;
@@ -655,6 +678,8 @@ static PyMethodDef MatrixMaker_methods[] = {
 	{"area1",  (PyCFunction)MatrixMaker_area1, METH_KEYWORDS,
 		""},
 	{"set_interp_grid",  (PyCFunction)MatrixMaker_set_interp_grid, METH_KEYWORDS,
+		""},
+	{"set_interp_style",  (PyCFunction)MatrixMaker_set_interp_style, METH_KEYWORDS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
 		""},
