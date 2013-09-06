@@ -716,8 +716,9 @@ printf("n1p=%d, n3p=%d\n", n1p, n3p);
 
 		int i1, k;
 		hc_index->index_to_ik(i3, i1, k);
-		qpt.X0[i3p] = f1(i1);
-		qpt.X[i3p] = f1(i1)*2.;		// Starting value
+		hval = f1(i1) * sum1_inv[i1];
+		qpt.X0[i3p] = hval;
+		qpt.X[i3p] = hval;		// Starting value
 	}
 
 	// No (additional) linear or constant term
@@ -726,7 +727,7 @@ printf("n1p=%d, n3p=%d\n", n1p, n3p);
 
 	// Solve it!
 	double infinity = 1e20;
-	eqp_solve_simple(qpt.this_f, infinity);
+//	eqp_solve_simple(qpt.this_f, infinity);
 
 	// --------- Pick out the answer and convert back to standard vector space
 	giss::CooVector<int, double> ret3;		// Function return value
