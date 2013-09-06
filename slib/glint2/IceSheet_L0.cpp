@@ -65,7 +65,7 @@ static int nearest_1d(
 std::unique_ptr<giss::VectorSparseMatrix> 
 IceSheet_L0::hp_to_iceexch(IceExch dest)
 {
-printf("BEGIN hp_interp(%)\n", dest.str());
+printf("BEGIN hp_interp(%s) mask1=%p\n", dest.str(), &*gcm->mask1);
 	if (interp_style == InterpStyle::BILIN_INTERP) {
 
 		if (dest == IceExch::EXCH) {

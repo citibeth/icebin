@@ -645,6 +645,7 @@ giss::CooVector<int, double> MatrixMaker::atm_to_hp(blitz::Array<double,1> f1)
 	// sum1(RM) = x means that height point = 1 gets scaled to x in atm grid.
 	// So we must divide by x to rescale from atm to height point
 	for (auto ii=sum1.begin(); ii!=sum1.end(); ++ii) {
+printf("sum1[%d] = %g\n", ii->first, ii->second);
 		ii->second = 1.0d / ii->second;
 	}
 	std::unordered_map<int,double> sum1_inv(std::move(sum1));
@@ -675,13 +676,15 @@ printf("atm_to_hp: rm_local = %d\n", rm_local);
 	trans_3_3p.init(n3(), used3);
 	int n3p = trans_3_3p.nb();
 
+printf("n1p=%d, n3p=%d\n", n1p, n3p);
+
 	// Allocate optimization problem
 	galahad::qpt_problem_c qpt(n1p, n3p, true, 1);	// Hessian_kind = 1
 
 	// ================== Constraints: RM f3 = f1
 	// qpt.A = constraints matrix = RMp
 
-	// LHC of constraints = RMp
+	// LHS of constraints = RMp
 	// Translate RM matrix while copying
 	qpt.alloc_A(RM0->size());
 	giss::ZD11SparseMatrix A_zd11(qpt.A, 0);
@@ -703,6 +706,9 @@ printf("atm_to_hp: rm_local = %d\n", rm_local);
 
 	// ================== Objective Function
 	// Remember: qpt.Hessian_kind = 1;
+	qpt.alloc_H(0);
+	giss::ZD11SparseMatrix H_zd11(qpt.H, 1);
+
 
 	// Fill in qpt.X0 = \Lambda f1
 	for (int i3p=0; i3p<n3p; ++i3p) {
@@ -711,7 +717,7 @@ printf("atm_to_hp: rm_local = %d\n", rm_local);
 		int i1, k;
 		hc_index->index_to_ik(i3, i1, k);
 		qpt.X0[i3p] = f1(i1);
-		qpt.X[i3p] = f1(i1);		// Starting value
+		qpt.X[i3p] = f1(i1)*2.;		// Starting value
 	}
 
 	// No (additional) linear or constant term
@@ -794,7 +800,7 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 	// Define the variables
 	fns.push_back(grid1->netcdf_define(nc, vname + ".grid1"));
 	if (mask1.get())
-		fns.push_back(giss::netcdf_define(nc, vname + "mask1", *mask1));
+		fns.push_back(giss::netcdf_define(nc, vname + ".mask1", *mask1));
 	fns.push_back(giss::netcdf_define(nc, vname + ".hpdefs", hpdefs));
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 		fns.push_back(sheet->netcdf_define(nc, vname + "." + sheet->name));
@@ -850,6 +856,7 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 	if (giss::get_var_safe(nc, vname + ".mask1")) {
 		mask1.reset(new blitz::Array<int,1>(
 		giss::read_blitz<int,1>(nc, vname + ".mask1")));
+printf("2 Set mask1 = %p\n", mask1.get());
 	}
 	hpdefs = giss::read_vector<double>(nc, vname + ".hpdefs");
 

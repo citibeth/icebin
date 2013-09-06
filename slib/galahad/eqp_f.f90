@@ -46,6 +46,7 @@ logical(kind=c_bool) :: eqp_solve_simple
 !	control%generate_sif_file = .TRUE.
 	control%print_level = 5
 
+print *,'Hessian_kind',p%Hessian_kind
 print *,'m,n,A%m,A%n,A%ne',p%m,p%n,p%A%m,p%A%n,p%A%ne
 !print *,'p%A%row',p%A%row
 !print *,'p%A%col',p%A%col

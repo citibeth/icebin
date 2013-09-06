@@ -266,7 +266,7 @@ blitz::Array<double,1> const &elev2,
 blitz::Array<int,1> const *mask1,		// [n1] Shows where we will / will not expect landice
 blitz::Array<int,1> const *mask2)
 {
-	printf("BEGIN bilin_interp()\n");
+	printf("BEGIN bilin_interp(mask1=%p, mask2=%p)\n", mask1, mask2);
 
 	// Check types
 	auto grid1p = dynamic_cast<Grid_LonLat const *>(&grid1_lonlat);
@@ -285,7 +285,7 @@ blitz::Array<int,1> const *mask2)
 //	int nhc = hpdefs.size();
 	int n2 = elev2.extent(0);
 
-	gassert(!mask1 || mask1->extent(1) == n1);
+	gassert(!mask1 || mask1->extent(0) == n1);
 	gassert(!mask2 || mask2->extent(0) == n2);
 
 

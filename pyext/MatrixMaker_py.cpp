@@ -88,7 +88,8 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 		if (!PyArg_ParseTupleAndKeywords(
 			args, kwds, "ssO|Oi",
 			const_cast<char **>(keyword_list),
-			&grid1_fname_py, &shptype, &hpdefs_py, &mask1_py, &correct_area1))
+			&grid1_fname_py, &shptype, &hpdefs_py,
+			&mask1_py, &correct_area1))
 		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
@@ -109,8 +110,10 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 
 		int n1 = maker->grid1->ndata();
 
-		if (mask1_py) maker->mask1.reset(new blitz::Array<int,1>(
-			giss::py_to_blitz<int,1>(mask1_py, "mask1", {n1})));
+		if (mask1_py) {
+			maker->mask1.reset(new blitz::Array<int,1>(
+				giss::py_to_blitz<int,1>(mask1_py, "mask1", {n1})));
+		}
 
 		maker->hpdefs = giss::py_to_vector<double>(hpdefs_py, "hpdefs", -1);
 
@@ -122,6 +125,35 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 		return 0;
 	}
 }
+
+/** Use this to generate GLINT2 config file */
+static PyObject *MatrixMaker_set_mask1(PyMatrixMaker *self, PyObject *args)
+{
+	try {
+		// Get arguments
+		PyObject *mask1_py = NULL;
+
+		if (!PyArg_ParseTuple(
+			args, "O",
+			&mask1_py))
+		{
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"MatrixMaker_set_mask1() called without valid arguments.");
+			return 0;
+		}
+
+		self->maker->mask1.reset(new blitz::Array<int,1>(
+			giss::py_to_blitz<int,1>(mask1_py, "mask1", {self->maker->n1()})));
+
+		return Py_None;
+	} catch(...) {
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_set_mask1()");
+		return 0;
+	}
+}
+
+
 
 static PyObject *MatrixMaker_add_ice_sheet(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
@@ -680,6 +712,8 @@ static PyMethodDef MatrixMaker_methods[] = {
 	{"set_interp_grid",  (PyCFunction)MatrixMaker_set_interp_grid, METH_KEYWORDS,
 		""},
 	{"set_interp_style",  (PyCFunction)MatrixMaker_set_interp_style, METH_KEYWORDS,
+		""},
+	{"set_mask1",  (PyCFunction)MatrixMaker_set_mask1, METH_VARARGS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
 		""},
