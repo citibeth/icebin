@@ -282,8 +282,8 @@ static PyObject *MatrixMaker_iceinterp_to_atm(PyMatrixMaker *self, PyObject *arg
 	try {
 
 		// Get arguments
-		const char *ice_sheet_name_py;
-		const char *src_py = "ICE";
+		char *ice_sheet_name_py;
+		char *src_py = "ICE";
 		static char const *keyword_list[] = {"sheetname", "src", NULL};
 
 
@@ -354,15 +354,20 @@ static PyObject *MatrixMaker_hp_to_atm(PyMatrixMaker *self, PyObject *args)
 	}
 }
 
-static PyObject *MatrixMaker_atm_to_hp(PyMatrixMaker *self, PyObject *args)
+static PyObject *MatrixMaker_atm_to_hp(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *ret_py = NULL;
 	try {
 
 		PyObject *f1_py;
+		int force_lambda = 0;	// false
+		static char const *keyword_list[] = {"f1", "force_lambda", NULL};
 
-		// Get arguments
-		if (!PyArg_ParseTuple(args, "O", &f1_py)) {
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "O|i",
+			const_cast<char **>(keyword_list),
+			&f1_py, &force_lambda))
+		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
 				"atm_to_hp(): bad arguments");
@@ -373,7 +378,7 @@ static PyObject *MatrixMaker_atm_to_hp(PyMatrixMaker *self, PyObject *args)
 		auto f1(giss::py_to_blitz<double,1>(f1_py, "f1", 1, dims));
 
 		// Call!
-		giss::CooVector<int, double> f3(self->maker->atm_to_hp(f1));
+		giss::CooVector<int, double> f3(self->maker->atm_to_hp(f1, force_lambda));
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
@@ -407,9 +412,10 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 		static char const *keyword_list[] = {"f2s", "initial3", "src", "qp_algorithm", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "OO|ss",
+			args, kwds, "O|Oss",
 			const_cast<char **>(keyword_list),
-			&f2s_py, &initial_py, &src_py, &qp_algorithm_py)) {
+			&f2s_py,
+			&initial_py, &src_py, &qp_algorithm_py)) {
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
 				"Bad arguments for ice_to_hp().");
@@ -451,7 +457,10 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 
 		// Get the blitz array from python
 		int dims[1] = {self->maker->n3()};
-		auto initial(giss::py_to_blitz<double,1>(initial_py, "initial", 1, dims));
+		blitz::Array<double,1> initial;
+		if (initial_py) {
+			initial.reference(giss::py_to_blitz<double,1>(initial_py, "initial", 1, dims));
+		}
 
 		// Call!
 		giss::CooVector<int, double> f3(
@@ -699,7 +708,7 @@ static PyMethodDef MatrixMaker_methods[] = {
 		""},
 	{"hp_to_atm", (PyCFunction)MatrixMaker_hp_to_atm, METH_KEYWORDS,
 		""},
-	{"atm_to_hp", (PyCFunction)MatrixMaker_atm_to_hp, METH_VARARGS,
+	{"atm_to_hp", (PyCFunction)MatrixMaker_atm_to_hp, METH_KEYWORDS,
 		""},
 	{"iceinterp_to_atm", (PyCFunction)MatrixMaker_iceinterp_to_atm, METH_KEYWORDS,
 		""},

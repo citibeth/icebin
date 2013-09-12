@@ -109,7 +109,7 @@ public:
 	for multiple ice sheets. */
 	giss::CooVector<int, double> iceinterp_to_hp(
 		std::map<int, blitz::Array<double,1>> &f4s,
-		blitz::Array<double,1> &initial3,
+		blitz::Array<double,1> initial3,
 		IceInterp src,
 		QPAlgorithm qp_algorithm = QPAlgorithm::SINGLE_QP);
 
@@ -119,7 +119,8 @@ public:
 	TODO: This only works on one ice sheet.  Will need to be extended
 	for multiple ice sheets. */
 	giss::CooVector<int, double> atm_to_hp(
-		blitz::Array<double,1> f1);
+		blitz::Array<double,1> f1,
+		bool force_lambda = false);
 
 
 

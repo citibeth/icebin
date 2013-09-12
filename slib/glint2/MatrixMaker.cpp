@@ -255,7 +255,7 @@ static int get_subid(int i1) { return i1; }
 giss::CooVector<int, double>
 MatrixMaker::iceinterp_to_hp(
 std::map<int, blitz::Array<double,1>> &f2_or_4s,		// Actually f2 or f4
-blitz::Array<double,1> &initial3,
+blitz::Array<double,1> initial3,
 IceInterp src,
 QPAlgorithm qp_algorithm)
 {
@@ -567,6 +567,7 @@ printf("AA1 Done\n");
 		giss::ZD11SparseMatrix A_zd11(qpt.A, 0);
 		copy(*ua->RMp, A_zd11);
 
+		// Constraints: Ax + C = 0
 		// qpt.C = equality constraints RHS = Sp * f4p
 		for (int i=0; i<n1p; ++i) qpt.C[i] = 0;
 		for (auto ii = ua->Sp->begin(); ii != ua->Sp->end(); ++ii) {
@@ -580,16 +581,23 @@ printf("AA1 Done\n");
 
 		// =========================== Initial guess at solution
 		bool nanerr = false;
+		bool zero_initial(initial3.size() == 0);
 		for (int i3p=0; i3p<n3p; ++i3p) {
-			int i3x = ua->trans_3x_3p.b2a(i3p);
-			int i3 = trans_3_3x.i3x_to_i3(i3x);
-			double val = initial3(i3);
-			if (std::isnan(val)) {
-				fprintf(stderr, "ERROR: ice_to_hp(), NaN in initial guess, i3=%d\n", i3);
-				nanerr = true;
+			if (zero_initial) {
+				// No initial guess, start at 0
 				qpt.X[i3p] = 0;
 			} else {
-				qpt.X[i3p] = val;
+				// Use initial guess supplied by user
+				int i3x = ua->trans_3x_3p.b2a(i3p);
+				int i3 = trans_3_3x.i3x_to_i3(i3x);
+				double val = initial3(i3);
+				if (std::isnan(val)) {
+					fprintf(stderr, "ERROR: ice_to_hp(), NaN in initial guess, i3=%d\n", i3);
+					nanerr = true;
+					qpt.X[i3p] = 0;
+				} else {
+					qpt.X[i3p] = val;
+				}
 			}
 		}
 
@@ -613,7 +621,11 @@ printf("AA1 Done\n");
 
 
 // --------------------------------------------------------------
-giss::CooVector<int, double> MatrixMaker::atm_to_hp(blitz::Array<double,1> f1)
+/** @param force_lambda If true, then just return $f3 = \Lambda f1$,
+           the physicaly most correct answer.
+*/
+giss::CooVector<int, double> MatrixMaker::atm_to_hp(blitz::Array<double,1> f1,
+bool force_lambda)
 {
 	// RM = hp --> atm conversion
 	std::unique_ptr<giss::VectorSparseMatrix> RM0(hp_to_atm());	// 3->1
@@ -653,7 +665,7 @@ printf("sum1[%d] = %g\n", ii->first, ii->second);
 	// For local RM: Answer is \Lambda f1
 	// (i.e. just repeat each atmosphere value for each elevation point)
 printf("atm_to_hp: rm_local = %d\n", rm_local);
-	if (rm_local) {
+	if (force_lambda || rm_local) {
 		giss::CooVector<int, double> ret;
 		for (auto p3 = used3.begin(); p3 != used3.end(); ++p3) {
 			int i3 = *p3;
@@ -679,7 +691,8 @@ printf("atm_to_hp: rm_local = %d\n", rm_local);
 printf("n1p=%d, n3p=%d\n", n1p, n3p);
 
 	// Allocate optimization problem
-	galahad::qpt_problem_c qpt(n1p, n3p, true, 1);	// Hessian_kind = 1
+//	galahad::qpt_problem_c qpt(n1p, n3p, true, 1);	// Hessian_kind = 1
+	galahad::qpt_problem_c qpt(n1p, n3p, true);	// m, n, eqp
 
 	// ================== Constraints: RM f3 = f1
 	// qpt.A = constraints matrix = RMp
@@ -698,36 +711,42 @@ printf("n1p=%d, n3p=%d\n", n1p, n3p);
 			ii.val());
 	}
 
+	// Constraints: Ax + C = 0
 	// Constraints RHS = f1p (rescaled)
 	for (int i1p=0; i1p<n1p; ++i1p) {
 		int i1 = trans_1_1p.b2a(i1p);
-		qpt.C[i1p] = f1(i1) * sum1_inv[i1];
+		qpt.C[i1p] = -f1(i1) * sum1_inv[i1];
 	}
 
 	// ================== Objective Function
-	// Remember: qpt.Hessian_kind = 1;
-	qpt.alloc_H(0);
-	giss::ZD11SparseMatrix H_zd11(qpt.H, 1);
+	// Remember: qpt.Hessian_kind = -1;
 
-
+	// H = 2 I
+	qpt.alloc_H(n3p);
+	giss::ZD11SparseMatrix H_zd11(qpt.H, 0);
+	for (int i3p=0; i3p<n3p; ++i3p) {
+		H_zd11.add(i3p, i3p, 2.0d);
+	}
+printf("CC1\n");
 	// Fill in qpt.X0 = \Lambda f1
+	qpt.f = 0;
 	for (int i3p=0; i3p<n3p; ++i3p) {
 		int i3 = trans_3_3p.b2a(i3p);
 
 		int i1, k;
 		hc_index->index_to_ik(i3, i1, k);
-		hval = f1(i1) * sum1_inv[i1];
-		qpt.X0[i3p] = hval;
+		double hval = f1(i1) * sum1_inv[i1];
+//		qpt.X0[i3p] = hval;
 		qpt.X[i3p] = hval;		// Starting value
+		qpt.G[i3p] = -2.0d * hval;		// G = -2X0
+		qpt.f += hval * hval;			// f = x0 . x0
 	}
 
-	// No (additional) linear or constant term
-	for (int i=0; i<qpt.n; ++i) qpt.G[i] = 0;
-	qpt.f = 0;
+printf("CC2\n");
 
 	// Solve it!
 	double infinity = 1e20;
-//	eqp_solve_simple(qpt.this_f, infinity);
+	eqp_solve_simple(qpt.this_f, infinity);
 
 	// --------- Pick out the answer and convert back to standard vector space
 	giss::CooVector<int, double> ret3;		// Function return value
