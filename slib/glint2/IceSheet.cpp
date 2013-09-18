@@ -307,7 +307,7 @@ blitz::Array<int,1> const *mask2)
 	gassert(!mask2 || mask2->extent(0) == n2);
 
 
-	// --------- Compute Cell centers
+	// --------- Compute Atmosphere Cell centers
 	std::vector<double> lon1c(grid1.lonc());
 	std::vector<double> lat1c(grid1.latc());
 
