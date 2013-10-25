@@ -47,6 +47,8 @@ static char help[] =
 #include "POFactory.hh"
 #include "PSFactory.hh"
 
+#include <PISMTime.hh>
+
 int main(int argc, char *argv[]) {
   PetscErrorCode  ierr;
 
@@ -95,6 +97,9 @@ int main(int argc, char *argv[]) {
 
     IceGrid g(com, rank, size, config);
     IceModel m(g, config, overrides);
+
+printf("start = %f\n", g.time->start());
+printf("end = %f\n", g.time->end());
 
     ierr = m.setExecName("pismr"); CHKERRQ(ierr);
 

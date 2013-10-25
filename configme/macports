@@ -87,5 +87,5 @@ export GSL_LIBS="-L$GSL_HOME/lib -lgslcblas"
 export PISM_SRC=$HOME/git/pism/src
 export PISM_HOME=$HOME/opt/pism
 
-./configure --prefix=$DEST_PREFIX --with-galahad #--with-pism
+./configure --prefix=$DEST_PREFIX --with-galahad --with-pism
 
