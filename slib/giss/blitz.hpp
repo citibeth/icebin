@@ -22,8 +22,15 @@
 #include <vector>
 #include <blitz/array.h>
 
+/** \file blitz.hpp
+Type conversion utilities related to Blitz++ arrays.  Blitz++ arrays
+are so flexible... if subroutines are written to take them as
+arguments, then other array data types can be converted as needed. */
+
 namespace giss {
 
+/** Converts a std::vector to a Blitz++ 1-D array that shares the same memory. */
+@param vec The input vector */
 template<class T>
 blitz::Array<T,1> vector_to_blitz(std::vector<T> &vec)
 {
@@ -37,6 +44,7 @@ blitz::Array<T,1> vector_to_blitz(std::vector<T> &vec)
 		blitz::neverDeleteData);
 }
 
+/** Converts a const std::vector to a const Blitz++ 1-D array that shares the same memory. */
 template<class T>
 blitz::Array<T,1> const vector_to_blitz(std::vector<T> const &vec)
 {
@@ -54,6 +62,14 @@ blitz::Array<T,1> const vector_to_blitz(std::vector<T> const &vec)
 
 /** Makes sure a blitz::Array dimension.
 Raises a Python exception if it does not. */
+
+/** Checks that the dimensions of an array are what we think they
+should be.  This is used in Python interface code to add sophisticated
+type checking to functions.
+
+@param vname Name of this variables (used in error comments)
+@param arr The array to check dimensions
+@param dims The expected dimensions.  If a dims[i] < 0, then dimension i is not checked. */
 template<class T, int rank>
 void check_dimensions(
 std::string const &vname,
@@ -70,6 +86,10 @@ std::vector<int> const &dims)
 	}
 }
 // ------------------------------------------------------------
+
+/** Changes a C-style Blitz++ array (biggest stride in first dimension
+and zero-based indexing) to a Fortran-style Blitz++ array (biggest
+stride in last dimension and one-based indexing) that shares the same memory. */
 template<class T, int rank>
 blitz::Array<T, rank> c_to_f(blitz::Array<T, rank> &arr);
 
@@ -93,6 +113,9 @@ blitz::Array<T, rank> c_to_f(blitz::Array<T, rank> &arr)
 	return ret;
 }
 // ------------------------------------------------------------
+/** Changes a C-style Blitz++ array (biggest stride in first dimension
+and zero-based indexing) to a Fortran-style Blitz++ array (biggest
+stride in last dimension and one-based indexing) that shares the same memory. */
 template<class T, int rank>
 blitz::Array<T, rank> f_to_c(blitz::Array<T, rank> &arr);
 

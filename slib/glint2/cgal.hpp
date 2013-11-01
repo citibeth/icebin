@@ -25,7 +25,12 @@
 
 namespace glint2 {
 
-/** GLINT2-specific instatiations of CGAL templates. */
+/** (Internal Use Only).  GLINT2-specific instatiations of CGAL templates.  These are used
+internally by GLINT2 when interacting with the CGAL library, should
+have no effect on the user.
+
+@see http://www.cgal.org/ */
+
 namespace gc {
 	typedef CGAL::Exact_predicates_exact_constructions_kernel Kernel;
 	typedef Kernel::Point_2                                   Point_2;

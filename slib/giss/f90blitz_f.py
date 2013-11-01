@@ -82,7 +82,7 @@ def get_spec(ftype,ctype,rank) :
 # ---------------------------------------------------
 def get_module(fctypes, ranks) :
 	out = []
-	out.append('''! ======== DO NOT EDIT!!!!  Macine Generated!!!!
+	out.append('''! ======== DO NOT EDIT!!!!  Machine Generated!!!!
 module f90blitz
 
 use, intrinsic :: iso_c_binding
@@ -120,11 +120,18 @@ def get_macros(fctypes, ranks) :
 	return string.join(out,'\n')
 # ---------------------------------------------------
 
-fctypes = [('real*8', 'double'), ('integer', 'int')]
-ranks = [1,2,3]
+if len(sys.argv) < 3 :
+	print 'Usage: %s <output.f90> <output.h>'
+	sys.exit(-1)
 
-#fctypes = [('real*4', 'float')]
-#ranks = [3]
+# Definitions will be generate for the cross product of fctypes and ranks.
+
+# The list of Fortran/C tyes to generate definitions.
+# Format is (fortran-type, c-type)
+fctypes = [
+	('real*8', 'double'),
+	('integer', 'int')]
+ranks = [1,2,3]
 
 module = get_module(fctypes, ranks)
 macros = get_macros(fctypes, ranks)

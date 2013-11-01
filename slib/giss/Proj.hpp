@@ -16,7 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** C++ API for proj.4 Projection Library.
+/*
+C++ API for proj.4 Projection Library.
 By Robert Fischer: robert.fischer@nasa.gov
 April 5, 2012
 

@@ -23,6 +23,13 @@
 
 namespace giss {
 
+
+/** Implements a "sparse vector", stored as an array of <index, value>
+pairs.  This is analogous to a coordinate-style sparse matrix
+representation (VectorSparseMatrix).  The SparseAccumulator class does
+a similar job, but it is analogous to a lookup-based sparse matrix
+representation (MapSparseMatrix).
+@see SparseAccumulator, VectorSparseMatrix, MapSparseMatrix */
 template<class IndexT, class ValT>
 class CooVector : public std::vector<std::pair<IndexT, ValT>>
 {
