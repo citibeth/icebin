@@ -22,6 +22,11 @@
 
 namespace giss {
 
+/** Utility class to hash std::pair, which was left out of std::hash.
+Used to construct std::unordered_maps where std::pair is used as the
+key.  Might have been made obsolete by an implementation of
+std::hash<> for std::pair.
+@see gridutil.hpp,std::hash< pair< S, T > > */
 template<class A, class B>
 struct HashPair {
 	size_t operator()(std::pair<A, B> const &x) const throw()

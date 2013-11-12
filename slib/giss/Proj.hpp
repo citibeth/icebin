@@ -72,6 +72,7 @@ class Proj {
 public:
     Proj() : pj(0) {}
 
+	/** Tests if this projection has been initialized. */
 	bool is_valid() const { return (pj != 0); }
 
     friend int transform(Proj const &src, Proj const &dest,

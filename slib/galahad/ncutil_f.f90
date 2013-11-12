@@ -14,6 +14,7 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+!> Subroutines for reading netCDF files, taken from GISS ModelE codebase
 MODULE ncutil_mod
 
 use netcdf

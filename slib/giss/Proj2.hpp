@@ -25,34 +25,46 @@
 
 namespace giss {
 
-
+/** Class that joins together a pair of Proj instances, to implement
+both the forward and backward translation together in one.  Instances have
+a <i>direction</i>, which can be either spherical-to-map, or map-to-spherical. */
 class Proj2 {
 public:
+	/** The proj.4 projection string. */
 	std::string sproj;
+	/** Direction enums for latlon-to-xy, and xy-to-latlon */
 	enum class Direction {LL2XY, XY2LL};
+	/** The direction of translation for this instance. */
 	Direction direction;
 protected:
 	Proj _proj, _llproj;
 	void realize();
 public:
 
+	/** Tests if this projection has been initialized. */
 	bool is_valid() const { return _proj.is_valid(); }
 
+	/** @param _sproj The projection string.
+	@param _direction Direction of translation. */
 	Proj2(std::string const &_sproj, Direction _direction);
 
 	Proj2() : direction(Direction::LL2XY) {}
 
+	/** Release everything */
 	void clear() {
 		_proj.clear();
 		_llproj.clear();
 	}
 
+	/** Copy constructor */
 	Proj2(Proj2 const &rhs);
 
+	/** Copies an existing Proj2, but with a different direction. */
 	Proj2(Proj2 const &rhs, Direction _direction) :
 		sproj(rhs.sproj), direction(_direction)
 		{ realize(); }
 
+	/** Initialize an instance */
 	void init(std::string const &_sproj, Direction _direction)
 	{
 		sproj = _sproj;

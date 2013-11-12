@@ -24,11 +24,13 @@
 namespace giss {
 
 
-/** Implements a "sparse vector", stored as an array of <index, value>
+/**
+Implements a "sparse vector", stored as an array of <index, value>
 pairs.  This is analogous to a coordinate-style sparse matrix
 representation (VectorSparseMatrix).  The SparseAccumulator class does
 a similar job, but it is analogous to a lookup-based sparse matrix
-representation (MapSparseMatrix).
+representation (MapSparseMatrix).  This class is templated in order to
+support multiple <index, value> types.
 @see SparseAccumulator, VectorSparseMatrix, MapSparseMatrix */
 template<class IndexT, class ValT>
 class CooVector : public std::vector<std::pair<IndexT, ValT>>
@@ -36,12 +38,17 @@ class CooVector : public std::vector<std::pair<IndexT, ValT>>
 public:
 //	typedef std::vector<std::pair<IndexT, ValT>> super;
 
+	/** Insert a new <index, value> pair to the end of the sparse
+	vector list.  Does not detect or eliminate duplicates. */
 	void add(IndexT const &index, ValT const &val)
 		{ this->push_back(std::make_pair(index, val)); }
 
+	/** Sort the <index, value> pairs by index. */
 	void sort()
 		{ std::sort(this->begin(), this->end()); }
 
+	/** Sums duplicate indices, resulting in a vector with no
+	duplicates.  Also sorts in order to do this. */
 	void sum_duplicates();
 };
 // ---------------------------------------------------

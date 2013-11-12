@@ -14,14 +14,18 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-! Extensions to c_loc() functionality
+!> Work-around of a bug in GNU gfortran, in which c_loc() does not work
+!! when applied directly to elements of arrays.  The bug is fixed in GCC 4.9
 
+!> Container modulefor c_loc() workaround.
 module c_loc_x
 
 implicit none
 
 CONTAINS
 
+	!> Used to get the C address of a real*8 array
+	!! @param A The array in question
 	function c_loc_array_double(A)
         use, intrinsic :: iso_c_binding
         real*8, target :: A(*)
@@ -30,6 +34,8 @@ CONTAINS
         c_loc_array_double = c_loc(A)
 	end function c_loc_array_double
 
+	!> Used to get the C address of a integer array
+	!! @param A The array in question
 	function c_loc_array_int(A)
         use, intrinsic :: iso_c_binding
         integer, target :: A(*)

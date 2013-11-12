@@ -14,6 +14,13 @@
 ! You should have received a copy of the GNU General Public License
 ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
+
+!> @file
+!! Code used to bind GALAHAD's data structure QPT_problem_type to a C++ peer class.
+!! @see galahad,galahd::qpt_problem_c
+
+!> Container module for the Fortran peer class.
 MODULE qpt_x
 	use, intrinsic :: iso_c_binding
 	use hsl_zd11_double
@@ -21,6 +28,8 @@ MODULE qpt_x
 
 IMPLICIT NONE
 
+	!> Peer derived type for QPT_problem_type.  Equivalent to the C++
+    !! class galahad::qpt_problem_c, which documents the classmembers.
 	type QPT_problem_c
 		type(c_ptr) :: this_fc		! QTP_problem_type * (peer)
 
@@ -50,8 +59,17 @@ END MODULE qpt_x
 ! Functions to be called from C, so they're outside of a module
 
 ! ----------------------------------------------------------
-! @param m Number of constraints
-! @param n Number of variables
+
+!> Binds an instance of the C++ peer class to an instance of the
+!! underlying Fortran derived type.  Meant to be called from C++.
+!! Used by galahad::qpt_problem_c::qpt_problem_c().
+!! @param this_cc Pointer or reference to the C++ peer class of type qpt_problem_c
+!! @param this_fc Pointer to the Fortran underlying derived type
+!!    (previously allocated in Fortran, but then passed to C++)
+!! @param m Number of constraints
+!! @param n Number of variables
+!! @param eqp Are we preparing for a problem w/ equality constraints?
+!! @param Hessian_kind Format of the Hessian matrix.  See GALAHAD documentation for QPT.
 subroutine QPT_problem_init_c(this_cc, this_fc, m, n, eqp, Hessian_kind) bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
@@ -119,6 +137,11 @@ integer, value :: Hessian_kind
 
 end subroutine QPT_problem_init_c
 ! ----------------------------------------------------------
+
+!> Allocate the H matrix in an existing peered instance of QPT_problem_type.
+!! Meant to be called from C++
+!! @param this_cc Pointer to C++ peer class (galahad::qpt_problem_c).
+!! @param H_ne Nubmer of non-zero elements in the Hessian matrix H.
 subroutine QPT_problem_alloc_H(this_cc, H_ne) bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
@@ -138,6 +161,10 @@ integer(c_int), value :: H_ne		! # of elements in H (Hessian) matrix
 
 end subroutine QPT_problem_alloc_H
 ! ----------------------------------------------------------
+!> Allocate the A matrix in an existing peered instance of QPT_problem_type.
+!! Meant to be called from C++
+!! @param this_cc Pointer to C++ peer class (galahad::qpt_problem_c).
+!! @param A_ne Nubmer of non-zero elements in the A matrix.
 subroutine QPT_problem_alloc_A(this_cc, A_ne) bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
@@ -157,6 +184,9 @@ integer(c_int), value :: A_ne		! # of elements in A (constraints) matrix
 
 end subroutine QPT_problem_alloc_A
 ! ----------------------------------------------------------
+!> Allocates a new instance of the Fortran underlying dervied type QPT_problem_type
+!! Meant to be called from C++.
+!! @return pointer to the allocated derived type, of type QPT_problem_type.
 function QPT_problem_new_c() bind(c)
 use GALAHAD_QPT_double
 USE qpt_x
@@ -171,6 +201,10 @@ type(c_ptr) :: QPT_problem_new_c
 	QPT_problem_new_c = c_loc(main)
 end function QPT_problem_new_c
 ! ---------------------------------------------------------------------
+!> De-allocates an instance of the Fortran underlying derived type QPT_problem_type,
+!! that was previously allocated via QPT_problem_new_c().
+!! Meant to be called from C++.
+!! @param this_fc Pointer to an instance of the Fortran underlying derived type QPT_problem_type.
 subroutine QPT_problem_delete_c(this_fc) bind(c)
 use GALAHAD_QPT_double
 USE qpt_x

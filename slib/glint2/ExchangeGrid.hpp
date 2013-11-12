@@ -27,7 +27,8 @@ namespace glint2 {
 class ExchangeGrid : public Grid {
 public :
 	/** Transformation to get from local Grid coords to Exchange Grid coords */
-	giss::Proj2 proj1, proj2;
+	giss::Proj2 proj1;
+	giss::Proj2 proj2;		/**< proj2 documentation */
 
 	/** Keep track of the "full" indexing space for the Overlap Matrix. */
 	long grid1_ncells_full;

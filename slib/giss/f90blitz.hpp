@@ -23,19 +23,27 @@
 #include <blitz/array.h>
 #include <iostream>
 
+/** @file
+C++ (Blitz) / Fortran interoperability for Assumed Shape (Fortran 90) arrays. */
+
 namespace giss {
 
-/** Used to accept Fortran 90 arrays and re-constitute them as blitz++ arrays.
+/**A reconstruction of the "dope vector" used to describe assumed
+shape arrays in Fortran 90.  Used as parameters in C++ functions to
+accept Fortran 90 arrays and re-constitute them as blitz++ arrays.
+Peered with the Fortran derived types arr_spec_<x>, where <x> is a
+number of dimensions.
 @see f90blitz_f.py */
 template<class ArrT, int rank>
 struct F90Array {
-	ArrT *base;
-	ArrT *deltas[rank];
-	int lbounds[rank];
-	int ubounds[rank];
+	ArrT *base;				///< Beginning of the array
+	ArrT *deltas[rank];		///< Used to calculate strides
+	int lbounds[rank];		///< Lower bound index of each dimension (usually 1)
+	int ubounds[rank];		///< Upper bound index of each dimension
 
-	/** Extract F90Array info from existing blitz::Array.  Used to
-	write C++ test code for Fortrn APIs. */
+	/** Extracts the dope vector from an existing blitz::Array.  Used
+	to write C++ test code for Fortrn APIs (so we can construct and pass
+	dope vectors without actually running Fortran code.) */
 	F90Array(blitz::Array<ArrT,rank> &arr) {
 		this->base = arr.data();
 
@@ -48,6 +56,9 @@ struct F90Array {
 	}
 
 
+	/** Construct a blitz::Array from the dope vector.  The blitz
+	array returned is identical to the original Fortran array used to
+	create this dope vector. */
 	blitz::Array<ArrT,rank> to_blitz()
 	{
 		blitz::TinyVector<int, rank> shape, stride;

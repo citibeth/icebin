@@ -29,28 +29,27 @@ namespace galahad {
 	class zd11_f;		// Fortran type, opaque
 }
 
+/** @see zdqq_f.f90 */
 extern "C" int zd11_put_type_c(galahad::zd11_f &, char const *, int);
 
 namespace galahad {
 
-// =============== C++ Peer Classes
-/** C++ Peer class for the Fortran hsl_zd11_double::zd11_type.
-Elements of the Fortran derived type may be safely accessed via the references (scalars) and pointers (arrays) in this class.  See hsl_zd11_double::zd11_type for descriptions of these elements.
-<b>NOTE:</b> This class must always match the Fortran derived type zd11_c.
-@see hsl_zd11_double::zd11_type, hsl_zd11_double_x::zd11_c */
+/**
+C++ peer to GALAHAD's derived type zd11_type, which is used to
+store sparse matrices.  See galahd namespace documentation for details
+on how the peering is achieved.  See GALAHAD QPT documentation for
+specifics of how to set the fields in this class.
+@see galahad, zd11_type, zd11_x::zd11_c */
 class zd11_c {
 public :
-	zd11_f &main;		// Actual storage for this
+	zd11_f &main;		///< Actual storage for this
 
 	int &m;
 	int &n;
-	int &ne;				// Number of non-zero elements
+	int &ne;				///< Number of non-zero elements
 
-	/** Array of length ne */
-	int * const row;		// int[ne]
-	/** Array of length ne */
-	int * const col;		// int[ne]
-	/** Array of length ne */
+	int * const row;		///< int[ne]
+	int * const col;		///< int[ne]
 	double * const val;		// double[ne]
 
 	/** Construct a dummy instance of this peer class.

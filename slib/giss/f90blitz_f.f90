@@ -1,4 +1,4 @@
-! ======== DO NOT EDIT!!!!  Macine Generated!!!!
+! ======== DO NOT EDIT!!!!  Machine Generated!!!!
 module f90blitz
 
 use, intrinsic :: iso_c_binding

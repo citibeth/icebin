@@ -389,6 +389,7 @@ protected:
 
 // Because there is not stream support, this is a quick and dirty file I/O helper.
 // Users will likely replace its usage with a Stream implementation from their favorite API.
+/**(internal use only) */
 class RTFileStream
 {
   FILE* m_file;

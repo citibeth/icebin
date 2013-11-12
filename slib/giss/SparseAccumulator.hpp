@@ -23,23 +23,36 @@
 
 namespace giss {
 
+/**Implements a "sparse vector", stored as an
+std::unordered_map<index, value>.  This is analogous to a lookup-style
+sparse matrix representation (MapSparseMatrix).  The CooVecotr class
+does a similar job, but it is analogous to a coordinate-style sparse
+matrix representation (VectorSparseMatrix).  This class is templated
+in order to support multiple <index, value> types.
+@see CooVector, VectorSparseMatrix, MapSparseMatrix */
 template<class IndexT, class AccumT, class Hash = std::hash<IndexT>>
 class SparseAccumulator : public std::unordered_map<IndexT, AccumT, Hash> {
 public :
 	typedef std::unordered_map<IndexT, AccumT, Hash> super;
 
+	/** Inserts a new <index, value> pair to sparse vector.  If that
+	element was already non-zero, adds to it. */
 	void add(IndexT const &index, AccumT const &val) {
 		auto ii(super::find(index));
 		if (ii == super::end()) super::insert(std::make_pair(index, val));
 		else ii->second += val;
 	}
 
+	/** Inserts a new <index, value> pair to sparse vector.  If that
+	element was already non-zero, replaces to it. */
 	void set(IndexT const &index, AccumT const &val) {
 		auto ii(super::find(index));
 		if (ii == super::end()) super::insert(std::make_pair(index, val));
 		else ii->second = val;
 	}
 
+	/** Looks up a value in the sparse index by index.  Throws an
+	exception if the index does not exist. */
 	AccumT &operator[](IndexT const &index) {
 		auto ii(super::find(index));
 		if (ii == super::end()) {
@@ -49,6 +62,8 @@ public :
 		return ii->second;
 	}
 
+	/** Looks up a value in the sparse index by index.  Throws an
+	exception if the index does not exist. */
 	AccumT const &operator[](IndexT const &index) const {
 		auto ii(super::find(index));
 		if (ii == super::end()) throw std::exception();

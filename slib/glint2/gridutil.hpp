@@ -27,14 +27,15 @@
 #include <giss/Proj.hpp>
 #include <glint2/Grid.hpp>
 
-/** std::hash<std::pair<>> is defined in "namespace std" to fix a shortcoming in C++.
+/**@file std::hash<std::pair<>> is defined in "namespace std" to fix a shortcoming in C++.
 
 @see: http://stackoverflow.com/questions/7222143/unordered-map-hash-function-c
 */
 namespace std
 {
   /** Used to hash elements of type std::pair<>.  This should have been
-  in the standard C++11 */
+  in the standard C++11
+  @see: http://stackoverflow.com/questions/7222143/unordered-map-hash-function-c */
   template<typename S, typename T> struct hash<pair<S, T>>
   {
     inline size_t operator()(const pair<S, T> & v) const

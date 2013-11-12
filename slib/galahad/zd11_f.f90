@@ -131,6 +131,13 @@
 ! Code below by Bob Fischer
 ! This stuff is for interfacing
 
+!> @file
+!! Code used to bind GALAHAD's data structure ZD11_type (sparse matrix
+!! representation) to a C++ peer class.
+!! @see galahad,galahd::qpt_problem_c
+!! @see galahad,galahd::zd11_c
+
+!> Container module for the Fortran peer class.
 module zd11_x
 
 use, intrinsic :: iso_c_binding

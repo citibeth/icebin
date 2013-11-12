@@ -29,7 +29,7 @@ arguments, then other array data types can be converted as needed. */
 
 namespace giss {
 
-/** Converts a std::vector to a Blitz++ 1-D array that shares the same memory. */
+/** Converts a std::vector to a Blitz++ 1-D array that shares the same memory.
 @param vec The input vector */
 template<class T>
 blitz::Array<T,1> vector_to_blitz(std::vector<T> &vec)

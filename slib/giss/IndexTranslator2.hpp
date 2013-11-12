@@ -28,7 +28,11 @@
 
 namespace giss {
 
-/** Used to translated row and column matrix indices between spaces related by removal of dimensions. */
+/** Used to translated row and column matrix indices between spaces
+related by removal of dimensions.  In this case, the two index spaces
+are different.  Space A is two-dimensionsal (<i>i,j</i>) whereas space
+B is one-dimensional (<i>i</i>).  Doing this with a template for the
+general case was not deemed worth the effort at the time. */
 class IndexTranslator2 {
 	std::string _name;	// For debugging
 	std::map<int, size_t> *_size_a;
@@ -48,10 +52,10 @@ public:
 
 	size_t nindex() const { return _size_a->size(); }
 
-	/** @return Size of space A. */
+	/** Size of space A. */
 	size_t na(int index) const { return _size_a->at(index); }
 
-	/** @return Size of space B. */
+	/** Size of space B. */
 	size_t nb() const { return _b2a.size(); }
 
 	/** Convert an index from space A to B.

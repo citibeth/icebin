@@ -27,12 +27,22 @@
 namespace giss {
 
 
-/** An iterator that derferences its result one more time.
-Useful to iterate through colletions of unique_ptr as if
-they're plain values. */
+/**An interator that derferences its result one more time than the
+wrapped iterator.  Implemented as a wrapper.  Useful to iterate
+through colletions of unique_ptr as if they're plain values.  For
+example:
+@code
+ MyIterator ii = ...;
+ DerefIterator<MyIterator> dii(ii);
+ **ii == *dii
+@endcode
+@param IterT The type of iterator to wrap.
+@see RerefIterator
+*/
 template<class IterT>
 class DerefIterator : public IterT {
 public:
+	/** Construct by wrapping an existing iterator */
 	DerefIterator(IterT const &ii) : IterT(ii) {}
 
 	auto operator*() -> decltype(*(this->IterT::operator*()))
@@ -45,10 +55,19 @@ public:
 
 
 /** Opposite of DerefIterator.  Requires one more
-dereference than the wrapped iterator. */
+dereference than the wrapped iterator.  For
+example:
+@code
+ MyIterator ii = ...;
+ RerefIterator<MyIterator> dii(ii);
+ *ii == **dii
+@endcode
+@param IterT The type of iterator to wrap.
+@see DerefIterator */
 template<class IterT>
 class RerefIterator : public IterT {
 public:
+	/** Construct by wrapping an existing iterator */
 	RerefIterator(IterT const &ii) : IterT(ii) {}
 
 	IterT &operator*() { return *this; }
@@ -56,52 +75,104 @@ public:
 };
 
 
+/**Wraps an iterator, accessing the <i>*->second</i> element of
+that iterator.  Useful for iterating over values in a std::map or
+std::unordered_set as if it were a std::vector.
 
+@param SuperT Class that will be wrapped
+@param KeyT The type of <i>SuperT->first</i>
+@param ValT The type of <i>SuperT->second</i>
+*/
 template<class superT, class KeyT, class ValT>
 struct SecondIterator : public superT
 {
+	/** Construct by wrapping an existing iterator */
 	SecondIterator(superT const &ii) : superT(ii) {}
 
+	/** @return the <i>->second</i> item of the underlying iterator. */
 	ValT &operator*() const
 		{ return *(superT::operator*().second); }
+	/** @return the <i>->second</i> item of the underlying iterator. */
 	ValT *operator->() const
 		{ return &*(superT::operator*().second); }
 
+	/** @return the <i>->first</i> item of the underlying iterator. */
 	KeyT const &key() const
 		{ return superT::operator*().first; }
 };
 
+/**A <key, value> collection of unique_ptrs, where dereferencing the unique_ptrs
+is swept under the hood (as compared to standard STL collections)
+@param BaseTpl The template of the underlying collection class.  Could be std::map, std::unordered_set.  Example:
+@code
+ typedef Dict<std::map, int, MyClass> MyDict;
+ MyDict dict;
+ dict.insert(17, std::unique_ptr<MyClass>(new MyClass));
+ for (MyDict::iterator ii = dict.begin(); ii != dict.end(); ++ii) {
+     int key = ii.key():
+     MyClass &item(*ii);
+ }
+ MyClass *p = dict[17];
+@endcode
+This template is normally accessed through MapDict and HashDict, not directly.
+@see MapDict, HashDict */
 template<
 	template<class KeyTT, class ValTT> class BaseTpl,
 	class KeyT, class ValT>
 struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
 {
+	/** The superclass, which is also the underlying class for this wrapper. */
 	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super;
 
+	/** An iterator through the values of this Dict.  Can also be used
+	to get keys via ValIterator.key().
+	 MyDiict::ValIterator ii = myDict.begin();
+	 
+	@see SecondIterator */
 	typedef SecondIterator<typename super::iterator, KeyT, ValT> ValIterator;
+
+	/** Alias ValIterator so this class may be used like a standard
+	STL class when iterating through, completely hiding the use of
+	unique_ptr. */
 	typedef ValIterator iterator;
 	ValIterator begin() { return ValIterator(super::begin()); }
 	ValIterator end() { return ValIterator(super::end()); }
 
+	/** const version of ValIterator.
+	@see ValIteratorIterator */
 	typedef SecondIterator<typename super::const_iterator, KeyT, ValT> const_ValIterator;
+
+	/** Alias const_ValIterator so this class may be used like a standard
+	STL class when iterating through, completely hiding the use of
+	unique_ptr. */
 	typedef const_ValIterator const_iterator;
 	const_ValIterator begin() const { return const_ValIterator(super::begin()); }
 	const_ValIterator end() const { return const_ValIterator(super::end()); }
 
 
-
+	/** Looks up an item in the Dict by key.
+	@return A pointer to the item.  Returns the null pointer if the key does not exist. */
 	ValT *operator[](KeyT const &key) {
 		auto ii = super::find(key);
 		if (ii == super::end()) return 0;
 		return &*(ii->second);
 	}
 
+	/** Looks up an item in the Dict by key.
+	@return A pointer to the item.  Returns the null pointer if the key does not exist. */
 	ValT const *operator[](KeyT const &key) const {
 		auto ii = super::find(key);
 		if (ii == super::end()) return 0;
 		return &*(ii->second);
 	}
 
+	/** Inserts a new <key, value> pair.
+	@param valp A unique_ptr to the value to be inserted.  The Dict
+	takes ownership of the value, leaving the unique_ptr null on exit.
+	@return A pair consisting of a (simple) pointer to the inserted
+	value, and a boolean telling whether or not it was inserted.
+	Analogous to the return values of standard STL insert()
+	methods. */
 	std::pair<ValT *, bool> insert(KeyT const &key, std::unique_ptr<ValT> &&valp) {
 		auto ret = super::insert(std::make_pair(key, std::move(valp)));
 		typename super::iterator nw_it;
@@ -112,6 +183,9 @@ struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
 		return std::make_pair(nw_valp, is_inserted);
 	}
 
+	/** For ValT types that support move semantics... moves the value into
+	a unique_ptr, and then inserts it.
+	@param key The key */
 	std::pair<ValT *, bool> insert(KeyT const &key, ValT &&val) {
 		return insert(key,
 			std::unique_ptr<ValT>(new ValT(std::move(val))));
@@ -124,7 +198,7 @@ private :
 
 public :
 
-	/** @return A sorted set of the elements. */
+	/** @return A sorted vector of (simple pointers to) the values stored in the Dict. */
 	std::vector<ValT *> sorted() const
 	{
 		// Make a vector of pointers
@@ -142,6 +216,9 @@ public :
 };	// class Dict
 
 // -----------------------------------------
+/**Subclass of Dict that creates new elements via new if one attempts to
+access a new key via array indexing [].
+@see Dict */
 template<
 	template<class KeyTT, class ValTT> class BaseTpl,
 	class KeyT, class ValT>
@@ -150,7 +227,8 @@ struct Dict_Create : public Dict<BaseTpl, KeyT, ValT>
 	typedef Dict<BaseTpl, KeyT, ValT> super;
 //	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super2;
 
-	/** Creates elements as you insert them! */
+	/** Access the value of an existing key.  Creates a new item if it
+	does not already exist. */
 	ValT *operator[](KeyT const &key) {
 		auto ii = super::find(key);
 		if (ii == super::end()) {
@@ -164,21 +242,33 @@ struct Dict_Create : public Dict<BaseTpl, KeyT, ValT>
 	}
 };
 // -----------------------------------------
+/**(internal use only) */
 template<class KeyT, class ValT>
 class _MapDict_core : public std::map<KeyT, ValT> {};
 
+/**Equal to Dict<std::map, KeyT, ValT>
+@see Dict */
 template<class KeyT, class ValT>
 class MapDict : public Dict<_MapDict_core, KeyT, ValT> {};
 
+/**Equal to Dict_Create<std::map, KeyT, ValT>
+@see Dict_Create */
 template<class KeyT, class ValT>
 class MapDict_Create : public Dict_Create<_MapDict_core, KeyT, ValT> {};
 // -----------------------------------------
+
+/**(internal use only).  In spite of the name, same as _MapDict_core.
+TODO: Subclass from std::unordered_map, as the nmae implies. */
 template<class KeyT, class ValT>
 class _HashDict_core : public std::map<KeyT, ValT> {};
 
+/**In spite of the name, same as MapDict
+TODO: Subclass from std::unordered_map, as the nmae implies. */
 template<class KeyT, class ValT>
 class HashDict : public Dict<_HashDict_core, KeyT, ValT> {};
 
+/**In spite of the name, same as MapDict_Create
+TODO: Subclass from std::unordered_map, as the nmae implies. */
 template<class KeyT, class ValT>
 class HashDict_Create : public Dict_Create<_HashDict_core, KeyT, ValT> {};
 // -----------------------------------------

@@ -31,6 +31,7 @@ class IndexTranslator {
 	std::vector<int> _a2b;
 	std::vector<int> _b2a;
 public:
+	/** @param name Arbitrary name of the index to be translated, used for error messages. */
 	IndexTranslator(std::string const &name) : _name(name) {}
 
 	/** Set up the translation.
@@ -40,10 +41,10 @@ public:
 	Indices in space B run [0...used.size()-1]. */
 	void init(int size_a, std::set<int> const &used);
 
-	/** @return Size of space A. */
+	/** Size of space A. */
 	int na() const { return _a2b.size(); }
 
-	/** @return Size of space B. */
+	/** Size of space B. */
 	int nb() const { return _b2a.size(); }
 
 	/** Convert an index from space A to B.
