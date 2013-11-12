@@ -389,6 +389,7 @@ public:
 		iterator(ZD11SparseMatrix0 *z, int _i) : parent(z), i(_i) {}
 		bool operator==(iterator const &rhs) { return i == rhs.i; }
 		bool operator!=(iterator const &rhs) { return i != rhs.i; }
+		bool operator<(iterator const &rhs) { return i < rhs.i; }
 		void operator++() { ++i; }
 		int row() { return parent->zd11().row[i] - parent->index_base; }
 		int col() { return parent->zd11().col[i] - parent->index_base; }
@@ -498,6 +499,7 @@ public:
 		iterator(VectorSparseMatrix0 *p, int _i) : parent(p), i(_i) {}
 		bool operator==(iterator const &rhs) const { return i == rhs.i; }
 		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
+		bool operator<(iterator const &rhs) { return i < rhs.i; }
 		void operator++() { ++i; }
 		int row() const { return parent->indx[i] - parent->index_base; }
 		int col() const { return parent->jndx[i] - parent->index_base; }
@@ -647,6 +649,7 @@ public:
 		iterator(BlitzSparseMatrix0 *p, int _i) : parent(p), i(_i) {}
 		bool operator==(iterator const &rhs) const { return i == rhs.i; }
 		bool operator!=(iterator const &rhs) const { return i != rhs.i; }
+		bool operator<(iterator const &rhs) { return i < rhs.i; }
 		void operator++() { ++i; }
 		int row() const { return parent->indx(i) - parent->index_base; }
 		int col() const { return parent->jndx(i) - parent->index_base; }
@@ -1017,7 +1020,7 @@ SparseMatrixT &mat)
 // ===============================================================
 // ======== Extra Functions
 
-extern std::unique_ptr<VectorSparseMatrix> multiply_eigen_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b);
+//extern std::unique_ptr<VectorSparseMatrix> multiply_eigen_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b);
 extern std::unique_ptr<VectorSparseMatrix> multiply_giss_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b);
 
 inline std::unique_ptr<VectorSparseMatrix> multiply(VectorSparseMatrix &a, VectorSparseMatrix &b)

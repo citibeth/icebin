@@ -18,13 +18,13 @@
 
 #include <vector>
 #include <giss/SparseMatrix.hpp>
-#include <giss/eigen.hpp>
+//#include <giss/eigen.hpp>
 
 namespace giss {
 
 // =======================================================================
 
-
+#if 0
 std::unique_ptr<VectorSparseMatrix> multiply_eigen_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b)
 {
         // Get two matrices and convert to Eigen format.
@@ -37,6 +37,7 @@ std::unique_ptr<VectorSparseMatrix> multiply_eigen_algorithm(VectorSparseMatrix 
         // Convert back to GISS format sparse matrices
         return giss::Eigen_to_giss(e_ret);
 }
+#endif
 
 // =======================================================================
 
