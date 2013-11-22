@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     bool iset, bfset;
     ierr = PISMOptionsIsSet("-i", iset); CHKERRQ(ierr);
     ierr = PISMOptionsIsSet("-boot_file", bfset); CHKERRQ(ierr);
-    string usage =
+    std::string usage =
       "  pismr {-i IN.nc|-boot_file IN.nc} [OTHER PISM & PETSc OPTIONS]\n"
       "where:\n"
       "  -i          IN.nc is input file in NetCDF format: contains PISM-written model state\n"
@@ -86,13 +86,14 @@ int main(int argc, char *argv[]) {
     if ((iset == PETSC_FALSE) && (bfset == PETSC_FALSE)) {
       ierr = PetscPrintf(com,
          "\nPISM ERROR: one of options -i,-boot_file is required\n\n"); CHKERRQ(ierr);
-      ierr = show_usage_and_quit(com, "pismr", usage.c_str()); CHKERRQ(ierr);
+      ierr = show_usage_and_quit(com, "pismr", usage); CHKERRQ(ierr);
     } else {
-      vector<string> required;  required.clear();
+      std::vector<std::string> required;  required.clear();
       ierr = show_usage_check_req_opts(com, "pismr", required, usage.c_str()); CHKERRQ(ierr);
     }
 
-    NCConfigVariable config, overrides;
+    PISMUnitSystem unit_system(NULL);
+    NCConfigVariable config(unit_system), overrides(unit_system);
     ierr = init_config(com, rank, config, overrides, true); CHKERRQ(ierr);
 
     IceGrid g(com, rank, size, config);
@@ -105,7 +106,16 @@ printf("end = %f\n", g.time->end());
 
     ierr = m.init(); CHKERRQ(ierr);
 
-    ierr = m.run(); CHKERRQ(ierr);
+
+    ierr = m.init_run(); CHKERRQ(ierr);
+
+//3155692.597470          Natural timestep
+//m.grid.time->set_end(13155700.0);
+	printf("run_to time = %f\n", g.time->current());
+    ierr = m.run_to(2e6); CHKERRQ(ierr);
+	printf("run_to time = %f\n", g.time->current());
+    ierr = m.run_to(1e7); CHKERRQ(ierr);
+	printf("run_to time = %f\n", g.time->current());
 
     ierr = verbPrintf(2,com, "... done with run\n"); CHKERRQ(ierr);
     // provide a default output file name if no -o option is given.

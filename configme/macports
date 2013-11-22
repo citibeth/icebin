@@ -87,5 +87,13 @@ export GSL_LIBS="-L$GSL_HOME/lib -lgslcblas"
 export PISM_SRC=$HOME/git/pism/src
 export PISM_HOME=$HOME/opt/pism
 
+## Production branch PISM
+#export UDUNITS2_CFLAGS="-I $PISM_SRC/udunits"
+#export UDUNITS2_LIBS="-lpismudunits"
+
+# Dev branch PISM
+export UDUNITS2_CFLAGS="-I /opt/local/include/udunits2"
+export UDUNITS2_LIBS="-L/opt/local/lib -ludunits2"
+
 ./configure --prefix=$DEST_PREFIX \
-	--with-galahad  --with-pism
+	--with-galahad --with-pism

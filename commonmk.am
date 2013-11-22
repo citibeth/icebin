@@ -28,7 +28,7 @@ endif
 
 if USE_PISM
 #AM_CPPFLAGS += -DUSE_PISM
-AM_CXXFLAGS += -DUSE_PISM @PETSC_CFLAGS@ -I@PISM_SRC@/base -I@PISM_SRC@/base/stressbalance -I@PISM_SRC@/base/util -I@PISM_SRC@/base/util/io -I@PISM_SRC@/base/energy -I@PISM_SRC@/base/rheology -I@PISM_SRC@/base/basal_strength -I@PISM_SRC@/earth -I@PISM_SRC@/coupler -I@PISM_SRC@/coupler/atmosphere -I@PISM_SRC@/coupler/surface -I@PISM_SRC@/coupler/ocean -I@PISM_SRC@/coupler/util -I@PISM_SRC@/udunits
-AM_LDFLAGS += @PETSC_LIBS@ -L@PISM_HOME@/lib/pism -lpismbase -lpismearth -lpismboundary -lpismstressbalance -lpismflowlaws -lpismutil -lpismudunits @PISM_SRC@/../build/src/libpismrevision.a @GSL_LIBS@
+AM_CXXFLAGS += -DUSE_PISM @PETSC_CFLAGS@ -I@PISM_SRC@/base -I@PISM_SRC@/base/stressbalance -I@PISM_SRC@/base/util -I@PISM_SRC@/base/util/io -I@PISM_SRC@/base/energy -I@PISM_SRC@/base/rheology -I@PISM_SRC@/base/basal_strength -I@PISM_SRC@/earth -I@PISM_SRC@/coupler -I@PISM_SRC@/coupler/atmosphere -I@PISM_SRC@/coupler/surface -I@PISM_SRC@/coupler/ocean -I@PISM_SRC@/coupler/util @UDUNITS2_CFLAGS@
+AM_LDFLAGS += @PETSC_LIBS@ -L@PISM_HOME@/lib/pism -lpismbase -lpismearth -lpismboundary -lpismstressbalance -lpismflowlaws -lpismutil @UDUNITS2_LIBS@ @PISM_SRC@/../build/src/libpismrevision.a @GSL_LIBS@
 # libdev_la_SOURCES += png.c     # For use in individual makefiles
 endif
