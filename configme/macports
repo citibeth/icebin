@@ -1,6 +1,9 @@
 #!/bin/sh
 #
 
+# Uncomment this line if you have MacPorts in the standard location
+#export MACPORTS=/opt/local
+
 DEST_PREFIX=$HOME/opt/glint2
 
 ## ----- Where is your GALAHAD installation?
@@ -15,51 +18,53 @@ export GALAHAD_LIB_DIR="$GALAHAD_HOME/objects/$GALAHAD_ARCH/double"
 # installed via MacPorts.
 
 # Which python we want to use --- whether it's the default, or some other
-export PYTHON=/opt/local/bin/python
+export PYTHON=$MACPORTS/bin/python
 
-export EIGEN_DIR="/opt/local/include/eigen3"
-export EIGEN_CFLAGS="-I $EIGEN_DIR"
+export EIGEN_DIR="$MACPORTS/include/eigen3"
+export EIGEN_CFLAGS="-I$EIGEN_DIR"
 export EIGEN_LIBS=""
 
 #NETCDF_HOME=$HOME/opt/netcdf-4.1.3
-NETCDF_HOME=/opt/local
-export NETCDF_CFLAGS="-I $NETCDF_HOME/include"
+NETCDF_HOME=$MACPORTS
+export NETCDF_CFLAGS="-I$NETCDF_HOME/include"
 export NETCDF_LIBS="-L$NETCDF_HOME/lib -lnetcdf"
 
 #NETCDFF_HOME=$HOME/opt/netcdf-fortran
-NETCDFF_HOME=/opt/local
-export NETCDFF_CFLAGS="-I $NETCDFF_HOME/include"
+NETCDFF_HOME=$MACPORTS
+export NETCDFF_CFLAGS="-I$NETCDFF_HOME/include"
 export NETCDFF_LIBS="-L$NETCDFF_HOME/lib -lnetcdff"
 
-export NETCDFCXX_HOME=/opt/local
+export NETCDFCXX_HOME=$MACPORTS
 export NETCDFCXX_CFLAGS="-I$NETCDFCXX_HOME/include"
 export NETCDFCXX_LIBS="""-L$NETCDFCXX_HOME/lib -lnetcdf_c++"
 
-MPI_HOME=$HOME/opt/openmpi-1.6.4
-export MPI_INCLUDE="$MPI_HOME/include"
-export MPI_CFLAGS="-I $MPI_INCLUDE"
+#MPI_HOME=$HOME/opt/openmpi-1.6.4
+MPI_HOME=$MACPORTS
+export MPI_INCLUDE="$MPI_HOME/include/openmpi"
+export MPI_CFLAGS="-I$MPI_INCLUDE"
 export MPI_LIBS="-L$MPI_HOME/lib -lmpi -lmpi_cxx"
 
-export PROJ_HOME=/opt/local
-export PROJ_CFLAGS="-I $PROJ_HOME/include"
+export PROJ_HOME=$MACPORTS
+export PROJ_CFLAGS="-I$PROJ_HOME/include"
 export PROJ_LIBS="-L$PROJ_HOME/lib -lproj"
 
-BLITZ_HOME=/opt/local
-export BLITZ_CFLAGS="-I $BLITZ_HOME/include"
+BLITZ_HOME=$MACPORTS
+export BLITZ_CFLAGS="-I$BLITZ_HOME/include"
 export BLITZ_LIBS="-L$BLITZ_HOME/lib -lblitz"
 
 
-GMP_HOME=/opt/local
-export GMP_CFLAGS="-I $GMP_HOME/include"
+GMP_HOME=$MACPORTS
+export GMP_CFLAGS="-I$GMP_HOME/include"
 export GMP_LIBS="-L$GMP_HOME/lib -lgmp"
 
-MPFR_HOME=/opt/local
-export MPFR_CFLAGS="-I $MPFR_HOME/include"
+MPFR_HOME=$MACPORTS
+export MPFR_CFLAGS="-I$MPFR_HOME/include"
 export MPFR_LIBS="-L$MPFR_HOME/lib -lmpfr"
 
-export CGAL_HOME=/opt/local
-export CGAL_CFLAGS="-I $CGAL_HOME/include"
+export CGAL_HOME=$HOME/opt/cgal-4.3
+export CGAL_CFLAGS="-I$CGAL_HOME/include"
 export CGAL_LIBS="-L$CGAL_HOME/lib -lCGAL"
+#export CGAL_LIBS="$CGAL_HOME/lib/libCGAL.dylib"
 
 
 # Link fortran libraries into Python extension.  Other linking steps are
@@ -71,29 +76,33 @@ export FORTRAN_LIBS="-lgfortran"
 # -fp-model strict for intel
 export CPPFLAGS="-frounding-math"
 
-PETSC_HOME=$HOME/opt/petsc-3.3-p7
+PETSC_HOME=$HOME/opt/petsc-3.4.3
 PETSC_ARCH=$PETSC_HOME/arch-darwin-c-opt
 export PETSC_CFLAGS="-I$PETSC_ARCH/include -I$PETSC_HOME/include"
 export PETSC_LIBS="-L$PETSC_ARCH/lib -lpetsc"
 
-export FFTW_HOME=/opt/local
-export FFTW_CFLAGS="-I $FFTW_HOME/include"
+export FFTW_HOME=$MACPORTS
+export FFTW_CFLAGS="-I$FFTW_HOME/include"
 export FFTW_LIBS="-L$FFTW_HOME/lib -lfftw3"
 
-export GSL_HOME=/opt/local
-export GSL_CFLAGS="-I $GSL_HOME/include"
+export GSL_HOME=$MACPORTS
+export GSL_CFLAGS="-I$GSL_HOME/include"
 export GSL_LIBS="-L$GSL_HOME/lib -lgslcblas"
 
 export PISM_SRC=$HOME/git/pism/src
 export PISM_HOME=$HOME/opt/pism
 
 ## Production branch PISM
-#export UDUNITS2_CFLAGS="-I $PISM_SRC/udunits"
+#export UDUNITS2_CFLAGS="-I$PISM_SRC/udunits"
 #export UDUNITS2_LIBS="-lpismudunits"
 
 # Dev branch PISM
-export UDUNITS2_CFLAGS="-I /opt/local/include/udunits2"
-export UDUNITS2_LIBS="-L/opt/local/lib -ludunits2"
+export UDUNITS2_CFLAGS="-I$MACPORTS/include/udunits2"
+export UDUNITS2_LIBS="-L$MACPORTS/lib -ludunits2"
+
+# Needed for Boost
+BOOST_HOME=$HOME/opt/boost-1.55.0
 
 ./configure --prefix=$DEST_PREFIX \
+	--with-boost=$BOOST_HOME \
 	--with-galahad --with-pism

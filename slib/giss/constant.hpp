@@ -22,7 +22,13 @@
 
 namespace giss {
 
+// Radians <--> Degrees
 const double D2R = M_PI / 180.0;
 const double R2D = 180.0 / M_PI;
+
+// Kelvin <--> Celsius
+const double K2C = -273.15;
+const double C2K = 273.15;
+
 
 }

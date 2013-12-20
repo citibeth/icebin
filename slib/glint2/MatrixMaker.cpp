@@ -55,7 +55,7 @@ void MatrixMaker::realize() {
 		sheet->realize();
 
 	// ------------- Set up HCIndex
-	hc_index = HCIndex::new_HCIndex(_hptype, *this);
+	hc_index = HCIndex::new_HCIndex(_hc_index_type, *this);
 }
 
 int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet)
@@ -818,7 +818,7 @@ printf("MatrixMaker::netcdf_define(%s) (BEGIN)\n", vname.c_str());
 	// ------ Attributes
 	auto one_dim = giss::get_or_add_dim(nc, "one", 1);
 	NcVar *info_var = nc.add_var((vname + ".info").c_str(), ncInt, one_dim);
-	info_var->add_att("hptype", _hptype.str());
+	info_var->add_att("hc_index_type", _hc_index_type.str());
 
 	// Names of the ice sheets
 	std::string sheet_names = "";
@@ -906,8 +906,8 @@ printf("2 Set mask1 = %p\n", mask1.get());
 	// Read list of ice sheets
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 
-	std::string shptype(giss::get_att(info_var, "hptype")->as_string(0));
-	_hptype = giss::parse_enum<HCIndex::Type>(shptype.c_str());
+	std::string shc_index_type(giss::get_att(info_var, "hc_index_type")->as_string(0));
+	_hc_index_type = giss::parse_enum<HCIndex::Type>(shc_index_type.c_str());
 
 
 	std::vector<std::string> sheet_names = parse_comma_list(std::string(

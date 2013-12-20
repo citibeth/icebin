@@ -23,15 +23,16 @@
 #include <glint2/HCIndex.hpp>
 #include <glint2/modele/glint2_modele.hpp>
 #include <glint2/IceModel_TConv.hpp>
+#include <boost/filesystem.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
 
 // ---------------------------------------------------
 
-/** @param spec  */
+/** @param glint2_config_fname_f Name of GLINT2 configuration file */
 extern "C" glint2_modele *glint2_modele_new(
-	char const *maker_fname_f, int maker_fname_len,
+	char const *glint2_config_fname_f, int glint2_config_fname_len,
 	char const *maker_vname_f, int maker_vname_len,
 
 	// Info about the global grid
@@ -42,21 +43,31 @@ extern "C" glint2_modele *glint2_modele_new(
 	int i0, int i1, int j0, int j1,
 	int j0s, int j1s,
 
+	// Info about size of a timestep
+	double dtsrc,
+
 	// MPI Stuff
 	int comm_f, int root,
 
-	// Constants from ModelE
+	// Constants passed in directly from ModelE
 	double LHM, double SHI)
 {
 	printf("***** BEGIN glint2_modele()\n");
 
 	// Convert Fortran arguments
-	std::string maker_fname(maker_fname_f, maker_fname_len);
+	std::string glint2_config_fname(glint2_config_fname_f, glint2_config_fname_len);
 	std::string maker_vname(maker_vname_f, maker_vname_len);
+
+	// Parse directory out of glint2_config_fname
+printf("glint2_config_fname = %s\n", glint2_config_fname.c_str());
+	boost::filesystem::path glint2_config_dir(boost::filesystem::path(glint2_config_fname).parent_path());
+std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 
 	// Allocate our return variable
 	std::unique_ptr<glint2_modele> api(new glint2_modele());
+	api->dtsrc = dtsrc;
 
+#if 1
 	// Set up the domain
 	std::unique_ptr<GridDomain> mdomain(
 		new ModelEDomain(im, jm,
@@ -68,17 +79,19 @@ extern "C" glint2_modele *glint2_modele_new(
 	// Load the MatrixMaker	(filtering by our domain, of course)
 	// Also load the ice sheets
 	api->maker.reset(new MatrixMaker(true, std::move(mdomain)));
-	NcFile nc(maker_fname.c_str(), NcFile::ReadOnly);
-	api->maker->read_from_netcdf(nc, maker_vname);
+	NcFile glint2_config_nc(glint2_config_fname.c_str(), NcFile::ReadOnly);
+	api->maker->read_from_netcdf(glint2_config_nc, maker_vname);
 	api->maker->realize();
 
 	// Read the coupler, along with ice model proxies
-	api->gcm_coupler.reset(new GCMCoupler_MPI(MPI_Comm_f2c(comm_f), root));
-	api->gcm_coupler->read_from_netcdf(nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
-	nc.close();
+	api->gcm_coupler.reset(new GCMCoupler(MPI_Comm_f2c(comm_f), root));
+	api->gcm_coupler->read_from_netcdf(glint2_config_dir, glint2_config_nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
+	glint2_config_nc.close();
 
 	// TODO: Test that im and jm are consistent with the grid read.
+#endif
 
+#if 1
 	// Add adapters to the ice models, if needed
 	for (auto ii=api->gcm_coupler->models.super::begin();
 		ii != api->gcm_coupler->models.super::end(); ++ii)
@@ -97,12 +110,14 @@ extern "C" glint2_modele *glint2_modele_new(
 				LHM, SHI));
 		}
 	}
+#endif
 
-
-	printf("***** END glint2_modele()\n");
+	printf("***** END glint2_modele_new()\n");
 
 	// No exception, we can release our pointer back to Fortran
-	return api.release();
+	glint2_modele *ret = api.release();
+	printf("***** END glint2_modele_new (for real) %p\n", ret);
+	return ret;
 }
 // -----------------------------------------------------
 extern "C" void glint2_modele_delete(glint2_modele *&api)
@@ -465,14 +480,14 @@ printf("END glint2_modele_init_hp_to_ices\n");
 /** @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide. */
 extern "C"
-void glint2_modele_couple_to_ice_c(
+void  glint2_modele_couple_to_ice_c(
 glint2_modele *api,
 int itime,
 giss::F90Array<double,3> &smb1h_f,
 giss::F90Array<double,3> &seb1h_f,
 giss::F90Array<double,3> &tg21h_f)
 {
-	GCMCoupler_MPI &coupler(*api->gcm_coupler);
+	GCMCoupler &coupler(*api->gcm_coupler);
 int rank = coupler.rank();	// debugging
 
 	std::vector<IceField> fields =
@@ -487,12 +502,14 @@ int rank = coupler.rank();	// debugging
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
 	int nele_l = 0; //api->maker->ice_matrices_size();
+printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %d\n", api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
 		nele_l += ii->second.size();
 	}
 
 	// Allocate buffer for that amount of stuff
 	int nfields = fields.size();
+printf("glint2_modele_couple_to_ice_c(): nfields=%d, nele_l = %d\n", nfields, nele_l);
 	giss::DynArray<SMBMsg> sbuf(SMBMsg::size(nfields), nele_l);
 
 	// Fill it in by doing a sparse multiply...
@@ -532,5 +549,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		throw std::exception();
 	}
 
-	coupler.couple_to_ice(itime, fields, sbuf);
+	double time_s = itime * api->dtsrc;
+printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itime, time_s, api->dtsrc);
+	coupler.couple_to_ice(time_s, fields, sbuf);
 }

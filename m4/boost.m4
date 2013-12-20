@@ -1,5 +1,5 @@
 # boost.m4: Locate Boost headers and libraries for autoconf-based projects.
-# Copyright (C) 2007, 2008, 2009, 2010, 2011  Benoit Sigoure <tsuna@lrde.epita.fr>
+# Copyright (C) 2007, 2008, 2009, 2010, 2011 Benoit Sigoure <tsuna@lrde.epita.fr>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,45 +15,45 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 m4_define([_BOOST_SERIAL], [m4_translit([
-# serial 16
+# serial 18
 ], [#
 ], [])])
 
 # Original sources can be found at http://github.com/tsuna/boost.m4
 # You can fetch the latest version of the script by doing:
-#   wget http://github.com/tsuna/boost.m4/raw/master/build-aux/boost.m4
+# wget http://github.com/tsuna/boost.m4/raw/master/build-aux/boost.m4
 
 # ------ #
 # README #
 # ------ #
 
 # This file provides several macros to use the various Boost libraries.
-# The first macro is BOOST_REQUIRE.  It will simply check if it's possible to
+# The first macro is BOOST_REQUIRE. It will simply check if it's possible to
 # find the Boost headers of a given (optional) minimum version and it will
-# define BOOST_CPPFLAGS accordingly.  It will add an option --with-boost to
+# define BOOST_CPPFLAGS accordingly. It will add an option --with-boost to
 # your configure so that users can specify non standard locations.
 # If the user's environment contains BOOST_ROOT and --with-boost was not
 # specified, --with-boost=$BOOST_ROOT is implicitly used.
 # For more README and documentation, go to http://github.com/tsuna/boost.m4
-# Note: THESE MACROS ASSUME THAT YOU USE LIBTOOL.  If you don't, don't worry,
+# Note: THESE MACROS ASSUME THAT YOU USE LIBTOOL. If you don't, don't worry,
 # simply read the README, it will show you what to do step by step.
 
 m4_pattern_forbid([^_?(BOOST|Boost)_])
 
 
 # _BOOST_SED_CPP(SED-PROGRAM, PROGRAM,
-#                [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
+# [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
 # --------------------------------------------------------
 # Same as AC_EGREP_CPP, but leave the result in conftest.i.
 #
-# SED-PROGRAM is *not* overquoted, as in AC_EGREP_CPP.  It is expanded
+# SED-PROGRAM is *not* overquoted, as in AC_EGREP_CPP. It is expanded
 # in double-quotes, so escape your double quotes.
 #
 # It could be useful to turn this into a macro which extracts the
@@ -65,9 +65,9 @@ AC_LANG_CONFTEST([AC_LANG_SOURCE([[$2]])])
 AS_IF([dnl eval is necessary to expand ac_cpp.
 dnl Ultrix and Pyramid sh refuse to redirect output of eval, so use subshell.
 dnl Beware of Windows end-of-lines, for instance if we are running
-dnl some Windows programs under Wine.  In that case, boost/version.hpp
+dnl some Windows programs under Wine. In that case, boost/version.hpp
 dnl is certainly using "\r\n", but the regular Unix shell will only
-dnl strip `\n' with backquotes, not the `\r'.  This results in
+dnl strip `\n' with backquotes, not the `\r'. This results in
 dnl boost_cv_lib_version='1_37\r' for instance, which breaks
 dnl everything else.
 dnl Cannot use 'dnl' after [$4] because a trailing dnl may break AC_CACHE_CHECK
@@ -83,12 +83,12 @@ rm -rf conftest*
 
 # BOOST_REQUIRE([VERSION], [ACTION-IF-NOT-FOUND])
 # -----------------------------------------------
-# Look for Boost.  If version is given, it must either be a literal of the form
+# Look for Boost. If version is given, it must either be a literal of the form
 # "X.Y.Z" where X, Y and Z are integers (the ".Z" part being optional) or a
 # variable "$var".
-# Defines the value BOOST_CPPFLAGS.  This macro only checks for headers with
+# Defines the value BOOST_CPPFLAGS. This macro only checks for headers with
 # the required version, it does not check for any of the Boost libraries.
-# On # success, defines HAVE_BOOST.  On failure, calls the optional
+# On # success, defines HAVE_BOOST. On failure, calls the optional
 # ACTION-IF-NOT-FOUND action if one was supplied.
 # Otherwise aborts with an error message.
 AC_DEFUN([BOOST_REQUIRE],
@@ -136,18 +136,18 @@ m4_pattern_allow([^BOOST_VERSION$])dnl
     case $with_boost in #(
       ''|yes) set x '' /opt/local/include /usr/local/include /opt/include \
                  /usr/include C:/Boost/include;; #(
-      *)      set x "$with_boost/include" "$with_boost";;
+      *) set x "$with_boost/include" "$with_boost";;
     esac
     shift
     for boost_dir
     do
     # Without --layout=system, Boost (or at least some versions) installs
-    # itself in <prefix>/include/boost-<version>.  This inner loop helps to
+    # itself in <prefix>/include/boost-<version>. This inner loop helps to
     # find headers in such directories.
     #
     # Any ${boost_dir}/boost-x_xx directories are searched in reverse version
-    # order followed by ${boost_dir}.  The final '.' is a sentinel for
-    # searching $boost_dir" itself.  Entries are whitespace separated.
+    # order followed by ${boost_dir}. The final '.' is a sentinel for
+    # searching $boost_dir" itself. Entries are whitespace separated.
     #
     # I didn't indent this loop on purpose (to avoid over-indented code)
     boost_layout_system_search_list=`cd "$boost_dir" 2>/dev/null \
@@ -163,12 +163,12 @@ m4_pattern_allow([^BOOST_VERSION$])dnl
       if test x"$boost_inc" != x; then
         # We are going to check whether the version of Boost installed
         # in $boost_inc is usable by running a compilation that
-        # #includes it.  But if we pass a -I/some/path in which Boost
+        # #includes it. But if we pass a -I/some/path in which Boost
         # is not installed, the compiler will just skip this -I and
         # use other locations (either from CPPFLAGS, or from its list
-        # of system include directories).  As a result we would use
+        # of system include directories). As a result we would use
         # header installed on the machine instead of the /some/path
-        # specified by the user.  So in that precise case (trying
+        # specified by the user. So in that precise case (trying
         # $boost_inc), make sure the version.hpp exists.
         #
         # Use test -e as there can be symlinks.
@@ -189,7 +189,7 @@ AC_LANG_POP([C++])dnl
     case $boost_cv_inc_path in #(
       no)
         boost_errmsg="cannot find Boost headers version >= $boost_version_req_string"
-        m4_if([$2], [],  [AC_MSG_ERROR([$boost_errmsg])],
+        m4_if([$2], [], [AC_MSG_ERROR([$boost_errmsg])],
                         [AC_MSG_NOTICE([$boost_errmsg])])
         $2
         ;;#(
@@ -227,20 +227,20 @@ CPPFLAGS=$boost_save_CPPFLAGS
 # on the command line, static versions of the libraries will be looked up.
 AC_DEFUN([BOOST_STATIC],
   [AC_ARG_ENABLE([static-boost],
-     [AC_HELP_STRING([--enable-static-boost],
+     [AS_HELP_STRING([--enable-static-boost],
                [Prefer the static boost libraries over the shared ones [no]])],
      [enable_static_boost=yes],
      [enable_static_boost=no])])# BOOST_STATIC
 
 # BOOST_FIND_HEADER([HEADER-NAME], [ACTION-IF-NOT-FOUND], [ACTION-IF-FOUND])
 # --------------------------------------------------------------------------
-# Wrapper around AC_CHECK_HEADER for Boost headers.  Useful to check for
+# Wrapper around AC_CHECK_HEADER for Boost headers. Useful to check for
 # some parts of the Boost library which are only made of headers and don't
 # require linking (such as Boost.Foreach).
 #
 # Default ACTION-IF-NOT-FOUND: Fail with a fatal error unless Boost couldn't be
 # found in the first place, in which case by default a notice is issued to the
-# user.  Presumably if we haven't died already it's because it's OK to not have
+# user. Presumably if we haven't died already it's because it's OK to not have
 # Boost, which is why only a notice is issued instead of a hard error.
 #
 # Default ACTION-IF-FOUND: define the preprocessor symbol HAVE_<HEADER-NAME> in
@@ -265,25 +265,25 @@ fi
 
 
 # BOOST_FIND_LIB([LIB-NAME], [PREFERRED-RT-OPT], [HEADER-NAME], [CXX-TEST],
-#                [CXX-PROLOGUE])
+# [CXX-PROLOGUE])
 # -------------------------------------------------------------------------
 # Look for the Boost library LIB-NAME (e.g., LIB-NAME = `thread', for
-# libboost_thread).  Check that HEADER-NAME works and check that
-# libboost_LIB-NAME can link with the code CXX-TEST.  The optional argument
+# libboost_thread). Check that HEADER-NAME works and check that
+# libboost_LIB-NAME can link with the code CXX-TEST. The optional argument
 # CXX-PROLOGUE can be used to include some C++ code before the `main'
 # function.
 #
 # Invokes BOOST_FIND_HEADER([HEADER-NAME]) (see above).
 #
 # Boost libraries typically come compiled with several flavors (with different
-# runtime options) so PREFERRED-RT-OPT is the preferred suffix.  A suffix is one
-# or more of the following letters: sgdpn (in that order).  s = static
+# runtime options) so PREFERRED-RT-OPT is the preferred suffix. A suffix is one
+# or more of the following letters: sgdpn (in that order). s = static
 # runtime, d = debug build, g = debug/diagnostic runtime, p = STLPort build,
 # n = (unsure) STLPort build without iostreams from STLPort (it looks like `n'
-# must always be used along with `p').  Additionally, PREFERRED-RT-OPT can
+# must always be used along with `p'). Additionally, PREFERRED-RT-OPT can
 # start with `mt-' to indicate that there is a preference for multi-thread
-# builds.  Some sample values for PREFERRED-RT-OPT: (nothing), mt, d, mt-d, gdp
-# ...  If you want to make sure you have a specific version of Boost
+# builds. Some sample values for PREFERRED-RT-OPT: (nothing), mt, d, mt-d, gdp
+# ... If you want to make sure you have a specific version of Boost
 # (eg, >= 1.33) you *must* invoke BOOST_REQUIRE before this macro.
 AC_DEFUN([BOOST_FIND_LIB],
 [AC_REQUIRE([BOOST_REQUIRE])dnl
@@ -302,11 +302,11 @@ AS_VAR_PUSHDEF([Boost_lib_LIBS], [boost_cv_lib_$1_LIBS])dnl
 BOOST_FIND_HEADER([$3])
 boost_save_CPPFLAGS=$CPPFLAGS
 CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
-# Now let's try to find the library.  The algorithm is as follows: first look
-# for a given library name according to the user's PREFERRED-RT-OPT.  For each
+# Now let's try to find the library. The algorithm is as follows: first look
+# for a given library name according to the user's PREFERRED-RT-OPT. For each
 # library name, we prefer to use the ones that carry the tag (toolset name).
 # Each library is searched through the various standard paths were Boost is
-# usually installed.  If we can't find the standard variants, we try to
+# usually installed. If we can't find the standard variants, we try to
 # enforce -mt (for instance on MacOSX, libboost_threads.dylib doesn't exist
 # but there's -obviously- libboost_threads-mt.dylib).
 AC_CACHE_CHECK([for the Boost $1 library], [Boost_lib],
@@ -337,17 +337,17 @@ AC_CACHE_CHECK([for the Boost $1 library], [Boost_lib],
   # Generate the test file.
   AC_LANG_CONFTEST([AC_LANG_PROGRAM([#include <$3>
 $5], [$4])])
-dnl Optimization hacks: compiling C++ is slow, especially with Boost.  What
+dnl Optimization hacks: compiling C++ is slow, especially with Boost. What
 dnl we're trying to do here is guess the right combination of link flags
-dnl (LIBS / LDFLAGS) to use a given library.  This can take several
-dnl iterations before it succeeds and is thus *very* slow.  So what we do
+dnl (LIBS / LDFLAGS) to use a given library. This can take several
+dnl iterations before it succeeds and is thus *very* slow. So what we do
 dnl instead is that we compile the code first (and thus get an object file,
-dnl typically conftest.o).  Then we try various combinations of link flags
-dnl until we succeed to link conftest.o in an executable.  The problem is
+dnl typically conftest.o). Then we try various combinations of link flags
+dnl until we succeed to link conftest.o in an executable. The problem is
 dnl that the various TRY_LINK / COMPILE_IFELSE macros of Autoconf always
-dnl remove all the temporary files including conftest.o.  So the trick here
+dnl remove all the temporary files including conftest.o. So the trick here
 dnl is to temporarily change the value of ac_objext so that conftest.o is
-dnl preserved accross tests.  This is obviously fragile and I will burn in
+dnl preserved accross tests. This is obviously fragile and I will burn in
 dnl hell for not respecting Autoconf's documented interfaces, but in the
 dnl mean time, it optimizes the macro by a factor of 5 to 30.
 dnl Another small optimization: the first argument of AC_COMPILE_IFELSE left
@@ -403,7 +403,25 @@ dnl generated only once above (before we start the for loops).
       LDFLAGS=$boost_save_LDFLAGS
       LIBS=$boost_save_LIBS
       if test x"$Boost_lib" = xyes; then
-        Boost_lib_LDFLAGS="-L$boost_ldpath -Wl,-rpath $boost_ldpath"
+        # Check or used cached result of whether or not using -R or -rpath makes sense.
+        # Some implementations of ld, such as for Mac OSX, require -rpath but
+        # -R is the flag known to work on other systems.
+        # https://github.com/tsuna/boost.m4/issues/19
+        AC_CACHE_VAL([boost_cv_rpath_link_ldflag],
+          [for boost_cv_rpath_link_ldflag in -Wl,-R, -Wl,-rpath,; do
+            LDFLAGS="$boost_save_LDFLAGS -L$boost_ldpath $boost_cv_rpath_link_ldflag$boost_ldpath"
+            LIBS="$boost_save_LIBS $Boost_lib_LIBS"
+            _BOOST_AC_LINK_IFELSE([],
+              [boost_rpath_link_ldflag_found=yes
+              break],
+              [boost_rpath_link_ldflag_found=no])
+          done
+          AS_IF([test "x$boost_rpath_link_ldflag_found" != "xyes"],
+            [AC_MSG_ERROR([Unable to determine whether to use -R or -rpath])])
+          LDFLAGS=$boost_save_LDFLAGS
+          LIBS=$boost_save_LIBS
+          ])
+        Boost_lib_LDFLAGS="-L$boost_ldpath $boost_cv_rpath_link_ldflag$boost_ldpath"
         Boost_lib_LDPATH="$boost_ldpath"
         break 6
       else
@@ -484,8 +502,8 @@ BOOST_DEFUN([Bind],
 # ------------------
 # Look for Boost.Chrono
 BOOST_DEFUN([Chrono],
-[# Do we have to check for Boost.System?  This link-time dependency was
-# added as of 1.35.0.  If we have a version <1.35, we must not attempt to
+[# Do we have to check for Boost.System? This link-time dependency was
+# added as of 1.35.0. If we have a version <1.35, we must not attempt to
 # find Boost.System as it didn't exist by then.
 if test $boost_major_version -ge 135; then
 BOOST_SYSTEM([$1])
@@ -516,9 +534,17 @@ BOOST_FIND_HEADER([boost/lexical_cast.hpp])
 ])# BOOST_CONVERSION
 
 
+# BOOST_CRC()
+# -----------
+# Look for Boost.CRC
+BOOST_DEFUN([CRC],
+[BOOST_FIND_HEADER([boost/crc.hpp])
+])# BOOST_CRC
+
+
 # BOOST_DATE_TIME([PREFERRED-RT-OPT])
 # -----------------------------------
-# Look for Boost.Date_Time.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.Date_Time. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Date_Time],
 [BOOST_FIND_LIB([date_time], [$1],
@@ -529,13 +555,13 @@ BOOST_DEFUN([Date_Time],
 
 # BOOST_FILESYSTEM([PREFERRED-RT-OPT])
 # ------------------------------------
-# Look for Boost.Filesystem.  For the documentation of PREFERRED-RT-OPT, see
+# Look for Boost.Filesystem. For the documentation of PREFERRED-RT-OPT, see
 # the documentation of BOOST_FIND_LIB above.
 # Do not check for boost/filesystem.hpp because this file was introduced in
 # 1.34.
 BOOST_DEFUN([Filesystem],
-[# Do we have to check for Boost.System?  This link-time dependency was
-# added as of 1.35.0.  If we have a version <1.35, we must not attempt to
+[# Do we have to check for Boost.System? This link-time dependency was
+# added as of 1.35.0. If we have a version <1.35, we must not attempt to
 # find Boost.System as it didn't exist by then.
 if test $boost_major_version -ge 135; then
 BOOST_SYSTEM([$1])
@@ -566,9 +592,9 @@ BOOST_DEFUN([Foreach],
 # --------------
 # Look for Boost.Format
 # Note: we can't check for boost/format/format_fwd.hpp because the header isn't
-# standalone.  It can't be compiled because it triggers the following error:
+# standalone. It can't be compiled because it triggers the following error:
 # boost/format/detail/config_macros.hpp:88: error: 'locale' in namespace 'std'
-#                                                  does not name a type
+# does not name a type
 BOOST_DEFUN([Format],
 [BOOST_FIND_HEADER([boost/format.hpp])])
 
@@ -580,9 +606,17 @@ BOOST_DEFUN([Function],
 [BOOST_FIND_HEADER([boost/function.hpp])])
 
 
+# BOOST_GEOMETRY()
+# ----------------
+# Look for Boost.Geometry (new since 1.47.0).
+BOOST_DEFUN([Geometry],
+[BOOST_FIND_HEADER([boost/geometry.hpp])
+])# BOOST_GEOMETRY
+
+
 # BOOST_GRAPH([PREFERRED-RT-OPT])
 # -------------------------------
-# Look for Boost.Graphs.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.Graphs. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Graph],
 [BOOST_FIND_LIB([graph], [$1],
@@ -592,7 +626,7 @@ BOOST_DEFUN([Graph],
 
 # BOOST_IOSTREAMS([PREFERRED-RT-OPT])
 # -----------------------------------
-# Look for Boost.IOStreams.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.IOStreams. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([IOStreams],
 [BOOST_FIND_LIB([iostreams], [$1],
@@ -644,7 +678,7 @@ BOOST_FIND_LIB([log_setup], [$1],
 # TODO: This library isn't header-only but it comes in multiple different
 # flavors that don't play well with BOOST_FIND_LIB (e.g, libboost_math_c99,
 # libboost_math_c99f, libboost_math_c99l, libboost_math_tr1,
-# libboost_math_tr1f, libboost_math_tr1l).  This macro must be fixed to do the
+# libboost_math_tr1f, libboost_math_tr1l). This macro must be fixed to do the
 # right thing anyway.
 BOOST_DEFUN([Math],
 [BOOST_FIND_HEADER([boost/math/special_functions.hpp])])
@@ -695,7 +729,7 @@ BOOST_DEFUN([Uuid],
 
 # BOOST_PROGRAM_OPTIONS([PREFERRED-RT-OPT])
 # -----------------------------------------
-# Look for Boost.Program_options.  For the documentation of PREFERRED-RT-OPT,
+# Look for Boost.Program_options. For the documentation of PREFERRED-RT-OPT,
 # see the documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Program_Options],
 [BOOST_FIND_LIB([program_options], [$1],
@@ -718,12 +752,12 @@ $1="$$1 $BOOST_PYTHON_$1"])
 
 # BOOST_PYTHON([PREFERRED-RT-OPT])
 # --------------------------------
-# Look for Boost.Python.  For the documentation of PREFERRED-RT-OPT,
+# Look for Boost.Python. For the documentation of PREFERRED-RT-OPT,
 # see the documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Python],
 [_BOOST_PYTHON_CONFIG([CPPFLAGS], [includes])
-_BOOST_PYTHON_CONFIG([LDFLAGS],   [ldflags])
-_BOOST_PYTHON_CONFIG([LIBS],      [libs])
+_BOOST_PYTHON_CONFIG([LDFLAGS], [ldflags])
+_BOOST_PYTHON_CONFIG([LIBS], [libs])
 m4_pattern_allow([^BOOST_PYTHON_MODULE$])dnl
 BOOST_FIND_LIB([python], [$1],
                [boost/python.hpp],
@@ -743,7 +777,7 @@ BOOST_DEFUN([Ref],
 
 # BOOST_REGEX([PREFERRED-RT-OPT])
 # -------------------------------
-# Look for Boost.Regex.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.Regex. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Regex],
 [BOOST_FIND_LIB([regex], [$1],
@@ -754,7 +788,7 @@ BOOST_DEFUN([Regex],
 
 # BOOST_SERIALIZATION([PREFERRED-RT-OPT])
 # ---------------------------------------
-# Look for Boost.Serialization.  For the documentation of PREFERRED-RT-OPT, see
+# Look for Boost.Serialization. For the documentation of PREFERRED-RT-OPT, see
 # the documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Serialization],
 [BOOST_FIND_LIB([serialization], [$1],
@@ -766,13 +800,21 @@ BOOST_DEFUN([Serialization],
 
 # BOOST_SIGNALS([PREFERRED-RT-OPT])
 # ---------------------------------
-# Look for Boost.Signals.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.Signals. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Signals],
 [BOOST_FIND_LIB([signals], [$1],
                 [boost/signal.hpp],
                 [boost::signal<void ()> s;])
 ])# BOOST_SIGNALS
+
+
+# BOOST_SIGNALS2()
+# ----------------
+# Look for Boost.Signals2 (new since 1.39.0).
+BOOST_DEFUN([Signals2],
+[BOOST_FIND_HEADER([boost/signals2.hpp])
+])# BOOST_SIGNALS2
 
 
 # BOOST_SMART_PTR()
@@ -801,8 +843,8 @@ BOOST_DEFUN([String_Algo],
 
 # BOOST_SYSTEM([PREFERRED-RT-OPT])
 # --------------------------------
-# Look for Boost.System.  For the documentation of PREFERRED-RT-OPT, see the
-# documentation of BOOST_FIND_LIB above.  This library was introduced in Boost
+# Look for Boost.System. For the documentation of PREFERRED-RT-OPT, see the
+# documentation of BOOST_FIND_LIB above. This library was introduced in Boost
 # 1.35.0.
 BOOST_DEFUN([System],
 [BOOST_FIND_LIB([system], [$1],
@@ -813,7 +855,7 @@ BOOST_DEFUN([System],
 
 # BOOST_TEST([PREFERRED-RT-OPT])
 # ------------------------------
-# Look for Boost.Test.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.Test. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Test],
 [m4_pattern_allow([^BOOST_CHECK$])dnl
@@ -827,7 +869,7 @@ BOOST_FIND_LIB([unit_test_framework], [$1],
 
 # BOOST_THREADS([PREFERRED-RT-OPT])
 # ---------------------------------
-# Look for Boost.Thread.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.Thread. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 # FIXME: Provide an alias "BOOST_THREAD".
 BOOST_DEFUN([Threads],
@@ -847,9 +889,9 @@ LIBS="$LIBS $BOOST_SYSTEM_LIBS $boost_cv_pthread_flag"
 LDFLAGS="$LDFLAGS $BOOST_SYSTEM_LDFLAGS"
 # Yes, we *need* to put the -pthread thing in CPPFLAGS because with GCC3,
 # boost/thread.hpp will trigger a #error if -pthread isn't used:
-#   boost/config/requires_threads.hpp:47:5: #error "Compiler threading support
-#   is not turned on. Please set the correct command line options for
-#   threading: -pthread (Linux), -pthreads (Solaris) or -mthreads (Mingw32)"
+# boost/config/requires_threads.hpp:47:5: #error "Compiler threading support
+# is not turned on. Please set the correct command line options for
+# threading: -pthread (Linux), -pthreads (Solaris) or -mthreads (Mingw32)"
 CPPFLAGS="$CPPFLAGS $boost_cv_pthread_flag"
 
 # When compiling for the Windows platform, the threads library is named
@@ -922,12 +964,23 @@ BOOST_DEFUN([Variant],
 [BOOST_FIND_HEADER([boost/variant/variant_fwd.hpp])
 BOOST_FIND_HEADER([boost/variant.hpp])])
 
+# BOOST_POINTERCONTAINER()
+# ------------------------
+# Look for Boost.PointerContainer
+BOOST_DEFUN([Pointer_Container],
+[BOOST_FIND_HEADER([boost/ptr_container/ptr_deque.hpp])
+BOOST_FIND_HEADER([boost/ptr_container/ptr_list.hpp])
+BOOST_FIND_HEADER([boost/ptr_container/ptr_vector.hpp])
+BOOST_FIND_HEADER([boost/ptr_container/ptr_array.hpp])
+BOOST_FIND_HEADER([boost/ptr_container/ptr_set.hpp])
+BOOST_FIND_HEADER([boost/ptr_container/ptr_map.hpp])
+])# BOOST_POINTERCONTAINER
 
 # BOOST_WAVE([PREFERRED-RT-OPT])
 # ------------------------------
 # NOTE: If you intend to use Wave/Spirit with thread support, make sure you
 # call BOOST_THREADS first.
-# Look for Boost.Wave.  For the documentation of PREFERRED-RT-OPT, see the
+# Look for Boost.Wave. For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 BOOST_DEFUN([Wave],
 [AC_REQUIRE([BOOST_FILESYSTEM])dnl
@@ -961,7 +1014,7 @@ BOOST_DEFUN([Xpressive],
 
 # _BOOST_PTHREAD_FLAG()
 # ---------------------
-# Internal helper for BOOST_THREADS.  Based on ACX_PTHREAD:
+# Internal helper for BOOST_THREADS. Based on ACX_PTHREAD:
 # http://autoconf-archive.cryp.to/acx_pthread.html
 AC_DEFUN([_BOOST_PTHREAD_FLAG],
 [AC_REQUIRE([AC_PROG_CXX])dnl
@@ -969,10 +1022,10 @@ AC_REQUIRE([AC_CANONICAL_HOST])dnl
 AC_LANG_PUSH([C++])dnl
 AC_CACHE_CHECK([for the flags needed to use pthreads], [boost_cv_pthread_flag],
 [ boost_cv_pthread_flag=
-  # The ordering *is* (sometimes) important.  Some notes on the
+  # The ordering *is* (sometimes) important. Some notes on the
   # individual items follow:
   # (none): in case threads are in libc; should be tried before -Kthread and
-  #       other compiler flags to prevent continual compiler warnings
+  # other compiler flags to prevent continual compiler warnings
   # -lpthreads: AIX (must check this before -lpthread)
   # -Kthread: Sequent (threads in libc, but -Kthread needed for pthread.h)
   # -kthread: FreeBSD kernel threads (preferred to -pthread since SMP-able)
@@ -981,19 +1034,19 @@ AC_CACHE_CHECK([for the flags needed to use pthreads], [boost_cv_pthread_flag],
   # -pthreads: Solaris/GCC
   # -mthreads: MinGW32/GCC, Lynx/GCC
   # -mt: Sun Workshop C (may only link SunOS threads [-lthread], but it
-  #      doesn't hurt to check since this sometimes defines pthreads too;
-  #      also defines -D_REENTRANT)
-  #      ... -mt is also the pthreads flag for HP/aCC
+  # doesn't hurt to check since this sometimes defines pthreads too;
+  # also defines -D_REENTRANT)
+  # ... -mt is also the pthreads flag for HP/aCC
   # -lpthread: GNU Linux, etc.
   # --thread-safe: KAI C++
   case $host_os in #(
     *solaris*)
       # On Solaris (at least, for some versions), libc contains stubbed
       # (non-functional) versions of the pthreads routines, so link-based
-      # tests will erroneously succeed.  (We need to link with -pthreads/-mt/
-      # -lpthread.)  (The stubs are missing pthread_cleanup_push, or rather
+      # tests will erroneously succeed. (We need to link with -pthreads/-mt/
+      # -lpthread.) (The stubs are missing pthread_cleanup_push, or rather
       # a function called by this macro, so we could check for that, but
-      # who knows whether they'll stub that too in a future libc.)  So,
+      # who knows whether they'll stub that too in a future libc.) So,
       # we'll just look for -pthreads and -lpthread first:
       boost_pthread_flags="-pthreads -lpthread -mt -pthread";; #(
     *)
@@ -1033,9 +1086,9 @@ m4_define([_BOOST_gcc_test],
 
 # _BOOST_FIND_COMPILER_TAG()
 # --------------------------
-# Internal.  When Boost is installed without --layout=system, each library
+# Internal. When Boost is installed without --layout=system, each library
 # filename will hold a suffix that encodes the compiler used during the
-# build.  The Boost build system seems to call this a `tag'.
+# build. The Boost build system seems to call this a `tag'.
 AC_DEFUN([_BOOST_FIND_COMPILER_TAG],
 [AC_REQUIRE([AC_PROG_CXX])dnl
 AC_REQUIRE([AC_CANONICAL_HOST])dnl
@@ -1053,7 +1106,7 @@ if test x$boost_cv_inc_path != xno; then
   # each compiler so that it works even when cross-compiling (let me know
   # if you know a better approach).
   # Known missing tags (known from Boost's tools/build/v2/tools/common.jam):
-  #   como, edg, kcc, bck, mp, sw, tru, xlc
+  # como, edg, kcc, bck, mp, sw, tru, xlc
   # I'm not sure about my test for `il' (be careful: Intel's ICC pre-defines
   # the same defines as GCC's).
   for i in \
@@ -1101,7 +1154,7 @@ AC_LANG_POP([C++])dnl
   case $boost_cv_lib_tag in #(
     # Some newer (>= 1.35?) versions of Boost seem to only use "gcc" as opposed
     # to "gcc41" for instance.
-    *-gcc | *'-gcc ') :;; #(  Don't re-add -gcc: it's already in there.
+    *-gcc | *'-gcc ') :;; #( Don't re-add -gcc: it's already in there.
     gcc*)
       boost_tag_x=
       case $host_os in #(
@@ -1127,7 +1180,7 @@ fi])dnl end of AC_CACHE_CHECK
 # _BOOST_GUESS_WHETHER_TO_USE_MT()
 # --------------------------------
 # Compile a small test to try to guess whether we should favor MT (Multi
-# Thread) flavors of Boost.  Sets boost_guess_use_mt accordingly.
+# Thread) flavors of Boost. Sets boost_guess_use_mt accordingly.
 AC_DEFUN([_BOOST_GUESS_WHETHER_TO_USE_MT],
 [# Check whether we do better use `mt' even though we weren't ask to.
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
@@ -1141,8 +1194,8 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 
 # _BOOST_AC_LINK_IFELSE(PROGRAM, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -------------------------------------------------------------------
-# Fork of _AC_LINK_IFELSE that preserves conftest.o across calls.  Fragile,
-# will break when Autoconf changes its internals.  Requires that you manually
+# Fork of _AC_LINK_IFELSE that preserves conftest.o across calls. Fragile,
+# will break when Autoconf changes its internals. Requires that you manually
 # rm -f conftest.$ac_objext in between to really different tests, otherwise
 # you will try to link a conftest.o left behind by a previous test.
 # Used to aggressively optimize BOOST_FIND_LIB (see the big comment in this
@@ -1155,16 +1208,16 @@ m4_define([_BOOST_AC_LINK_IFELSE],
 rm -f conftest$ac_exeext
 boost_save_ac_ext=$ac_ext
 boost_use_source=:
-# If we already have a .o, re-use it.  We change $ac_ext so that $ac_link
+# If we already have a .o, re-use it. We change $ac_ext so that $ac_link
 # tries to link the existing object file instead of compiling from source.
 test -f conftest.$ac_objext && ac_ext=$ac_objext && boost_use_source=false &&
   _AS_ECHO_LOG([re-using the existing conftest.$ac_objext])
 AS_IF([_AC_DO_STDERR($ac_link) && {
-	 test -z "$ac_[]_AC_LANG_ABBREV[]_werror_flag" ||
-	 test ! -s conftest.err
+         test -z "$ac_[]_AC_LANG_ABBREV[]_werror_flag" ||
+         test ! -s conftest.err
        } && test -s conftest$ac_exeext && {
-	 test "$cross_compiling" = yes ||
-	 $as_executable_p conftest$ac_exeext
+         test "$cross_compiling" = yes ||
+         $as_executable_p conftest$ac_exeext
 dnl FIXME: use AS_TEST_X instead when 2.61 is widespread enough.
        }],
       [$2],

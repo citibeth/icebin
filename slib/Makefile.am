@@ -25,7 +25,6 @@ libglint2_la_SOURCES = \
 	glint2/clippers.cpp \
 	glint2/ExchangeGrid.cpp \
 	glint2/GCMCoupler.cpp \
-	glint2/GCMCoupler_MPI.cpp \
 	glint2/Grid.cpp \
 	glint2/Grid_LonLat.cpp \
 	glint2/Grid_XY.cpp \
@@ -44,7 +43,10 @@ libglint2_la_SOURCES = \
 	glint2/modele/glint2_modele.cpp \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
-	glint2/read_matrixmaker.cpp
+	glint2/read_matrixmaker.cpp \
+	glint2/pism/PSConstantGLINT2.cpp \
+	glint2/pism/IceModel_PISM.cpp \
+	glint2/pism/PISMIceModel.cpp
 
 FORTRAN_SOURCES = \
 	giss/f90blitz_f.f90 \
@@ -91,7 +93,9 @@ f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
 nobase_include_HEADERS = \
 	$(shell find . -name '*.hpp') \
 	$(shell find . -name '*.h') \
-	$(shell find . -name '*.mod') \
 	ncutil_mod.mod qpt_x.mod c_loc_x.mod zd11_x.mod
+
+#	$(shell find . -name '*.mod')
+
 
 libglint2_ladir = $(includedir)

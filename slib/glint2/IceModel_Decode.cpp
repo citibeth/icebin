@@ -16,26 +16,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <mpi.h>		// Must be first
 #include <glint2/IceModel_Decode.hpp>
 
 namespace glint2 {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-void IceModel_Decode::run_timestep(long itime,
+void IceModel_Decode::run_timestep(double time_s,
 	blitz::Array<int,1> const &indices,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
 {
-printf("BEGIN IceModel_Decode::run_timestep(%ld)\n", itime);
+printf("BEGIN IceModel_Decode::run_timestep(%f)\n", time_s);
 	std::map<IceField, blitz::Array<double,1>> vals2d;	/// Decoded fields
 
 	// Loop through the fields we require
 	std::set<IceField> fields;
-printf("CC0\n");
 	get_required_fields(fields);
-printf("CC0\n");
 	for (auto field = fields.begin(); field != fields.end(); ++field) {
-printf("CC1a\n");
 printf("Looking for required field %s\n", field->str());
 
 		// Look up the field we require
@@ -46,7 +44,6 @@ printf("Looking for required field %s\n", field->str());
 		}
 		blitz::Array<double,1> vals(ii->second);
 
-printf("CC1 ndata=%d\n", ndata);
 		// Decode the field!
 		blitz::Array<double,1> valsd(ndata);
 		valsd = nan;
@@ -72,17 +69,14 @@ printf("CC1 ndata=%d\n", ndata);
 			if (std::isnan(oval)) oval = vals(i);
 			else oval += vals(i);
 		}
-printf("CC2\n");
 
 		// Store decoded field in our output
 		vals2d.insert(std::make_pair(*field, valsd));
-printf("CC3\n");
 	}
-printf("CC4\n");
 
 	// Pass decoded fields on to subclass
-	run_decoded(itime, vals2d);
-printf("END IceModel_Decode::run_timestep(%ld)\n", itime);
+	run_decoded(time_s, vals2d);
+printf("END IceModel_Decode::run_timestep(%ld)\n", time_s);
 }
 
 

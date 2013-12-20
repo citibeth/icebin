@@ -20,7 +20,8 @@ bin_PROGRAMS = \
 	greenland_4x5 greenland_2x2_5 \
 	ga_2x2_5 \
 	overlap \
-	apitest blitztest smulttest
+	apitest blitztest smulttest \
+	desm
 
 hires_SOURCES = hires.cpp
 
@@ -47,9 +48,11 @@ blitztest_SOURCES = blitztest.cpp
 smulttest_SOURCES = smulttest.cpp
 
 if USE_PISM
-bin_PROGRAMS += pismr pismconfig
+bin_PROGRAMS += pismr #pismconfig
 pismr_SOURCES = pismr.cpp
-pismconfig_SOURCES = pismconfig.cpp
+#pismconfig_SOURCES = pismconfig.cpp
 endif
+
+desm_SOURCES = desm.cpp
 
 ###############################################################################

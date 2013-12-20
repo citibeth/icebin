@@ -22,7 +22,7 @@
 #include <giss/f90blitz.hpp>
 #include <giss/SparseMatrix.hpp>
 #include <glint2/MatrixMaker.hpp>
-#include <glint2/GCMCoupler_MPI.hpp>
+#include <glint2/GCMCoupler.hpp>
 #include <glint2/modele/ModelEDomain.hpp>
 
 namespace glint2 {
@@ -46,7 +46,8 @@ struct glint2_modele {
 	std::unique_ptr<MatrixMaker> maker;
 	ModelEDomain *domain;	// Points to domain owned by maker
 
-	std::unique_ptr<GCMCoupler_MPI> gcm_coupler;
+	double dtsrc;			// Size of ModelE timestep
+	std::unique_ptr<GCMCoupler> gcm_coupler;
 
 	std::map<int, std::vector<hp_to_ice_rec>> hp_to_ices;
 
@@ -64,6 +65,9 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 	int i0h, int i1h, int j0h, int j1h,
 	int i0, int i1, int j0, int j1,
 	int j0s, int j1s,
+
+	// Info about size of a timestep (DTsrc defined in ModelE's MODEL_COM.f)
+	double dtsrc,
 
 	// MPI Stuff
 	int comm_f, int root,
@@ -95,9 +99,12 @@ void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
 	int const i0, int const j0, int const i1, int const j1);			// Array bound to write in
 
 extern "C"
+void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api);
+
+extern "C"
 void glint2_modele_couple_to_ice_c(
 glint2::modele::glint2_modele *api,
-int itime,
+int itime,			// ModelE itime counter
 giss::F90Array<double,3> &smb1hp_f,
 giss::F90Array<double,3> &seb1hp_,
 giss::F90Array<double,3> &tg21hp_f);

@@ -22,8 +22,9 @@
 
 namespace glint2 {
 
-/** Produces a Surface T field for ice models that need it,
-from GCM-supplied Mass and Energy fields */
+/** This is a filter IceModel that wraps another existing ice model.
+Produces a Surface T field for ice models that need it, from
+GCM-supplied Mass and Energy fields */
 class IceModel_TConv : public IceModel_Decode {
 	std::unique_ptr<IceModel_Decode> model;
 
@@ -40,9 +41,8 @@ public:
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc.
-	@param itime Some kind of representation of the current GCM timestep.
-	Helps with debugging. */
-	void run_decoded(long itime,
+	@param time_s Time since start of simulation, in seconds */
+	void run_decoded(double time_s,
 		std::map<IceField, blitz::Array<double,1>> const &vals2);
 
 	void read_from_netcdf(NcFile &nc, std::string const &vname);

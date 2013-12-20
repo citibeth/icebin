@@ -22,6 +22,11 @@
 
 namespace glint2 {
 
+/** Serves as a base class for practical IceModels.  The
+run_timestep() method is implemented, requiring subclasses to
+implement the new method run_decoded().  Decoding converts a set of
+(index, value) pairs into normal arrays (with NaN where no value was
+given. */
 class IceModel_Decode : public IceModel {
 public:
 	// Dimensionality Ice Model's vector space
@@ -33,16 +38,15 @@ public:
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc.
-	@param itime Some kind of representation of the current GCM timestep.
-	Helps with debugging. */
-	virtual void run_timestep(long itime,
+	@param time_s Time since start of simulation, in seconds */
+	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
 		std::map<IceField, blitz::Array<double,1>> const &vals2);
 
 	/** Runs a timestep after fields have been decoded.  This is what
 	one will normally want to override, unless you wish to decode
 	yourself. */
-	virtual void run_decoded(long itime,
+	virtual void run_decoded(double time_s,
 		std::map<IceField, blitz::Array<double,1>> const &vals2) = 0;
 
 };

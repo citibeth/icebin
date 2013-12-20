@@ -96,17 +96,17 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 	try {
 		// Get arguments
 		const char *grid1_fname_py = NULL;
-		const char *shptype = NULL;
+		const char *shc_index_type = NULL;
 		PyObject *hpdefs_py = NULL;
 		PyObject *mask1_py = NULL;
 		int correct_area1 = true;
 
-		static char const *keyword_list[] = {"grid1_fname", "hptype", "hpdefs", "mask1", "correct_area1", NULL};
+		static char const *keyword_list[] = {"grid1_fname", "hc_index_type", "hpdefs", "mask1", "correct_area1", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
 			args, kwds, "ssO|Oi",
 			const_cast<char **>(keyword_list),
-			&grid1_fname_py, &shptype, &hpdefs_py,
+			&grid1_fname_py, &shc_index_type, &hpdefs_py,
 			&mask1_py, &correct_area1))
 		{
 			// Throw an exception...
@@ -120,7 +120,7 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(
 			correct_area1, std::move(domain)));
 
-		maker->_hptype = giss::parse_enum<HCIndex::Type>(shptype);
+		maker->_hc_index_type = giss::parse_enum<HCIndex::Type>(shc_index_type);
 
 		{NcFile nc(grid1_fname_py, NcFile::ReadOnly);
 			maker->grid1 = read_grid(nc, "grid");

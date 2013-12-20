@@ -23,3 +23,6 @@ endif
 MOSTLYCLEANFILES = $(DX_CLEANFILES)
 
 EXTRA_DIST = cleanup bootstrap $(TESTS) $(DX_CONFIG)
+
+modele_const.py : parse_fconst.py
+	python parse_fconst.py >modele_const.py

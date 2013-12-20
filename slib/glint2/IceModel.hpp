@@ -19,6 +19,7 @@
 #pragma once
 
 #include <boost/enum.hpp>
+#include <boost/filesystem/path.hpp>
 #include <glint2/IceSheet.hpp>
 
 namespace glint2 {
@@ -50,22 +51,18 @@ public:
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc.
-	@param itime Some kind of representation of the current GCM timestep.
+	@param time_s Seconds since beginning of simulation.
 	Helps with debugging. */
-	virtual void run_timestep(long itime,
+	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
 		std::map<IceField, blitz::Array<double,1>> const &vals2) = 0;
 
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname) {}
-
-protected:
-	// Utility routine for subclasses that want to decode the input
-	std::map<IceField, blitz::Array<double,1>> decode(
-		blitz::Array<int,1> const &indices,
-		std::map<IceField, blitz::Array<double,1>> const &vals2);
 };
 
 extern std::unique_ptr<IceModel> read_icemodel(
+	MPI_Comm gcm_comm,
+	boost::filesystem::path const &config_dir,
 	NcFile &nc, std::string const &vname, IceSheet const *sheet = NULL);
 
 }

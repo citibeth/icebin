@@ -60,12 +60,12 @@ protected:
 	std::unique_ptr<GridDomain> domain;
 public:
 	bool const correct_area1;		/// Should we correct for projection and geometric error?
-	HCIndex::Type _hptype;
+	HCIndex::Type _hc_index_type;
 	MatrixMaker(
 		bool _correct_area1,
 		std::unique_ptr<GridDomain> &&_domain)
 		: _next_sheet_index(0),
-		_hptype(HCIndex::Type::UNKNOWN),
+		_hc_index_type(HCIndex::Type::UNKNOWN),
 		domain(std::move(_domain)),
 		correct_area1(_correct_area1) {}
 

@@ -16,7 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mpi.h>
+#include <mpi.h>	// For Intel MPI, mpi.h must be included before stdio.h
 
 #include <cstdlib>
 #include <glint2/GCMCoupler_MPI.hpp>
@@ -51,7 +51,7 @@ int SMBMsg::compar(void const *a, void const *b)
 // ===================================================
 // GCMCoupler_MPI
 
-void GCMCoupler_MPI::call_ice_model(int itime,
+void GCMCoupler_MPI::call_ice_model(double time_s,
 	giss::DynArray<SMBMsg> &rbuf,
 	std::vector<IceField> const &fields,
 	SMBMsg *begin, SMBMsg *end)
@@ -78,14 +78,15 @@ printf("BEGIN call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size()
 				shape, stride, blitz::neverDeleteData)));
 	}
 
-	models[sheetno]->run_timestep(itime, indices, vals2);
+	models[sheetno]->run_timestep(time_s, indices, vals2);
 printf("END call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size());
 };
 
 
 
 /** @param sbuf the (filled) array of ice grid values for this MPI node. */
-void GCMCoupler_MPI::couple_to_ice(int itime,
+void GCMCoupler_MPI::couple_to_ice(
+double time_s,
 std::vector<IceField> const &fields,
 giss::DynArray<SMBMsg> &sbuf)
 {
@@ -183,7 +184,7 @@ printf("[%d] rbuf->begin()=%p, rbuf->end()=%p\n", rank, rbuf->begin(), rbuf->end
 			if (rscan->sheetno != lscan->sheetno) {
 printf("[%d] rscan = =========================================\n", rank);
 				int sheetno = lscan->sheetno;
-				call_ice_model(itime, *rbuf, fields, lscan, rscan);
+				call_ice_model(time_s, *rbuf, fields, lscan, rscan);
 				sheets_remain.erase(sheetno);
 				lscan = rscan;
 			}
@@ -191,20 +192,22 @@ printf("[%d] rscan = =========================================\n", rank);
 		}
 printf("[%d] BB2\n", rank);
 
-		// Call the ice sheets we don't have data for
+		// Call the ice sheets we received no data for (should not usually happen)
 		for (auto sheet=sheets_remain.begin(); sheet != sheets_remain.end(); ++sheet) {
 			int sheetno = *sheet;
 			std::vector<int> indices;
 			std::map<IceField, blitz::Array<double,1>> vals2;
 			// Run with null data
-			models[sheetno]->run_timestep(itime,
+			models[sheetno]->run_timestep(time_s,
 				giss::vector_to_blitz(indices), vals2);
 		}
 printf("[%d] BB\n", rank);
 	}		// if (rank == root)
 }
 
-void GCMCoupler_MPI::read_from_netcdf(NcFile &nc, std::string const &vname,
+void GCMCoupler_MPI::read_from_netcdf(
+	boost::filesystem::path const &glint2_config_dir,
+	NcFile &nc, std::string const &vname,
 	std::vector<std::string> const &sheet_names,
     giss::MapDict<std::string, IceSheet> const &sheets)
 {
@@ -214,7 +217,7 @@ void GCMCoupler_MPI::read_from_netcdf(NcFile &nc, std::string const &vname,
 	// Only load up ice model proxies on root node
 	if (rank != root) return;
 
-	GCMCoupler::read_from_netcdf(nc, vname, sheet_names, sheets);
+	GCMCoupler::read_from_netcdf(glint2_config_dir, nc, vname, sheet_names, sheets);
 }
 
 int GCMCoupler_MPI::rank()

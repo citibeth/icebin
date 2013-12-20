@@ -50,9 +50,10 @@ template<> inline NcType get_nc_type<int>()
 
 // --------------------------------------------------------------------
 // Avoid memory leaks
-inline std::unique_ptr<NcAtt> get_att(NcVar *var, NcToken attname)
+template<class KeyT>
+inline std::unique_ptr<NcAtt> get_att(NcVar *var, KeyT key)
 {
-	NcAtt *att = var->get_att(attname);
+	NcAtt *att = var->get_att(key);
 	return std::unique_ptr<NcAtt>(att);
 }
 // --------------------------------------------------------------------

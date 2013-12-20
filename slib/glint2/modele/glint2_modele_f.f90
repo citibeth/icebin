@@ -33,6 +33,7 @@ INTERFACE
 		i0h,i1h,j0h,j1h, &
 		i0,i1,j0,j1, &
 		j0s,j1s, &
+		dtsrc, &
 		comm_f, root, &
 		LHM, SHI) bind(c)
 	use iso_c_binding
@@ -44,6 +45,7 @@ INTERFACE
 		integer(c_int), value :: i0h,i1h,j0h,j1h
 		integer(c_int), value :: i0,i1,j0,j1
 		integer(c_int), value :: j0s,j1s
+		real(c_double), value :: dtsrc
 		integer(c_int), value :: comm_f, root
 		real(c_double), value :: LHM, SHI
 		type(c_ptr) :: glint2_modele_new

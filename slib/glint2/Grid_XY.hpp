@@ -49,10 +49,10 @@ public:
 		parameterization = Grid::Parameterization::L0;
 	}
 
-	virtual long ij_to_index(int i, int j) const
+	long ij_to_index(int i, int j) const
 		{ return j * nx() + i; }
 
-	virtual void index_to_ij(long index, int &i, int &j) const
+	void index_to_ij(long index, int &i, int &j) const
 	{
 		int n = nx();
 		j = index / n;

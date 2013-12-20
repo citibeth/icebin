@@ -16,11 +16,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <boost/filesystem.hpp>
+#include <mpi.h>		// Must be first
 #include <glint2/IceModel_DISMAL.hpp>
 #include <cstdio>
 #include <cmath>
 
 namespace glint2 {
+
+// Arguments that are paths, and thus need pathname resolution
+static std::set<std::string> path_args = {"output_dir"};
+
+IceModel_DISMAL::IceModel_DISMAL(Grid_XY const &grid,
+boost::filesystem::path const &config_dir,
+NcVar *dismal_var, NcVar *const_var) :
+	IceModel_Decode(grid),
+	nx(grid.nx()), ny(grid.ny()),
+	output_dir(boost::filesystem::absolute(
+		boost::filesystem::path(giss::get_att(dismal_var, "output_dir")->as_string(0)),
+		config_dir))
+{
+}
+
+
 
 /** Query all the ice models to figure out what fields they need */
 void IceModel_DISMAL::get_required_fields(std::set<IceField> &fields)
@@ -36,7 +54,7 @@ void IceModel_DISMAL::get_required_fields(std::set<IceField> &fields)
 /** @param index Index of each grid value.
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
-void IceModel_DISMAL::run_decoded(long itime,
+void IceModel_DISMAL::run_decoded(double time_s,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
 {
 	auto mass(get_field(vals2, IceField::MASS_FLUX));
@@ -56,9 +74,9 @@ void IceModel_DISMAL::run_decoded(long itime,
 		blitz::shape(ny,nx), blitz::neverDeleteData);
 #endif
 
-	char fname[100];
-	sprintf(fname, "dismal-%ld.nc", itime);
-	NcFile ncout(fname, NcFile::Replace);
+	char fname[30];
+	sprintf(fname, "dismal-%ld.nc", (long)time_s);
+	NcFile ncout((output_dir / fname).string().c_str(), NcFile::Replace);
 
 	std::vector<boost::function<void ()>> fns;
 	NcDim *nx_dim = ncout.add_dim("nx", nx);

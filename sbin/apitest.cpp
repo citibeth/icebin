@@ -110,6 +110,9 @@ int main(int argc, char **argv)
 		j0s, j1s,
 //		2, jm-1,
 
+		// dtsrc  (see MODEL_COM.f)
+		3600.,
+
 		// MPI Stuff
 		// int comm_f, int root;
 		MPI_Comm_c2f(comm), 0,

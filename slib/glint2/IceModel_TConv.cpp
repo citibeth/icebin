@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <mpi.h>		// Must be first
 #include <glint2/IceModel_TConv.hpp>
 
 namespace glint2 {
@@ -40,12 +41,11 @@ printf("END IceModel_TConv::get_required_fields()\n");
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc.
-	@param itime Some kind of representation of the current GCM timestep.
-	Helps with debugging. */
-	void IceModel_TConv::run_decoded(long itime,
+	@param time_s Time since start of simulation, in seconds */
+	void IceModel_TConv::run_decoded(double time_s,
 		std::map<IceField, blitz::Array<double,1>> const &vals2)
 	{
-printf("BEGIN IceModel_TConv::run_decoded(%ld)\n", itime);
+printf("BEGIN IceModel_TConv::run_decoded(%f)\n", time_s);
 
 		// Copy existing fields
 		std::map<IceField, blitz::Array<double,1>> ovals;
@@ -62,8 +62,8 @@ printf("BEGIN IceModel_TConv::run_decoded(%ld)\n", itime);
 		}
 		ovals.insert(std::make_pair(IceField::SURFACE_T, surfacet));
 
-		model->run_decoded(itime, ovals);
-printf("END IceModel_TConv::run_decoded(%ld)\n", itime);
+		model->run_decoded(time_s, ovals);
+printf("END IceModel_TConv::run_decoded(%ld)\n", time_s);
 	}
 
 	void IceModel_TConv::read_from_netcdf(NcFile &nc, std::string const &vname)

@@ -28,11 +28,14 @@ class IceModel_DISMAL : public IceModel_Decode
 	// Assume a simple X-Y Cartesian grid
 	int nx, ny;
 
+	// Where should we put our output
+	boost::filesystem::path output_dir;
+
 public:
 
-	IceModel_DISMAL(Grid_XY const &grid) :
-		IceModel_Decode(grid),
-		nx(grid.nx()), ny(grid.ny()) {}
+	IceModel_DISMAL(Grid_XY const &grid,
+		boost::filesystem::path const &config_dir,
+		NcVar *dismal_var, NcVar *const_var);
 
 	/** Query all the ice models to figure out what fields they need */
 	void get_required_fields(std::set<IceField> &fields);
@@ -40,7 +43,7 @@ public:
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc. */
-	void run_decoded(long itime,
+	void run_decoded(double time_s,
 		std::map<IceField, blitz::Array<double,1>> const &vals2);
 
 protected :

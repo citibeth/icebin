@@ -41,6 +41,8 @@ struct F90Array {
 	int lbounds[rank];		///< Lower bound index of each dimension (usually 1)
 	int ubounds[rank];		///< Upper bound index of each dimension
 
+	F90Array() : base(0) {}
+
 	/** Extracts the dope vector from an existing blitz::Array.  Used
 	to write C++ test code for Fortrn APIs (so we can construct and pass
 	dope vectors without actually running Fortran code.) */
@@ -54,7 +56,6 @@ struct F90Array {
 			this->ubounds[i] = arr.ubound(i);
 		}
 	}
-
 
 	/** Construct a blitz::Array from the dope vector.  The blitz
 	array returned is identical to the original Fortran array used to
