@@ -28,12 +28,21 @@ implement the new method run_decoded().  Decoding converts a set of
 (index, value) pairs into normal arrays (with NaN where no value was
 given. */
 class IceModel_Decode : public IceModel {
-public:
+private:
 	// Dimensionality Ice Model's vector space
-	int const ndata;
+	int _ndata;
 
-	IceModel_Decode(Grid const &grid) : ndata(grid.ndata()) {}
-	IceModel_Decode(int _ndata) : ndata(_ndata) {}
+public :
+	int ndata() { return _ndata; }
+
+//	IceModel_Decode(Grid const &grid) : ndata(grid.ndata()) {}
+//	IceModel_Decode(int _ndata) : ndata(_ndata) {}
+
+	void init(IceModel::GCMParams const &gcm_params, int ndata)
+	{
+		IceModel::init(gcm_params);
+		this->_ndata = ndata;
+	}
 
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...

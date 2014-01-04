@@ -46,39 +46,32 @@ struct SMBMsg {
 
 
 class GCMCoupler {
-protected:
-
-	/** The MPI Communicator used by the GCM */
-	MPI_Comm comm;
-
-	/** Rank of the root process, which will receive data on the ice grid */
-	int root;
-
 public:
+	IceModel::GCMParams const gcm_params;
+
 	// Only needed by root MPI node in MPI version
 	giss::MapDict<int,IceModel> models;
 
-	GCMCoupler(MPI_Comm _comm, int _root) :
-		comm(_comm), root(_root) {}
-
+	GCMCoupler(IceModel::GCMParams const &_gcm_params) : gcm_params(_gcm_params) {}
 
 	/** Query all the ice models to figure out what fields they need */
 	std::set<IceField> get_required_fields();
 
 	/** @param sheets (OPTIONAL): IceSheet data structures w/ grids, etc. */
 	virtual void read_from_netcdf(
-		boost::filesystem::path const &glint2_config_dir,
 		NcFile &nc, std::string const &vname,
 		std::vector<std::string> const &sheet_names,
 	    giss::MapDict<std::string, IceSheet> const &sheets);
 
 	/** Returns a unique rank number for each node in the parallel computation.
 	Useful for debugging-type output. */
-	virtual int rank();
+	int rank();
 
 protected:
 	/** @param time_s Time since start of simulation, in seconds */
-	void call_ice_model(double time_s,
+	void call_ice_model(
+		IceModel *model,
+		double time_s,
 		giss::DynArray<SMBMsg> &rbuf,
 		std::vector<IceField> const &fields,
 		SMBMsg *begin, SMBMsg *end);

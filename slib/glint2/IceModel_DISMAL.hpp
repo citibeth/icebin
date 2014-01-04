@@ -33,9 +33,14 @@ class IceModel_DISMAL : public IceModel_Decode
 
 public:
 
-	IceModel_DISMAL(Grid_XY const &grid,
-		boost::filesystem::path const &config_dir,
-		NcVar *dismal_var, NcVar *const_var);
+	/** Initialize any grid information, etc. from the IceSheet struct.
+	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
+	void init(
+		IceModel::GCMParams const &gcm_params,
+		std::shared_ptr<glint2::Grid> const &grid2,
+		NcFile &nc,
+		std::string const &vname_base,
+		NcVar *const_var);
 
 	/** Query all the ice models to figure out what fields they need */
 	void get_required_fields(std::set<IceField> &fields);

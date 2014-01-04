@@ -24,8 +24,7 @@ namespace glint2 {
 
 /** @param sheet (OPTIONAL): Info on the ice sheet data structure */
 std::unique_ptr<IceModel> read_icemodel(
-	MPI_Comm gcm_comm,
-	boost::filesystem::path const &config_dir,		/** Directory of glint2 configuration file */
+	IceModel::GCMParams const &gcm_params,
 	NcFile &nc,
 	std::string const &vname,
 	IceSheet const *sheet)
@@ -39,23 +38,14 @@ std::unique_ptr<IceModel> read_icemodel(
 
 	std::unique_ptr<IceModel> ice_model;
 	switch(type.index()) {
-		case IceModel::Type::DISMAL : {
-			Grid_XY const *grid2 = dynamic_cast<Grid_XY const *>(&*(sheet->grid2));
-			auto dismal_var = nc.get_var((vname + ".dismal").c_str());	// DISMAL parameters
-			ice_model.reset(new IceModel_DISMAL(*grid2, config_dir, dismal_var, const_var));
-		} break;
-		case IceModel::Type::PISM : {
-			std::shared_ptr<Grid_XY const> grid2 = std::dynamic_pointer_cast<Grid_XY const>(sheet->grid2);
-//			Grid_XY const *grid2 = dynamic_cast<Grid_XY const *>(&*(sheet->grid2));
-			auto pism_var = nc.get_var((vname + ".pism").c_str());	// PISM parameters
-			ice_model.reset(new glint2::pism::IceModel_PISM(grid2, gcm_comm, config_dir, pism_var, const_var));
-		} break;
-#if 0
-		case IceModel::Type::ISSM :
-			ice_model.reset(new IceModel_ISSM(const_var));
+		case IceModel::Type::DISMAL :
+			ice_model.reset(new IceModel_DISMAL());
 			break;
-#endif
+		case IceModel::Type::PISM :
+			ice_model.reset(new glint2::pism::IceModel_PISM());
+			break;
 	}
+	ice_model->init(gcm_params, sheet->grid2, nc, vname, const_var);
 
 	ice_model->read_from_netcdf(nc, vname);
 	return ice_model;

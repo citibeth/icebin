@@ -35,22 +35,15 @@ std::set<IceField> GCMCoupler::get_required_fields()
 /** @param glint2_config_dir Director the GLINT2 config file is found in.  Used to interpret relative paths found in that file.
 @param nc The GLINT2 configuration file */
 void GCMCoupler::read_from_netcdf(
-	boost::filesystem::path const &glint2_config_dir,
 	NcFile &nc,
 	std::string const &vname,
 	std::vector<std::string> const &sheet_names,
     giss::MapDict<std::string, IceSheet> const &sheets)
 {
-	int rank;
-	MPI_Comm_rank(comm, &rank);
-
-	// Only load up ice model proxies on root node
-	if (rank != root) return;
-
 	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 	int i = 0;
 	for (auto name = sheet_names.begin(); name != sheet_names.end(); ++name) {
-		models.insert(i, read_icemodel(comm, glint2_config_dir, nc, vname + "." + *name, sheets[*name]));
+		models.insert(i, read_icemodel(gcm_params, nc, vname + "." + *name, sheets[*name]));
 		++i;
 	}
 	printf("END GCMCoupler::read_from_netcdf()\n");
@@ -84,15 +77,30 @@ int SMBMsg::compar(void const *a, void const *b)
 // ===================================================
 // GCMCoupler
 
-void GCMCoupler::call_ice_model(double time_s,
+/** Parameters to the call_ice_model() method.  Calls to the
+ice model are planned first, then executed separately. */
+class CallIceModelParams {
+public:
+	int sheetno;
+	SMBMsg *begin;
+	SMBMsg *next;
+
+	CallIceModelParams() {}
+
+	CallIceModelParams(int _sheetno, SMBMsg *_begin, SMBMsg *_next) :
+		sheetno(_sheetno), begin(_begin), next(_next) {}
+};
+
+void GCMCoupler::call_ice_model(
+	IceModel *model,
+	double time_s,
 	giss::DynArray<SMBMsg> &rbuf,
 	std::vector<IceField> const &fields,
 	SMBMsg *begin, SMBMsg *end)
 {
 	int nfields = fields.size();
-	int sheetno = begin->sheetno;
 
-printf("BEGIN call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size());
+printf("BEGIN call_ice_model(nfields=%ld)\n", fields.size());
 
 	// Construct indices vector
 	blitz::TinyVector<int,1> shape(rbuf.diff(end, begin));
@@ -111,8 +119,8 @@ printf("BEGIN call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size()
 				shape, stride, blitz::neverDeleteData)));
 	}
 
-	models[sheetno]->run_timestep(time_s, indices, vals2);
-printf("END call_ice_model(sheetno=%d, nfields=%ld)\n", sheetno, fields.size());
+	model->run_timestep(time_s, indices, vals2);
+printf("END call_ice_model(nfields=%ld)\n", fields.size());
 };
 
 
@@ -126,16 +134,14 @@ giss::DynArray<SMBMsg> &sbuf)
 	int nfields = fields.size();
 
 	// Gather buffers on root node
-	int num_mpi_nodes, rank;
-	MPI_Comm_size(comm, &num_mpi_nodes); 
-	MPI_Comm_rank(comm, &rank);
+	int num_mpi_nodes;
+	MPI_Comm_size(gcm_params.gcm_comm, &num_mpi_nodes); 
 
-printf("[%d] BEGIN couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size=%d\n", rank, time_s, sbuf.size, sbuf.ele_size);
+printf("[%d] BEGIN couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size=%d\n", gcm_params.gcm_rank, time_s, sbuf.size, sbuf.ele_size);
 
 	// MPI_Gather the count
 	std::unique_ptr<int[]> rcounts;
-//	if (rank == root)
-		rcounts.reset(new int[num_mpi_nodes]);
+	rcounts.reset(new int[num_mpi_nodes]);
 	for (int i=0; i<num_mpi_nodes; ++i) rcounts[i] = 0;
 
 #if 0
@@ -149,43 +155,32 @@ for (SMBMsg *sscan = sbuf.begin(); sscan < sbuf.end(); sbuf.incr(sscan)) {
 #endif
 
 	int nele_l = sbuf.size;
-printf("[%d] MPI_Gather sbuf.size=%ld\n", rank, sbuf.size);
-	MPI_Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, root, comm);
-printf("[%d] DONE MPI_Gather\n", rank);
-
-//if (rank == root) for (int i=0; i<num_mpi_nodes; ++i) printf("[%d] rcounts[%d] = %d\n", rank, i, rcounts[i]);
+printf("[%d] MPI_Gather sbuf.size=%ld\n", gcm_params.gcm_rank, sbuf.size);
+	MPI_Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, gcm_params.gcm_root, gcm_params.gcm_comm);
+printf("[%d] DONE MPI_Gather\n", gcm_params.gcm_rank);
 
 	// Compute displacements as prefix sum of rcounts
 	std::unique_ptr<int[]> displs;
 	std::unique_ptr<giss::DynArray<SMBMsg>> rbuf;
-//	if (rank == root) {
-printf("[%d] CC\n", rank);
-		displs.reset(new int[num_mpi_nodes+1]);
-		displs[0] = 0;
-		for (int i=0; i<num_mpi_nodes; ++i) displs[i+1] = displs[i] + rcounts[i];
-#if 0
-if (rank == 0) {
-for (int i=0; i<num_mpi_nodes; ++i) printf("[%d] rcounts[%d] = %d\n", rank, i, rcounts[i]);
-for (int i=0; i<=num_mpi_nodes; ++i) printf("[%d] displs[%d] = %d\n", rank, i, displs[i]);
-}
-#endif
-		int nele_g = displs[num_mpi_nodes];
 
-		// Create receive buffer, and gather into it
-		// (There's an extra item in the array for a sentinel)
-//printf("[%d] nfields=%d, SMBMsg::size(nfields)=%ld, nele_g=%d\n", rank, nfields, SMBMsg::size(nfields), nele_g);
-		rbuf.reset(new giss::DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
-//printf("[%d] rbuf->size = %ld\n", rank, rbuf->size);
-//	}
+printf("[%d] CC\n", gcm_params.gcm_rank);
+	displs.reset(new int[num_mpi_nodes+1]);
+	displs[0] = 0;
+	for (int i=0; i<num_mpi_nodes; ++i) displs[i+1] = displs[i] + rcounts[i];
+	int nele_g = displs[num_mpi_nodes];
+
+	// Create receive buffer, and gather into it
+	// (There's an extra item in the array for a sentinel)
+	rbuf.reset(new giss::DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
 
 	MPI_Datatype mpi_type(SMBMsg::new_MPI_struct(nfields));
-printf("[%d] MPI_Gatherv: %p, %ld, %p, %p, %p, %p\n", rank, sbuf.begin(), sbuf.size, mpi_type, rbuf->begin(), &rcounts[0], &displs[0]);
+printf("[%d] MPI_Gatherv: %p, %ld, %p, %p, %p, %p\n", gcm_params.gcm_rank, sbuf.begin(), sbuf.size, mpi_type, rbuf->begin(), &rcounts[0], &displs[0]);
 	MPI_Gatherv(sbuf.begin(), sbuf.size, mpi_type,
 		rbuf->begin(), &rcounts[0], &displs[0], mpi_type,
-		root, comm);
-printf("[%d] MPI_Gatherv DONE\n", rank);
+		gcm_params.gcm_root, gcm_params.gcm_comm);
+printf("[%d] MPI_Gatherv DONE\n", gcm_params.gcm_rank);
 	MPI_Type_free(&mpi_type);
-	if (rank == root) {
+	if (gcm_params.gcm_rank == gcm_params.gcm_root) {
 		// Add a sentinel
 		(*rbuf)[rbuf->size-1].sheetno = 999999;
 
@@ -193,12 +188,8 @@ printf("[%d] MPI_Gatherv DONE\n", rank);
 		// are found together
 		qsort(rbuf->begin(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
 
-		// Make a set of all the ice sheets in this model run
-		std::set<int> sheets_remain;
-		for (auto sheet=models.begin(); sheet != models.end(); ++sheet)
-			sheets_remain.insert(sheet.key());
 #if 1
-printf("[%d] BB1\n", rank);
+printf("[%d] BB1\n", gcm_params.gcm_rank);
 int nprt=0;
 for (int i=0; i<rbuf->size; ++i) {
 	SMBMsg &msg((*rbuf)[i]);
@@ -210,43 +201,59 @@ for (int i=0; i<rbuf->size; ++i) {
 }
 #endif
 
-		// Call each ice sheet (that we have data for)
-printf("[%d] rbuf->begin()=%p, rbuf->end()=%p\n", rank, rbuf->begin(), rbuf->end());
+		// Figure out which ice sheets we have data for
+printf("[%d] rbuf->begin()=%p, rbuf->end()=%p\n", gcm_params.gcm_rank, rbuf->begin(), rbuf->end());
 printf("[%d] rbuf->size() = %d\n", rbuf->size);
 		SMBMsg *lscan = rbuf->begin();
 		SMBMsg *rscan = lscan;
+		std::map<int, CallIceModelParams> im_params;
 		while (rscan < rbuf->end()) {
 //printf("rscan = %d %d %f %f (%p %p)\n", rscan->sheetno, rscan->i2, (*rscan)[0], (*rscan)[1], rscan, rbuf->end());
 			if (rscan->sheetno != lscan->sheetno) {
-printf("[%d] rscan = =========================================\n", rank);
+printf("[%d] rscan = =========================================\n", gcm_params.gcm_rank);
 				int sheetno = lscan->sheetno;
-				call_ice_model(time_s, *rbuf, fields, lscan, rscan);
-				sheets_remain.erase(sheetno);
+				auto cimp(CallIceModelParams(sheetno, lscan, rscan));
+				im_params[sheetno] = cimp;
 				lscan = rscan;
 			}
+
 			rbuf->incr(rscan);
 		}
-printf("[%d] BB2\n", rank);
+printf("[%d] BB2\n", gcm_params.gcm_rank);
 
-		// Call the ice sheets we received no data for (should not usually happen)
-		for (auto sheet=sheets_remain.begin(); sheet != sheets_remain.end(); ++sheet) {
-			int sheetno = *sheet;
-			std::vector<int> indices;
-			std::map<IceField, blitz::Array<double,1>> vals2;
-			// Run with null data
-			models[sheetno]->run_timestep(time_s,
-				giss::vector_to_blitz(indices), vals2);
-		}
-printf("[%d] BB\n", rank);
-	}		// if (rank == root)
+		// Call all our ice models
+		for (auto model = models.begin(); model != models.end(); ++model) {
+			int sheetno = model.key();
+printf("[%d] Calling to model sheetno=%d\n", rank(), sheetno);
+			// Assume we have data for all ice models
+			// (So we can easily maintain MPI SIMD operation)
+			auto params(im_params.find(sheetno));
+			call_ice_model(&*model, time_s, *rbuf, fields,
+				params->second.begin, params->second.next);
+
+printf("[%d] BB\n", gcm_params.gcm_rank);
+		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
+	} else {
+		// We're not root --- we have no data to send to ice
+		// models, we just call through anyway because we will
+		// receive data in an upcomming MPI_Scatter
+		// Call all our ice models
+		for (auto model = models.begin(); model != models.end(); ++model) {
+			int sheetno = model.key();
+printf("[%d] Calling to model sheetno=%d: NULL\n", rank(), sheetno);
+			// Assume we have data for all ice models
+			// (So we can easily maintain MPI SIMD operation)
+			call_ice_model(&*model, time_s, *rbuf, fields,
+				NULL, NULL);
+
+printf("[%d] BB\n", gcm_params.gcm_rank);
+		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
+
+	}
 }
 
 int GCMCoupler::rank()
-{
-	int ret;
-	MPI_Comm_rank(comm, &ret);
-	return ret;
-}
+	{ return gcm_params.gcm_rank; }
 
 
 

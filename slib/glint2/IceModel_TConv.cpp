@@ -23,9 +23,11 @@ namespace glint2 {
 
 	IceModel_TConv::IceModel_TConv(std::unique_ptr<IceModel_Decode> &&_model,
 		double _LHM, double _SHI) :
-		IceModel_Decode(_model->ndata),
 		model(std::move(_model)), 
-		LHM(_LHM), SHI(_SHI) {}
+		LHM(_LHM), SHI(_SHI)
+	{
+		IceModel_Decode::init(_model->ndata());
+	}
 
  	/** Query all the ice models to figure out what fields they need */
 	void IceModel_TConv::get_required_fields(std::set<IceField> &fields)
@@ -55,9 +57,9 @@ printf("BEGIN IceModel_TConv::run_decoded(%f)\n", time_s);
 		// Augment with SURFACE_T
 		blitz::Array<double,1> mass(vals2.find(IceField::MASS_FLUX)->second);
 		blitz::Array<double,1> energy(vals2.find(IceField::ENERGY_FLUX)->second);
-		blitz::Array<double,1> surfacet(ndata);
+		blitz::Array<double,1> surfacet(ndata());
 
-		for (int i=0; i<ndata; ++i) {
+		for (int i=0; i<ndata(); ++i) {
 			surfacet(i) = (energy(i) / mass(i) + LHM) / SHI;
 		}
 		ovals.insert(std::make_pair(IceField::SURFACE_T, surfacet));

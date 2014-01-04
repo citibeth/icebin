@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <giss/time.hpp>
 #include <boost/enum.hpp>
 #include <boost/filesystem/path.hpp>
 #include <glint2/IceSheet.hpp>
@@ -32,7 +33,30 @@ BOOST_ENUM_VALUES( IceField, int,
 	(SURFACE_T)		(3)		// C (Computed T based on mass & energy flux)
 );
 
+
 class IceModel {
+public:
+	/** Parameters passed from the GCM through to the ice model.
+	These parameters cannot be specific to either the ice model or the GCM. */
+	struct GCMParams {
+		MPI_Comm gcm_comm;		// MPI communicator used by the GCM
+		int gcm_rank;			// Rank of this process in gcm_comm
+		int gcm_root;			// Rank of root process in gcm_comm
+		boost::filesystem::path config_dir;	// Where to look for Ice Model configuration files
+		giss::time::tm time_base;	// Corresponds to time_s == 0
+
+		GCMParams();
+
+		GCMParams(
+			MPI_Comm const _gcm_comm,
+			int _gcm_root,
+			boost::filesystem::path const &_config_dir,
+			giss::time::tm const &_time_base);
+	};
+
+protected:
+	GCMParams gcm_params;
+	
 public:
 	BOOST_ENUM_VALUES( Type, int,
 		(DISMAL)		(0)		// Demo Ice Sheet Model and LandIce
@@ -42,8 +66,21 @@ public:
 
 	virtual ~IceModel() {}
 
-	/** Initialize any grid information, etc. from the IceSheet struct. */
-//	virtual void init(IceSheet *sheet);
+	void init(IceModel::GCMParams const &_gcm_params)
+	{ gcm_params = _gcm_params; }
+
+	/** Initialize any grid information, etc. from the IceSheet struct.
+	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
+	virtual void init(
+		IceModel::GCMParams const &gcm_params,
+		std::shared_ptr<glint2::Grid> const &grid2,
+		NcFile &nc,
+		std::string const &vname_base,
+		NcVar *const_var)
+	{
+		fprintf(stderr, "IceModel::init() must be implemented!\n");
+		throw std::exception();
+	}
 
  	/** Query all the ice models to figure out what fields they need */
 	virtual void get_required_fields(std::set<IceField> &fields) = 0;
@@ -51,7 +88,7 @@ public:
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc.
-	@param time_s Seconds since beginning of simulation.
+	@param time_s Seconds since GCMParams::time_base
 	Helps with debugging. */
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
@@ -61,8 +98,7 @@ public:
 };
 
 extern std::unique_ptr<IceModel> read_icemodel(
-	MPI_Comm gcm_comm,
-	boost::filesystem::path const &config_dir,
+	IceModel::GCMParams const &gcm_params,
 	NcFile &nc, std::string const &vname, IceSheet const *sheet = NULL);
 
 }

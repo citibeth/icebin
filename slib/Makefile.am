@@ -32,8 +32,8 @@ libglint2_la_SOURCES = \
 	glint2/GridDomain_Listed.cpp \
 	glint2/gridutil.cpp \
 	glint2/HCIndex.cpp \
+	glint2/IceModel.cpp \
 	glint2/IceModel_Decode.cpp \
-	glint2/IceModel_TConv.cpp \
 	glint2/IceModel_DISMAL.cpp \
 	glint2/IceSheet.cpp \
 	glint2/IceSheet_L0.cpp \
@@ -47,6 +47,10 @@ libglint2_la_SOURCES = \
 	glint2/pism/PSConstantGLINT2.cpp \
 	glint2/pism/IceModel_PISM.cpp \
 	glint2/pism/PISMIceModel.cpp
+
+# Deprecated, at least temporarily
+#	glint2/IceModel_TConv.cpp
+
 
 FORTRAN_SOURCES = \
 	giss/f90blitz_f.f90 \
@@ -93,7 +97,8 @@ f90_deps.mk : ../f90_mod_deps.py $(FORTRAN_SOURCES)
 nobase_include_HEADERS = \
 	$(shell find . -name '*.hpp') \
 	$(shell find . -name '*.h') \
-	ncutil_mod.mod qpt_x.mod c_loc_x.mod zd11_x.mod
+	ncutil_mod.mod qpt_x.mod c_loc_x.mod zd11_x.mod \
+	f90blitz.mod glint2_modele.mod
 
 #	$(shell find . -name '*.mod')
 

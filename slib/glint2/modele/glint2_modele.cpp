@@ -22,7 +22,7 @@
 #include <giss/f90blitz.hpp>
 #include <glint2/HCIndex.hpp>
 #include <glint2/modele/glint2_modele.hpp>
-#include <glint2/IceModel_TConv.hpp>
+//#include <glint2/IceModel_TConv.hpp>
 #include <boost/filesystem.hpp>
 
 using namespace glint2;
@@ -44,24 +44,36 @@ extern "C" glint2_modele *glint2_modele_new(
 	int j0s, int j1s,
 
 	// Info about size of a timestep
+	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
 	double dtsrc,
 
 	// MPI Stuff
-	int comm_f, int root,
+	MPI_Fint comm_f, int root,
 
 	// Constants passed in directly from ModelE
 	double LHM, double SHI)
 {
-	printf("***** BEGIN glint2_modele()\n");
+//iyear1=1950;		// Hard-code iyear1 because it hasn't been initialized yet in ModelE
+	printf("***** BEGIN glint2_modele_new()\n");
 
 	// Convert Fortran arguments
 	std::string glint2_config_fname(glint2_config_fname_f, glint2_config_fname_len);
 	std::string maker_vname(maker_vname_f, maker_vname_len);
 
 	// Parse directory out of glint2_config_fname
-printf("glint2_config_fname = %s\n", glint2_config_fname.c_str());
-	boost::filesystem::path glint2_config_dir(boost::filesystem::path(glint2_config_fname).parent_path());
+	boost::filesystem::path glint2_config_rfname = boost::filesystem::canonical(glint2_config_fname);
+printf("glint2_config_rfname = %s\n", glint2_config_rfname.c_str());
+	boost::filesystem::path glint2_config_dir(glint2_config_rfname.parent_path());
 std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
+
+	// Set up parmaeters from the GCM to the ice model
+	IceModel::GCMParams gcm_params(
+		MPI_Comm_f2c(comm_f),
+		root,
+		glint2_config_dir,
+		giss::time::tm(iyear1, 1, 1));
+
+printf("iyear1 = %d\n", iyear1);
 
 	// Allocate our return variable
 	std::unique_ptr<glint2_modele> api(new glint2_modele());
@@ -79,19 +91,26 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 	// Load the MatrixMaker	(filtering by our domain, of course)
 	// Also load the ice sheets
 	api->maker.reset(new MatrixMaker(true, std::move(mdomain)));
-	NcFile glint2_config_nc(glint2_config_fname.c_str(), NcFile::ReadOnly);
+
+	// ModelE makes symlinks to our real files, which we don't want.
+
+	printf("Opening GLINT2 config file: %s\n", glint2_config_rfname.c_str());
+	NcFile glint2_config_nc(glint2_config_rfname.c_str(), NcFile::ReadOnly);
 	api->maker->read_from_netcdf(glint2_config_nc, maker_vname);
 	api->maker->realize();
 
 	// Read the coupler, along with ice model proxies
-	api->gcm_coupler.reset(new GCMCoupler(MPI_Comm_f2c(comm_f), root));
-	api->gcm_coupler->read_from_netcdf(glint2_config_dir, glint2_config_nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
+	MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
+	api->gcm_coupler.reset(new GCMCoupler(gcm_params));
+	api->gcm_coupler->read_from_netcdf(glint2_config_nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
 	glint2_config_nc.close();
 
 	// TODO: Test that im and jm are consistent with the grid read.
 #endif
 
-#if 1
+#if 0
+// THis crashes anyway...
+printf("AA1\n");
 	// Add adapters to the ice models, if needed
 	for (auto ii=api->gcm_coupler->models.super::begin();
 		ii != api->gcm_coupler->models.super::end(); ++ii)
@@ -105,11 +124,12 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 			// This ice model wants SURFACE_T... add an adapter
 			ii->second.release();
 			std::unique_ptr<IceModel> model(std::move(ii->second));
-			ii->second.reset(new IceModel_TConv(
+			ii->second.reset(new IceModel_TConv())
 				std::unique_ptr<IceModel_Decode>(imd),
 				LHM, SHI));
 		}
 	}
+printf("AA1\n");
 #endif
 
 	printf("***** END glint2_modele_new()\n");

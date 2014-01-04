@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <boost/filesystem.hpp>
 #include <mpi.h>		// Must be first
+#include <boost/filesystem.hpp>
 #include <glint2/IceModel_DISMAL.hpp>
 #include <cstdio>
 #include <cmath>
@@ -27,17 +27,25 @@ namespace glint2 {
 // Arguments that are paths, and thus need pathname resolution
 static std::set<std::string> path_args = {"output_dir"};
 
-IceModel_DISMAL::IceModel_DISMAL(Grid_XY const &grid,
-boost::filesystem::path const &config_dir,
-NcVar *dismal_var, NcVar *const_var) :
-	IceModel_Decode(grid),
-	nx(grid.nx()), ny(grid.ny()),
-	output_dir(boost::filesystem::absolute(
-		boost::filesystem::path(giss::get_att(dismal_var, "output_dir")->as_string(0)),
-		config_dir))
+void IceModel_DISMAL::IceModel_DISMAL::init(
+		IceModel::GCMParams const &_gcm_params,
+		std::shared_ptr<glint2::Grid> const &grid2,
+		NcFile &nc,
+		std::string const &vname_base,
+		NcVar *const_var)
 {
-}
+	printf("BEGIN IceModel_DISMAL::init(%s)\n", vname_base.c_str());
 
+	IceModel_Decode::init(_gcm_params, grid2->ndata());
+	auto grid2_xy = dynamic_cast<Grid_XY const *>(&*grid2);
+	nx = grid2_xy->nx();
+	ny = grid2_xy->ny();
+	auto dismal_var = nc.get_var((vname_base + ".dismal").c_str());	// DISMAL parameters
+	output_dir = boost::filesystem::absolute(
+		boost::filesystem::path(giss::get_att(dismal_var, "output_dir")->as_string(0)),
+		gcm_params.config_dir);
+	printf("END IceModel_DISMAL::int()\n");
+}
 
 
 /** Query all the ice models to figure out what fields they need */
@@ -45,7 +53,7 @@ void IceModel_DISMAL::get_required_fields(std::set<IceField> &fields)
 {
 	fields.insert(IceField::MASS_FLUX);
 	fields.insert(IceField::ENERGY_FLUX);
-	fields.insert(IceField::SURFACE_T);
+//	fields.insert(IceField::SURFACE_T);
 	fields.insert(IceField::TG2);
 }
 
@@ -57,40 +65,40 @@ TODO: More params need to be added.  Time, return values, etc. */
 void IceModel_DISMAL::run_decoded(double time_s,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
 {
+	// Only need to run one copy of this
+	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
+
+printf("BEGIN IceModel_DISMAL::run_decoded\n");
 	auto mass(get_field(vals2, IceField::MASS_FLUX));
 	auto energy(get_field(vals2, IceField::ENERGY_FLUX));
 	auto surfacet(get_field(vals2, IceField::SURFACE_T));
 	auto tg2(get_field(vals2, IceField::TG2));
-#if 0
-	// Re-shape the arrays
-	blitz::Array<double,2> const mass(
-		const_cast<double *>(vals2.find(IceField::MASS_FLUX)->second.data()),
-		blitz::shape(ny,nx), blitz::neverDeleteData);
-	blitz::Array<double,2> const energy(
-		const_cast<double *>(vals2.find(IceField::ENERGY_FLUX)->second.data()),
-		blitz::shape(ny,nx), blitz::neverDeleteData);
-	blitz::Array<double,2> surfacet(
-		const_cast<double *>(vals2.find(IceField::SURFACE_T)->second.data()),
-		blitz::shape(ny,nx), blitz::neverDeleteData);
-#endif
 
 	char fname[30];
-	sprintf(fname, "dismal-%ld.nc", (long)time_s);
-	NcFile ncout((output_dir / fname).string().c_str(), NcFile::Replace);
+	long time_day = (int)(time_s / 86400. + .5);
+	sprintf(fname, "%ld-dismal.nc", time_day);
+	auto full_fname(output_dir / fname);
+	printf("IceModel_DISMAL writing to: %s\n", full_fname.c_str());
+	NcFile ncout(full_fname.c_str(), NcFile::Replace);
 
 	std::vector<boost::function<void ()>> fns;
 	NcDim *nx_dim = ncout.add_dim("nx", nx);
 	NcDim *ny_dim = ncout.add_dim("ny", ny);
 
 	// Define variables
-	fns.push_back(giss::netcdf_define(ncout, "mass", mass, {ny_dim, nx_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "energy", energy, {ny_dim, nx_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "T", surfacet, {ny_dim, nx_dim}));
-	fns.push_back(giss::netcdf_define(ncout, "TG2", tg2, {ny_dim, nx_dim}));
+	if (vals2.find(IceField::MASS_FLUX) != vals2.end())
+		fns.push_back(giss::netcdf_define(ncout, "mass", mass, {ny_dim, nx_dim}));
+	if (vals2.find(IceField::ENERGY_FLUX) != vals2.end())
+		fns.push_back(giss::netcdf_define(ncout, "energy", energy, {ny_dim, nx_dim}));
+	if (vals2.find(IceField::SURFACE_T) != vals2.end())
+		fns.push_back(giss::netcdf_define(ncout, "T", surfacet, {ny_dim, nx_dim}));
+	if (vals2.find(IceField::TG2) != vals2.end())
+		fns.push_back(giss::netcdf_define(ncout, "TG2", tg2, {ny_dim, nx_dim}));
 
 	// Write data to netCDF file
 	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
 	ncout.close();
+printf("END IceModel_DISMAL::run_decoded\n");
 }
 
 

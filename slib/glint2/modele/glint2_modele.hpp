@@ -67,10 +67,11 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 	int j0s, int j1s,
 
 	// Info about size of a timestep (DTsrc defined in ModelE's MODEL_COM.f)
+	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
 	double dtsrc,
 
 	// MPI Stuff
-	int comm_f, int root,
+	MPI_Fint comm_f, int root,
 
 	// Constants from ModelE
 	double LHM, double SHI);

@@ -27,7 +27,7 @@ void IceModel_Decode::run_timestep(double time_s,
 	blitz::Array<int,1> const &indices,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
 {
-printf("BEGIN IceModel_Decode::run_timestep(%f)\n", time_s);
+printf("BEGIN IceModel_Decode::run_timestep(%f) size=%ld\n", time_s, indices.size());
 	std::map<IceField, blitz::Array<double,1>> vals2d;	/// Decoded fields
 
 	// Loop through the fields we require
@@ -45,14 +45,14 @@ printf("Looking for required field %s\n", field->str());
 		blitz::Array<double,1> vals(ii->second);
 
 		// Decode the field!
-		blitz::Array<double,1> valsd(ndata);
+		blitz::Array<double,1> valsd(ndata());
 		valsd = nan;
 		int n = indices.size();
 		for (int i=0; i < n; ++i) {
 			int ix = indices(i);
 			// Do our own bounds checking!
-			if (ix < 0 || ix >= ndata) {
-				fprintf(stderr, "IceModel: index %d out of range [0, %d)\n", ix, ndata);
+			if (ix < 0 || ix >= ndata()) {
+				fprintf(stderr, "IceModel: index %d out of range [0, %d)\n", ix, ndata());
 				throw std::exception();
 			}
 
@@ -72,6 +72,7 @@ printf("Looking for required field %s\n", field->str());
 
 		// Store decoded field in our output
 		vals2d.insert(std::make_pair(*field, valsd));
+printf("Done decoding required field, %s\n", field->str());
 	}
 
 	// Pass decoded fields on to subclass

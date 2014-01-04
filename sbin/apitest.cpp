@@ -110,6 +110,8 @@ int main(int argc, char **argv)
 		j0s, j1s,
 //		2, jm-1,
 
+		// iyear
+		1950,
 		// dtsrc  (see MODEL_COM.f)
 		3600.,
 
