@@ -27,7 +27,7 @@ std::unique_ptr<IceModel> read_icemodel(
 	IceModel::GCMParams const &gcm_params,
 	NcFile &nc,
 	std::string const &vname,
-	IceSheet const *sheet)
+	IceSheet *sheet)
 {
 	printf("BEGIN read_icemodel(%s)\n", vname.c_str());
 	auto info_var = nc.get_var((vname + ".info").c_str());
@@ -46,8 +46,8 @@ std::unique_ptr<IceModel> read_icemodel(
 			break;
 	}
 	ice_model->init(gcm_params, sheet->grid2, nc, vname, const_var);
+	ice_model->update_ice_sheet(nc, vname, sheet);
 
-	ice_model->read_from_netcdf(nc, vname);
 	return ice_model;
 	printf("END read_icemodel(%s)\n", vname.c_str());
 }

@@ -76,6 +76,80 @@ void IceModel_PISM::init(
 	printf("END IceModel_PISM::init()\n");
 }
 
+void IceModel_PISM::update_ice_sheet(
+	NcFile &nc,
+	std::string const &vname,
+	IceSheet *sheet)
+{
+	printf("BEGIN IceModel_PISM::update_ice_sheet(%s)\n", vname.c_str());
+
+	auto pism_var = nc.get_var((vname + ".pism").c_str());	// PISM parameters
+	auto pism_i_att(giss::get_att(pism_var, "i"));	// PISM -i argument (input file)
+	std::string pism_i = boost::filesystem::absolute(boost::filesystem::path(
+		pism_i_att->as_string(0)), gcm_params.config_dir).string();
+
+	// Read variables from PISM input file
+	// byte mask(time, x, y) ;
+	// 		mask:units = "" ;
+	// 		mask:coordinates = "lat lon" ;
+	// 		mask:flag_meanings = "ice_free_bedrock grounded_ice floating_ice ice_free_ocean" ;
+	// 		mask:grid_mapping = "mapping" ;
+	// 		mask:long_name = "ice-type (ice-free/grounded/floating/ocean) integer mask" ;
+	// 		mask:pism_intent = "diagnostic" ;
+	// 		mask:flag_values = 0b, 2b, 3b, 4b ;
+	// double thk(time, x, y) ;
+	// 		thk:units = "m" ;
+	// 		thk:valid_min = 0. ;
+	// 		thk:coordinates = "lat lon" ;
+	// 		thk:grid_mapping = "mapping" ;
+	// 		thk:long_name = "land ice thickness" ;
+	// 		thk:pism_intent = "model_state" ;
+	// 		thk:standard_name = "land_ice_thickness" ;
+	// double topg(time, x, y) ;
+	// 		topg:units = "m" ;
+	// 		topg:coordinates = "lat lon" ;
+	// 		topg:grid_mapping = "mapping" ;
+	// 		topg:long_name = "bedrock surface elevation" ;
+	// 		topg:pism_intent = "model_state" ;
+	// 		topg:standard_name = "bedrock_altitude" ;
+printf("Opening PISM file for elev2 and mask2: %s\n", pism_i.c_str());
+	NcFile ncin(pism_i.c_str());
+	long ntime = ncin.get_dim("time")->size();
+	long nx = ncin.get_dim("x")->size();
+	long ny = ncin.get_dim("y")->size();
+
+	blitz::Array<ncbyte,2> mask(nx, ny);
+	NcVar *mask_var = ncin.get_var("mask");
+	mask_var->set_cur(ntime-1, 0, 0);
+	mask_var->get(mask.data(), 1, nx, ny);
+
+	NcVar *thk_var = ncin.get_var("thk");
+	blitz::Array<double,2> thk(nx, ny);
+	thk_var->set_cur(ntime-1, 0, 0);
+	thk_var->get(thk.data(), 1, nx, ny);
+
+	NcVar *topg_var = ncin.get_var("topg");
+	blitz::Array<double,2> topg(nx, ny);
+	topg_var->set_cur(ntime-1, 0, 0);
+	topg_var->get(topg.data(), 1, nx, ny);
+
+	ncin.close();
+
+	// Transpose and copy the data
+	if (!sheet->mask2.get()) sheet->mask2.reset(
+		new blitz::Array<int,1>(glint2_grid->ndata()));
+	for (int i=0; i<nx; ++i) {
+	for (int j=0; j<ny; ++j) {
+		int ix2 = glint2_grid->ij_to_index(i, j);
+		sheet->elev2(ix2) = topg(i,j) + thk(i,j);
+		// Mask uses same convention as MATPLOTLIB: 1 = masked out
+		(*sheet->mask2)(ix2) = (mask(i,j) == 2 ? 0 : 1);
+	}}
+
+	printf("END IceModel_PISM::update_ice_sheet()\n");
+}
+
+
 
 IceModel_PISM::~IceModel_PISM()
 {
@@ -331,7 +405,8 @@ printf("BY_ICE_DENSITY = %f\n", BY_ICE_DENSITY);
 				// GLINT2: C --> PISM: K
 				for (int ix0=0; ix0<ndata(); ++ix0) {
 					if (std::isnan(val(ix0))) {
-						g2_y[nval] = 273.15;
+//						g2_y[nval] = giss::C2K;
+continue;		// GLINT2 and PISM land surface masks must match!
 					} else {
 						g2_y[nval] = val(ix0) + giss::C2K;
 					}

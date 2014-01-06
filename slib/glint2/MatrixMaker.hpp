@@ -49,9 +49,6 @@ BOOST_ENUM_VALUES( QPAlgorithm, int,
 class MatrixMaker
 {
 public:
-//	std::map<int, std::unique_ptr<IceSheet>> sheets;
-
-//	std::vector<string> sheet_names;	// Gives numbering of ALL sheets as well as names
     giss::MapDict<std::string, IceSheet> sheets;
 	std::map<int, IceSheet *> sheets_by_id;
 	std::unique_ptr<HCIndex> hc_index;	// Methods to extract i1 and ihc from an elevation index
@@ -69,8 +66,6 @@ public:
 		domain(std::move(_domain)),
 		correct_area1(_correct_area1) {}
 
-//	std::vector<std::unique_ptr<IceSheet>> sheets;
-	
 	/** These are all left public because someone will probably want
 	to look at / use them. */
 

@@ -38,7 +38,7 @@ void GCMCoupler::read_from_netcdf(
 	NcFile &nc,
 	std::string const &vname,
 	std::vector<std::string> const &sheet_names,
-    giss::MapDict<std::string, IceSheet> const &sheets)
+    giss::MapDict<std::string, IceSheet> &sheets)
 {
 	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 	int i = 0;

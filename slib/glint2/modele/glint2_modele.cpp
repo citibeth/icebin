@@ -97,13 +97,20 @@ printf("iyear1 = %d\n", iyear1);
 	printf("Opening GLINT2 config file: %s\n", glint2_config_rfname.c_str());
 	NcFile glint2_config_nc(glint2_config_rfname.c_str(), NcFile::ReadOnly);
 	api->maker->read_from_netcdf(glint2_config_nc, maker_vname);
-	api->maker->realize();
 
 	// Read the coupler, along with ice model proxies
 	MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
 	api->gcm_coupler.reset(new GCMCoupler(gcm_params));
 	api->gcm_coupler->read_from_netcdf(glint2_config_nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
 	glint2_config_nc.close();
+
+	// Check bounds on the IceSheets, set up any state, etc.
+	// This is done AFTER setup of gcm_coupler because gcm_coupler->read_from_netcdf()
+	// might change the IceSheet, in certain cases.
+	// (for example, if PISM is used, elev2 and mask2 will be read from related
+	// PISM input file, and the version in the GLINT2 file will be ignored)
+	api->maker->realize();
+
 
 	// TODO: Test that im and jm are consistent with the grid read.
 #endif
@@ -172,29 +179,6 @@ std::cout << "fgice1_f: " << fgice1_f << std::endl;
 std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
 
 	ModelEDomain &domain(*api->domain);
-
-#if 0
-{
-NcFile nc("fgice1_0.nc", NcFile::Replace);
-auto fgice1(fgice1_f.to_blitz());
-auto fgice1_c(giss::f_to_c(fgice1));
-auto a(giss::netcdf_define(nc, "fgice1", fgice1_c));
-a();
-nc.close();
-}
-#endif
-
-#if 0
-printf("domain: (%d %d) (%d %d %d %d) (%d %d %d %d) (%d %d)\n",
-domain.im, domain.jm,
-domain.i0h_f, domain.i1h_f, domain.j0h_f, domain.j1h_f,
-domain.i0_f, domain.i1_f, domain.j0_f, domain.j1_f,
-domain.j0s_f, domain.j1s_f);
-
-printf("grid1->size() = %ld\n", api->maker->grid1->ncells_realized());
-#endif
-
-//printf("Addresses:\n%p\n%p\n%p\n%p\n%p\n", fgice1_glint2_f.base, fgice1_f.base, fgrnd1_f.base, focean1_f.base, flake1_f.base);
 
 	// Reconstruct arrays, using Fortran conventions
 	// (smallest stride first, whatever-based indexing it came with)

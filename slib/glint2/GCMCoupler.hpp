@@ -61,7 +61,7 @@ public:
 	virtual void read_from_netcdf(
 		NcFile &nc, std::string const &vname,
 		std::vector<std::string> const &sheet_names,
-	    giss::MapDict<std::string, IceSheet> const &sheets);
+	    giss::MapDict<std::string, IceSheet> &sheets);
 
 	/** Returns a unique rank number for each node in the parallel computation.
 	Useful for debugging-type output. */

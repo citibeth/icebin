@@ -76,6 +76,12 @@ public:
 		std::string const &vname_base,
 		NcVar *const_var);
 
+
+	void update_ice_sheet(
+		NcFile &nc,
+		std::string const &vname,
+		IceSheet *sheet);
+
 	~IceModel_PISM();
 
 	/** Query all the ice models to figure out what fields they need */

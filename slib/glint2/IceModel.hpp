@@ -94,11 +94,18 @@ public:
 		blitz::Array<int,1> const &indices,
 		std::map<IceField, blitz::Array<double,1>> const &vals2) = 0;
 
-	virtual void read_from_netcdf(NcFile &nc, std::string const &vname) {}
+	/** Allows the IceModel to change the inputs used to create the
+	regridding transformations.  This is used, for example, to make
+	elev2 and mask2 consistent with an existing ice model (eg, PISM).
+	It is called after init().
+	Default implementation is to do nothing. */
+	virtual void update_ice_sheet(NcFile &nc, std::string const &vname,
+		IceSheet *sheet) {}
+
 };
 
 extern std::unique_ptr<IceModel> read_icemodel(
 	IceModel::GCMParams const &gcm_params,
-	NcFile &nc, std::string const &vname, IceSheet const *sheet = NULL);
+	NcFile &nc, std::string const &vname, IceSheet *sheet = NULL);
 
 }
