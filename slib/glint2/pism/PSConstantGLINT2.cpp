@@ -28,7 +28,7 @@ namespace pism {
 ///// ice surface temperature parameterized as in PISM-GLINT2 dependent on latitude and surface elevation
 
 
-PSConstantGLINT2::PSConstantGLINT2(IceGrid &g, const NCConfigVariable &conf)
+PSConstantGLINT2::PSConstantGLINT2(IceGrid &g, const ::PISMConfig &conf)
 	: PISMSurfaceModel(g, conf)
 {
 	PetscErrorCode ierr = allocate_PSConstantGLINT2(); CHKERRCONTINUE(ierr);
@@ -48,7 +48,7 @@ printf("BEGIN PSConstantGLINT2::allocate_PSConstantGLINT2()\n");
 	PetscErrorCode ierr;
 
 printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx, grid.My);
-	ierr = climatic_mass_balance.create(grid, "climatic_mass_balance", false); CHKERRQ(ierr);
+	ierr = climatic_mass_balance.create(grid, "climatic_mass_balance", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = climatic_mass_balance.set_attrs("climate_state",
 		"constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
 		"m s-1",
@@ -56,7 +56,7 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 	ierr = climatic_mass_balance.set_glaciological_units("m year-1"); CHKERRQ(ierr);
 	climatic_mass_balance.write_in_glaciological_units = true;
 
-	ierr = ice_surface_temp.create(grid, "ice_surface_temp", false); CHKERRQ(ierr);
+	ierr = ice_surface_temp.create(grid, "ice_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = ice_surface_temp.set_attrs("climate_state",
 		"constant-in-time ice temperature at the ice surface",
 		"K", ""); CHKERRQ(ierr);
@@ -96,7 +96,7 @@ printf("BEGIN PSConstantGLINT2::init()\n");
 		"		reading ice-equivalent surface mass balance rate 'climatic_mass_balance' from %s ... \n",
 		input_file.c_str()); CHKERRQ(ierr);
 	if (do_regrid) {
-		ierr = climatic_mass_balance.regrid(input_file, true); CHKERRQ(ierr); // fails if not found!
+		ierr = climatic_mass_balance.regrid(input_file, CRITICAL); CHKERRQ(ierr); // fails if not found!
 	} else {
 		ierr = climatic_mass_balance.read(input_file, start); CHKERRQ(ierr); // fails if not found!
 	}

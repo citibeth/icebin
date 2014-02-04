@@ -19,8 +19,8 @@
 #pragma once
 
 #include <boost/function.hpp>
+#include <giss/blitz.hpp>
 #include <glint2/Grid.hpp>
-//#include "geometry.hpp"
 
 namespace glint2 {
 
@@ -59,6 +59,21 @@ public:
 		i = index - j*n;
 	}
 
+	template<class T>
+	blitz::Array<T,2> reshape_1d_to_xy(blitz::Array<T,1> &arr1d);
+
+	template<class T>
+	blitz::Array<T,1> reshape_xy_to_1d(blitz::Array<T,2> &arrxy);
+
+
+	template<class T>
+	blitz::Array<T,2> const reshape_1d_to_xy(blitz::Array<T,1> const &arr1d);
+
+	template<class T>
+	blitz::Array<T,1> const reshape_xy_to_1d(blitz::Array<T,2> const &arr_xy);
+
+
+
 	/** Create a new Cartesian grid with arbitrary grid cell boundaries.
 	@param name Value of <generic-name>.info:name in netCDF file.
 	@param xb x-axis boundaries of grid cells, sorted low to high.
@@ -82,6 +97,27 @@ public:
 	virtual void read_from_netcdf(NcFile &nc, std::string const &vname);
 
 };
+
+// -----------------------------------------------------------------
+
+template<class T>
+blitz::Array<T,2> Grid_XY::reshape_1d_to_xy(blitz::Array<T,1> &arr_1d)
+	{ return giss::reshape<T, 1, 2>(arr_1d, blitz::shape(ny(), nx())); }
+
+template<class T>
+blitz::Array<T,1> Grid_XY::reshape_xy_to_1d(blitz::Array<T,2> &arr_xy)
+	{ return giss::reshape<T, 2, 1>(arr_xy, blitz::shape(ny() * nx())); }
+
+
+/// Const versions
+template<class T>
+blitz::Array<T,2> const Grid_XY::reshape_1d_to_xy(blitz::Array<T,1> const &arr_1d)
+	{ return giss::reshape<T, 1, 2>(arr_1d, blitz::shape(ny(), nx())); }
+
+template<class T>
+blitz::Array<T,1> const Grid_XY::reshape_xy_to_1d(blitz::Array<T,2> const &arr_xy)
+	{ return giss::reshape<T, 2, 1>(arr_xy, blitz::shape(ny() * nx())); }
+
 
 // -----------------------------------------------------------------
 

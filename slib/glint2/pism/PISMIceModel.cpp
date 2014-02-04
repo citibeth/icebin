@@ -3,7 +3,7 @@
 namespace glint2 {
 namespace pism {
 
-PISMIceModel::PISMIceModel(IceGrid &g, NCConfigVariable &config, NCConfigVariable &overrides) :
+PISMIceModel::PISMIceModel(IceGrid &g, PISMConfig &config, PISMConfig &overrides) :
 	::IceModel(g, config, overrides)
 {}
 

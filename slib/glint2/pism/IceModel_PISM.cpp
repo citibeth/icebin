@@ -1,4 +1,5 @@
 #include <mpi.h>	// For Intel MPI, mpi.h must be included before stdio.h
+#include <PISMStressBalance.hh>
 #include <glint2/pism/IceModel_PISM.hpp>
 #include <giss/ncutil.hpp>
 #include <boost/filesystem.hpp>
@@ -249,9 +250,9 @@ printf("Initializing PETSc\n");
 	petsc_context.reset(new PetscContext(pism_comm, argc, argv));
 
     unit_system.reset(new ::PISMUnitSystem(NULL));
-    config.reset(new ::NCConfigVariable(*unit_system));
-	overrides.reset(new ::NCConfigVariable(*unit_system));
-    ierr = init_config(pism_comm, pism_rank, *config, *overrides, true); CHKERRQ(ierr);
+    config.reset(new ::PISMConfig(pism_comm, "pism_config", *unit_system));
+	overrides.reset(new ::PISMConfig(pism_comm, "pism_overrides", *unit_system));
+    ierr = init_config(pism_comm, *config, *overrides, true); CHKERRQ(ierr);
 
 //#if 0
 //	if (pism_rank == 0) {
@@ -261,16 +262,16 @@ printf("Initializing PETSc\n");
 //	}
 //#endif
 
-    pism_grid.reset(new ::IceGrid(pism_comm, pism_rank, pism_size, *config));
+    pism_grid.reset(new ::IceGrid(pism_comm, *config));
 printf("pism_grid=%p: (xs,xm,ys,ym,Mx,My) = %d %d %d %d %d %d %ld %ld\n", &*pism_grid, pism_grid->xs, pism_grid->xm, pism_grid->ys, pism_grid->ym, pism_grid->Mx, pism_grid->My, pism_grid->x.size(), pism_grid->y.size());
     ice_model.reset(new PISMIceModel(*pism_grid, *config, *overrides));
 
 	// Transfer constants from GLINT2 to PISM
 	double ice_density = giss::get_att(const_var, "ice_density")->as_double(0);
-	config->set("ice_density", ice_density);
+	config->set_double("ice_density", ice_density);
 	BY_ICE_DENSITY = 1.0d / ice_density;
-	config->set("ice_specific_heat_cpacity", giss::get_att(const_var, "ice_specific_heat_capacity")->as_double(0));
-	config->set("ideal_gas_constant", giss::get_att(const_var, "ideal_gas_constant")->as_double(0));
+	config->set_double("ice_specific_heat_cpacity", giss::get_att(const_var, "ice_specific_heat_capacity")->as_double(0));
+	config->set_double("ideal_gas_constant", giss::get_att(const_var, "ideal_gas_constant")->as_double(0));
 
 
 printf("[%d] start = %f\n", pism_rank, pism_grid->time->start());
@@ -323,6 +324,14 @@ printf("IceModel_PISM checking grid dimensions: pism=(%d, %d) glint2=(%d, %d)\n"
 		throw std::exception();
 	}
 
+	// Initialize variables to store 2D sums of 3D things
+	// ice upper surface elevation
+	ierr = strain_heating2.create(*pism_grid, "strain_heating2", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = strain_heating2.set_attrs("internal",
+		"rate of strain heating in ice (dissipation heating), summed over column",
+		"W m-2", ""); CHKERRQ(ierr);
+
+
 	return 0;
 }
 
@@ -339,6 +348,97 @@ PetscErrorCode IceModel_PISM::deallocate()
 }
 
 
+// --------------------------------------------------------
+/** Sum a 3-D vector in the Z direction to create a 2-D vector.
+
+<p>Note that this sums up all the values in a column, including ones
+above the ice. This may or may not be what you need. Also, take a look
+at IceModel::compute_ice_enthalpy(PetscScalar &result) in iMreport.cc.</p>
+
+<p>As for the difference between IceModelVec2 and IceModelVec2S, the
+former can store fields with more than 1 "degree of freedom" per grid
+point (such as 2D fields on the "staggered" grid, with the first
+degree of freedom corresponding to the i-offset and second to
+j-offset).</p>
+
+<p>IceModelVec2S is just IceModelVec2 with "dof == 1", and
+IceModelVec2V is IceModelVec2 with "dof == 2". (Plus some extra
+methods, of course.)</p>
+
+<p>Either one of IceModelVec2 and IceModelVec2S would work in this
+case.</p>
+
+@see https://github.com/pism/pism/issues/229 */
+static int sum_columns(IceModelVec3 &input, IceModelVec2S &output)
+{
+  PetscScalar *column = NULL;
+  IceGrid &grid = *input.get_grid();
+  int ierr = 0;
+
+  ierr = input.begin_access(); CHKERRQ(ierr);
+  ierr = output.begin_access(); CHKERRQ(ierr);
+  for (PetscInt   i = grid.xs; i < grid.xs+grid.xm; ++i) {
+    for (PetscInt j = grid.ys; j < grid.ys+grid.ym; ++j) {
+      ierr = input.getInternalColumn(i, j, &column); CHKERRQ(ierr);
+
+      output(i,j) = 0.0;
+      for (unsigned int k = 0; k < grid.Mz; ++k)
+        output(i,j) += column[k];
+    }
+  }
+  ierr = output.end_access(); CHKERRQ(ierr);
+  ierr = input.end_access(); CHKERRQ(ierr);
+
+  return 0;
+}
+
+// --------------------------------------------------
+/** glint2_var Variable, already allocated, to receive data
+@param glint2_var_xy The array to write into.  If this array is not yet allocated,
+it will be allocated.*/
+PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var, blitz::Array<double,2> &ret)
+{
+	PetscErrorCode ierr;
+	Vec g;
+
+	auto xy_shape(blitz::shape(ny(), nx()));
+	if (ret.size() == 0) {
+		ret.reference(blitz::Array<double,2>(ny(), nx()));
+	} else {
+		if (ret.extent(0) != xy_shape[0] || ret.extent(1) != xy_shape[1]) {
+			fprintf(stderr, "IceModel_PISM::iceModelVec2S_to_blitz_xy(): ret(%d, %d) should be (%d, %d)\n", ret.extent(0), ret.extent(1), xy_shape[0], xy_shape[1]);
+			throw std::exception();
+		}
+	}
+
+	if (pism_var.get_dof() != 1)
+		SETERRQ(pism_grid->com, 1, "This method only supports IceModelVecs with dof == 1");
+
+	// Gather data to one processor
+	// See IceModelVec2::write (iceModelVec2.cc line ~154)
+    ierr = DMCreateGlobalVector(pism_var.get_da(), &g); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(pism_var.get_da(), pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(pism_var.get_da(), pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
+
+	// Copy it over into Blitz Array, changing indices along the way
+	PetscScalar *a_petsc;
+	ierr = VecGetArray(g, &a_petsc); CHKERRQ(ierr);
+	int npism = pism_grid->Mx * pism_grid->My;
+	for (int ix1=0; ix1<npism; ++ix1) {
+		// int ix0 = pism_to_glint2_index(ix1);
+		int ii, jj;
+		pism1d_to_ij(ix1, ii, jj);
+		if (jj > xy_shape[0] || ii > xy_shape[1]) {
+			fprintf(stderr, "Index out of bounds: %ld (%d, %d) bounds are (%d, %d)\n", ix1, jj, ii, xy_shape[0], xy_shape[1]);
+			throw std::exception();
+		}
+		ret(jj,ii) = a_petsc[ix1];
+//		ret(ii,jj) = a_petsc[ix1];
+	}
+	ierr = VecRestoreArray(g, &a_petsc); CHKERRQ(ierr);
+
+}
+// --------------------------------------------------
 void IceModel_PISM::run_decoded(double time_s,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
 {
@@ -350,6 +450,7 @@ void IceModel_PISM::run_decoded(double time_s,
 	}
 }
 
+// --------------------------------------------------
 
 PetscErrorCode IceModel_PISM::run_decoded_petsc(double time_s,
 	std::map<IceField, blitz::Array<double,1>> const &vals2)
@@ -393,11 +494,12 @@ printf("BY_ICE_DENSITY = %f\n", BY_ICE_DENSITY);
 					g2_y[nval] = val(ix0) * BY_ICE_DENSITY;
 //					g2_y[nval] = val(ix0);
 
-					int ii,jj;
-					glint2_grid->index_to_ij(ix0, ii, jj);
-					int ix1 = ii * glint2_grid->ny() + jj;
-					g2_ix[nval] = ix1;
+//					int ii,jj;
+//					glint2_grid->index_to_ij(ix0, ii, jj);
+//					int ix1 = ii * glint2_grid->ny() + jj;
+//					g2_ix[nval] = ix1;
 
+					g2_ix[nval] = glint2_to_pism1d(ix0);
 					++nval;
 				}
 			} break;
@@ -468,7 +570,41 @@ printf("[%d] BEGIN ice_model->run_to(%f) %p\n", pism_rank, time_s, ice_model.get
 	// Run PISM for one timestep
 	ice_model->run_to(time_s);
 
+	// Retrieve stuff from PISM
+	blitz::Array<double,2> geothermal_flux;
+	iceModelVec2S_to_blitz_xy(ice_model->geothermal_flux, geothermal_flux);
+
+	// Sum strain_heating over the Z direction and retrieve from PISM
+	IceModelVec3 *strain_heating3p;
+	ice_model->stress_balance->get_volumetric_strain_heating(strain_heating3p);
+	ierr = sum_columns(*strain_heating3p, strain_heating2); CHKERRQ(ierr);
+	blitz::Array<double,2> strain_heating2b;	// GLINT2-style array
+	iceModelVec2S_to_blitz_xy(strain_heating2, strain_heating2b);
+
 printf("[%d] END ice_model->run_to()\n");
+
+
+
+if (pism_rank == 0) {
+	char fname[30];
+	long time_day = (int)(time_s / 86400. + .5);
+	sprintf(fname, "%ld-pismout.nc", time_day);
+	auto full_fname(gcm_params.config_dir / "dismal_out2" / fname);
+	NcFile ncout(full_fname.c_str(), NcFile::Replace);
+
+	NcDim *ny_dim = ncout.add_dim("ny", ny());
+	NcDim *nx_dim = ncout.add_dim("nx", nx());
+
+	std::vector<boost::function<void ()>> fns;
+	fns.push_back(giss::netcdf_define(ncout, "strain_heating", strain_heating2b, {nx_dim, ny_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "geothermal_flux", geothermal_flux, {ny_dim, nx_dim}));
+	
+    // Write data to netCDF file
+    for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
+    ncout.close();
+}
+
+
 	return 0;
 }
 

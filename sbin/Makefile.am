@@ -48,8 +48,8 @@ blitztest_SOURCES = blitztest.cpp
 smulttest_SOURCES = smulttest.cpp
 
 if USE_PISM
-bin_PROGRAMS += pismr #pismconfig
-pismr_SOURCES = pismr.cpp
+#bin_PROGRAMS += pismr #pismconfig
+#pismr_SOURCES = pismr.cpp
 #pismconfig_SOURCES = pismconfig.cpp
 endif
 

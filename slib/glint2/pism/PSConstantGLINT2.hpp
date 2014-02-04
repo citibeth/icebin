@@ -38,8 +38,9 @@ class PSConstantGLINT2 : public PISMSurfaceModel {
 public:
 
 	/** @param conf Not Used (Looked up all the constructors, it just
-	sets this->config, whic his not used*/
-	PSConstantGLINT2(IceGrid &g, const NCConfigVariable &conf);
+	sets this->config, whic his not used
+	@param g glint2::IceGrid*/
+	PSConstantGLINT2(IceGrid &g, const ::PISMConfig &conf);
 
 	virtual PetscErrorCode init(PISMVars &vars);
 

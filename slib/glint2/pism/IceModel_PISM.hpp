@@ -39,8 +39,8 @@ class IceModel_PISM : public IceModel_Decode
 	// See: http://msdn.microsoft.com/en-us/library/8183zf3x%28v=vs.110%29.aspx
 	std::unique_ptr<PetscContext> petsc_context;
 	std::unique_ptr<::PISMUnitSystem> unit_system;
-	std::unique_ptr<::NCConfigVariable> config;
-	std::unique_ptr<::NCConfigVariable> overrides;
+	std::unique_ptr<::PISMConfig> config;
+	std::unique_ptr<::PISMConfig> overrides;
 	std::unique_ptr<::IceGrid> pism_grid;
 	std::unique_ptr<PISMIceModel> ice_model;
 	/** We retain ownership to this because IceModel::attach_surface_model() does not take ownership. */
@@ -52,6 +52,10 @@ class IceModel_PISM : public IceModel_Decode
 	Vec g2, g2natural;  //!< global Vecs used to transfer data to/from processor 0.
 	// VecScatter scatter; //!< VecScatter used to transfer data to/from processor 0.
 	// Vec Hp0;			//!< Resulting vector on process 0
+
+	// Temporary stuff to hold returns from PISM
+	IceModelVec2S strain_heating2;		//!< ice surface elevation; ghosted
+
 
 
 	// Corresponding PISM variable for each field
@@ -76,6 +80,40 @@ public:
 		std::string const &vname_base,
 		NcVar *const_var);
 
+	int nx() { return pism_grid->Mx; }
+	int ny() { return pism_grid->My; }
+
+	// ----------------------------------------------
+	/** Converts ij indices to PISM
+	@param i Index in x ("horizontal") direction
+	@param j Index in y ("vertical") direction, toward the poles */
+	long ij_to_pism1d(int i, int j) const
+		{ return i * glint2_grid->ny() + j; }
+
+	void pism1d_to_ij(long ix1, int &i, int &j)
+	{
+		i = ix1 / ny();
+		j = ix1 - (i * ny());
+	}
+
+	// ----------------------------------------------
+	long pism1d_to_glint2(long ix_pism)
+	{
+		int i, j;
+		pism1d_to_ij(ix_pism, i, j);
+		return glint2_grid->ij_to_index(i, j);
+	}
+
+	long glint2_to_pism1d(long ix_glint2)
+	{
+		int i, j;
+		glint2_grid->index_to_ij(ix_glint2, i, j);
+		return ij_to_pism1d(i, j);
+	}
+
+	// ----------------------------------------------
+	PetscErrorCode iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var, blitz::Array<double,2> &ret);
+	// ----------------------------------------------
 
 	void update_ice_sheet(
 		NcFile &nc,

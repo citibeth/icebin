@@ -139,4 +139,37 @@ blitz::Array<T, rank> f_to_c(blitz::Array<T, rank> &arr)
 	return ret;
 }
 
+
+#define RESHAPE_BODY \
+	/* Check dimensions */ \
+	long src_n = 1; \
+	for (int i=0; i<src_ndim; ++i) src_n *= src.extent[i]; \
+	long dest_n = 1; \
+	for (int i=0; i<dest_ndim; ++i) dest_n *= dest_shape[i]; \
+	if (src_n != dest_n) { \
+		fprintf(stderr, "blitz.hpp, giss::reshape(): Total dimension mismatch, src=%ld, dest=%ld\n", src_n, dest_n); \
+		throw std::exception(); \
+	} \
+ \
+	/* Do the reshaping */ \
+	return blitz::Array<T,dest_ndim>(src.data(), dest_shape, blitz::neverDeleteData)
+
+
+
+/** Reshape an array.  As long as src and dest have same total number
+of elements.  Assumes a dense array on both sides. */
+template<class T, int src_ndim, int dest_ndim>
+extern blitz::Array<T, dest_ndim> reshape(
+	blitz::Array<T, src_ndim> &src,
+	blitz::TinyVector<int,dest_ndim> const dest_shape)
+{ RESHAPE_BODY; }
+
+/** Reshape an array.  As long as src and dest have same total number
+of elements.  Assumes a dense array on both sides. */
+template<class T, int src_ndim, int dest_ndim>
+extern blitz::Array<T, dest_ndim> const reshape(
+	blitz::Array<T, src_ndim> const &src,
+	blitz::TinyVector<int,dest_ndim> const dest_shape)
+{ RESHAPE_BODY; }
+
 }

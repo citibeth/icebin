@@ -39,7 +39,7 @@ class PISMIceModel : public ::IceModel
 public:
 
 	// see iceModel.cc for implementation of constructor and destructor:
-	PISMIceModel(IceGrid &g, NCConfigVariable &config, NCConfigVariable &overrides);
+	PISMIceModel(IceGrid &g, PISMConfig &config, PISMConfig &overrides);
 	virtual ~PISMIceModel(); // must be virtual merely because some members are virtual
 
 	virtual PetscErrorCode allocate_couplers();
