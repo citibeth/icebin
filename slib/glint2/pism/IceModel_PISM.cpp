@@ -311,11 +311,14 @@ printf("pism_grid->max_stencil_width = %d\n", pism_grid->max_stencil_width);
 
 	ierr = DMCreateGlobalVector(da2, &g2); CHKERRQ(ierr);
 
-	// note we want a global Vec but reordered in the natural ordering so when it is
-	// scattered to proc zero it is not all messed up; see above
+
+	// note we want a global Vec but reordered in the natural ordering
+	// so when it is scattered to proc zero it is not all messed up;
+	// see above
 	ierr = DMDACreateNaturalVector(da2, &g2natural); CHKERRQ(ierr);
+
 	// next get context *and* allocate samplep0 (on proc zero only, naturally)
-//	ierr = VecScatterCreateToZero(g2natural, &scatter, &Hp0); CHKERRQ(ierr);
+	ierr = VecScatterCreateToZero(g2natural, &scatter, &Hp0); CHKERRQ(ierr);
 
 	// Check that grid dimensions match
 printf("IceModel_PISM checking grid dimensions: pism=(%d, %d) glint2=(%d, %d)\n", pism_grid->Mx, pism_grid->My, glint2_grid->nx(), glint2_grid->ny());
@@ -401,6 +404,10 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 	PetscErrorCode ierr;
 	Vec g;
 
+printf("iceModelVec2S_to_blitz_xy:\n");
+printf("nx() ny() = %d, %d\n", nx(), ny());
+printf("Mx My = %d, %d\n", pism_grid->Mx, pism_grid->My);
+
 	auto xy_shape(blitz::shape(ny(), nx()));
 	if (ret.size() == 0) {
 		ret.reference(blitz::Array<double,2>(ny(), nx()));
@@ -415,30 +422,17 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 		SETERRQ(pism_grid->com, 1, "This method only supports IceModelVecs with dof == 1");
 
 	// Gather data to one processor
-	// See IceModelVec2::write (iceModelVec2.cc line ~154)
-	DM dm;	// See: https://github.com/pism/pism/issues/235#issuecomment-34092019
-	ierr = pism_grid.get_dm(pism_var.get_dof(), pism_var.get_stencil_width(), dm); CHKERRQ(ierr);
-    ierr = DMCreateGlobalVector(dm, &g); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(dm, pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(dm, pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
+	PetscScalar **bHp0;
+	ierr = pism_var.put_on_proc0(Hp0, scatter, g2, g2natural); CHKERRQ(ierr);
 
-	// Copy it over into Blitz Array, changing indices along the way
-	PetscScalar *a_petsc;
-	ierr = VecGetArray(g, &a_petsc); CHKERRQ(ierr);
-	int npism = pism_grid->Mx * pism_grid->My;
-	for (int ix1=0; ix1<npism; ++ix1) {
-		// int ix0 = pism_to_glint2_index(ix1);
-		int ii, jj;
-		pism1d_to_ij(ix1, ii, jj);
-		if (jj > xy_shape[0] || ii > xy_shape[1]) {
-			fprintf(stderr, "Index out of bounds: %ld (%d, %d) bounds are (%d, %d)\n", ix1, jj, ii, xy_shape[0], xy_shape[1]);
-			throw std::exception();
+	// Copy it to blitz array
+	ierr = VecGetArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
+	for (PetscInt i=0; i < pism_grid->Mx; i++) {
+		for (PetscInt j=0; j < pism_grid->My; j++) {
+			ret(j, i) = bHp0[i][j];
 		}
-		ret(jj,ii) = a_petsc[ix1];
-//		ret(ii,jj) = a_petsc[ix1];
 	}
-	ierr = VecRestoreArray(g, &a_petsc); CHKERRQ(ierr);
-
+	ierr = VecRestoreArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
 }
 // --------------------------------------------------
 void IceModel_PISM::run_decoded(double time_s,
@@ -598,7 +592,7 @@ if (pism_rank == 0) {
 	NcDim *nx_dim = ncout.add_dim("nx", nx());
 
 	std::vector<boost::function<void ()>> fns;
-	fns.push_back(giss::netcdf_define(ncout, "strain_heating", strain_heating2b, {nx_dim, ny_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "strain_heating", strain_heating2b, {ny_dim, nx_dim}));
 	fns.push_back(giss::netcdf_define(ncout, "geothermal_flux", geothermal_flux, {ny_dim, nx_dim}));
 	
     // Write data to netCDF file
@@ -609,112 +603,5 @@ if (pism_rank == 0) {
 
 	return 0;
 }
-
-
-// void IceModel_PISM::run_timestep(double time_s,
-// 	blitz::Array<int,1> const &indices,
-// 	std::map<IceField, blitz::Array<double,1>> const &vals2)
-// {
-// 	dismal->run_timestep(time_s, indices, vals2);
-// 
-// 	if (run_timestep_petsc(time_s, indices, vals2) != 0) {
-// 		PetscPrintf(pism_comm, "IceModel_PISM::runtimestep() failed\n");
-// 		PISMEnd();
-// 	}
-// }
-//
-// PetscErrorCode IceModel_PISM::run_timestep_petsc(double time_s,
-// 	blitz::Array<int,1> const &indices,
-// 	std::map<IceField, blitz::Array<double,1>> const &vals2)
-// {
-// printf("IceModel_PISM::run_timestep_petsc(%f)\n", time_s);
-// 	PetscErrorCode ierr;
-// 
-// 	int nval = indices.extent(0);
-// 
-// 	// Convert from GLINT2 2D indices, to PISM 2D indices.
-// 	// (one does x-major, the other y-major ordering)
-// 	// Also, pack those indices into a dense array
-// 	// (the incoming blitz::Array is not dense)
-// 	std::unique_ptr<int[]> g2_ix(new int[nval]);
-// 	for (int i=0; i<nval; ++i) {
-// 		int ii,jj;
-// 		glint2_grid->index_to_ij(indices(i), ii, jj);
-// //printf("indices %d -> %d %d\n", indices(i), ii,jj);
-// 		int ix = ii * glint2_grid->ny() + jj;
-// 		g2_ix[i] = ix;
-// 	}
-// 
-// 	// Transfer input to PISM variables (and scatter w/ PETSc as well)
-// 	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[nval]);
-// 	for (auto ii = vals2.begin(); ii != vals2.end(); ++ii) {
-// 		IceField field(ii->first);
-// 		blitz::Array<double,1> const &val(ii->second);
-// 
-// 		// Go on if PISM is not interested in this field
-// 		auto pism_var_ii(pism_vars.find(field));
-// 		if (pism_var_ii == pism_vars.end()) continue;
-// 
-// 		// Densify the values array, and convert units
-// printf("BY_ICE_DENSITY = %f\n", BY_ICE_DENSITY);
-// 		switch(field.index()) {
-// 			case IceField::MASS_FLUX :
-// 				// GLINT2: kg/(s m^2) --> m s-1 ice:
-// 				for (int i=0; i<nval; ++i) g2_y[i] = val(i) * BY_ICE_DENSITY;
-// 			break;
-// 			case IceField::TG2 :
-// 				// GLINT2: C --> PISM: K
-// 				for (int i=0; i<nval; ++i) g2_y[i] = val(i) + giss::C2K;
-// 			break;
-// 		}
-// //for (int i=0; i<nval; ++i) g2_y[i] = 17.0;
-// 
-// 		// Put into a natural-ordering global distributed Petsc Vec
-// 		ierr = VecSet(g2natural, 0.0); CHKERRQ(ierr);
-// #if 1
-// //for (int i=0; i<nval; ++i) printf("G2 %s: %d %f\n", field.str(), g2_ix[i], g2_y[i]);
-// 		ierr = VecSetValues(g2natural, nval, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKERRQ(ierr);
-// #else
-// // Debug: send in zero vectors
-// ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKERRQ(ierr);
-// #endif
-// 
-// 		ierr = VecAssemblyBegin(g2natural); CHKERRQ(ierr);
-// 		ierr = VecAssemblyEnd(g2natural); CHKERRQ(ierr);
-// 
-// 		// Copy to Petsc-ordered global vec
-// 		ierr = DMDANaturalToGlobalBegin(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
-// 		ierr =   DMDANaturalToGlobalEnd(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
-// 
-// 		// Copy to the output variable
-// 		// (Could we just do DMDANaturalToGlobal() directly to this?)
-// 		ierr = pism_var_ii->second->copy_from(g2); CHKERRQ(ierr);
-// 
-// long time_day = (int)(time_s / 86400. + .5);
-// char fname[100];
-// char *folder = "dismal_out2/";
-// switch(field.index()) {
-// 	case IceField::MASS_FLUX :
-// 		// GLINT2: kg/(s m^2) --> m s-1 ice:
-// 		sprintf(fname, "%s%d-climatic_mass_balance.nc", folder, time_day);
-// 	break;
-// 	case IceField::TG2 :
-// 		// GLINT2: C --> PISM: K
-// 		sprintf(fname, "%s%d-ice_surface_temp.nc", folder, time_day);
-// 	break;
-// }
-// 
-// printf("ICeModel_PISM: Dumping %s\n", fname);
-// pism_var_ii->second->dump(fname);
-// 
-// 	}
-// 
-// printf("IM3 %p\n", ice_model.get());
-// 	// Run PISM for one timestep
-// 	ice_model->run_to(time_s);
-// 
-// printf("IM4\n");
-// 	return 0;
-// }
 
 }}

@@ -50,8 +50,8 @@ class IceModel_PISM : public IceModel_Decode
 	// Stuff used for Scatter/Gather
 	DM da2;
 	Vec g2, g2natural;  //!< global Vecs used to transfer data to/from processor 0.
-	// VecScatter scatter; //!< VecScatter used to transfer data to/from processor 0.
-	// Vec Hp0;			//!< Resulting vector on process 0
+	VecScatter scatter; //!< VecScatter used to transfer data to/from processor 0.
+	Vec Hp0;			//!< Resulting vector on process 0
 
 	// Temporary stuff to hold returns from PISM
 	IceModelVec2S strain_heating2;		//!< ice surface elevation; ghosted
