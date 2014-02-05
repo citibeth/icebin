@@ -416,9 +416,11 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 
 	// Gather data to one processor
 	// See IceModelVec2::write (iceModelVec2.cc line ~154)
-    ierr = DMCreateGlobalVector(pism_var.get_da(), &g); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(pism_var.get_da(), pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(pism_var.get_da(), pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
+	DM dm;	// See: https://github.com/pism/pism/issues/235#issuecomment-34092019
+	ierr = pism_grid.get_dm(pism_var.get_dof(), pism_var.get_stencil_width(), dm); CHKERRQ(ierr);
+    ierr = DMCreateGlobalVector(dm, &g); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(dm, pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(dm, pism_var.get_vec(), INSERT_VALUES, g); CHKERRQ(ierr);
 
 	// Copy it over into Blitz Array, changing indices along the way
 	PetscScalar *a_petsc;
