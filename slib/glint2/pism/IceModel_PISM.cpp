@@ -483,12 +483,11 @@ printf("BY_ICE_DENSITY = %f\n", BY_ICE_DENSITY);
 		int nval = 0;
 		switch(field.index()) {
 			case IceField::MASS_FLUX : {
-				// GLINT2: kg/(s m^2) --> m s-1 ice:
+				// GLINT2: kg/(s m^2) --> "kg m-2 s-1" in PISM
 				for (int ix0=0; ix0<ndata(); ++ix0) {
 					if (std::isnan(val(ix0))) continue;
 
-					g2_y[nval] = val(ix0) * BY_ICE_DENSITY;
-//					g2_y[nval] = val(ix0);
+					g2_y[nval] = val(ix0);
 
 //					int ii,jj;
 //					glint2_grid->index_to_ij(ix0, ii, jj);
