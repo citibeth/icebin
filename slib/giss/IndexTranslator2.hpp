@@ -24,7 +24,7 @@
 #include <cstdio>
 #include <map>
 #include <unordered_map>
-#include <giss/Hash.hpp>
+#include <giss/hash.hpp>
 
 namespace giss {
 

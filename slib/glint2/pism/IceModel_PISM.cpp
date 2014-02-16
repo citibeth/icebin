@@ -546,11 +546,11 @@ char *fnpart = NULL;
 switch(field.index()) {
 	case IceField::MASS_FLUX :
 		// GLINT2: kg/(s m^2) --> m s-1 ice:
-		fnpart = "climatic_mass_balance";
+		fnpart = (char *)"climatic_mass_balance";
 	break;
 	case IceField::TG2 :
 		// GLINT2: C --> PISM: K
-		fnpart = "ice_surface_temp";
+		fnpart = (char *)"ice_surface_temp";
 	break;
 }
 sprintf(fname, "%d-%s.nc", time_day, fnpart);
