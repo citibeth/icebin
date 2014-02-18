@@ -567,11 +567,11 @@ printf("[%d] BEGIN ice_model->run_to(%f) %p\n", pism_rank, time_s, ice_model.get
 
 	// Retrieve stuff from PISM
 	blitz::Array<double,2> geothermal_flux;
-	iceModelVec2S_to_blitz_xy(ice_model->geothermal_flux, geothermal_flux);
+	iceModelVec2S_to_blitz_xy(*ice_model->get_geothermal_flux(), geothermal_flux);
 
 	// Sum strain_heating over the Z direction and retrieve from PISM
 	IceModelVec3 *strain_heating3p;
-	ice_model->stress_balance->get_volumetric_strain_heating(strain_heating3p);
+	ice_model->get_stress_balance()->get_volumetric_strain_heating(strain_heating3p);
 	ierr = sum_columns(*strain_heating3p, strain_heating2); CHKERRQ(ierr);
 	blitz::Array<double,2> strain_heating2b;	// GLINT2-style array
 	iceModelVec2S_to_blitz_xy(strain_heating2, strain_heating2b);

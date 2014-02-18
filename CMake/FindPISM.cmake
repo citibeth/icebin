@@ -14,7 +14,20 @@
 find_path(PISM_SRC base/iceModel.hh
           HINTS ${PISM_SRC})
 
-set(PISM_INCLUDE_DIRS ${PISM_SRC}/base ${PISM_SRC}/base/stressbalance ${PISM_SRC}/base/util ${PISM_SRC}/base/util/io ${PISM_SRC}/base/energy ${PISM_SRC}/base/rheology ${PISM_SRC}/base/basalstrength ${PISM_SRC}/earth ${PISM_SRC}/coupler ${PISM_SRC}/coupler/atmosphere ${PISM_SRC}/coupler/surface ${PISM_SRC}/coupler/ocean ${PISM_SRC}/coupler/util)
+set(PISM_INCLUDE_DIRS
+  ${PISM_SRC}/base
+  ${PISM_SRC}/base/stressbalance
+  ${PISM_SRC}/base/util
+  ${PISM_SRC}/base/util/io
+  ${PISM_SRC}/base/energy
+  ${PISM_SRC}/base/rheology
+  ${PISM_SRC}/base/basalstrength
+  ${PISM_SRC}/earth
+  ${PISM_SRC}/coupler
+  ${PISM_SRC}/coupler/atmosphere
+  ${PISM_SRC}/coupler/surface
+  ${PISM_SRC}/coupler/ocean
+  ${PISM_SRC}/coupler/util)
 
 
 #     -DUSE_PISM @PETSC_CFLAGS@)
