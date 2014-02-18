@@ -1,4 +1,4 @@
-// Copyright (C) 2008-2013 PISM Authors
+// Copyright (C) 2008-2014 PISM Authors
 //
 // This file is part of PISM.
 //
@@ -123,45 +123,10 @@ printf("BEGIN update(%f, %f)\n", my_t, my_dt);
 	m_t	= my_t;
 	m_dt = my_dt;
 
-#if 0
-// This code from PIK needs to go
-printf("update() 1\n");
-	ierr = ice_surface_temp.begin_access();	 CHKERRQ(ierr);
-printf("update() 2\n");
-printf("usurf = %p\n", &*usurf);
-	ierr = usurf->begin_access();	 CHKERRQ(ierr);
-printf("update() 3\n");
-	ierr = lat->begin_access(); CHKERRQ(ierr);
-printf("update() 4\n");
-	for (PetscInt i=grid.xs; i<grid.xs+grid.xm; ++i) {
-		for (PetscInt j=grid.ys; j<grid.ys+grid.ym; ++j) {
-			ice_surface_temp(i,j) = 273.15 + 30 - 0.0075 * (*usurf)(i,j) - 0.68775 * (*lat)(i,j)*(-1.0);
-		}
-	}
-printf("update() 5\n");
-	ierr = usurf->end_access();	 CHKERRQ(ierr);
-printf("update() 6\n");
-	ierr = lat->end_access(); CHKERRQ(ierr);
-printf("update() 7\n");
-	ierr = ice_surface_temp.end_access();	 CHKERRQ(ierr);
-printf("update() 8\n");
-#endif
-
-#if 0
-PIO nc(grid.com, grid.rank, "netcdf3",
-	grid.get_unit_system());
-ierr = nc.open("PSConstantGLINT2.nc", PISM_WRITE); CHKERRQ(ierr);
-std::set<std::string> vars = {"ice_surface_temp", "climatic_mass_balance"};
-this->define_variables(vars, nc, PISM_DOUBLE);
-this->write_variables(vars, nc);
-ierr = nc.close(); CHKERRQ(ierr);
-#endif
-
 printf("PSConstantGLINT2::update(%f) dumping variables\n", my_t);
 ice_surface_temp.dump("ice_surface_temp.nc");
 climatic_mass_balance.dump("climatic_mass_balance.nc");
 printf("PSConstantGLINT2::update(%f) done dumping variables\n", my_t);
-
 
 	return 0;
 }
