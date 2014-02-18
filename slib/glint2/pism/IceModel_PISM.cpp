@@ -5,6 +5,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <cmath>
+#include <sstream>
+#include <string>
 
 namespace glint2 {
 namespace pism {
@@ -541,20 +543,20 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 		ierr = pism_var_ii->second->copy_from(g2); CHKERRQ(ierr);
 
 long time_day = (int)(time_s / 86400. + .5);
-char fname[100];
-char *fnpart = NULL;
+std::stringstream fname;
+std::string fnpart;
 switch(field.index()) {
 	case IceField::MASS_FLUX :
 		// GLINT2: kg/(s m^2) --> m s-1 ice:
-		fnpart = (char *)"climatic_mass_balance";
+		fnpart = "climatic_mass_balance";
 	break;
 	case IceField::TG2 :
 		// GLINT2: C --> PISM: K
-		fnpart = (char *)"ice_surface_temp";
+		fnpart = "ice_surface_temp";
 	break;
 }
-sprintf(fname, "%d-%s.nc", time_day, fnpart);
-boost::filesystem::path pfname(gcm_params.config_dir / "dismal_out2" / fname);
+fname << time_day << "-" << fnpart << ".nc";
+boost::filesystem::path pfname(gcm_params.config_dir / "dismal_out2" / fname.str());
 
 printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
 pism_var_ii->second->dump(pfname.c_str());
