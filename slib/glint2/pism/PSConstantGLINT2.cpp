@@ -24,10 +24,6 @@
 namespace glint2 {
 namespace pism {
 
-///// Constant-in-time surface model for accumulation,
-///// ice surface temperature parameterized as in PISM-GLINT2 dependent on latitude and surface elevation
-
-
 PSConstantGLINT2::PSConstantGLINT2(IceGrid &g, const ::PISMConfig &conf)
 	: PISMSurfaceModel(g, conf)
 {
@@ -78,15 +74,7 @@ printf("BEGIN PSConstantGLINT2::init()\n");
 
 	ierr = verbPrintf(2, grid.com,
 		 "* Initializing the constant-in-time surface processes model PSConstantGLINT2.\n"
-		 "	It reads surface mass balance directly from the file and holds it constant.\n"
-		 "	Ice upper-surface temperature is parameterized as in Martin et al. 2011, Eqn. 2.0.2.\n"
 		 "	Any choice of atmosphere coupler (option '-atmosphere') is ignored.\n"); CHKERRQ(ierr);
-
-	usurf = dynamic_cast<IceModelVec2S*>(vars.get("surface_altitude"));
-	 if (!usurf) SETERRQ(grid.com, 12, "ERROR: 'usurf' is not available or is wrong type in dictionary");
-
-	lat = dynamic_cast<IceModelVec2S*>(vars.get("latitude"));
-	if (!lat) SETERRQ(grid.com, 1, "ERROR: latitude is not available");
 
 	// find PISM input file to read data from:
 	ierr = find_pism_input(input_file, do_regrid, start); CHKERRQ(ierr);
@@ -112,7 +100,6 @@ printf("END PSConstantGLINT2::init()\n");
 PetscErrorCode PSConstantGLINT2::update(PetscReal my_t, PetscReal my_dt)
 {
 	PetscErrorCode ierr;
-
 
 printf("BEGIN update(%f, %f)\n", my_t, my_dt);
 
@@ -189,4 +176,5 @@ PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, con
 	return 0;
 }
 
-}}		// namespace
+}		// namespace glint2::pism
+}		// namespace glint2

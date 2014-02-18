@@ -1,4 +1,4 @@
-// Copyright (C) 2011, 2012, 2013 PISM Authors
+// Copyright (C) 2011, 2012, 2013, 2014 PISM Authors
 //
 // This file is part of PISM.
 //
@@ -60,7 +60,6 @@ protected:
 public:
 	IceModelVec2S climatic_mass_balance;
 	IceModelVec2S ice_surface_temp;
-	IceModelVec2S *lat, *usurf;
 private:
 	PetscErrorCode allocate_PSConstantGLINT2();
 };
