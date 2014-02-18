@@ -74,75 +74,9 @@ set(glint2_SOURCES
 	galahad/zd11_c.cpp
 	galahad/qpt_c.cpp)
 
-set(glint2_HEADERS 
-	boost/enum.hpp
-	boost/enum/base.hpp
-	boost/enum/bitfield.hpp
-	boost/enum/iterator.hpp
-	boost/enum/macros.hpp
-	galahad/eqp_c.hpp
-	galahad/qpt_c.hpp
-	galahad/zd11_c.hpp
-	giss/CooVector.hpp
-	giss/Dict.hpp
-	giss/DynArray.hpp
-	giss/IndexTranslator.hpp
-	giss/IndexTranslator2.hpp
-	giss/Proj.hpp
-	giss/Proj2.hpp
-	giss/RTree.hpp
-	giss/SparseAccumulator.hpp
-	giss/SparseMatrix.hpp
-	giss/blitz.hpp
-	giss/constant.hpp
-	giss/eigen.hpp
-	giss/enum.hpp
-	giss/f90blitz.hpp
-	giss/geodesy.hpp
-	giss/hash.hpp
-	giss/memory.hpp
-	giss/ncutil.hpp
-	giss/time.hpp
-	glint2/ExchangeGrid.hpp
-	glint2/GCMCoupler.hpp
-	glint2/Grid.hpp
-	glint2/GridDomain.hpp
-	glint2/GridDomain_Listed.hpp
-	glint2/Grid_LonLat.hpp
-	glint2/Grid_XY.hpp
-	glint2/HCIndex.hpp
-	glint2/HeightClassifier.hpp
-	glint2/IceModel.hpp
-	glint2/IceModel_DISMAL.hpp
-	glint2/IceModel_Decode.hpp
-	glint2/IceModel_TConv.hpp
-	glint2/IceSheet.hpp
-	glint2/IceSheet_L0.hpp
-	glint2/MatrixMaker.hpp
-	glint2/cgal.hpp
-	glint2/clippers.hpp
-	glint2/gridfile.hpp
-	glint2/gridutil.hpp
-	glint2/matrix_ops.hpp
-	glint2/modele/ModelEDomain.hpp
-	glint2/modele/glint2_modele.hpp
-	glint2/modele/grids_ll.hpp
-	glint2/pism/IceModel_PISM.hpp
-	glint2/pism/PISMIceModel.hpp
-	glint2/pism/PSConstantGLINT2.hpp
-	glint2/pism/PetscContext.hpp
-	glint2/util.hpp)
-
-add_library (glint2 SHARED ${glint2_SOURCES} ${glint2_HEADERS})
+add_library (glint2 SHARED ${glint2_SOURCES})
 target_link_libraries(glint2 ${Glint2_EXTERNAL_LIBS})
 
-#${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_DATE_TIME_LIBRARY})
-
-
-
-#message(Hello World)
-#message(${Boost_INCLUDE_DIRS})
-#message(${BOOST_ROOT})
 
 install(TARGETS glint2 DESTINATION lib)
 install(FILES ${glint2_HEADERS} DESTINATION include)
