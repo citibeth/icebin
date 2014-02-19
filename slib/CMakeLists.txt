@@ -79,7 +79,13 @@ target_link_libraries(glint2 ${Glint2_EXTERNAL_LIBS})
 
 
 install(TARGETS glint2 DESTINATION lib)
+
+# install Glint2 headers
+file(GLOB_RECURSE glint2_HEADERS "*.hpp")
 install(FILES ${glint2_HEADERS} DESTINATION include)
+# (Consider using "install(DIRECTORY ...)" if you want to preserve
+# directory structure.)
+
 
 # Set RPATH in the installed library
 # http://www.cmake.org/pipermail/cmake/2010-February/035157.html
