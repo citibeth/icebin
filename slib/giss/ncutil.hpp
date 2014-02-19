@@ -1,6 +1,6 @@
 /*
  * GLINT2: A Coupling Library for Ice Models and GCMs
- * Copyright (c) 2013 by Robert Fischer
+ * Copyright (c) 2013, 2014 by Robert Fischer
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 #include <giss/blitz.hpp>
+#include <cassert>
 
 namespace giss {
 
@@ -189,10 +190,12 @@ boost::function<void ()> netcdf_define(
 			dims[i] = ddims[i];
 		}
 //		counts[i] = val.extent(i);
+                assert(dims[i] != NULL);
 	}
 
 	// Create the variable
 	NcVar *nc_var = nc.add_var(vname.c_str(), get_nc_type<T>(), rank, dims);
+        assert(nc_var != NULL);
 
 	// Write it out (later)
 	return boost::bind(&netcdf_write_blitz<T,rank>, nc_var, val);

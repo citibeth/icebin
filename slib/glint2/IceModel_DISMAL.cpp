@@ -1,6 +1,6 @@
 /*
  * GLINT2: A Coupling Library for Ice Models and GCMs
- * Copyright (c) 2013 by Robert Fischer
+ * Copyright (c) 2013, 2014 by Robert Fischer
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include <glint2/IceModel_DISMAL.hpp>
 #include <cstdio>
 #include <cmath>
+#include <cassert>
 
 namespace glint2 {
 
@@ -80,10 +81,13 @@ printf("BEGIN IceModel_DISMAL::run_decoded\n");
 	auto full_fname(output_dir / fname);
 	printf("IceModel_DISMAL writing to: %s\n", full_fname.c_str());
 	NcFile ncout(full_fname.c_str(), NcFile::Replace);
+        assert(ncout.is_valid() == true);
 
 	std::vector<boost::function<void ()>> fns;
 	NcDim *nx_dim = ncout.add_dim("nx", nx);
+        assert(nx_dim != NULL);
 	NcDim *ny_dim = ncout.add_dim("ny", ny);
+        assert(ny_dim != NULL);
 
 	// Define variables
 	if (vals2.find(IceField::MASS_FLUX) != vals2.end())

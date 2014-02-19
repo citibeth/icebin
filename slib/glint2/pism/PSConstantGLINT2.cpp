@@ -60,9 +60,6 @@ printf("END PSConstantGLINT2::allocate_PSConstantGLINT2()\n");
 	return 0;
 }
 
-/** This seems to be called from pclimate line 472:
-		ierr = surface->init(variables); CHKERRQ(ierr);
-*/
 PetscErrorCode PSConstantGLINT2::init(PISMVars &vars)
 {
 printf("BEGIN PSConstantGLINT2::init()\n");
@@ -73,7 +70,7 @@ printf("BEGIN PSConstantGLINT2::init()\n");
 	m_t = m_dt = GSL_NAN;	// every re-init restarts the clock
 
 	ierr = verbPrintf(2, grid.com,
-		 "* Initializing the constant-in-time surface processes model PSConstantGLINT2.\n"
+		 "* Initializing the PSConstantGLINT2 surface model. Serves as storage for climate fields.\n"
 		 "	Any choice of atmosphere coupler (option '-atmosphere') is ignored.\n"); CHKERRQ(ierr);
 
 	// find PISM input file to read data from:
@@ -88,6 +85,9 @@ printf("BEGIN PSConstantGLINT2::init()\n");
 	} else {
 		ierr = climatic_mass_balance.read(input_file, start); CHKERRQ(ierr); // fails if not found!
 	}
+
+	// Set ice_surface_temp to a harmless value for now. (FIXME, though.)
+	ierr = ice_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
 
 	// parameterizing the ice surface temperature 'ice_surface_temp'
 	ierr = verbPrintf(2, grid.com,
