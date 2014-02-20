@@ -107,8 +107,6 @@ printf("end = %f\n", g.time->end());
     ierr = m.init(); CHKERRQ(ierr);
 
 
-    ierr = m.init_run(); CHKERRQ(ierr);
-
 //3155692.597470          Natural timestep
 //m.grid.time->set_end(13155700.0);
 	printf("run_to time = %f\n", g.time->current());

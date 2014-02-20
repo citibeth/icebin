@@ -290,7 +290,6 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 printf("[%d] Before ice_model->init()\n", pism_rank);
     ierr = ice_model->init(); CHKERRQ(ierr);
 printf("[%d] After ice_model->init()\n", pism_rank);
-    ierr = ice_model->init_run(); CHKERRQ(ierr);
 
 //	// Add our stock initialization to it
 //	pism_surface_model.reset(new PSConstantGLINT2(*pism_grid, *config));
