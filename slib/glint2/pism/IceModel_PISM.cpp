@@ -302,10 +302,8 @@ printf("pism_surface_model = %p\n", pism_surface_model);
 
 	// Set up corresponence between GLINT2 fields and variables
 	// in the PISM data structures.
-	pism_vars.insert(std::make_pair(IceField::MASS_FLUX,
-		&pism_surface_model->climatic_mass_balance));
-	pism_vars.insert(std::make_pair(IceField::TG2,
-		&pism_surface_model->ice_surface_temp));
+	pism_vars[IceField::MASS_FLUX] = &pism_surface_model->climatic_mass_balance;
+	pism_vars[IceField::TG2] = &pism_surface_model->ice_surface_temp;
 
 	// Initialize scatter/gather stuff
 printf("pism_grid->max_stencil_width = %d\n", pism_grid->max_stencil_width);
