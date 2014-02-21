@@ -285,15 +285,14 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// 	IceModel::model_state_setup()		[iMinit.cc]
 	// 	IceModel::init_couplers()			[iMinit.cc]
 	// 	surface->init()
-	// We need to have called attach_surface_model() by now, so that
-	// pism_surface_model->init() will be called.
 printf("[%d] Before ice_model->init()\n", pism_rank);
     ierr = ice_model->init(); CHKERRQ(ierr);
 printf("[%d] After ice_model->init()\n", pism_rank);
 
-//	// Add our stock initialization to it
-//	pism_surface_model.reset(new PSConstantGLINT2(*pism_grid, *config));
-//	ice_model->attach_surface_model(pism_surface_model.get());
+	// During the ice_model->init() call above the PISMIceModel
+	// class (derived from PISM's IceModel) allocated an instance
+	// of PSConstantGLINT2. This instance is owned and will be
+	// de-allocated by PISMIceModel ice_model.
 
 	// Fetch out our pism_surface_model
 	pism_surface_model = ice_model->ps_constant_glint2();
