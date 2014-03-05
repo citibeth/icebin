@@ -74,17 +74,27 @@ printf("BEGIN PSConstantGLINT2::init()\n");
 		 "	Any choice of atmosphere coupler (option '-atmosphere') is ignored.\n"); CHKERRQ(ierr);
 
 	// find PISM input file to read data from:
+	// (do_regrid will be true if there's a -boot_file
+	// command line option.  We are not using it that way with PISM)
+	// see pism/src/base/util/PISMComponent.cc
 	ierr = find_pism_input(input_file, do_regrid, start); CHKERRQ(ierr);
 
+#if 0
 	// read snow precipitation rate from file
+printf("AA1\n");
 	ierr = verbPrintf(2, grid.com,
 		"		reading ice-equivalent surface mass balance rate 'climatic_mass_balance' from %s ... \n",
 		input_file.c_str()); CHKERRQ(ierr);
 	if (do_regrid) {
 		ierr = climatic_mass_balance.regrid(input_file, CRITICAL); CHKERRQ(ierr); // fails if not found!
 	} else {
+		// *** This is the branch we're using
 		ierr = climatic_mass_balance.read(input_file, start); CHKERRQ(ierr); // fails if not found!
 	}
+#else
+	// It doesn't matter what we set this to, it will be re-set later.
+	ierr = climatic_mass_balance.set(0.0); CHKERRQ(ierr);
+#endif
 
 	// Set ice_surface_temp to a harmless value for now. (FIXME, though.)
 	ierr = ice_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
