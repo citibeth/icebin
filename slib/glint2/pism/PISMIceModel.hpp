@@ -14,6 +14,7 @@
 #include <PISMTime.hh>
 // --------------------------------
 #include <glint2/pism/PSConstantGLINT2.hpp>
+#include <glint2/pism/NullTransportHydrology.hpp>
 
 namespace glint2 {
 namespace pism {
@@ -42,11 +43,14 @@ public:
 	PISMIceModel(IceGrid &g, PISMConfig &config, PISMConfig &overrides);
 	virtual ~PISMIceModel(); // must be virtual merely because some members are virtual
 
+	virtual PetscErrorCode allocate_subglacial_hydrology();
 	virtual PetscErrorCode allocate_couplers();
 
 	/** @return Our instance of PSConstantGLINT2 */
 	PSConstantGLINT2 *ps_constant_glint2()
 		{ return dynamic_cast<PSConstantGLINT2 *>(surface); }
+	NullTransportHydrology *null_hydrology()
+		{ return dynamic_cast<NullTransportHydrology *>(::IceModel::subglacial_hydrology); }
 };
 
 }}

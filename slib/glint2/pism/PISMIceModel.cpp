@@ -10,6 +10,16 @@ PISMIceModel::PISMIceModel(IceGrid &g, PISMConfig &config, PISMConfig &overrides
 PISMIceModel::~PISMIceModel() {} // must be virtual merely because some members are virtual
 
 
+PetscErrorCode PISMIceModel::allocate_subglacial_hydrology()
+{
+	printf("BEGIN PISMIceModel::allocate_subglacial_hydrology()\n");
+//	printf("subglacial_hydrology = %p %p\n", subglacial_hydrology, ::IceModel::subglacial_hydrology);
+	if (::IceModel::subglacial_hydrology != NULL) return 0; // indicates it has already been allocated
+    subglacial_hydrology = new NullTransportHydrology(grid, config);
+	printf("END PISMIceModel::allocate_subglacial_hydrology()\n");
+	return 0;
+}
+
 
 
 PetscErrorCode PISMIceModel::allocate_couplers()
@@ -51,4 +61,5 @@ PetscErrorCode PISMIceModel::allocate_couplers()
 
 	return 0;
 }
+
 }}

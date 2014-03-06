@@ -46,6 +46,7 @@ libglint2_la_SOURCES = \
 	glint2/read_matrixmaker.cpp \
 	glint2/pism/PSConstantGLINT2.cpp \
 	glint2/pism/IceModel_PISM.cpp \
+	glint2/pism/NullTransportHydrology.cpp \
 	glint2/pism/PISMIceModel.cpp
 
 # Deprecated, at least temporarily

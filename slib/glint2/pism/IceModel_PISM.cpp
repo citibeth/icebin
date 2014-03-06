@@ -400,7 +400,7 @@ it will be allocated.*/
 PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var, blitz::Array<double,2> &ret)
 {
 	PetscErrorCode ierr;
-	Vec g;
+//	Vec g;
 
 printf("iceModelVec2S_to_blitz_xy:\n");
 printf("nx() ny() = %d, %d\n", nx(), ny());
@@ -566,6 +566,10 @@ printf("[%d] BEGIN ice_model->run_to(%f) %p\n", pism_rank, time_s, ice_model.get
 	// Retrieve stuff from PISM
 	blitz::Array<double,2> geothermal_flux;
 	iceModelVec2S_to_blitz_xy(*ice_model->get_geothermal_flux(), geothermal_flux);
+	blitz::Array<double,2> ice_surface_elevation;
+	iceModelVec2S_to_blitz_xy(*ice_model->get_ice_surface_elevation(), ice_surface_elevation);
+	blitz::Array<double,2> wtilimp;
+	iceModelVec2S_to_blitz_xy(ice_model->null_hydrology()->Wtilimp, wtilimp);
 
 	// Sum strain_heating over the Z direction and retrieve from PISM
 	IceModelVec3 *strain_heating3p;
@@ -574,7 +578,7 @@ printf("[%d] BEGIN ice_model->run_to(%f) %p\n", pism_rank, time_s, ice_model.get
 	blitz::Array<double,2> strain_heating2b;	// GLINT2-style array
 	iceModelVec2S_to_blitz_xy(strain_heating2, strain_heating2b);
 
-printf("[%d] END ice_model->run_to()\n");
+printf("[%d] END ice_model->run_to()\n", pism_rank);
 
 
 
@@ -591,6 +595,8 @@ if (pism_rank == 0) {
 	std::vector<boost::function<void ()>> fns;
 	fns.push_back(giss::netcdf_define(ncout, "strain_heating", strain_heating2b, {ny_dim, nx_dim}));
 	fns.push_back(giss::netcdf_define(ncout, "geothermal_flux", geothermal_flux, {ny_dim, nx_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "ice_surface_elevation", ice_surface_elevation, {ny_dim, nx_dim}));
+	fns.push_back(giss::netcdf_define(ncout, "wtilimp", wtilimp, {ny_dim, nx_dim}));
 	
     // Write data to netCDF file
     for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
