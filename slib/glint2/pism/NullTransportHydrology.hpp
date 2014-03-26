@@ -41,23 +41,18 @@ Here is a talk which illustrates the "till-can" metaphor:
 namespace glint2 {
 namespace pism {
 
-class NullTransportHydrology : public PISMHydrology {
+class NullTransportHydrology : public PISMNullTransportHydrology {
+  friend class IceModel_PISM;
+
 public:
   NullTransportHydrology(IceGrid &g, const PISMConfig &conf);
   virtual ~NullTransportHydrology() {}
 
-  virtual PetscErrorCode init(PISMVars &vars);
-
-  // sets result = 0
-  virtual PetscErrorCode subglacial_water_thickness(IceModelVec2S &result);
-
-  // returns the overburden pressure in hope it is harmless
-  virtual PetscErrorCode subglacial_water_pressure(IceModelVec2S &result);
-
   // solves an implicit step of a highly-simplified ODE
   virtual PetscErrorCode update(double icet, double icedt);
-//protected:
-  IceModelVec2S Wtilimp;      // Cumulative effective thickness of water removed from till
+
+protected:
+  IceModelVec2S basal_runoff_sum;      // Cumulative effective thickness of water removed from till
 };
 
 }}

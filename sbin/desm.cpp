@@ -112,6 +112,13 @@ int main(int argc, char **argv)
 
 	// -----------------------------------------------------
 	// Initialize GLINT2 (via a Fortran-ish interface)
+	NcVar *itime_nc = dnc.get_var("itime");
+	long cur[4] = {0, 0, 0, 0};
+	long counts1 = 1;
+	itime_nc->set_cur(cur);	// Just use cur[0]
+	int itimei;
+	itime_nc->get(&itimei, &counts1);	// Just get one item
+
 	glint2_modele *api = glint2_modele_new(
 		glint2_config_fname.c_str(), glint2_config_fname.size(),
 		glint2_config_vname.c_str(), glint2_config_vname.size(),
@@ -129,7 +136,7 @@ int main(int argc, char **argv)
 		j0s, j1s,
 
 		// iyear1
-		1950,
+		1950, itimei,
 
 		// dtsrc  (see MODEL_COM.f)
 		dtsrc,
@@ -151,8 +158,7 @@ int main(int argc, char **argv)
 	// -------- Test regridding to the ice model
 
 	// Get Time...
-	NcVar *itime_nc = dnc.get_var("itime");
-	NcVar *date_nc = dnc.get_var("date");
+//	NcVar *date_nc = dnc.get_var("date");
 
 	// Get Data
 	const int nvar = 3;
@@ -164,7 +170,6 @@ int main(int argc, char **argv)
 	// Get dimensions by querying one variable
 	NcVar *var_nc = vars_nc[0];
 	long ntime = var_nc->get_dim(0)->size();
-	long cur[4] = {0, 0, 0, 0};
 	long counts[4] = {1,				// time
 		var_nc->get_dim(1)->size(),		// nhc
 		var_nc->get_dim(2)->size(),		// jm
@@ -186,9 +191,10 @@ int main(int argc, char **argv)
 	giss::F90Array<double,3> &tice_ff(vars_ff[2]);
 
 	// The main loop
-	for (long time=0; time<ntime; ++time) {
+	for (long time=1; time<ntime; ++time) {
 		// Read itime
 		int itime;
+		cur[0] = time;
 		itime_nc->set_cur(cur);	// Just use cur[0]
 		itime_nc->get(&itime, counts);	// Just get one item
 
@@ -196,7 +202,6 @@ int main(int argc, char **argv)
 		printf("**** itime=%d, time_s=%f\n", itime, time_s);
 
 		// Read the variables
-		cur[0] = time;
 		for (int vi=0; vi<nvar; ++vi) {
 			NcVar *var_nc = vars_nc[vi];
 			blitz::Array<double,3> &var_c = vars_c[vi];

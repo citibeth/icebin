@@ -45,7 +45,8 @@ extern "C" glint2_modele *glint2_modele_new(
 
 	// Info about size of a timestep
 	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
-	double dtsrc,
+	int itimei,			// itime of start of simulation
+	double dtsrc,		// Conversion from itime to seconds
 
 	// MPI Stuff
 	MPI_Fint comm_f, int root,
@@ -71,7 +72,8 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 		MPI_Comm_f2c(comm_f),
 		root,
 		glint2_config_dir,
-		giss::time::tm(iyear1, 1, 1));
+		giss::time::tm(iyear1, 1, 1),
+		itimei*dtsrc);
 
 printf("iyear1 = %d\n", iyear1);
 

@@ -68,6 +68,7 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 
 	// Info about size of a timestep (DTsrc defined in ModelE's MODEL_COM.f)
 	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
+	int itimei,			// itime of start of simulation
 	double dtsrc,
 
 	// MPI Stuff

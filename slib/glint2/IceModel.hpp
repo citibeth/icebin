@@ -44,6 +44,7 @@ public:
 		int gcm_root;			// Rank of root process in gcm_comm
 		boost::filesystem::path config_dir;	// Where to look for Ice Model configuration files
 		giss::time::tm time_base;	// Corresponds to time_s == 0
+		double time_start_s;		// Start of simulation, as far as ice model is concerned (seconds since time_base).
 
 		GCMParams();
 
@@ -51,7 +52,8 @@ public:
 			MPI_Comm const _gcm_comm,
 			int _gcm_root,
 			boost::filesystem::path const &_config_dir,
-			giss::time::tm const &_time_base);
+			giss::time::tm const &_time_base,
+			double time_start_s);
 	};
 
 protected:

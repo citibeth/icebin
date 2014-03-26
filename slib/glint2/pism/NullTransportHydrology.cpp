@@ -25,7 +25,7 @@ namespace pism {
 
 
 NullTransportHydrology::NullTransportHydrology(IceGrid &g, const PISMConfig &conf)
-    : PISMHydrology(g, conf)
+    : PISMNullTransportHydrology(g, conf)
 {
 
   PetscErrorCode ierr1, ierr2;
@@ -33,44 +33,20 @@ NullTransportHydrology::NullTransportHydrology(IceGrid &g, const PISMConfig &con
   printf("BEGIN NullTransportHydrology::NullTransportHydrology()\n");
 
   // *all* PISMHydrology classes have layer of water stored in till
-  ierr1 = Wtilimp.create(grid, "tillwat", WITHOUT_GHOSTS);
-  ierr2 = Wtilimp.set_attrs("excess water",
+  ierr1 = basal_runoff_sum.create(grid, "tillwat", WITHOUT_GHOSTS);
+  ierr2 = basal_runoff_sum.set_attrs("excess water",
                      "Cumulative effective thickness of subglacial water expelled from till",
                      "m", "");
-  Wtilimp.metadata().set_double("valid_min", 0.0);
+  basal_runoff_sum.metadata().set_double("valid_min", 0.0);
   if ((ierr1 != 0) || (ierr2 != 0)) {
       PetscPrintf(grid.com,
-        "PISM ERROR: memory allocation failed in NullTransportHydrology constructor (Wtilimp).\n");
+        "PISM ERROR: memory allocation failed in NullTransportHydrology constructor (basal_runoff_sum).\n");
       PISMEnd();
   }
 
   printf("END NullTransportHydrology::NullTransportHydrology()\n");
 }
 
-
-
-
-PetscErrorCode NullTransportHydrology::init(PISMVars &vars) {
-  PetscErrorCode ierr;
-  ierr = verbPrintf(2, grid.com,
-    "* Initializing the null-transport (till only) subglacial hydrology model ...\n"); CHKERRQ(ierr);
-  ierr = PISMHydrology::init(vars); CHKERRQ(ierr);
-  return 0;
-}
-
-
-//! Set the transportable subglacial water thickness to zero; there is no tranport.
-PetscErrorCode NullTransportHydrology::subglacial_water_thickness(IceModelVec2S &result) {
-  PetscErrorCode ierr = result.set(0.0); CHKERRQ(ierr);
-  return 0;
-}
-
-
-//! Returns the (trivial) overburden pressure as the pressure of the non-existent transportable water, because this is the least harmful output if this is misused.
-PetscErrorCode NullTransportHydrology::subglacial_water_pressure(IceModelVec2S &result) {
-  PetscErrorCode ierr = overburden_pressure(result); CHKERRQ(ierr);
-  return 0;
-}
 
 
 //! Update the till water thickness by simply integrating the melt input.
@@ -86,7 +62,8 @@ not conserve water.
 
 There is no tranportable water thickness variable and no interaction with it.
  */
-PetscErrorCode NullTransportHydrology::update(double icet, double icedt) {
+PetscErrorCode NullTransportHydrology::update(double icet, double icedt)
+{
   // if asked for the identical time interval as last time, then do nothing
   if ((fabs(icet - m_t) < 1e-6) && (fabs(icedt - m_dt) < 1e-6))
     return 0;
@@ -110,7 +87,7 @@ PetscErrorCode NullTransportHydrology::update(double icet, double icedt) {
   MaskQuery M(*mask);
   ierr = mask->begin_access(); CHKERRQ(ierr);
   ierr = Wtil.begin_access(); CHKERRQ(ierr);
-  ierr = Wtilimp.begin_access(); CHKERRQ(ierr);
+  ierr = basal_runoff_sum.begin_access(); CHKERRQ(ierr);
   ierr = total_input.begin_access(); CHKERRQ(ierr);
   for (int i=grid.xs; i<grid.xs+grid.xm; ++i) {
     for (int j=grid.ys; j<grid.ys+grid.ym; ++j) {
@@ -120,12 +97,12 @@ PetscErrorCode NullTransportHydrology::update(double icet, double icedt) {
         Wtil(i,j) += icedt * (total_input(i,j) - C);
         PetscScalar Wtil0 = Wtil(i,j);
         Wtil(i,j) = PetscMin(PetscMax(0.0, Wtil(i,j)), tillwat_max);
-        Wtilimp(i,j) += Wtil0 - Wtil(i,j);
+        basal_runoff_sum(i,j) += Wtil0 - Wtil(i,j);
       }
     }
   }
   ierr = mask->end_access(); CHKERRQ(ierr);
-  ierr = Wtilimp.end_access(); CHKERRQ(ierr);
+  ierr = basal_runoff_sum.end_access(); CHKERRQ(ierr);
   ierr = Wtil.end_access(); CHKERRQ(ierr);
   ierr = total_input.end_access(); CHKERRQ(ierr);
   return 0;

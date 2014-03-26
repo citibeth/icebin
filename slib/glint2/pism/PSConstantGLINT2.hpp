@@ -36,6 +36,9 @@ namespace pism {
 
 class PSConstantGLINT2 : public PISMSurfaceModel {
 public:
+	/** Experiment with b.c. in terms of conductive heat flow. */
+//	virtual BCType get_conduction_bc_type() { return NEUMANN; }
+	virtual BCType get_conduction_bc_type() { return DIRICHLET; }
 
 	/** @param conf Not Used (Looked up all the constructors, it just
 	sets this->config, whic his not used
@@ -51,6 +54,7 @@ public:
 															 std::map<std::string, PISMTSDiagnostic*> &ts_dict);
 	virtual PetscErrorCode update(PetscReal my_t, PetscReal my_dt);
 	virtual PetscErrorCode ice_surface_mass_flux(IceModelVec2S &result);
+	virtual PetscErrorCode ice_surface_hflux(IceModelVec2S &result);
 	virtual PetscErrorCode ice_surface_temperature(IceModelVec2S &result);
 	virtual PetscErrorCode define_variables(std::set<std::string> vars, const PIO &nc, PISM_IO_Type nctype);
 	virtual PetscErrorCode write_variables(std::set<std::string> vars, const PIO &nc);
@@ -60,6 +64,8 @@ protected:
 public:
 	IceModelVec2S climatic_mass_balance;
 	IceModelVec2S ice_surface_temp;
+	// IMPLIED: liquid fraction of 0 (see our superclass)
+	IceModelVec2S _ice_surface_hflux;
 private:
 	PetscErrorCode allocate_PSConstantGLINT2();
 };

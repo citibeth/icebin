@@ -56,6 +56,13 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 	ierr = ice_surface_temp.set_attrs("climate_state",
 		"constant-in-time ice temperature at the ice surface",
 		"K", ""); CHKERRQ(ierr);
+
+	ierr = _ice_surface_hflux.create(grid, "ice_surface_hflux", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = _ice_surface_hflux.set_attrs("climate_state",
+		"constant-in-time heat flux through top surface",
+		"W m-2", ""); CHKERRQ(ierr);
+
+
 printf("END PSConstantGLINT2::allocate_PSConstantGLINT2()\n");
 	return 0;
 }
@@ -99,6 +106,8 @@ printf("AA1\n");
 	// Set ice_surface_temp to a harmless value for now. (FIXME, though.)
 	ierr = ice_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
 
+	ierr = _ice_surface_hflux.set(0.0); CHKERRQ(ierr);
+
 	// parameterizing the ice surface temperature 'ice_surface_temp'
 	ierr = verbPrintf(2, grid.com,
 				"		parameterizing the ice surface temperature 'ice_surface_temp' ... \n"); CHKERRQ(ierr);
@@ -109,7 +118,7 @@ printf("END PSConstantGLINT2::init()\n");
 
 PetscErrorCode PSConstantGLINT2::update(PetscReal my_t, PetscReal my_dt)
 {
-	PetscErrorCode ierr;
+//	PetscErrorCode ierr;
 
 printf("BEGIN update(%f, %f)\n", my_t, my_dt);
 
@@ -120,10 +129,13 @@ printf("BEGIN update(%f, %f)\n", my_t, my_dt);
 	m_t	= my_t;
 	m_dt = my_dt;
 
+#if 0
 printf("PSConstantGLINT2::update(%f) dumping variables\n", my_t);
+_ice_surface_hflux.dump("ice_surface_hflux.nc");
 ice_surface_temp.dump("ice_surface_temp.nc");
 climatic_mass_balance.dump("climatic_mass_balance.nc");
 printf("PSConstantGLINT2::update(%f) done dumping variables\n", my_t);
+#endif
 
 	return 0;
 }
@@ -150,9 +162,18 @@ PetscErrorCode PSConstantGLINT2::ice_surface_temperature(IceModelVec2S &result) 
 	return 0;
 }
 
+PetscErrorCode PSConstantGLINT2::ice_surface_hflux(IceModelVec2S &result) {
+	PetscErrorCode ierr;
+
+	ierr = _ice_surface_hflux.copy_to(result); CHKERRQ(ierr);
+
+	return 0;
+}
+
 void PSConstantGLINT2::add_vars_to_output(std::string /*keyword*/, std::set<std::string> &result) {
 	result.insert("climatic_mass_balance");
 	result.insert("ice_surface_temp");
+	result.insert("ice_surface_hflux");
 	// does not call atmosphere->add_vars_to_output().
 }
 
@@ -163,6 +184,10 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 
 	if (set_contains(vars, "ice_surface_temp")) {
 		ierr = ice_surface_temp.define(nc, nctype); CHKERRQ(ierr);
+	}
+
+	if (set_contains(vars, "ice_surface_hflux")) {
+		ierr = _ice_surface_hflux.define(nc, nctype); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "climatic_mass_balance")) {
@@ -177,6 +202,10 @@ PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, con
 
 	if (set_contains(vars, "ice_surface_temp")) {
 		ierr = ice_surface_temp.write(nc); CHKERRQ(ierr);
+	}
+
+	if (set_contains(vars, "ice_surface_hflux")) {
+		ierr = _ice_surface_hflux.write(nc); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "climatic_mass_balance")) {

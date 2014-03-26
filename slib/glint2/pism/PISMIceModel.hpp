@@ -37,20 +37,71 @@ PISMIceModel.
 
 class PISMIceModel : public ::IceModel
 {
+	friend class IceModel_PISM;
+public:
+	typedef ::IceModel super;
+	struct Params {
+		double time_start_s;
+	};
+	Params const params;
+protected:
+
+	// Temporary stuff to hold returns from PISM
+//	IceModelVec2S strain_heating2;		//!< Rate of strain heating (W/m^2)
+	IceModelVec2S upward_geothermal_flux;	//!< Per-timestep upward geothermal flux (W/m^2)
+
+	IceModelVec2S basal_frictional_heating_sum;	//!< Total amount of basal friction heating (J/m^2)
+	IceModelVec2S strain_heating_sum;	//!< Total amount of strain heating (J/m^2)
+	IceModelVec2S geothermal_flux_sum;	//!< Total amount of geothermal energy (J/m^2)
+	IceModelVec2S upward_geothermal_flux_sum;	//!< Total amount of geothermal energy (J/m^2)
+	IceModelVec2S total_enthalpy;		//!< Total enthalpy of ice sheet (J/m^2)
+
+protected:
+	// see iceModel.cc
+	virtual PetscErrorCode createVecs();
+
+private:
+	// Utility function
+	PetscErrorCode prepare_nc(std::string const &fname, std::unique_ptr<PIO> &nc);
+
 public:
 
+	std::unique_ptr<PIO> pre_mass_nc;	//!< Write variables every time massContPostHook() is called.
+	std::unique_ptr<PIO> post_mass_nc;
+	std::unique_ptr<PIO> pre_energy_nc;
+	std::unique_ptr<PIO> post_energy_nc;
+
 	// see iceModel.cc for implementation of constructor and destructor:
-	PISMIceModel(IceGrid &g, PISMConfig &config, PISMConfig &overrides);
+	/** @param gcm_params Pointer to IceModel::gcm_params.  Lives at least as long as this object. */
+	PISMIceModel(IceGrid &g, PISMConfig &config, PISMConfig &overrides, Params const &params);
 	virtual ~PISMIceModel(); // must be virtual merely because some members are virtual
 
 	virtual PetscErrorCode allocate_subglacial_hydrology();
 	virtual PetscErrorCode allocate_couplers();
+	virtual PetscErrorCode grid_setup();
+    virtual PetscErrorCode misc_setup();
+
+	virtual PetscErrorCode run_to(double time);
 
 	/** @return Our instance of PSConstantGLINT2 */
 	PSConstantGLINT2 *ps_constant_glint2()
 		{ return dynamic_cast<PSConstantGLINT2 *>(surface); }
 	NullTransportHydrology *null_hydrology()
 		{ return dynamic_cast<NullTransportHydrology *>(::IceModel::subglacial_hydrology); }
+
+
+	/** @return Current time for mass timestepping */
+	double mass_t() const { return grid.time->current(); }
+	/** @return Current time for enthalpy timestepping */
+	double enthalpy_t() const { return t_TempAge; }
+
+	PetscErrorCode massContPreHook();
+	PetscErrorCode massContPostHook();
+	// Pre and post for energy
+	PetscErrorCode energyStep();
+
+	PetscErrorCode write_post_energy(double time_s);
+
 };
 
 }}
