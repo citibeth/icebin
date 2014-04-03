@@ -49,8 +49,12 @@ struct glint2_modele {
 	double dtsrc;			// Size of ModelE timestep
 	std::unique_ptr<GCMCoupler> gcm_coupler;
 
+	/** The matrix used for each IceModel, used to convert from
+	the elevation grid to ice grid */
 	std::map<int, std::vector<hp_to_ice_rec>> hp_to_ices;
 
+	/** Last time the coupler was called (or start of run) */
+	int itime_last;
 };
 }}	// namespace glint2::modele
 // ================================================

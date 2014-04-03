@@ -355,22 +355,3 @@ PetscErrorCode PISMIceModel::run_to(double time)
 
 }}	// namespace glint2::pism
 
-
-#if 0
-// Code removed from ::IceModel.  Probably not needed.
-
-// FIXME: THIS IS BAD! (Provides unguarded access to IceModel's internals.)
-IceModelVec2S* PISMIceModel::get_geothermal_flux() {
-  return &this->geothermal_flux;
-}
-
-// FIXME: THIS IS BAD! (Provides unguarded access to IceModel's internals.)
-IceModelVec2S* PISMIceModel::get_ice_surface_elevation() {
-  return &this->ice_surface_elevation;
-}
-
-// FIXME: THIS IS BAD! (Provides unguarded access to IceModel's internals.)
-PISMStressBalance* PISMIceModel::get_stress_balance() {
-  return this->stress_balance;
-}
-#endif

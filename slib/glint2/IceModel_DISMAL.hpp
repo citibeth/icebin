@@ -33,6 +33,8 @@ class IceModel_DISMAL : public IceModel_Decode
 
 public:
 
+	IceModel_DISMAL() : IceModel(IceModelType::DISMAL) {}
+
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 	void init(

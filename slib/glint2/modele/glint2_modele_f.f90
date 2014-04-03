@@ -214,9 +214,9 @@ integer, value :: itime
 print *,'BEGIN glint2_modele_couple_to_ice()'
 
 	! Grab array descriptors
-	call get_spec_double_3(smb1h, i0h, j0h, 1, smb1h_f)
-	call get_spec_double_3(seb1h, i0h, j0h, 1, seb1h_f)
-	call get_spec_double_3(tg21h, i0h, j0h, 1, tg21h_f)
+	call get_spec_double_3(smb1h, i0h, j0h, 1, smb1h_f)		! kg/m^2
+	call get_spec_double_3(seb1h, i0h, j0h, 1, seb1h_f)		! J/m^2: Latent Heat
+	call get_spec_double_3(tg21h, i0h, j0h, 1, tg21h_f)		! C
 
 	! Call the C-side of the interface
 	call glint2_modele_couple_to_ice_c(api, itime, smb1h_f, seb1h_f, tg21h_f)

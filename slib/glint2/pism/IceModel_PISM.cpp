@@ -249,7 +249,7 @@ printf("Initializing PETSc\n");
     unit_system.reset(new ::PISMUnitSystem(NULL));
     config.reset(new ::PISMConfig(pism_comm, "pism_config", *unit_system));
 	overrides.reset(new ::PISMConfig(pism_comm, "pism_overrides", *unit_system));
-    ierr = init_config(pism_comm, *config, *overrides, true); CHKERRQ(ierr);
+	ierr = init_config(pism_comm, *config, *overrides, true); CHKERRQ(ierr);
 
 	// Get arguments from the GCM
 //	args.push_back("-calendar");

@@ -78,7 +78,7 @@ public:
 	blitz::Array<double, NDIM> tensor;
 
 	/** Name of each element in each dimension */
-	DynamicEnum names[NDIM];
+	DynamicEnum *ele_names[NDIM];
 
 	/** Convenience function.
 	@return The size of each dimension. */

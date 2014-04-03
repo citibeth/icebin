@@ -21,14 +21,10 @@
 
 namespace glint2 {
 
-/** Query all the ice models to figure out what fields they need */
-std::set<IceField> GCMCoupler::get_required_fields()
-{
-	std::set<IceField> ret;
-	for (auto model = models.begin(); model != models.end(); ++model) {
-		model->get_required_fields(ret);
-	}
-	return ret;
+std::ostream CouplingContract::operator<<(std::ostream &out) {
+	for (auto ii = _ix_to_fields.begin(); ii != _ix_to_fields.end(); ++ii)
+		out << "    " << *ii << std::endl;
+	return out;
 }
 
 
@@ -43,7 +39,9 @@ void GCMCoupler::read_from_netcdf(
 	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 	int i = 0;
 	for (auto name = sheet_names.begin(); name != sheet_names.end(); ++name) {
-		models.insert(i, read_icemodel(gcm_params, nc, vname + "." + *name, sheets[*name]));
+		per_sheet.insert(std::make_pair(i, PerSheet()));
+		PerSheet &sheet = per_sheet[i];
+		sheet->model = read_icemodel(gcm_params, nc, vname + "." + *name, sheets[*name]);
 		++i;
 	}
 	printf("END GCMCoupler::read_from_netcdf()\n");

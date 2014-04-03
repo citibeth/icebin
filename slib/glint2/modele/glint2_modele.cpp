@@ -22,6 +22,7 @@
 #include <giss/f90blitz.hpp>
 #include <glint2/HCIndex.hpp>
 #include <glint2/modele/glint2_modele.hpp>
+#include <glint2/modele/GCMCoupler_ModelE.hpp>
 //#include <glint2/IceModel_TConv.hpp>
 #include <boost/filesystem.hpp>
 
@@ -74,6 +75,7 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 		glint2_config_dir,
 		giss::time::tm(iyear1, 1, 1),
 		itimei*dtsrc);
+	itime_last = itimei;
 
 printf("iyear1 = %d\n", iyear1);
 
@@ -102,7 +104,7 @@ printf("iyear1 = %d\n", iyear1);
 
 	// Read the coupler, along with ice model proxies
 	MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
-	api->gcm_coupler.reset(new GCMCoupler(gcm_params));
+	api->gcm_coupler.reset(new GCMCoupler_ModelE(gcm_params));
 	api->gcm_coupler->read_from_netcdf(glint2_config_nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
 	glint2_config_nc.close();
 
@@ -113,32 +115,7 @@ printf("iyear1 = %d\n", iyear1);
 	// PISM input file, and the version in the GLINT2 file will be ignored)
 	api->maker->realize();
 
-
 	// TODO: Test that im and jm are consistent with the grid read.
-#endif
-
-#if 0
-// THis crashes anyway...
-printf("AA1\n");
-	// Add adapters to the ice models, if needed
-	for (auto ii=api->gcm_coupler->models.super::begin();
-		ii != api->gcm_coupler->models.super::end(); ++ii)
-	{
-		std::set<IceField> fields;
-		ii->second->get_required_fields(fields);
-		if (fields.find(IceField::SURFACE_T) != fields.end()) {
-			IceModel_Decode *imd = dynamic_cast<IceModel_Decode *>(&*(ii->second));
-			if (!imd) continue;
-
-			// This ice model wants SURFACE_T... add an adapter
-			ii->second.release();
-			std::unique_ptr<IceModel> model(std::move(ii->second));
-			ii->second.reset(new IceModel_TConv())
-				std::unique_ptr<IceModel_Decode>(imd),
-				LHM, SHI));
-		}
-	}
-printf("AA1\n");
 #endif
 
 	printf("***** END glint2_modele_new()\n");
@@ -489,21 +466,21 @@ extern "C"
 void  glint2_modele_couple_to_ice_c(
 glint2_modele *api,
 int itime,
-giss::F90Array<double,3> &smb1h_f,
-giss::F90Array<double,3> &seb1h_f,
-giss::F90Array<double,3> &tg21h_f)
+giss::F90Array<double,3> &smb1h_f,		// kg/m^2
+giss::F90Array<double,3> &seb1h_f,		// J/m^2: Latent Heat
+giss::F90Array<double,3> &tg21h_f)		// C
 {
+	int rank = coupler.rank();	// MPI rank; debugging
+	double time_s = itime * api->dtsrc;
+
 	GCMCoupler &coupler(*api->gcm_coupler);
-int rank = coupler.rank();	// debugging
+	CouplingContract &gcm_inputs(coupler.gcm_inputs);
 
-	std::vector<IceField> fields =
-		{IceField::MASS_FLUX, IceField::ENERGY_FLUX, IceField::TG2};
-//	std::vector<blitz::Array<double,3>> vals1hp =
-//		{smb1h_f.to_blitz(), seb1h_f.to_blitz()};
-
-	auto smb1h(smb1h_f.to_blitz());
-	auto seb1h(seb1h_f.to_blitz());
-	auto tg21h(tg21h_f.to_blitz());
+	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
+	std::vector<blitz::Array<double,3>> inputs(gcm_inputs_enum.size());
+	inputs[gcm_inputs["smb"]] = smb1h_f.to_blitz();
+	inputs[gcm_inputs["seb"]] = seb1h_f.to_blitz();
+	inputs[gcm_inputs["tg2"]] = tg21h_f.to_blitz();
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
@@ -513,11 +490,6 @@ printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %d\n", api->hp_to_ice
 		nele_l += ii->second.size();
 	}
 
-	// Allocate buffer for that amount of stuff
-	int nfields = fields.size();
-printf("glint2_modele_couple_to_ice_c(): nfields=%d, nele_l = %d\n", nfields, nele_l);
-	giss::DynArray<SMBMsg> sbuf(SMBMsg::size(nfields), nele_l);
-
 	// Fill it in by doing a sparse multiply...
 	// (while translating indices to local coordinates)
 	HCIndex &hc_index(*api->maker->hc_index);
@@ -525,11 +497,23 @@ printf("glint2_modele_couple_to_ice_c(): nfields=%d, nele_l = %d\n", nfields, ne
 printf("[%d] hp_to_ices.size() = %ld\n", rank, api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
 		int sheetno = ii->first;
+		VarTransformer &vt(api->gcm_coupler->per_sheet[sheetno].vt_gcm_to_ice);
+
+		// Allocate buffer for that amount of stuff
+		int nfields = vt.dimsize(OUTPUTS);
+printf("glint2_modele_couple_to_ice_c(): nfields=%d, nele_l = %d\n", nfields, nele_l);
+		giss::DynArray<SMBMsg> sbuf(SMBMsg::size(nfields), nele_l);
+
 		std::vector<hp_to_ice_rec> &mat(ii->second);
 
 printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		// Skip if we have nothing to do for this ice sheet
 		if (mat.size() == 0) continue;
+
+		// Get the CSR sparse matrix to convert GCM outputs to ice model inputs
+		CSRAndUnits trans = vt.apply_scalars({
+			std::make_pair("by_dt", 1.0 / ((itime - itime_last) * api->dtsrc)),
+			std::make_pair("unit", 1.0)});
 
 		// Do the multiplication
 		for (int j=0; j < mat.size(); ++j) {
@@ -539,9 +523,22 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 			msg.sheetno = sheetno;
 			msg.i2 = jj.row;
 
-			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
-			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
-			msg[2] = jj.val * tg21h(jj.col_i, jj.col_j, jj.col_k);
+			// Convert from inputs to outputs while regridding
+			for (int xi=0; xi<vt.dimsize(OUTPUTS); ++xi) {
+				msg[xi] = 0;
+				std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
+				for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
+					int xj = xjj->first;
+					double io_val = xjj->second;
+					msg[xi] += io_val * inputs[xj](jj.col_i, jj.col_j, jj.col_k);
+				}
+				msg[xi] += trans.units[xi];
+			}
+			msg[xi] *= jj.val;
+
+//			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
+//			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
+//			msg[2] = jj.val * tg21h(jj.col_i, jj.col_j, jj.col_k);
 
 //printf("msg = %d (i,j, hc)=(%d %d %d) i2=%d %g %g (%g %g)\n", msg.sheetno, lindex[0], lindex[1], ihc+1, msg.i2, msg[0], msg[1], smb1h(lindex[0], lindex[1], ihc+1), seb1h(lindex[0], lindex[1], ihc+1));
 
@@ -555,7 +552,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		throw std::exception();
 	}
 
-	double time_s = itime * api->dtsrc;
 printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itime, time_s, api->dtsrc);
 	coupler.couple_to_ice(time_s, fields, sbuf);
+	itime_last = itime;
 }

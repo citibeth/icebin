@@ -25,14 +25,6 @@
 
 namespace glint2 {
 
-/** The different things we can pass to an ice model. */
-BOOST_ENUM_VALUES( IceField, int,
-	(MASS_FLUX) 	(0)		// kg/(s m^2)
-	(ENERGY_FLUX)	(1)		// W/m^2
-	(TG2)			(2)		// C (Mean T at bottom of firn/snow model)
-	(SURFACE_T)		(3)		// C (Computed T based on mass & energy flux)
-);
-
 
 class IceModel {
 public:
@@ -65,6 +57,9 @@ public:
 		(PISM)			(1)
 		(ISSM)			(2)
 	);
+	const IceModel::Type type;
+
+	IceModel(IceModel::Type _type) : type(_type) {}
 
 	virtual ~IceModel() {}
 

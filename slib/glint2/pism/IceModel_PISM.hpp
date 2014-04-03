@@ -115,6 +115,8 @@ public:
 		std::string const &vname,
 		IceSheet *sheet);
 
+	IceModel_PISM() : IceModel(IceModelType::PISM) {}
+
 	~IceModel_PISM();
 
 	/** Query all the ice models to figure out what fields they need */

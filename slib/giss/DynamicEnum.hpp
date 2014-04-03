@@ -6,6 +6,16 @@
 
 namespace giss {
 
+
+class DynamicEnum {
+	virtual ~DynamicEnum() {}
+
+	virtual int operator[](std::string const &name) = 0;
+	virtual std::string const &operator[](int ix) = 0;
+};
+
+
+#if 0
 /** A string-to-int mapping that is dynamic at runtime. */
 class DynamicEnum {
 	std::map<std::string, int> _name_to_ix;
@@ -31,5 +41,6 @@ public:
 
 
 };
+#endif
 
 }

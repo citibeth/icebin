@@ -1,3 +1,4 @@
+#if 0
 #include <giss/DynamicEnum.hpp>
 
 namespace giss {
@@ -14,3 +15,4 @@ void DynamicEnum::set_names(std::vector &&names)
 
 
 }
+#endif

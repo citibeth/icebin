@@ -15,13 +15,17 @@ lib_LTLIBRARIES = libglint2.la
 # the sources to add to the library and to add to the source distribution
 libglint2_la_SOURCES = \
 	$(FORTRAN_SOURCES) \
+	giss/cfnames.cpp \
+	giss/cfnames_data.cpp \
 	giss/geodesy.cpp \
+	giss/DynamicEnum.cpp \
 	giss/IndexTranslator.cpp \
 	giss/IndexTranslator2.cpp \
 	giss/ncutil.cpp \
 	giss/Proj2.cpp \
 	giss/SparseMatrix.cpp \
 	giss/sparsemult.cpp \
+	giss/VarTransformer.cpp \
 	glint2/clippers.cpp \
 	glint2/ExchangeGrid.cpp \
 	glint2/GCMCoupler.cpp \

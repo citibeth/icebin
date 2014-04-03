@@ -23,8 +23,55 @@
 #include <giss/Dict.hpp>
 #include <glint2/IceModel.hpp>
 #include <boost/filesystem.hpp>
+#include <giss/cfnames.hpp>
 
 namespace glint2 {
+
+
+struct CoupledField {
+	std::string name;
+	std::string description;
+	std::string units;			//!< UDUnits-compatible string
+
+	CoupledField(std::string const &_name, std::string const &_description,
+		std::string const _&units) : name(_name), description(_description), units(_units) {}
+
+
+	CoupledField(CFName *cfname) :
+		name(cf->id), description(cf->description), units(cf->canonical_units)
+	{}
+
+	std::ostream operator<<(std::ostream &out)
+		{ return out << "(" << name << ": " << units << ")"; } 
+
+};
+
+struct CouplingContract : public DynamicEnum
+{
+	std::vector<CoupledField> _ix_to_field;
+	std::map<std::string, int> _name_to_ix;
+public:
+
+	void push_back(CoupledField const &cf)
+	{
+		_name_to_ix.insert(std::make_pair(cf.id, _ix_to_field.size()));
+		_ix_to_field.push_back(cf);
+	}
+
+	long size() { return _ix_to_field.size(); }
+
+	int operator[](std::string const &name) {
+		auto ii = _name_to_ix.find(name);
+		if (ii == _name_to_ix.end()) return -1;
+		return *ii;
+	}
+
+	std::string const &operator[](int ix)
+		{ return _ix_to_field[ix].id; }
+
+	std::ostream operator<<(std::ostream &out);
+};
+
 
 struct SMBMsg {
 	int sheetno;
@@ -47,15 +94,46 @@ struct SMBMsg {
 
 class GCMCoupler {
 public:
+	/** Type tags for subclasses of GCMCoupler */
+	BOOST_ENUM_VALUES( Type, int,
+		(MODELE)		(0)
+		(CESM)			(1)
+	);
+	Type const type;
+
+	/** Items held in GCMCoupler on a per-ice-sheet basis. */
+	struct PerSheet {
+		std::unique_ptr<IceModel> model;
+
+		/** Ordered specification of the variables (w/ units)
+		to be passed from GLINT2 to the ice model */
+		CouplingContract con_gcm_to_ice;
+
+		/** Variable transformations to prepare GCM
+		output for consumption by the ice model.
+		This transformation is in addition to regridding. */
+		VarTransformer vt_gcm_to_ice;
+
+		/** Ordered specification of the variables (w/ units)
+		to be passed from the ice model to GLINT2 */
+		CouplingContract con_ice_to_gcm;
+
+		/** Variable transformations to prepare ice model 
+		output for consumption by the GCM.
+		This transformation is in addition to regridding. */
+		VarTransformer vt_ice_to_gcm;
+	};
+
 	IceModel::GCMParams const gcm_params;
 
 	// Only needed by root MPI node in MPI version
-	giss::MapDict<int,IceModel> models;
+	std::map<int, PerIce> per_sheet;
 
-	GCMCoupler(IceModel::GCMParams const &_gcm_params) : gcm_params(_gcm_params) {}
+	/** Fields we receive from the GCM */
+	CouplingContract gcm_inputs;
 
-	/** Query all the ice models to figure out what fields they need */
-	std::set<IceField> get_required_fields();
+	GCMCoupler(Type _type, IceModel::GCMParams const &_gcm_params) :
+		type(_type), gcm_params(_gcm_params) {}
 
 	/** @param sheets (OPTIONAL): IceSheet data structures w/ grids, etc. */
 	virtual void read_from_netcdf(

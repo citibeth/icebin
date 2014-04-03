@@ -30,13 +30,17 @@ glint2_set_dependencies()
 set(glint2_SOURCES 
 	galahad/qpt_c.cpp
 	galahad/zd11_c.cpp
+	giss/DynamicEnum.cpp
 	giss/IndexTranslator.cpp
 	giss/IndexTranslator2.cpp
 	giss/Proj2.cpp
 	giss/SparseMatrix.cpp
+	giss/cfnames.cpp
+	giss/cfnames_data.cpp
 	giss/geodesy.cpp
 	giss/ncutil.cpp
 	giss/sparsemult.cpp
+	giss/VarTransformer.cpp
 	glint2/ExchangeGrid.cpp
 	glint2/GCMCoupler.cpp
 	glint2/Grid.cpp
