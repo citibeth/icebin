@@ -191,6 +191,13 @@ struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
 			std::unique_ptr<ValT>(new ValT(std::move(val))));
 	}
 
+	/** Create a new item with no-arg constructor and insert it.
+	Convenience method. */
+	std::pair<ValT *, bool> create(KeyT const &key) {
+		return insert(key,
+			std::unique_ptr<ValT>(new ValT()));
+	}
+
 private :
 	struct CmpPointers {
 		bool operator()(ValT const *a, ValT const *b) { return *a < *b; }
