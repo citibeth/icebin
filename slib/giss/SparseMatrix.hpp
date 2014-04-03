@@ -489,7 +489,7 @@ public:
 	std::vector<double> const &vals() const { return val; }
 
 	// --------------------------------------------------
-	/** Standard STL-type iterator for iterating through a ZD11SparseMatrix. */
+	/** Standard STL-type iterator for iterating through a VectorSparseMatrix. */
 	class iterator {
 	protected:
 		VectorSparseMatrix0 *parent;
