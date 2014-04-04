@@ -14,7 +14,6 @@ lib_LTLIBRARIES = libglint2.la
 
 # the sources to add to the library and to add to the source distribution
 libglint2_la_SOURCES = \
-	$(FORTRAN_SOURCES) \
 	giss/cfnames.cpp \
 	giss/cfnames_data.cpp \
 	giss/geodesy.cpp \
@@ -51,7 +50,8 @@ libglint2_la_SOURCES = \
 	glint2/pism/PSConstantGLINT2.cpp \
 	glint2/pism/IceModel_PISM.cpp \
 	glint2/pism/NullTransportHydrology.cpp \
-	glint2/pism/PISMIceModel.cpp
+	glint2/pism/PISMIceModel.cpp \
+	$(FORTRAN_SOURCES)
 
 # Deprecated, at least temporarily
 #	glint2/IceModel_TConv.cpp

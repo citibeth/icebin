@@ -4,13 +4,13 @@ namespace giss {
 
 CFName const *get_cfname(std::string const &_id, std::string const &expected_units)
 {
-	CFName *cf = cf::standard_name_table()[_id];
-	if ((expected_units != "") && (cf->canonical_units != expected_units)) {
-		fprintf("CF Name '%s' has units '%s', but '%s' was expected.\n",
-			cf->id.c_str(), cf->canonical_units.c_str(), cf->expected_units.c_str());
+	giss::CFName const &cfp = cf::standard_name_table().at(_id);
+	if ((expected_units != "") && (cfp.canonical_units != expected_units)) {
+		fprintf(stderr, "CF Name '%s' has units '%s', but '%s' was expected.\n",
+			cfp.id.c_str(), cfp.canonical_units.c_str(), expected_units.c_str());
 		throw std::exception();
 	}
-	return ;
+	return &cfp;
 }
 
 }

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <vector>
+#include <blitz/array.h>
+#include <giss/DynamicEnum.hpp>
+
 namespace giss {
 
 /** This is not officially part of the SparseMatrix.hpp framework.
@@ -27,7 +31,7 @@ public:
 	std::vector<double> units;
 
 	CSRAndUnits(int nrow) : mat(nrow), units(nrow, 0.0) {}
-}
+};
 
 // -------------------------------------------------
 // -------------------------------------------------
@@ -78,24 +82,19 @@ public:
 	blitz::Array<double, NDIM> tensor;
 
 	/** Name of each element in each dimension */
-	DynamicEnum *ele_names[NDIM];
+	DynamicEnum const *ele_names[NDIM];
 
 	/** Convenience function.
 	@return The size of each dimension. */
-	int dimsize(int dim) { return names[dim].size(); }
+	int dimsize(int dim) { return ele_names[dim]->size(); }
 
 	/** Define the name of each element in a dimension. */
-	void set_names(int dim, std::vector<std::string> &&names);
-
-//	void check_names();
+	void set_names(int dim, DynamicEnum const *_ele_names)
+		{ ele_names[dim] = _ele_names; }
 
 	/** @return the index corresponding to a given name. */
 	int name_to_ix(int dim, std::string const &name)
-	{
-		auto ii = name_to_ix[dim].find(name);
-		if (ii == name_to_ix[dim].end()) return -1;
-		return *ii;
-	}
+		{ return (*ele_names[dim])[name]; }
 
 	/** Set an element of the tensor, using name-based indexing. */
 	void set(std::string output, std::string input, std::string scalar, double val);
@@ -103,8 +102,7 @@ public:
 	/** Instantiates the scalars with specific values, and returns a 2nd-order
 	matrix derived from the 3d-order tensor, in CSR format. */
 	CSRAndUnits apply_scalars(
-		std::initializer_list<std::string> names,
-		std::initializer_list<double> vals);
+		std::vector<std::pair<std::string, double>> const &nvpairs);
 
 	/** Print out the tensor as readable symbolic equations.
 	Used to check and debug. */
