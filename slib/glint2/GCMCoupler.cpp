@@ -46,10 +46,10 @@ void GCMCoupler::read_from_netcdf(
 #if 1
 		// Print out the contract and var transformations
 		std::cout << "========= Contract for " << *name << std::endl;
-		std::cout << "----> INPUT" << std::endl;
+		std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
 		std::cout << mod->contract[IceModel::INPUT];
 		std::cout << mod->var_transformer[IceModel::INPUT];
-		std::cout << "----> OUTPUT" << std::endl;
+		std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
 		std::cout << mod->contract[IceModel::OUTPUT];
 		std::cout << mod->var_transformer[IceModel::OUTPUT];
 #endif

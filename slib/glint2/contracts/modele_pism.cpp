@@ -14,6 +14,7 @@ void IceModel_PISM::setup_contract_modele(
 	glint2::modele::GCMCoupler_ModelE const &coupler,
 	glint2::modele::ContractParams_ModelE const &params)
 {
+	printf("BEGIN IceModel_PISM::setup_contract_modele\n");
 	IceModel &model(*this);
 
 	// ============ GCM -> Ice
@@ -36,6 +37,7 @@ void IceModel_PISM::setup_contract_modele(
 	ice_input_vt.set_names(VarTransformer::INPUTS, &coupler.gcm_outputs);
 	ice_input_vt.set_names(VarTransformer::OUTPUTS, &ice_input);
 	ice_input_vt.set_names(VarTransformer::SCALARS, &coupler.ice_input_scalars);
+	ice_input_vt.allocate();
 
 	// Add some recipes for gcm_to_ice
 	std::string out;
@@ -71,11 +73,14 @@ void IceModel_PISM::setup_contract_modele(
 	ice_output_vt.set_names(VarTransformer::INPUTS, &ice_output);
 	ice_output_vt.set_names(VarTransformer::OUTPUTS, gcm_inputs);
 	ice_output_vt.set_names(VarTransformer::SCALARS, ice_output_scalars);
+	ice_output_vt.allocate();
 
 	// Set up transformations: just copy inputs to outputs
 	for (auto ii = ice_output.begin(); ii != ice_output.end(); ++ii) {
 		ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
 	}
+
+	printf("END IceModel_PISM::setup_contract_modele\n");
 }
 
 }}		// namespace glint2::pism

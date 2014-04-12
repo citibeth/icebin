@@ -88,11 +88,12 @@ protected:
 
 public:
 
-	/** @return The size of each dimension, WITHOUT units */
-
 	/** Define the name of each element in a dimension. */
 	void set_names(int dim, DynamicEnum const *ele_names)
 		{ _ele_names[dim] = ele_names; }
+
+	/** Allocate the tensor, based on the names set above. */
+	void allocate();
 
 	// Accessor methods...
 	DynamicEnum const &dimension(int idim) const

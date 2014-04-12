@@ -2,6 +2,13 @@
 
 namespace giss {
 
+void VarTransformer::allocate()
+{
+	blitz::TinyVector<int, NDIM> extent;
+	for (int i=0; i<NDIM; ++i) extent[i] = _ele_names[i]->size_withunit();
+	_tensor.reference(blitz::Array<double, NDIM>(extent));
+	_tensor = 0;
+}
 
 
 void VarTransformer::set(std::string output, std::string input, std::string scalar, double val)
@@ -97,7 +104,7 @@ std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)
 			for (int k=0; k < n_scalars_wu; ++k) {
 				double val = vt._tensor(i,j,k);
 				if (val == 0.0) continue;
-				out << val;
+				if (val != 1.0) out << val;
 				if (k != unit_scalars) out << " " << vt.dimension(VarTransformer::SCALARS)[k];
 
 				if (kk != nkj-1) out << " + ";
@@ -110,11 +117,12 @@ std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)
 
 			if (jj != nj-1) out << " + ";
 
-			out << vt.dimension(VarTransformer::INPUTS)[j];
+//			out << vt.dimension(VarTransformer::INPUTS)[j];
 
 			// Increment count of SEEN j values
 			++jj;
 		}
+		out << std::endl;
 	}
 	return out;
 }
