@@ -28,9 +28,9 @@
 namespace glint2 {
 namespace modele {
 
-
+// The ModelE interface to GLINT2.  This is called directly by ModelE.
 // ------------------------------------------------------
-/** Make a sparse matrix with a vector of theses. */
+/** Make a sparse matrix with a vector of these. */
 struct hp_to_ice_rec {
 	int row;
 	int col_i, col_j, col_k;

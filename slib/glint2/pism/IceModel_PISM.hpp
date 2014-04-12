@@ -51,10 +51,8 @@ class IceModel_PISM : public IceModel_Decode
 	VecScatter scatter; //!< VecScatter used to transfer data to/from processor 0.
 	Vec Hp0;			//!< Resulting vector on process 0
 
-
-
 	// Corresponding PISM variable for each field
-	std::map<IceField, IceModelVec2S *> pism_vars;
+	std::vector<IceModelVec2S *> pism_vars;
 
 	double BY_ICE_DENSITY;		// CONSTANT Used to prepare input for PISM
 
@@ -115,12 +113,9 @@ public:
 		std::string const &vname,
 		IceSheet *sheet);
 
-	IceModel_PISM() : IceModel(IceModelType::PISM) {}
+	IceModel_PISM() : IceModel_Decode(IceModel::Type::PISM) {}
 
 	~IceModel_PISM();
-
-	/** Query all the ice models to figure out what fields they need */
-	void get_required_fields(std::set<IceField> &fields);
 
 	PetscErrorCode allocate(
 		std::shared_ptr<const glint2::Grid_XY> &,
@@ -128,24 +123,31 @@ public:
 
 	PetscErrorCode deallocate();
 
+	void setup_contract_modele(
+		glint2::modele::GCMCoupler_ModelE const &coupler,
+		glint2::modele::ContractParams_ModelE const &params);
+
+	/** Non-GCM-specific portion of setting up contracts */
+	void finish_contract_setup();
+
 #if 0
 public:
 	/** Inherited from IceModel */
 	void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
-		std::map<IceField, blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2);
 private:
 	PetscErrorCode run_timestep_petsc(double time_s,
 		blitz::Array<int,1> const &indices,
-		std::map<IceField, blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2);
 
 #else
 public:
 	void run_decoded(double time_s,
-		std::map<IceField, blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2);
 private:
 	PetscErrorCode run_decoded_petsc(double time_s,
-		std::map<IceField, blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2);
 
 #endif
 

@@ -19,58 +19,15 @@
 #pragma once
 
 #include <cstdlib>
+#include <boost/filesystem.hpp>
 #include <giss/DynArray.hpp>
 #include <giss/Dict.hpp>
 #include <glint2/IceModel.hpp>
-#include <boost/filesystem.hpp>
-#include <giss/cfnames.hpp>
+#include <glint2/CouplingContract.hpp>
 
 namespace glint2 {
 
 
-struct CoupledField {
-	std::string name;
-	std::string description;
-	std::string units;			//!< UDUnits-compatible string
-
-	CoupledField(std::string const &_name, std::string const &_description,
-		std::string const _&units) : name(_name), description(_description), units(_units) {}
-
-
-	CoupledField(CFName *cfname) :
-		name(cf->id), description(cf->description), units(cf->canonical_units)
-	{}
-
-	std::ostream operator<<(std::ostream &out)
-		{ return out << "(" << name << ": " << units << ")"; } 
-
-};
-
-struct CouplingContract : public DynamicEnum
-{
-	std::vector<CoupledField> _ix_to_field;
-	std::map<std::string, int> _name_to_ix;
-public:
-
-	void push_back(CoupledField const &cf)
-	{
-		_name_to_ix.insert(std::make_pair(cf.id, _ix_to_field.size()));
-		_ix_to_field.push_back(cf);
-	}
-
-	long size() { return _ix_to_field.size(); }
-
-	int operator[](std::string const &name) {
-		auto ii = _name_to_ix.find(name);
-		if (ii == _name_to_ix.end()) return -1;
-		return *ii;
-	}
-
-	std::string const &operator[](int ix)
-		{ return _ix_to_field[ix].id; }
-
-	std::ostream operator<<(std::ostream &out);
-};
 
 
 struct SMBMsg {
@@ -101,39 +58,24 @@ public:
 	);
 	Type const type;
 
-	/** Items held in GCMCoupler on a per-ice-sheet basis. */
-	struct PerSheet {
-		std::unique_ptr<IceModel> model;
-
-		/** Ordered specification of the variables (w/ units)
-		to be passed from GLINT2 to the ice model */
-		CouplingContract con_gcm_to_ice;
-
-		/** Variable transformations to prepare GCM
-		output for consumption by the ice model.
-		This transformation is in addition to regridding. */
-		VarTransformer vt_gcm_to_ice;
-
-		/** Ordered specification of the variables (w/ units)
-		to be passed from the ice model to GLINT2 */
-		CouplingContract con_ice_to_gcm;
-
-		/** Variable transformations to prepare ice model 
-		output for consumption by the GCM.
-		This transformation is in addition to regridding. */
-		VarTransformer vt_ice_to_gcm;
-	};
-
 	IceModel::GCMParams const gcm_params;
-
-	// Only needed by root MPI node in MPI version
-	std::map<int, PerIce> per_sheet;
+	giss::MapDict<int,IceModel> models;
 
 	/** Fields we receive from the GCM */
-	CouplingContract gcm_inputs;
+	CouplingContract gcm_outputs;
 
 	GCMCoupler(Type _type, IceModel::GCMParams const &_gcm_params) :
 		type(_type), gcm_params(_gcm_params) {}
+
+	virtual ~GCMCoupler() {}
+
+	/** Called from within read_from_netcdf().  GCM-specific implementation
+	sets up the contracts for this GCM - IceModel pair.  (Usually by calling
+	through to GCM-specific virtual methods on the IceModel. */
+	virtual void setup_contracts(
+		IceModel &mod,
+		NcFile &nc,
+		std::string const &sheet_vname) = 0;
 
 	/** @param sheets (OPTIONAL): IceSheet data structures w/ grids, etc. */
 	virtual void read_from_netcdf(
@@ -146,21 +88,28 @@ public:
 	int rank();
 
 protected:
-	/** @param time_s Time since start of simulation, in seconds */
+	/** @param time_s Time since start of simulation, in seconds
+	Fields contained in the SMBMsg are INPUTS from the GCM.  They are
+	therefore arranged according to gmc_inputs.  GCM inputs are converted
+	into ice model inputs within IceModel::run_timestep(), which
+	is called at the end of this method.
+	@see gmc_inputs*/
 	void call_ice_model(
 		IceModel *model,
 		double time_s,
 		giss::DynArray<SMBMsg> &rbuf,
-		std::vector<IceField> const &fields,
 		SMBMsg *begin, SMBMsg *end);
 
 
 public:
-	/** @param sbuf the (filled) array of ice grid values for this MPI node.
+	/** Top-level general-purpose method, called by glint2_modele.cpp
+	(or other GCM-specific code).
 	@param time_s Time (seconds) since the start of the GCM run.
+	@param nfields Number of fields in sbuf.  Not all will necessarily be filled, in the case of heterogeneous ice models.
+	@param sbuf the (filled) array of ice grid values for this MPI node.
 	*/
 	void couple_to_ice(double time_s,
-		std::vector<IceField> const &fields,
+		int nfields,
 		giss::DynArray<SMBMsg> &sbuf);
 
 };

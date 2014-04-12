@@ -8,17 +8,10 @@
 #include <sstream>
 #include <string>
 
+using namespace giss;
+
 namespace glint2 {
 namespace pism {
-
-/** Query all the ice models to figure out what fields they need */
-void IceModel_PISM::get_required_fields(std::set<IceField> &fields)
-{
-	fields.insert(IceField::MASS_FLUX);
-//	fields.insert(IceField::ENERGY_FLUX);
-//	fields.insert(IceField::SURFACE_T);
-	fields.insert(IceField::TG2);
-}
 
 
 int IceModel_PISM::process_options()
@@ -178,6 +171,7 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
 // For dev branch
 static std::set<std::string> path_args = {"i", "o", "surface_given_file", "ocean_kill", "extra_file", "ts_file"};
 
+/** Called from within init().  We could get rid of this method... */
 PetscErrorCode IceModel_PISM::allocate(
 	std::shared_ptr<const glint2::Grid_XY> &glint2_grid,
 	NcVar *pism_var, NcVar *const_var)
@@ -307,8 +301,12 @@ printf("pism_surface_model = %p\n", pism_surface_model);
 
 	// Set up corresponence between GLINT2 fields and variables
 	// in the PISM data structures.
-	pism_vars[IceField::MASS_FLUX] = &pism_surface_model->climatic_mass_balance;
-	pism_vars[IceField::TG2] = &pism_surface_model->ice_surface_temp;
+	int ix;
+	pism_vars.resize(contract[INPUT].size_nounit(), NULL);
+	ix = contract[INPUT]["land_ice_surface_specific_mass_balance_flux"];
+		pism_vars[ix] = &pism_surface_model->climatic_mass_balance;
+	ix = contract[INPUT]["surface_temperature"];
+		pism_vars[ix] = &pism_surface_model->ice_surface_temp;
 
 	// Initialize scatter/gather stuff
 printf("pism_grid->max_stencil_width = %d\n", pism_grid->max_stencil_width);
@@ -349,6 +347,10 @@ PetscErrorCode IceModel_PISM::deallocate()
 
 
 // --------------------------------------------------------
+void IceModel_PISM::finish_contract_setup()
+{
+}
+// -------------------------------------------------------------
 
 // --------------------------------------------------
 /** glint2_var Variable, already allocated, to receive data
@@ -393,7 +395,7 @@ printf("Mx My = %d, %d\n", pism_grid->Mx, pism_grid->My);
 }
 // --------------------------------------------------
 void IceModel_PISM::run_decoded(double time_s,
-	std::map<IceField, blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &vals2)
 {
 	dismal->run_decoded(time_s, vals2);
 
@@ -406,75 +408,35 @@ void IceModel_PISM::run_decoded(double time_s,
 // --------------------------------------------------
 
 PetscErrorCode IceModel_PISM::run_decoded_petsc(double time_s,
-	std::map<IceField, blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &vals2)
 {
 printf("%d IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 	PetscErrorCode ierr;
 
-	// Convert from GLINT2 2D indices, to PISM 2D indices.
-	// (one does x-major, the other y-major ordering)
-	// Also, pack those indices into a dense array
-	// (the incoming blitz::Array is not dense)
-	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
-#if 0
-	for (int ix0=0; ix0<ndata(); ++ix0) {
-		int ii,jj;
-		glint2_grid->index_to_ij(ix0, ii, jj);
-//printf("indices %d -> %d %d\n", indices(i), ii,jj);
-		int ix1 = ii * glint2_grid->ny() + jj;
-		g2_ix[ix0] = ix1;
+	// Check number of variables matches
+	if (vals2.size() != pism_vars.size()) {
+		fprintf(stderr, "IceModel_PISM::run_decoded_petsc: vals2.size()=%ld does not match pism_vars.size()=%ld\n", vals2.size(), pism_vars.size());
+		throw std::exception();
 	}
-#endif
-	// Transfer input to PISM variables (and scatter w/ PETSc as well)
-	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[ndata()]);
-	for (auto ii = vals2.begin(); ii != vals2.end(); ++ii) {
-		IceField field(ii->first);
-		blitz::Array<double,1> const &val(ii->second);
 
-		// Go on if PISM is not interested in this field
-		auto pism_var_ii(pism_vars.find(field));
-		if (pism_var_ii == pism_vars.end()) continue;
+
+	// Transfer input to PISM variables (and scatter w/ PETSc as well)
+	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
+	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[ndata()]);
+	for (int i=0; i<pism_vars.size(); ++i) {
+		// Get matching input (val) and output (pism_var) variables
+		blitz::Array<double,1> const &val(vals2[i]);
+		IceModelVec2S *pism_var = pism_vars[i];
 
 		// Densify the values array, and convert units
-printf("BY_ICE_DENSITY = %f\n", BY_ICE_DENSITY);
 		int nval = 0;
-		switch(field.index()) {
-			case IceField::MASS_FLUX : {
-				// GLINT2: kg/(s m^2) --> "kg m-2 s-1" in PISM
-				for (int ix0=0; ix0<ndata(); ++ix0) {
-					if (std::isnan(val(ix0))) continue;
+		for (int ix0=0; ix0<ndata(); ++ix0) {
+			if (std::isnan(val(ix0))) continue;
 
-					g2_y[nval] = val(ix0);
-
-//					int ii,jj;
-//					glint2_grid->index_to_ij(ix0, ii, jj);
-//					int ix1 = ii * glint2_grid->ny() + jj;
-//					g2_ix[nval] = ix1;
-
-					g2_ix[nval] = glint2_to_pism1d(ix0);
-					++nval;
-				}
-			} break;
-			case IceField::TG2 : {
-				// GLINT2: C --> PISM: K
-				for (int ix0=0; ix0<ndata(); ++ix0) {
-					if (std::isnan(val(ix0))) {
-//						g2_y[nval] = giss::C2K;
-continue;		// GLINT2 and PISM land surface masks must match!
-					} else {
-						g2_y[nval] = val(ix0) + giss::C2K;
-					}
-
-					int ii,jj;
-					glint2_grid->index_to_ij(ix0, ii, jj);
-					int ix1 = ii * glint2_grid->ny() + jj;
-					g2_ix[nval] = ix1;
-
-					++nval;
-				}
-			} break;
+			g2_y[nval] = val(ix0);
+			g2_ix[nval] = glint2_to_pism1d(ix0);
+			++nval;
 		}
-//for (int i=0; i<ndata(); ++i) g2_y[i] = 17.0;
 
 		// Put into a natural-ordering global distributed Petsc Vec
 		ierr = VecSet(g2natural, 0.0); CHKERRQ(ierr);
@@ -495,33 +457,28 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 
 		// Copy to the output variable
 		// (Could we just do DMDANaturalToGlobal() directly to this?)
-		ierr = pism_var_ii->second->copy_from(g2); CHKERRQ(ierr);
+		ierr = pism_var->copy_from(g2); CHKERRQ(ierr);
 
 		// ================ BEGIN Write PISM Inputs
 		long time_day = (int)(time_s / 86400. + .5);
 		std::stringstream fname;
-		std::string fnpart;
-		switch(field.index()) {
-			case IceField::MASS_FLUX :
-				// GLINT2: kg/(s m^2) --> m s-1 ice:
-				fnpart = "climatic_mass_balance";
-			break;
-			case IceField::TG2 :
-				// GLINT2: C --> PISM: K
-				fnpart = "ice_surface_temp";
-			break;
-		}
+		std::string const &fnpart = contract[INPUT][i];
+
 		fname << time_day << "-" << fnpart << ".nc";
 		boost::filesystem::path pfname(gcm_params.config_dir / "dismal_out2" / fname.str());
 
 		printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
-		pism_var_ii->second->dump(pfname.c_str());
+		pism_var->dump(pfname.c_str());
 		// ================ END Write PISM Inputs
 				
 	}
 
 printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time->current(), time_s, ice_model.get());
 	// =========== Run PISM for one coupling timestep
+
+
+	// Time of last time we coupled
+	auto old_pism_time(pism_grid->time->current());
 	ice_model->run_to(time_s);	// See glint2::pism::PISMIceModel::run_to()
 	if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
@@ -569,11 +526,6 @@ printf("[%d] END ice_model->run_to()\n", pism_rank);
 	    ncout.close();
 	}
 #endif
-
-
-
-
-		
 
 	return 0;
 }

@@ -23,6 +23,7 @@ in effect, and less than zero if the information is not available.
 * tm_sec is generally 0-59. The extra range is to accommodate for leap
 *seconds in certain systems.  */
 
+/** C++ version of standard struct tm */
 class tm : public ::tm {
 public:
 	tm() {

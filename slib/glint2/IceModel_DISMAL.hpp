@@ -33,7 +33,7 @@ class IceModel_DISMAL : public IceModel_Decode
 
 public:
 
-	IceModel_DISMAL() : IceModel(IceModelType::DISMAL) {}
+	IceModel_DISMAL() : IceModel_Decode(IceModel::Type::DISMAL) {}
 
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
@@ -44,24 +44,12 @@ public:
 		std::string const &vname_base,
 		NcVar *const_var);
 
-	/** Query all the ice models to figure out what fields they need */
-	void get_required_fields(std::set<IceField> &fields);
-
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc. */
 	void run_decoded(double time_s,
-		std::map<IceField, blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2);
 
-protected :
-	blitz::Array<double,2> const get_field(
-		std::map<IceField, blitz::Array<double,1>> const &vals2,
-		IceField field)
-	{
-		const double *data = vals2.find(field)->second.data();
-		return blitz::Array<double,2>(const_cast<double *>(data),
-			blitz::shape(ny,nx), blitz::neverDeleteData);
-	}
 
 };
 

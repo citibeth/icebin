@@ -21,13 +21,6 @@
 
 namespace glint2 {
 
-std::ostream CouplingContract::operator<<(std::ostream &out) {
-	for (auto ii = _ix_to_fields.begin(); ii != _ix_to_fields.end(); ++ii)
-		out << "    " << *ii << std::endl;
-	return out;
-}
-
-
 /** @param glint2_config_dir Director the GLINT2 config file is found in.  Used to interpret relative paths found in that file.
 @param nc The GLINT2 configuration file */
 void GCMCoupler::read_from_netcdf(
@@ -39,9 +32,34 @@ void GCMCoupler::read_from_netcdf(
 	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 	int i = 0;
 	for (auto name = sheet_names.begin(); name != sheet_names.end(); ++name) {
-		per_sheet.insert(std::make_pair(i, PerSheet()));
-		PerSheet &sheet = per_sheet[i];
-		sheet->model = read_icemodel(gcm_params, nc, vname + "." + *name, sheets[*name]);
+		// Create an IceModel corresponding to this IceSheet.
+		IceSheet *sheet = sheets[*name];
+		models.insert(i, read_icemodel(gcm_params, nc, vname + "." + *name, sheet));
+		IceModel *mod = models[i];
+
+		// Set up the contracts specifying the variables to be passed
+		// between the GCM and the ice model.  This contract is specific
+		// to both the GCM and the ice model.  Note that setup_contracts()
+		// is a virtual method.
+		setup_contracts(*mod, nc, vname + "." + *name);
+
+#if 1
+		// Print out the contract and var transformations
+		std::cout << "========= Contract for " << *name << std::endl;
+		std::cout << "----> INPUT" << std::endl;
+		std::cout << mod->contract[IceModel::INPUT];
+		std::cout << mod->var_transformer[IceModel::INPUT];
+		std::cout << "----> OUTPUT" << std::endl;
+		std::cout << mod->contract[IceModel::OUTPUT];
+		std::cout << mod->var_transformer[IceModel::OUTPUT];
+#endif
+
+		// Finish initializing the IceModel.
+		// This code MUST come after setup_contracts() above.
+		auto const_var = nc.get_var("const");	// Physical constants
+		mod->init(gcm_params, sheet->grid2, nc, vname, const_var);
+		mod->update_ice_sheet(nc, vname, sheet);
+
 		++i;
 	}
 	printf("END GCMCoupler::read_from_netcdf()\n");
@@ -89,16 +107,18 @@ public:
 		sheetno(_sheetno), begin(_begin), next(_next) {}
 };
 
+/** PROTECTED method */
 void GCMCoupler::call_ice_model(
 	IceModel *model,
 	double time_s,
 	giss::DynArray<SMBMsg> &rbuf,
-	std::vector<IceField> const &fields,
-	SMBMsg *begin, SMBMsg *end)
+	SMBMsg *begin, SMBMsg *end)		// Messages have the MAX number of fields for any ice model contract
 {
-	int nfields = fields.size();
+	// The number of fields for THIS ice sheet will be <= the number
+	// of fields in SMBMsg
+	int nfields = model->contract[IceModel::INPUT].size_nounit();
 
-printf("BEGIN call_ice_model(nfields=%ld)\n", fields.size());
+printf("BEGIN call_ice_model(nfields=%ld)\n", nfields);
 
 	// Construct indices vector
 	blitz::TinyVector<int,1> shape(rbuf.diff(end, begin));
@@ -106,19 +126,18 @@ printf("BEGIN call_ice_model(nfields=%ld)\n", fields.size());
 	blitz::Array<int,1> indices(&begin->i2,
 		shape, stride, blitz::neverDeleteData);
 
-	// Construct values vectors
-	std::map<IceField, blitz::Array<double,1>> vals2;
+	// Construct values vectors: sparse vectors pointing into the SMBMsgs
+	std::vector<blitz::Array<double,1>> vals2;
 	stride[0] = rbuf.ele_size / sizeof(double);
 	for (int i=0; i<nfields; ++i) {
-		SMBMsg &rbegin(*begin);
+		SMBMsg &rbegin(*begin);		// Reference to begin
 
-		vals2.insert(std::make_pair(fields[i],
-			blitz::Array<double,1>(&rbegin[i],
-				shape, stride, blitz::neverDeleteData)));
+		vals2.push_back(blitz::Array<double,1>(
+			&rbegin[i], shape, stride, blitz::neverDeleteData));
 	}
 
 	model->run_timestep(time_s, indices, vals2);
-printf("END call_ice_model(nfields=%ld)\n", fields.size());
+printf("END call_ice_model(nfields=%ld)\n", nfields);
 };
 
 
@@ -126,11 +145,9 @@ printf("END call_ice_model(nfields=%ld)\n", fields.size());
 /** @param sbuf the (filled) array of ice grid values for this MPI node. */
 void GCMCoupler::couple_to_ice(
 double time_s,
-std::vector<IceField> const &fields,
-giss::DynArray<SMBMsg> &sbuf)
+int nfields,			// Number of fields in sbuf.  Not all will necessarily be filled, in the case of heterogeneous ice models.
+giss::DynArray<SMBMsg> &sbuf)	// Values, already converted to ice model inputs (from gcm outputs)
 {
-	int nfields = fields.size();
-
 	// Gather buffers on root node
 	int num_mpi_nodes;
 	MPI_Comm_size(gcm_params.gcm_comm, &num_mpi_nodes); 
@@ -226,7 +243,7 @@ printf("[%d] Calling to model sheetno=%d\n", rank(), sheetno);
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
 			auto params(im_params.find(sheetno));
-			call_ice_model(&*model, time_s, *rbuf, fields,
+			call_ice_model(&*model, time_s, *rbuf,
 				params->second.begin, params->second.next);
 
 printf("[%d] BB\n", gcm_params.gcm_rank);
@@ -241,7 +258,7 @@ printf("[%d] BB\n", gcm_params.gcm_rank);
 printf("[%d] Calling to model sheetno=%d: NULL\n", rank(), sheetno);
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
-			call_ice_model(&*model, time_s, *rbuf, fields,
+			call_ice_model(&*model, time_s, *rbuf,
 				NULL, NULL);
 
 printf("[%d] BB\n", gcm_params.gcm_rank);

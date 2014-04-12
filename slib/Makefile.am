@@ -25,7 +25,9 @@ libglint2_la_SOURCES = \
 	giss/SparseMatrix.cpp \
 	giss/sparsemult.cpp \
 	giss/VarTransformer.cpp \
+	glint2/contracts/modele_pism.cpp \
 	glint2/clippers.cpp \
+	glint2/CouplingContract.cpp \
 	glint2/ExchangeGrid.cpp \
 	glint2/GCMCoupler.cpp \
 	glint2/Grid.cpp \

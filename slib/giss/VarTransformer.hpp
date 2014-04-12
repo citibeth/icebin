@@ -79,22 +79,24 @@ class VarTransformer {
 public:
 
 	enum {OUTPUTS, INPUTS, SCALARS, NDIM};	// Dimensions of our tensor
-	blitz::Array<double, NDIM> tensor;
+
+protected:
+	blitz::Array<double, NDIM> _tensor;
 
 	/** Name of each element in each dimension */
-	DynamicEnum const *ele_names[NDIM];
+	DynamicEnum const *_ele_names[NDIM];
 
-	/** Convenience function.
-	@return The size of each dimension. */
-	int dimsize(int dim) { return ele_names[dim]->size(); }
+public:
+
+	/** @return The size of each dimension, WITHOUT units */
 
 	/** Define the name of each element in a dimension. */
-	void set_names(int dim, DynamicEnum const *_ele_names)
-		{ ele_names[dim] = _ele_names; }
+	void set_names(int dim, DynamicEnum const *ele_names)
+		{ _ele_names[dim] = ele_names; }
 
-	/** @return the index corresponding to a given name. */
-	int name_to_ix(int dim, std::string const &name)
-		{ return (*ele_names[dim])[name]; }
+	// Accessor methods...
+	DynamicEnum const &dimension(int idim) const
+		{ return *_ele_names[idim]; }
 
 	/** Set an element of the tensor, using name-based indexing. */
 	void set(std::string output, std::string input, std::string scalar, double val);
@@ -104,11 +106,12 @@ public:
 	CSRAndUnits apply_scalars(
 		std::vector<std::pair<std::string, double>> const &nvpairs);
 
-	/** Print out the tensor as readable symbolic equations.
-	Used to check and debug. */
-	std::ostream &operator<<(std::ostream &out);
-
+	friend std::ostream &operator<<(std::ostream &out, VarTransformer const &vt);
 };
+
+/** Print out the tensor as readable symbolic equations.
+Used to check and debug. */
+std::ostream &operator<<(std::ostream &out, VarTransformer const &vt);
 
 
 

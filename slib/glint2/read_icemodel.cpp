@@ -45,8 +45,11 @@ std::unique_ptr<IceModel> read_icemodel(
 			ice_model.reset(new glint2::pism::IceModel_PISM());
 			break;
 	}
-	ice_model->init(gcm_params, sheet->grid2, nc, vname, const_var);
-	ice_model->update_ice_sheet(nc, vname, sheet);
+
+	// After this, the caller must run the following to finish IceModel setup:
+	// 1. Configure the contracts
+	// 2. ice_model->init(gcm_params, sheet->grid2, nc, vname, const_var);
+	// 3. ice_model->update_ice_sheet(nc, vname, sheet);
 
 	return ice_model;
 	printf("END read_icemodel(%s)\n", vname.c_str());

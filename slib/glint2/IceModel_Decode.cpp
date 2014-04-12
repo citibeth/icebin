@@ -25,24 +25,15 @@ static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 void IceModel_Decode::run_timestep(double time_s,
 	blitz::Array<int,1> const &indices,
-	std::map<IceField, blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &vals2)
 {
 printf("BEGIN IceModel_Decode::run_timestep(%f) size=%ld\n", time_s, indices.size());
-	std::map<IceField, blitz::Array<double,1>> vals2d;	/// Decoded fields
+	std::vector<blitz::Array<double,1>> vals2d;	/// Decoded fields
 
 	// Loop through the fields we require
-	std::set<IceField> fields;
-	get_required_fields(fields);
-	for (auto field = fields.begin(); field != fields.end(); ++field) {
-printf("Looking for required field %s\n", field->str());
-
-		// Look up the field we require
-		auto ii = vals2.find(*field);
-		if (ii == vals2.end()) {
-			fprintf(stderr, "Cannot find required ice field = %s\n", field->str());
-			throw std::exception();
-		}
-		blitz::Array<double,1> vals(ii->second);
+	int i=0;
+	for (auto ii = vals2.begin(); ii != vals2.end(); ++ii, ++i) {
+		blitz::Array<double,1> vals(*ii);
 
 		// Decode the field!
 		blitz::Array<double,1> valsd(ndata());
@@ -71,8 +62,8 @@ printf("Looking for required field %s\n", field->str());
 		}
 
 		// Store decoded field in our output
-		vals2d.insert(std::make_pair(*field, valsd));
-printf("Done decoding required field, %s\n", field->str());
+		vals2d.push_back(vals);
+printf("Done decoding required field, %s\n", contract[IceModel::INPUT][i].c_str());
 	}
 
 	// Pass decoded fields on to subclass

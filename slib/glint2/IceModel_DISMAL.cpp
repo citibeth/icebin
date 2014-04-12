@@ -49,31 +49,17 @@ void IceModel_DISMAL::IceModel_DISMAL::init(
 }
 
 
-/** Query all the ice models to figure out what fields they need */
-void IceModel_DISMAL::get_required_fields(std::set<IceField> &fields)
-{
-	fields.insert(IceField::MASS_FLUX);
-	fields.insert(IceField::ENERGY_FLUX);
-//	fields.insert(IceField::SURFACE_T);
-	fields.insert(IceField::TG2);
-}
-
-
 
 /** @param index Index of each grid value.
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
 void IceModel_DISMAL::run_decoded(double time_s,
-	std::map<IceField, blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &vals2)
 {
 	// Only need to run one copy of this
 	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
 
 printf("BEGIN IceModel_DISMAL::run_decoded\n");
-	auto mass(get_field(vals2, IceField::MASS_FLUX));
-	auto energy(get_field(vals2, IceField::ENERGY_FLUX));
-	auto surfacet(get_field(vals2, IceField::SURFACE_T));
-	auto tg2(get_field(vals2, IceField::TG2));
 
 	char fname[30];
 	long time_day = (int)(time_s / 86400. + .5);
@@ -90,14 +76,10 @@ printf("BEGIN IceModel_DISMAL::run_decoded\n");
         assert(ny_dim != NULL);
 
 	// Define variables
-	if (vals2.find(IceField::MASS_FLUX) != vals2.end())
-		fns.push_back(giss::netcdf_define(ncout, "mass", mass, {ny_dim, nx_dim}));
-	if (vals2.find(IceField::ENERGY_FLUX) != vals2.end())
-		fns.push_back(giss::netcdf_define(ncout, "energy", energy, {ny_dim, nx_dim}));
-	if (vals2.find(IceField::SURFACE_T) != vals2.end())
-		fns.push_back(giss::netcdf_define(ncout, "T", surfacet, {ny_dim, nx_dim}));
-	if (vals2.find(IceField::TG2) != vals2.end())
-		fns.push_back(giss::netcdf_define(ncout, "TG2", tg2, {ny_dim, nx_dim}));
+	int i = 0;
+	for (auto ii = contract[INPUT].begin(); ii != contract[INPUT].end(); ++ii, ++i) {
+		fns.push_back(giss::netcdf_define(ncout, "", *ii, vals2[i], {ny_dim, nx_dim}));
+	}
 
 	// Write data to netCDF file
 	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();

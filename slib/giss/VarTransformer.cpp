@@ -6,12 +6,12 @@ namespace giss {
 
 void VarTransformer::set(std::string output, std::string input, std::string scalar, double val)
 {
-	int ioutput = name_to_ix(OUTPUTS, output);
+	int ioutput = dimension(OUTPUTS)[output];
 	if (ioutput < 0) return;		// No error if our output variable is not in this tensor.
-	int iinput = name_to_ix(INPUTS, input);
-	int iscalar = name_to_ix(SCALARS, scalar);
+	int iinput = dimension(INPUTS)[input];
+	int iscalar = dimension(SCALARS)[scalar];
 
-	tensor(ioutput, iinput, iscalar) = val;
+	_tensor(ioutput, iinput, iscalar) = val;
 }
 
 
@@ -20,27 +20,32 @@ matrix derived from the 3d-order tensor, in CSR format. */
 CSRAndUnits VarTransformer::apply_scalars(
 		std::vector<std::pair<std::string, double>> const &nvpairs)
 {
+	int n_outputs_nu = dimension(OUTPUTS).size_nounit();		// # OUTPUTS no unit
+	int n_inputs_wu = dimension(INPUTS).size_withunit();
+	int n_scalars_wu = dimension(SCALARS).size_withunit();	// # SCALARS w/unit
+
+	int unit_inputs = dimension(INPUTS).unit_ix();
+
 	// Convert name/value pairs to a regular vector
-	blitz::Array<double,1> scalars(dimsize(SCALARS));
+	blitz::Array<double,1> scalars(n_scalars_wu);
 	scalars = 0;
 	for (auto ii = nvpairs.begin(); ii != nvpairs.end(); ++ii) {
-		std::string const &name = ii->first;
+		std::string const &nv_name = ii->first;
 		double const val = ii->second;
-		scalars[name_to_ix(SCALARS, name)] = val;
+		scalars(dimension(SCALARS)[nv_name]) = val;
 	}
 
 	// Take inner product of tensor with our scalars.
-	CSRAndUnits ret(dimsize(OUTPUTS));
-	for (int i=0; i < dimsize(OUTPUTS); ++i) {
-		int unit_ix = dimsize(INPUTS)-1;
-		for (int j=0; j < dimsize(INPUTS); ++i) {
+	CSRAndUnits ret(n_outputs_nu);
+	for (int i=0; i < n_outputs_nu; ++i) {
+		for (int j=0; j < n_inputs_wu; ++j) {
 			double coeff = 0;
-			for (int k=0; k < dimsize(SCALARS); ++i) {
-				coeff += tensor(i,j,k) * scalars(k);
+			for (int k=0; k < n_scalars_wu; ++k) {
+				coeff += _tensor(i,j,k) * scalars(k);
 			}
 
 			// Output format: sparse matrix plus dense unit column
-			if (j == unit_ix) {
+			if (j == unit_inputs) {
 				ret.units[j] = coeff;
 			} else {
 				if (coeff != 0) ret.mat.add(i, j, coeff);
@@ -51,19 +56,26 @@ CSRAndUnits VarTransformer::apply_scalars(
 	return ret;
 }
 
-std::ostream &VarTransformer::operator<<(std::ostream &out)
+std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)
 {
-	int unit_k = dimsize(SCALARS) - 1;
-	int unit_j = dimsize(INPUTS) - 1;
-	for (int i=0; i<dimsize(OUTPUTS); ++i) {
-		out << (*ele_names[OUTPUTS])[i] << " = ";
+	int n_outputs_nu = vt.dimension(VarTransformer::OUTPUTS).size_nounit();		// # OUTPUTS no unit
+	int n_inputs_wu = vt.dimension(VarTransformer::INPUTS).size_withunit();
+	int n_scalars_wu = vt.dimension(VarTransformer::SCALARS).size_withunit();	// # SCALARS w/unit
+
+	int unit_outputs = vt.dimension(VarTransformer::OUTPUTS).unit_ix();
+	int unit_inputs = vt.dimension(VarTransformer::INPUTS).unit_ix();
+	int unit_scalars = vt.dimension(VarTransformer::SCALARS).unit_ix();
+
+
+	for (int i=0; i<n_outputs_nu; ++i) {
+		out << vt.dimension(VarTransformer::OUTPUTS)[i] << " = ";
 
 		// Count number of INPUTs used for this OUTPUT
 		int nj = 0;
-		std::vector<int> nk(dimsize(INPUTS), 0);
-		for (int j=0; j < dimsize(INPUTS); ++j) {
-			for (int k=0; k < dimsize(SCALARS); ++k) {
-				if (tensor(i,j,k) != 0) ++nk[j];
+		std::vector<int> nk(n_inputs_wu, 0);
+		for (int j=0; j < n_inputs_wu; ++j) {
+			for (int k=0; k < n_scalars_wu; ++k) {
+				if (vt._tensor(i,j,k) != 0) ++nk[j];
 			}
 			if (nk[j] > 0) ++nj;
 		}
@@ -76,17 +88,17 @@ std::ostream &VarTransformer::operator<<(std::ostream &out)
 
 		// We DO have something on the RHS
 		int jj = 0;
-		for (int j=0; j < dimsize(INPUTS); ++j) {
+		for (int j=0; j < n_inputs_wu; ++j) {
 			int nkj = nk[j];
 			if (nkj == 0) continue;
 
 			if (nkj > 1) out << "(";
 			int kk = 0;
-			for (int k=0; k < dimsize(SCALARS); ++k) {
-				double val = tensor(i,j,k);
+			for (int k=0; k < n_scalars_wu; ++k) {
+				double val = vt._tensor(i,j,k);
 				if (val == 0.0) continue;
 				out << val;
-				if (k != unit_k) out << " " << (*ele_names[SCALARS])[k];
+				if (k != unit_scalars) out << " " << vt.dimension(VarTransformer::SCALARS)[k];
 
 				if (kk != nkj-1) out << " + ";
 
@@ -94,11 +106,11 @@ std::ostream &VarTransformer::operator<<(std::ostream &out)
 				++kk;
 			}
 			if (nkj > 1) out << ")";
-			if (j != unit_j) out << " " << (*ele_names[INPUTS])[j];
+			if (j != unit_inputs) out << " " << vt.dimension(VarTransformer::INPUTS)[j];
 
 			if (jj != nj-1) out << " + ";
 
-			out << (*ele_names[INPUTS])[j];
+			out << vt.dimension(VarTransformer::INPUTS)[j];
 
 			// Increment count of SEEN j values
 			++jj;

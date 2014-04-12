@@ -75,12 +75,12 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 		glint2_config_dir,
 		giss::time::tm(iyear1, 1, 1),
 		itimei*dtsrc);
-	itime_last = itimei;
 
 printf("iyear1 = %d\n", iyear1);
 
 	// Allocate our return variable
 	std::unique_ptr<glint2_modele> api(new glint2_modele());
+	api->itime_last = itimei;
 	api->dtsrc = dtsrc;
 
 #if 1
@@ -470,25 +470,38 @@ giss::F90Array<double,3> &smb1h_f,		// kg/m^2
 giss::F90Array<double,3> &seb1h_f,		// J/m^2: Latent Heat
 giss::F90Array<double,3> &tg21h_f)		// C
 {
-	int rank = coupler.rank();	// MPI rank; debugging
+	int rank = api->gcm_coupler->rank();	// MPI rank; debugging
 	double time_s = itime * api->dtsrc;
 
 	GCMCoupler &coupler(*api->gcm_coupler);
-	CouplingContract &gcm_inputs(coupler.gcm_inputs);
+	CouplingContract &gcm_outputs(coupler.gcm_outputs);
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
-	std::vector<blitz::Array<double,3>> inputs(gcm_inputs_enum.size());
-	inputs[gcm_inputs["smb"]] = smb1h_f.to_blitz();
-	inputs[gcm_inputs["seb"]] = seb1h_f.to_blitz();
-	inputs[gcm_inputs["tg2"]] = tg21h_f.to_blitz();
+	std::vector<blitz::Array<double,3>> inputs(gcm_outputs.size_nounit());
+	inputs[gcm_outputs["smb"]] = smb1h_f.to_blitz();
+	inputs[gcm_outputs["seb"]] = seb1h_f.to_blitz();
+	inputs[gcm_outputs["tg2"]] = tg21h_f.to_blitz();
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
 	int nele_l = 0; //api->maker->ice_matrices_size();
-printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %d\n", api->hp_to_ices.size());
+printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %ld\n", api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
 		nele_l += ii->second.size();
 	}
+
+	// Find the max. number of fields (for input) used for any ice sheet.
+	// This will determine the size of our MPI messages.
+	int nfields_max = 0;
+	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
+		int sheetno = ii->first;
+		giss::VarTransformer &vt(api->gcm_coupler->models[sheetno]->var_transformer[IceModel::INPUT]);
+		nfields_max = std::max(nfields_max, (int)vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit());
+	}
+
+	// Allocate buffer for that amount of stuff
+printf("glint2_modele_couple_to_ice_c(): nfields_max=%d, nele_l = %d\n", nfields_max, nele_l);
+	giss::DynArray<SMBMsg> sbuf(SMBMsg::size(nfields_max), nele_l);
 
 	// Fill it in by doing a sparse multiply...
 	// (while translating indices to local coordinates)
@@ -497,12 +510,8 @@ printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %d\n", api->hp_to_ice
 printf("[%d] hp_to_ices.size() = %ld\n", rank, api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
 		int sheetno = ii->first;
-		VarTransformer &vt(api->gcm_coupler->per_sheet[sheetno].vt_gcm_to_ice);
+		giss::VarTransformer &vt(api->gcm_coupler->models[sheetno]->var_transformer[IceModel::INPUT]);
 
-		// Allocate buffer for that amount of stuff
-		int nfields = vt.dimsize(OUTPUTS);
-printf("glint2_modele_couple_to_ice_c(): nfields=%d, nele_l = %d\n", nfields, nele_l);
-		giss::DynArray<SMBMsg> sbuf(SMBMsg::size(nfields), nele_l);
 
 		std::vector<hp_to_ice_rec> &mat(ii->second);
 
@@ -511,8 +520,8 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		if (mat.size() == 0) continue;
 
 		// Get the CSR sparse matrix to convert GCM outputs to ice model inputs
-		CSRAndUnits trans = vt.apply_scalars({
-			std::make_pair("by_dt", 1.0 / ((itime - itime_last) * api->dtsrc)),
+		giss::CSRAndUnits trans = vt.apply_scalars({
+			std::make_pair("by_dt", 1.0 / ((itime - api->itime_last) * api->dtsrc)),
 			std::make_pair("unit", 1.0)});
 
 		// Do the multiplication
@@ -524,7 +533,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 			msg.i2 = jj.row;
 
 			// Convert from inputs to outputs while regridding
-			for (int xi=0; xi<vt.dimsize(OUTPUTS); ++xi) {
+			for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {
 				msg[xi] = 0;
 				std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
 				for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
@@ -533,8 +542,8 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 					msg[xi] += io_val * inputs[xj](jj.col_i, jj.col_j, jj.col_k);
 				}
 				msg[xi] += trans.units[xi];
+				msg[xi] *= jj.val;
 			}
-			msg[xi] *= jj.val;
 
 //			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
 //			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
@@ -553,6 +562,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 	}
 
 printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itime, time_s, api->dtsrc);
-	coupler.couple_to_ice(time_s, fields, sbuf);
-	itime_last = itime;
+	// sbuf has elements for ALL ice sheets here
+	coupler.couple_to_ice(time_s, nfields_max, sbuf);
+	api->itime_last = itime;
 }

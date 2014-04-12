@@ -29,14 +29,16 @@ implement the new method run_decoded().  Decoding converts a set of
 given. */
 class IceModel_Decode : public IceModel {
 private:
-	// Dimensionality Ice Model's vector space
+	// Dimensionality Ice Model's vector space (grid)
 	int _ndata;
 
 public :
+	/** @return Dimensionality of ice model's vector space. */
 	int ndata() { return _ndata; }
 
 //	IceModel_Decode(Grid const &grid) : ndata(grid.ndata()) {}
 //	IceModel_Decode(int _ndata) : ndata(_ndata) {}
+	IceModel_Decode(IceModel::Type _type) : IceModel(_type) {}
 
 	void init(IceModel::GCMParams const &gcm_params, int ndata)
 	{
@@ -50,13 +52,13 @@ public :
 	@param time_s Time since start of simulation, in seconds */
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
-		std::map<IceField, blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2);
 
 	/** Runs a timestep after fields have been decoded.  This is what
 	one will normally want to override, unless you wish to decode
 	yourself. */
 	virtual void run_decoded(double time_s,
-		std::map<IceField, blitz::Array<double,1>> const &vals2) = 0;
+		std::vector<blitz::Array<double,1>> const &vals2);
 
 };
 

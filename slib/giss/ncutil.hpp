@@ -26,10 +26,10 @@
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 #include <giss/blitz.hpp>
+#include <giss/VarMetaData.hpp>
 #include <cassert>
 
 namespace giss {
-
 
 
 // --------------------------------------------------------------------
@@ -158,14 +158,6 @@ boost::function<void ()> netcdf_define(
 	blitz::Array<T,rank> const &val,
 	std::vector<NcDim *> const &ddims = {})
 {
-
-#if 0
-	// See if we're doing a Fortran-style array maybe..?
-	blitz::Array<T,rank> const *valp;
-	if (rank >= 2 && val.stride(0) == 1) {
-	}
-#endif
-
 	// Type-check for unit strides
 	int stride = 1;
 	for (int i=rank-1; i>=0; --i) {
@@ -180,7 +172,6 @@ boost::function<void ()> netcdf_define(
 
 	// Create the required dimensions
 	NcDim const *dims[rank];
-//	long counts[rank];
 	for (int i=0; i<rank; ++i) {
 		if (i >= ddims.size()) {
 			char dim_name[200];
@@ -189,8 +180,7 @@ boost::function<void ()> netcdf_define(
 		} else {
 			dims[i] = ddims[i];
 		}
-//		counts[i] = val.extent(i);
-                assert(dims[i] != NULL);
+        assert(dims[i] != NULL);
 	}
 
 	// Create the variable
@@ -212,6 +202,50 @@ inline boost::function<void ()> netcdf_define(
 //		const_cast<std::vector<T>>(val)));
 	return netcdf_define<T,1>(nc, vname, bval, ddims);
 }
+// ----------------------------------------------------
+
+/** Used to define (and then write out) a variable to NetCDF, along with
+meta-data.  This is supposed to serve as an extended version of
+netcdf_define() above, which does not write meta-data.
+
+@param nc The NetCDF file to which to write.
+@param vname_prefix Prefix to use on variables defined in nc.
+       Note that the name actually used == (vname + vmeta.name).
+@param vmeta Meta-data on this variable, to be written to NetCDF.
+@param val The blitz++ variable to write.
+@param ddims NetCDF dimensions to use in defining the variables
+      (will be checked to be the correct size) */
+
+template<class T, int rank>
+boost::function<void ()> netcdf_define(
+	NcFile &nc,
+	std::string const &vname_prefix,	// vname = vname_prefix + vmeta.name
+	VarMetaData const &vmeta,
+	blitz::Array<T,rank> const &val,
+	std::vector<NcDim *> const &ddims = {});
+
+template<class T, int rank>
+boost::function<void ()> netcdf_define(
+	NcFile &nc,
+	std::string const &vname_prefix,	// vname = vname_prefix + vmeta.name
+	VarMetaData const &vmeta,
+	blitz::Array<T,rank> const &val,
+	std::vector<NcDim *> const &ddims = {})
+{
+	std::string vname = vname_prefix + vmeta.get_name();
+	auto ret(netcdf_define(nc, vname, val, ddims));
+	NcVar *nc_var = nc.get_var(vname.c_str());
+
+	std::string const &description(vmeta.get_description());
+	if (description != "") nc_var->add_att("long_name", description.c_str());
+
+	std::string const &units(vmeta.get_units());
+	if (units != "") nc_var->add_att("units", units.c_str());
+
+	return ret;
+}
+// ----------------------------------------------------
+
 
 
 }
