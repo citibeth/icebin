@@ -1,3 +1,4 @@
+#include <mpi.h>		// Intel MPI wants to be first
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
 
 namespace glint2 {
@@ -9,7 +10,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(IceModel::GCMParams const &_gcm_params) :
 {
 	gcm_outputs.add_field("smb", "kg m-2", "Surface mass balance");
 	gcm_outputs.add_field("seb", "J m-2", "Latent heat flux, integrated");
-	gcm_outputs.add_field("tg2", "C", "T of bottom layer of snow/firn);
+	gcm_outputs.add_field("tg2", "C", "T of bottom layer of snow/firn");
 	gcm_outputs.add_field("unit", "", "Dimensionless identity");
 
 	ice_input_scalars.add_field("by_dt", "s-1", "Inverse of coupling timestep");
@@ -39,13 +40,13 @@ void GCMCoupler_ModelE::setup_contracts(
 	//   (a) GCM-specific coupling parameters (to be read),
 	//   (b) The type of ice model
 
-	auto gcm_var = nc.get_var((sheet_vname + ".modele").c_str());
+	auto gcm_var = giss::get_var_safe(nc, (sheet_vname + ".modele").c_str());
 
-	CouplingParams_ModelE params;
+	ContractParams_ModelE params;
 	params.coupling_type = giss::parse_enum<ModelE_CouplingType>(
 		giss::get_att(gcm_var, "coupling_type")->as_string(0));
 
-	model.setup_contract_modele(this, params);
+	model.setup_contract_modele(*this, params);
 	model.finish_contract_setup();
 
 	printf("END GCMCoupler_ModelE::setup_contracts()\n");

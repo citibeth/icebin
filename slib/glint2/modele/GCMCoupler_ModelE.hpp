@@ -28,12 +28,6 @@ public:
 
 	GCMCoupler_ModelE(IceModel::GCMParams const &_gcm_params);
 
-	virtual void read_from_netcdf(
-		NcFile &nc,
-		std::string const &vname,
-		std::vector<std::string> const &sheet_names,
-	    giss::MapDict<std::string, IceSheet> &sheets);
-
 	virtual void setup_contracts(
 		IceModel &mod,
 		NcFile &nc,

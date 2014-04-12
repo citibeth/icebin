@@ -64,7 +64,9 @@ inline std::unique_ptr<NcAtt> get_att(NcVar *var, KeyT key)
 
 extern NcDim *get_or_add_dim(NcFile &nc, std::string const &dim_name, long dim_size);
 
-NcVar *get_var_safe(NcFile &nc, std::string const &var_name);
+/** Retrieves a variable from a NetCDF file.  If the variable is not found, returns
+ NULL. */
+NcVar *get_var_safe(NcFile &nc, std::string const &var_name, bool report_error=true);
 
 //extern std::vector<double> read_double_vector(NcFile &nc, std::string const &var_name);
 

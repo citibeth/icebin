@@ -58,7 +58,7 @@ public :
 	one will normally want to override, unless you wish to decode
 	yourself. */
 	virtual void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2) = 0;
 
 };
 

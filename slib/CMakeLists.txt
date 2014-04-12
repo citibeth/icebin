@@ -61,8 +61,9 @@ set(glint2_SOURCES
 	glint2/clippers.cpp
 	glint2/gridutil.cpp
 	glint2/matrix_ops.cpp
-	glint2/contracts/modele_pism.cpp \
-u	glint2/modele/glint2_modele.cpp
+	glint2/contracts/modele_pism.cpp
+	glint2/modele/glint2_modele.cpp
+	glint2/modele/GCMCoupler_ModelE.cpp
 	glint2/modele/grids_ll.cpp
 	glint2/pism/IceModel_PISM.cpp
 	glint2/pism/NullTransportHydrology.cpp

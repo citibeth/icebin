@@ -42,7 +42,7 @@ NcDim *get_or_add_dim(NcFile &nc, std::string const &dim_name, long dim_size)
 	return nc.add_dim(dim_name.c_str(), dim_size);
 }
 
-NcVar *get_var_safe(NcFile &nc, std::string const &var_name)
+NcVar *get_var_safe(NcFile &nc, std::string const &var_name, bool report_error)
 {
 	// Look up var the slow way...
 	int num_vars = nc.num_vars();
@@ -54,6 +54,8 @@ NcVar *get_var_safe(NcFile &nc, std::string const &var_name)
 			return var;
 		}
 	}
+	if (report_error)
+		fprintf(stderr, "Cannot find variable '%s' in NetCDF file\n", var_name.c_str());
 	return NULL;
 }
 

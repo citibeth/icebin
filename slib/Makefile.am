@@ -46,6 +46,7 @@ libglint2_la_SOURCES = \
 	glint2/MatrixMaker.cpp \
 	glint2/modele/grids_ll.cpp \
 	glint2/modele/glint2_modele.cpp \
+	glint2/modele/GCMCoupler_ModelE.cpp \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
 	glint2/read_matrixmaker.cpp \
