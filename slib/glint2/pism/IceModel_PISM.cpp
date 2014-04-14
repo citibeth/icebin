@@ -14,6 +14,23 @@ namespace glint2 {
 namespace pism {
 
 
+IceModel_PISM::IceModel_PISM(bool with_dismal)
+	: IceModel_Decode(IceModel::Type::PISM)
+{
+	if (with_dismal) dismal.reset(new IceModel_DISMAL());
+}
+
+
+IceModel_PISM::~IceModel_PISM()
+{
+	if (deallocate() != 0) {
+		PetscPrintf(pism_comm, "IceModel_PISM::IceModel_PISM(...): allocate() failed\n");
+		PISMEnd();
+	}
+}
+
+
+
 int IceModel_PISM::process_options()
 {
 	PetscErrorCode ierr;
@@ -60,12 +77,15 @@ void IceModel_PISM::init(
 	printf("BEGIN IceModel_PISM::init(%s)\n", vname_base.c_str());
 	IceModel_Decode::init(_gcm_params, grid2->ndata());
 
-	dismal.reset(new IceModel_DISMAL());
-	dismal->init(_gcm_params, grid2, nc, vname_base, const_var);
+	if (dismal.get()) dismal->init(_gcm_params, grid2, nc, vname_base, const_var);
 
 	std::shared_ptr<Grid_XY const> grid2_xy = std::dynamic_pointer_cast<Grid_XY const>(grid2);
-	auto pism_var = nc.get_var((vname_base + ".pism").c_str());	// PISM parameters
-	if (allocate(grid2_xy, pism_var, const_var) != 0) {
+
+	// General args passed to the ice sheet, regardless of which ice model is being used
+	auto info_var = nc.get_var((vname_base + ".info").c_str());
+	// PISM parameters, passed to PISM via argv
+	auto pism_var = nc.get_var((vname_base + ".pism").c_str());
+	if (allocate(grid2_xy, pism_var, info_var, const_var) != 0) {
 		PetscPrintf(gcm_params.gcm_comm, "IceModel_PISM::IceModel_PISM(...): allocate() failed\n");
 		PISMEnd();
 	}
@@ -137,8 +157,15 @@ printf("Opening PISM file for elev2 and mask2: %s\n", pism_i.c_str());
 	for (int i=0; i<nx; ++i) {
 	for (int j=0; j<ny; ++j) {
 		int ix2 = glint2_grid->ij_to_index(i, j);
-		sheet->elev2(ix2) = topg(i,j) + thk(i,j);
+		// Set update_elevation=false to temporarily "repair" fields that are
+		// broken due to a difference in the elevation classes used to generate
+		// the SMB in a one-way coupled run, and the elevation classes
+		// as defined by the ice sheet.
+		if (update_elevation) sheet->elev2(ix2) = topg(i,j) + thk(i,j);
+
 		// Mask uses same convention as MATPLOTLIB: 1 = masked out
+		// Even if not update_elevation, it is still important to update the
+		// mask, or else PISM will just not work.
 		(*sheet->mask2)(ix2) = (mask(i,j) == 2 ? 0 : 1);
 	}}
 
@@ -146,14 +173,6 @@ printf("Opening PISM file for elev2 and mask2: %s\n", pism_i.c_str());
 }
 
 
-
-IceModel_PISM::~IceModel_PISM()
-{
-	if (deallocate() != 0) {
-		PetscPrintf(pism_comm, "IceModel_PISM::IceModel_PISM(...): allocate() failed\n");
-		PISMEnd();
-	}
-}
 
 // See: http://stackoverflow.com/questions/3418231/replace-part-of-a-string-with-another-string
 bool replace(std::string& str, const std::string& from, const std::string& to) {
@@ -174,9 +193,16 @@ static std::set<std::string> path_args = {"i", "o", "surface_given_file", "ocean
 /** Called from within init().  We could get rid of this method... */
 PetscErrorCode IceModel_PISM::allocate(
 	std::shared_ptr<const glint2::Grid_XY> &glint2_grid,
-	NcVar *pism_var, NcVar *const_var)
+	NcVar *pism_var,
+	NcVar *info_var,
+	NcVar *const_var)
 {
 	this->glint2_grid = glint2_grid;
+
+	// Get simple arguments
+	update_elevation = giss::nc_str_to_bool(giss::get_att(
+		info_var, "update_elevation")->as_string(0));
+
 
 	// Create arguments from PISM configuration
 	std::vector<std::string> args;
@@ -397,12 +423,14 @@ printf("Mx My = %d, %d\n", pism_grid->Mx, pism_grid->My);
 void IceModel_PISM::run_decoded(double time_s,
 	std::vector<blitz::Array<double,1>> const &vals2)
 {
-	dismal->run_decoded(time_s, vals2);
+	printf("BEGIN IceModel_PISM::run_decoded(%f)\n", time_s);
+	if (dismal.get()) dismal->run_decoded(time_s, vals2);
 
 	if (run_decoded_petsc(time_s, vals2) != 0) {
 		PetscPrintf(pism_comm, "IceModel_PISM::runtimestep() failed\n");
 		PISMEnd();
 	}
+	printf("END IceModel_PISM::run_decoded(%f)\n", time_s);
 }
 
 // --------------------------------------------------
@@ -410,7 +438,7 @@ void IceModel_PISM::run_decoded(double time_s,
 PetscErrorCode IceModel_PISM::run_decoded_petsc(double time_s,
 	std::vector<blitz::Array<double,1>> const &vals2)
 {
-printf("%d IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
+printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 	PetscErrorCode ierr;
 
 	// Check number of variables matches
@@ -423,12 +451,19 @@ printf("%d IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 	// Transfer input to PISM variables (and scatter w/ PETSc as well)
 	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
 	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[ndata()]);
-	for (int i=0; i<pism_vars.size(); ++i) {
+	for (unsigned int i=0; i<pism_vars.size(); ++i) {
+
+printf("Doing pism_vars[%d]\n", i);
+
 		// Get matching input (val) and output (pism_var) variables
 		blitz::Array<double,1> const &val(vals2[i]);
 		IceModelVec2S *pism_var = pism_vars[i];
 
-		// Densify the values array, and convert units
+		// Inputs specified in the contract are not (necessarily) attached
+		// to any PISM var.  If they are not, just drop them on the ground.
+		if (!pism_var) continue;
+
+		// Densify the values array
 		int nval = 0;
 		for (int ix0=0; ix0<ndata(); ++ix0) {
 			if (std::isnan(val(ix0))) continue;
@@ -471,7 +506,7 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 		pism_var->dump(pfname.c_str());
 		// ================ END Write PISM Inputs
 				
-	}
+	}	// For each pism_var
 
 printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time->current(), time_s, ice_model.get());
 	// =========== Run PISM for one coupling timestep
@@ -479,7 +514,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 
 	// Time of last time we coupled
 	auto old_pism_time(pism_grid->time->current());
-	ice_model->run_to(time_s);	// See glint2::pism::PISMIceModel::run_to()
+	ierr = ice_model->run_to(time_s); CHKERRQ(ierr);	// See glint2::pism::PISMIceModel::run_to()
 	if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
 		throw std::exception();

@@ -31,6 +31,9 @@
 
 namespace giss {
 
+/** Convert a NetCDF attribute string to a bool.
+Used for bool-typed attributes. */
+bool nc_str_to_bool(char const *str);
 
 // --------------------------------------------------------------------
 // Convert template types to Numpy type_nums

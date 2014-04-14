@@ -120,7 +120,7 @@ PetscErrorCode PSConstantGLINT2::update(PetscReal my_t, PetscReal my_dt)
 {
 //	PetscErrorCode ierr;
 
-printf("BEGIN update(%f, %f)\n", my_t, my_dt);
+//	printf("BEGIN PSConstantGLINT2::update(t=%f, dt=%f)\n", my_t, my_dt);
 
 	if ((fabs(my_t - m_t) < 1e-12) &&
 			(fabs(my_dt - m_dt) < 1e-12))
@@ -136,6 +136,8 @@ ice_surface_temp.dump("ice_surface_temp.nc");
 climatic_mass_balance.dump("climatic_mass_balance.nc");
 printf("PSConstantGLINT2::update(%f) done dumping variables\n", my_t);
 #endif
+
+//	printf("END PSConstantGLINT2::update(t=%f, dt=%f)\n", my_t, my_dt);
 
 	return 0;
 }

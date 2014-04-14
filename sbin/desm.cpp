@@ -108,16 +108,19 @@ int main(int argc, char **argv)
 	// Get parameters
 	NcVar *rparam = dnc.get_var("rparam");
 	double dtsrc = giss::get_att(rparam, "dtsrc")->as_double(0);
+	int iyear1 = giss::get_att(rparam, "iyear1")->as_int(0);
 	printf("dtsrc = %f\n", dtsrc);
+	printf("iyear1 = %d\n", iyear1);
 
 	// -----------------------------------------------------
 	// Initialize GLINT2 (via a Fortran-ish interface)
-	NcVar *itime_nc = dnc.get_var("itime");
+	NcVar *time_nc = dnc.get_var("time");
 	long cur[4] = {0, 0, 0, 0};
 	long counts1 = 1;
-	itime_nc->set_cur(cur);	// Just use cur[0]
-	int itimei;
-	itime_nc->get(&itimei, &counts1);	// Just get one item
+	time_nc->set_cur(cur);	// Just use cur[0]
+	double time_si;		// itimei
+	time_nc->get(&time_si, &counts1);	// Just get one item
+	int itimei = (time_si / dtsrc + .5);
 
 	glint2_modele *api = glint2_modele_new(
 		glint2_config_fname.c_str(), glint2_config_fname.size(),
@@ -136,7 +139,7 @@ int main(int argc, char **argv)
 		j0s, j1s,
 
 		// iyear1
-		1950, itimei,
+		iyear1, itimei,
 
 		// dtsrc  (see MODEL_COM.f)
 		dtsrc,
@@ -150,7 +153,7 @@ int main(int argc, char **argv)
 		LHM, SHI);
 
 	int nhp = api->maker->nhp(-1);
-	printf("api->maker->nhp(-1) == %d\n", nhp);
+	printf("desm.cpp: Number Elevation Points (nhp)== %d\n", nhp);
 
 	glint2_modele_init_hp_to_ices(api);
 
@@ -190,15 +193,33 @@ int main(int argc, char **argv)
 	giss::F90Array<double,3> &imph_ff(vars_ff[1]);
 	giss::F90Array<double,3> &tice_ff(vars_ff[2]);
 
-	// The main loop
-	for (long time=1; time<ntime; ++time) {
-		// Read itime
-		int itime;
-		cur[0] = time;
-		itime_nc->set_cur(cur);	// Just use cur[0]
-		itime_nc->get(&itime, counts);	// Just get one item
+	blitz::Array<double,3> &impm_c(vars_c[0]);
+	blitz::Array<double,3> &imph_c(vars_c[1]);
+	blitz::Array<double,3> &tice_c(vars_c[2]);
 
-		double time_s = itime * dtsrc;
+
+	// The main loop
+	for (long time_i=0; time_i<ntime-1; ++time_i) {
+		// End of this time interval
+		cur[1] = time_i+1;
+		time_nc->set_cur(cur);	// Just use cur[0]
+		double end_time_s;
+		time_nc->get(&end_time_s, counts);
+
+		// Beginning of this time interval.
+		cur[0] = time_i;
+		time_nc->set_cur(cur);	// Just use cur[0]
+		double begin_time_s;
+		time_nc->get(&begin_time_s, counts);
+
+		// Copuling time interval (in seconds)
+		double dt_s = end_time_s - begin_time_s;
+
+		// Leave cur[] set at the beginning of the time interval, for reading variable below
+
+		// itime: ModelE calls GLINT2 at the END of a time interval
+		int itime = (end_time_s / dtsrc * .5);
+
 		printf("**** itime=%d, time_s=%f\n", itime, time_s);
 
 		// Read the variables
@@ -207,7 +228,7 @@ int main(int argc, char **argv)
 			blitz::Array<double,3> &var_c = vars_c[vi];
 			blitz::Array<double,3> &var_f = vars_f[vi];
 
-			// Read the variable
+			// Read the variable (over the time interval)
 			var_nc->set_cur(cur);
 			var_nc->get(var_c.data(), counts);
 
@@ -219,13 +240,19 @@ int main(int argc, char **argv)
 				if (fabs(var_ijk) >= 1e10) var_ijk = 0;
 			}}}
 				
-			// HACK: Clear things not in our domain
+			// HACK: Clear things not in our domain on this MPI node
 			for (int j=1; j<j0; ++j)
 				var_f(blitz::Range::all(), j, blitz::Range::all()) = 0;
 			for (int j=j1+1; j <= jm; ++j)
 				var_f(blitz::Range::all(), j, blitz::Range::all()) = 0;
 
 		}
+
+		// ModelE writes out NetCDF files in units X/s.
+		// But internally, impm_lndice/etc. are stored in just X.
+		// So we multiply by dt_s to get back to the internal ModelE units.
+		impm_c *= dt_s;
+		imph_c *= dt_s;
 
 		// Run the coupling step
 		glint2_modele_couple_to_ice_c(api, itime, impm_ff, imph_ff, tice_ff);

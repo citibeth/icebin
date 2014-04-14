@@ -23,17 +23,25 @@ namespace glint2 {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
+// REMEMBER: Decoding converts a set of (index, value) pairs into
+// normal arrays (with NaN where no value was given.)
 void IceModel_Decode::run_timestep(double time_s,
 	blitz::Array<int,1> const &indices,
 	std::vector<blitz::Array<double,1>> const &vals2)
 {
-printf("BEGIN IceModel_Decode::run_timestep(%f) size=%ld\n", time_s, indices.size());
+printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, indices.size());
 	std::vector<blitz::Array<double,1>> vals2d;	/// Decoded fields
+
+	// Naming convention on array variables:
+	//     vals2 = Vector of Values-arrays on grid2 (ice grid)
+	//     vals2d = Vector of DECODED values-arrays on grid2
+	//     vals = Individual value array from vals2
+	//     valsd = Individual valu array from vals2d
 
 	// Loop through the fields we require
 	int i=0;
 	for (auto ii = vals2.begin(); ii != vals2.end(); ++ii, ++i) {
-		blitz::Array<double,1> vals(*ii);
+		blitz::Array<double,1> const &vals(*ii);
 
 		// Decode the field!
 		blitz::Array<double,1> valsd(ndata());
@@ -62,7 +70,7 @@ printf("BEGIN IceModel_Decode::run_timestep(%f) size=%ld\n", time_s, indices.siz
 		}
 
 		// Store decoded field in our output
-		vals2d.push_back(vals);
+		vals2d.push_back(valsd);
 printf("Done decoding required field, %s\n", contract[IceModel::INPUT][i].c_str());
 	}
 

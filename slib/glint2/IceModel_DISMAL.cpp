@@ -41,13 +41,21 @@ void IceModel_DISMAL::IceModel_DISMAL::init(
 	auto grid2_xy = dynamic_cast<Grid_XY const *>(&*grid2);
 	nx = grid2_xy->nx();
 	ny = grid2_xy->ny();
-	auto dismal_var = nc.get_var((vname_base + ".dismal").c_str());	// DISMAL parameters
+	auto dismal_var = giss::get_var_safe(nc, (vname_base + ".dismal").c_str());	// DISMAL parameters
 	output_dir = boost::filesystem::absolute(
 		boost::filesystem::path(giss::get_att(dismal_var, "output_dir")->as_string(0)),
 		gcm_params.config_dir);
 	printf("END IceModel_DISMAL::int()\n");
 }
 
+
+blitz::Array<double,2> const IceModel_DISMAL::reshape_xy(
+	blitz::Array<double,1> const &vals2)
+{
+	const double *data = vals2.data();
+	return blitz::Array<double,2>(const_cast<double *>(data),
+		blitz::shape(ny,nx), blitz::neverDeleteData);
+}
 
 
 /** @param index Index of each grid value.
@@ -67,18 +75,25 @@ printf("BEGIN IceModel_DISMAL::run_decoded\n");
 	auto full_fname(output_dir / fname);
 	printf("IceModel_DISMAL writing to: %s\n", full_fname.c_str());
 	NcFile ncout(full_fname.c_str(), NcFile::Replace);
-        assert(ncout.is_valid() == true);
+	assert(ncout.is_valid());
 
 	std::vector<boost::function<void ()>> fns;
 	NcDim *nx_dim = ncout.add_dim("nx", nx);
-        assert(nx_dim != NULL);
+	assert(nx_dim);
 	NcDim *ny_dim = ncout.add_dim("ny", ny);
-        assert(ny_dim != NULL);
+	assert(ny_dim);
 
+printf("contract[INPUT].size_nounit() == %ld\n", contract[INPUT].size_nounit());
 	// Define variables
-	int i = 0;
-	for (auto ii = contract[INPUT].begin(); ii != contract[INPUT].end(); ++ii, ++i) {
-		fns.push_back(giss::netcdf_define(ncout, "", *ii, vals2[i], {ny_dim, nx_dim}));
+	for (int i=0; i < contract[INPUT].size_nounit(); ++i) {
+		CoupledField const &field(contract[INPUT].field(i));
+		printf("IceModel_DISMAL: Defining variable %s\n", field.name.c_str());
+
+		// Convert from 1D indexing to 2D
+//std::cout << "strides = " << vals2[i].stride() << std::endl;
+//std::cout << "extents = " << vals2[i].extent() << std::endl;
+		auto val2_xy(reshape_xy(vals2[i]));
+		fns.push_back(giss::netcdf_define(ncout, "", field, val2_xy, {ny_dim, nx_dim}));
 	}
 
 	// Write data to netCDF file

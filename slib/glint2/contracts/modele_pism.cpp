@@ -42,17 +42,17 @@ void IceModel_PISM::setup_contract_modele(
 	// Add some recipes for gcm_to_ice
 	std::string out;
 	out = "land_ice_surface_specific_mass_balance_flux";
-		ice_input_vt.set(out, "smb", "by_dt", 1.0);
+		ice_input_vt.set(out, "lismb", "by_dt", 1.0);
 	out = "surface_downward_latent_heat_flux";
-		ice_input_vt.set(out, "seb", "by_dt", 1.0);
+		ice_input_vt.set(out, "liseb", "by_dt", 1.0);
 	out = "surface_temperature";	// K
-		ice_input_vt.set(out, "tg2", "unit", 1.0);
+		ice_input_vt.set(out, "litg2", "by_dt", 1.0);
 		ice_input_vt.set(out, "unit", "unit", C2K);	// +273.15
 	out = "surface_downward_sensible_heat_flux";	// W m-2
 		// Zero for now
 
 	// ============== Ice -> GCM
-	CouplingContract &ice_output(contract[OUTPUT]);
+	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
 	ice_output.add_field("upward_geothermal_flux_sum", "J m-2", "");
 	ice_output.add_field("geothermal_flux_sum", "J m-2", "");
 	ice_output.add_field("basal_frictional_heating_sum", "J m-2", "");
@@ -78,6 +78,11 @@ void IceModel_PISM::setup_contract_modele(
 	// Set up transformations: just copy inputs to outputs
 	for (auto ii = ice_output.begin(); ii != ice_output.end(); ++ii) {
 		ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
+	}
+
+	// Now give our contracts to our dismal slave IceModel
+	if (dismal.get()) {
+		dismal->contract = contract;
 	}
 
 	printf("END IceModel_PISM::setup_contract_modele\n");

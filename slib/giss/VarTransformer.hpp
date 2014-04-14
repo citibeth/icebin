@@ -16,6 +16,8 @@ public:
 
 	void add(int row, int col, double val)
 		{ (*this)[row].push_back(std::make_pair(col, val)); }
+
+	friend std::ostream &operator<<(std::ostream &out, CSRMatrix const &mat);
 };
 
 /** A relation such as y = Ax + b can be represented as:
@@ -31,6 +33,8 @@ public:
 	std::vector<double> units;
 
 	CSRAndUnits(int nrow) : mat(nrow), units(nrow, 0.0) {}
+
+	friend std::ostream &operator<<(std::ostream &out, CSRAndUnits const &matu);
 };
 
 // -------------------------------------------------
@@ -110,11 +114,12 @@ public:
 	friend std::ostream &operator<<(std::ostream &out, VarTransformer const &vt);
 };
 
+std::ostream &operator<<(std::ostream &out, CSRMatrix const &mat);
+std::ostream &operator<<(std::ostream &out, CSRAndUnits const &matu);
+
 /** Print out the tensor as readable symbolic equations.
 Used to check and debug. */
 std::ostream &operator<<(std::ostream &out, VarTransformer const &vt);
-
-
 
 
 }

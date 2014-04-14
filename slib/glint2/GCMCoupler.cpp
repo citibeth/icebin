@@ -32,16 +32,18 @@ void GCMCoupler::read_from_netcdf(
 	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 	int i = 0;
 	for (auto name = sheet_names.begin(); name != sheet_names.end(); ++name) {
+		std::string vname_sheet = vname + "." + *name;
+
 		// Create an IceModel corresponding to this IceSheet.
 		IceSheet *sheet = sheets[*name];
-		models.insert(i, read_icemodel(gcm_params, nc, vname + "." + *name, sheet));
+		models.insert(i, read_icemodel(gcm_params, nc, vname_sheet, sheet));
 		IceModel *mod = models[i];
 
 		// Set up the contracts specifying the variables to be passed
 		// between the GCM and the ice model.  This contract is specific
 		// to both the GCM and the ice model.  Note that setup_contracts()
 		// is a virtual method.
-		setup_contracts(*mod, nc, vname + "." + *name);
+		setup_contracts(*mod, nc, vname_sheet);
 
 #if 1
 		// Print out the contract and var transformations
@@ -57,8 +59,8 @@ void GCMCoupler::read_from_netcdf(
 		// Finish initializing the IceModel.
 		// This code MUST come after setup_contracts() above.
 		auto const_var = nc.get_var("const");	// Physical constants
-		mod->init(gcm_params, sheet->grid2, nc, vname, const_var);
-		mod->update_ice_sheet(nc, vname, sheet);
+		mod->init(gcm_params, sheet->grid2, nc, vname_sheet, const_var);
+		mod->update_ice_sheet(nc, vname_sheet, sheet);
 
 		++i;
 	}

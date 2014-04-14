@@ -27,6 +27,12 @@ matrix derived from the 3d-order tensor, in CSR format. */
 CSRAndUnits VarTransformer::apply_scalars(
 		std::vector<std::pair<std::string, double>> const &nvpairs)
 {
+	printf("BEGIN VarTransformer::apply_scalars()\n");
+	for (auto ele : nvpairs) {
+		printf("    %s = %g\n", ele.first.c_str(), ele.second);
+	}
+
+
 	int n_outputs_nu = dimension(OUTPUTS).size_nounit();		// # OUTPUTS no unit
 	int n_inputs_wu = dimension(INPUTS).size_withunit();
 	int n_scalars_wu = dimension(SCALARS).size_withunit();	// # SCALARS w/unit
@@ -42,6 +48,8 @@ CSRAndUnits VarTransformer::apply_scalars(
 		scalars(dimension(SCALARS)[nv_name]) = val;
 	}
 
+//std::cout << "Input vector = " << scalars << std::endl;
+
 	// Take inner product of tensor with our scalars.
 	CSRAndUnits ret(n_outputs_nu);
 	for (int i=0; i < n_outputs_nu; ++i) {
@@ -53,14 +61,45 @@ CSRAndUnits VarTransformer::apply_scalars(
 
 			// Output format: sparse matrix plus dense unit column
 			if (j == unit_inputs) {
-				ret.units[j] = coeff;
+				ret.units[i] = coeff;
 			} else {
 				if (coeff != 0) ret.mat.add(i, j, coeff);
 			}
 		}
 	}
 
+	std::cout << "apply_scalars() returning " << ret;
+
+	printf("END VarTransformer::apply_scalars()\n");
 	return ret;
+}
+
+std::ostream &operator<<(std::ostream &out, CSRMatrix const &mat)
+{
+	out << "CSRMatrix :" << std::endl;
+	for (unsigned int i=0; i < mat.size(); ++i) {
+		out << "    " << i << ":";
+		for (auto ele : mat[i]) {
+			out << " (" << ele.first << ", " << ele.second << ")";
+		}
+		out << std::endl;
+	}
+	return out;
+}
+
+std::ostream &operator<<(std::ostream &out, CSRAndUnits const &matu)
+{
+	CSRMatrix const &mat(matu.mat);
+
+	out << "CSRMatrix :" << std::endl;
+	for (unsigned int i=0; i < mat.size(); ++i) {
+		out << "    " << i << ": " << matu.units[i] << " +";
+		for (auto ele : mat[i]) {
+			out << " (" << ele.first << ", " << ele.second << ")";
+		}
+		out << std::endl;
+	}
+	return out;
 }
 
 std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)

@@ -93,6 +93,9 @@ public:
 	std::string const &operator[](int ix) const
 		{ return _ix_to_field[ix].name; }
 
+	CoupledField const &field(int ix) const
+		{ return _ix_to_field[ix]; }
+
 	std::ostream &operator<<(std::ostream &out) const;
  
 	friend std::ostream &operator<<(std::ostream &out, CouplingContract const &con);

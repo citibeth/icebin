@@ -473,14 +473,19 @@ giss::F90Array<double,3> &tg21h_f)		// C
 	int rank = api->gcm_coupler->rank();	// MPI rank; debugging
 	double time_s = itime * api->dtsrc;
 
+	printf("BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f)\n", itime, time_s);
+
 	GCMCoupler &coupler(*api->gcm_coupler);
 	CouplingContract &gcm_outputs(coupler.gcm_outputs);
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
 	std::vector<blitz::Array<double,3>> inputs(gcm_outputs.size_nounit());
-	inputs[gcm_outputs["smb"]] = smb1h_f.to_blitz();
-	inputs[gcm_outputs["seb"]] = seb1h_f.to_blitz();
-	inputs[gcm_outputs["tg2"]] = tg21h_f.to_blitz();
+printf("gcm_outputs[smb] = %d\n", gcm_outputs["smb"]);
+printf("gcm_outputs[seb] = %d\n", gcm_outputs["seb"]);
+printf("gcm_outputs[tg2] = %d\n", gcm_outputs["tg2"]);
+	inputs[gcm_outputs["lismb"]].reference(smb1h_f.to_blitz());
+	inputs[gcm_outputs["liseb"]].reference(seb1h_f.to_blitz());
+	inputs[gcm_outputs["litg2"]].reference(tg21h_f.to_blitz());
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
@@ -527,24 +532,27 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		// Do the multiplication
 		for (int j=0; j < mat.size(); ++j) {
 			hp_to_ice_rec &jj(mat[j]);
-
 			SMBMsg &msg = sbuf[nmsg];
 			msg.sheetno = sheetno;
 			msg.i2 = jj.row;
 
+#if 1
 			// Convert from inputs to outputs while regridding
 			for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {
-				msg[xi] = 0;
+				double inp = 0;
 				std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
 				for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
 					int xj = xjj->first;
 					double io_val = xjj->second;
-					msg[xi] += io_val * inputs[xj](jj.col_i, jj.col_j, jj.col_k);
+					inp += io_val * inputs[xj](jj.col_i, jj.col_j, jj.col_k);
 				}
-				msg[xi] += trans.units[xi];
-				msg[xi] *= jj.val;
+				msg[xi] = jj.val * (inp + trans.units[xi]);
 			}
-
+#else
+			msg[0] = jj.val * inputs[0](jj.col_i, jj.col_j, jj.col_k);
+			msg[1] = jj.val * inputs[1](jj.col_i, jj.col_j, jj.col_k);
+			msg[2] = jj.val * inputs[2](jj.col_i, jj.col_j, jj.col_k);
+#endif
 //			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
 //			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
 //			msg[2] = jj.val * tg21h(jj.col_i, jj.col_j, jj.col_k);
@@ -565,4 +573,6 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 	// sbuf has elements for ALL ice sheets here
 	coupler.couple_to_ice(time_s, nfields_max, sbuf);
 	api->itime_last = itime;
+
+	printf("END glint2_modele_couple_to_ice_c(itime=%d)\n", itime);
 }

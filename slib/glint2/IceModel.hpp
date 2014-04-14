@@ -73,8 +73,8 @@ public:
 
 	/** Ordered specification of the variables (w/ units)
 	to be passed GLINT2->IceModel */
-	CouplingContract contract[2];		// [INPUT|OUTPUT]
-	giss::VarTransformer var_transformer[2];
+	std::array<CouplingContract, 2> contract;		// [INPUT|OUTPUT]
+	std::array<giss::VarTransformer, 2> var_transformer;
 
 	/** Placeholder for additional coupling contracts that had to be allocated. */
 	std::vector<std::unique_ptr<CouplingContract>> _extra_contracts;

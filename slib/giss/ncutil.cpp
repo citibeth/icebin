@@ -16,9 +16,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <map>
+#include <giss/string.hpp>
 #include <giss/ncutil.hpp>
 
+// See: http://stackoverflow.com/questions/11635/case-insensitive-string-comparison-in-c
+#include <boost/algorithm/string/predicate.hpp>
+
 namespace giss {
+
+std::map<std::string, bool> _str_to_bool = {
+	{"true", true}, {"on", true}, {"yes", true},
+	{"false", false}, {"off", false}, {"no", false}
+};
+
+bool nc_str_to_bool(char const *cstr)
+{
+	std::string str(cstr);
+	giss::tolower(str);
+	auto ii = _str_to_bool.find(str);
+	return ii->second;		// Throws exception if not found.
+}
+
 
 NcDim *get_or_add_dim(NcFile &nc, std::string const &dim_name, long dim_size)
 {

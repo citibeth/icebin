@@ -50,6 +50,14 @@ public:
 	void run_decoded(double time_s,
 		std::vector<blitz::Array<double,1>> const &vals2);
 
+protected :
+	/** Utility class to reshape blitz arrays.
+	TODO: This should not be necessary, there is a general reshape
+	in giss/blitz.hpp */
+	blitz::Array<double,2> const reshape_xy(
+		blitz::Array<double,1> const &vals2);
+
+
 
 };
 

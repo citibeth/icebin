@@ -56,6 +56,12 @@ class IceModel_PISM : public IceModel_Decode
 
 	double BY_ICE_DENSITY;		// CONSTANT Used to prepare input for PISM
 
+	/** Should we upate the elevation field in update_ice_sheet()?  Normally, yes.
+	But in some TEST CASES ONLY --- when the SMB field was created with a different
+	set of elevations than the ice model is using --- then this can cause problems
+	in the generated SMB fields. */
+	bool update_elevation = true;
+
 	/** Use a DISMAL ice model to save stuff easily (for debugging) */
 	std::unique_ptr<IceModel_DISMAL> dismal;
 
@@ -113,13 +119,15 @@ public:
 		std::string const &vname,
 		IceSheet *sheet);
 
-	IceModel_PISM() : IceModel_Decode(IceModel::Type::PISM) {}
+	IceModel_PISM(bool with_dismal=true);
 
 	~IceModel_PISM();
 
 	PetscErrorCode allocate(
 		std::shared_ptr<const glint2::Grid_XY> &,
-		NcVar *pism_var, NcVar *const_var);
+		NcVar *pism_var,
+		NcVar *info_var,
+		NcVar *const_var);
 
 	PetscErrorCode deallocate();
 

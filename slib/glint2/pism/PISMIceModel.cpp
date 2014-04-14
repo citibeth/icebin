@@ -203,7 +203,7 @@ PetscErrorCode PISMIceModel::energyStep()
 {
 	PetscErrorCode ierr;
 
-	printf("BEGIN PISMIceModel::energyStep()\n");
+	printf("BEGIN PISMIceModel::energyStep(t=%f, dt=%f)\n", t_TempAge, dt_TempAge);
 
 	// Enthalpy and mass continuity are stepped with different timesteps.
 	// Fish out the timestep relevant to US.
@@ -211,7 +211,6 @@ PetscErrorCode PISMIceModel::energyStep()
 	const double my_dt = dt_TempAge;
 
 	// =========== BEFORE Energy Step
-printf("AA1\n");
 
 	// =========== The Energy Step Itself
 	ierr = super::energyStep(); CHKERRQ(ierr);
@@ -221,7 +220,6 @@ printf("AA1\n");
 	// We need to integrate over strain_heating and geothermal_flux, which
 	// are given in PISM as rates.
 
-printf("AA1\n");
 
 	// --------- Upward Geothermal Flux
 	// Use actual geothermal flux, not the long-term average..
@@ -232,15 +230,11 @@ printf("AA1\n");
 	// ----------- Geothermal Flux
 	ierr = geothermal_flux_sum.add(dt, geothermal_flux); CHKERRQ(ierr);
 
-printf("AA1\n");
 	// ---------- Basal Frictional Heating (see iMenthalpy.cc l. 220)
 	IceModelVec2S *Rb = NULL;
-printf("stress_balance = %p\n", stress_balance);
 	ierr = stress_balance->get_basal_frictional_heating(Rb); CHKERRQ(ierr);
-printf("Rb=%p\n", Rb);
 	basal_frictional_heating_sum.add(dt, *Rb);
 
-printf("AA1\n");
 	// ------------ Volumetric Strain Heating
 	// strain_heating_sum += dt * sum_columns(strainheating3p)
 	IceModelVec3 *strain_heating3p;
@@ -252,11 +246,7 @@ printf("AA1\n");
 	ierr = strain_heating3p->sumColumns(strain_heating_sum, 1e0, dt); CHKERRQ(ierr);
 #endif
 
-printf("AA1\n");
-
-
-
-	printf("END PISMIceModel::energyStep()\n");
+	printf("END PISMIceModel::energyStep(time=%f)\n", t_TempAge);
 	return 0;
 }
 
