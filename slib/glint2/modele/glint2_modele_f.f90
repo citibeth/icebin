@@ -33,8 +33,6 @@ INTERFACE
 		i0h,i1h,j0h,j1h, &
 		i0,i1,j0,j1, &
 		j0s,j1s, &
-		iyear1, itimei, &
-		dtsrc, &
 		comm_f, root, &
 		LHM, SHI) bind(c)
 	use iso_c_binding
@@ -46,9 +44,6 @@ INTERFACE
 		integer(c_int), value :: i0h,i1h,j0h,j1h
 		integer(c_int), value :: i0,i1,j0,j1
 		integer(c_int), value :: j0s,j1s
-		integer(c_int), value :: iyear1
-		integer(c_int), value :: itimei
-		real(c_double), value :: dtsrc
 		integer(c_int), value :: comm_f, root
 		real(c_double), value :: LHM, SHI
 		type(c_ptr) :: glint2_modele_new
@@ -66,6 +61,14 @@ INTERFACE
 		type(c_ptr), value :: api
 		integer(c_int) :: glint2_modele_nhp
 	end function
+
+	subroutine glint2_modele_set_start_time(api, iyear1, itimei, dtsrc) bind(c)
+		use iso_c_binding
+		type(c_ptr), value :: api
+		integer(c_int), value :: iyear1
+		integer(c_int), value :: itimei
+		real(c_double), value :: dtsrc
+	end subroutine
 
 	subroutine glint2_modele_compute_fgice_c(api, &
 		replace_fgice_b, fgice1_glint2_f, &

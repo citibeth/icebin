@@ -26,13 +26,12 @@ public:
 	/** Names of items used in the SCALARS dimension of VarTranslator */
 	CouplingContract ice_input_scalars;
 
-	GCMCoupler_ModelE(IceModel::GCMParams const &_gcm_params);
+	GCMCoupler_ModelE(GCMParams const &_gcm_params);
 
 	virtual void setup_contracts(
 		IceModel &mod,
 		NcFile &nc,
 		std::string const &sheet_vname);
-
 
 };
 

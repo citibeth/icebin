@@ -19,11 +19,11 @@
 #pragma once
 
 #include <cstdlib>
-#include <boost/filesystem.hpp>
 #include <giss/DynArray.hpp>
 #include <giss/Dict.hpp>
 #include <glint2/IceModel.hpp>
 #include <glint2/CouplingContract.hpp>
+#include <glint2/GCMParams.hpp>
 
 namespace glint2 {
 
@@ -58,13 +58,18 @@ public:
 	);
 	Type const type;
 
-	IceModel::GCMParams const gcm_params;
+	GCMParams gcm_params;
 	giss::MapDict<int,IceModel> models;
 
 	/** Fields we receive from the GCM */
 	CouplingContract gcm_outputs;
 
-	GCMCoupler(Type _type, IceModel::GCMParams const &_gcm_params) :
+	// Fields we read from the config file...
+
+	/** File to which to write gcm_output.  If "", then don't write. */
+	std::string gcm_out_file;
+
+	GCMCoupler(Type _type, GCMParams const &_gcm_params) :
 		type(_type), gcm_params(_gcm_params) {}
 
 	virtual ~GCMCoupler() {}
@@ -85,7 +90,7 @@ public:
 
 	/** Returns a unique rank number for each node in the parallel computation.
 	Useful for debugging-type output. */
-	int rank();
+	int rank() const;
 
 protected:
 	/** @param time_s Time since start of simulation, in seconds

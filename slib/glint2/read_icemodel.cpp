@@ -24,7 +24,7 @@ namespace glint2 {
 
 /** @param sheet (OPTIONAL): Info on the ice sheet data structure */
 std::unique_ptr<IceModel> read_icemodel(
-	IceModel::GCMParams const &gcm_params,
+	GCMCoupler const *coupler,
 	NcFile &nc,
 	std::string const &vname,
 	IceSheet *sheet)
@@ -39,16 +39,16 @@ std::unique_ptr<IceModel> read_icemodel(
 	std::unique_ptr<IceModel> ice_model;
 	switch(type.index()) {
 		case IceModel::Type::DISMAL :
-			ice_model.reset(new IceModel_DISMAL());
+			ice_model.reset(new IceModel_DISMAL(coupler));
 			break;
 		case IceModel::Type::PISM :
-			ice_model.reset(new glint2::pism::IceModel_PISM());
+			ice_model.reset(new glint2::pism::IceModel_PISM(coupler));
 			break;
 	}
 
 	// After this, the caller must run the following to finish IceModel setup:
 	// 1. Configure the contracts
-	// 2. ice_model->init(gcm_params, sheet->grid2, nc, vname, const_var);
+	// 2. ice_model->init(coupler, sheet->grid2, nc, vname, const_var);
 	// 3. ice_model->update_ice_sheet(nc, vname, sheet);
 
 	return ice_model;

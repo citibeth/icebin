@@ -50,12 +50,16 @@ struct glint2_modele {
 	std::unique_ptr<GCMCoupler> gcm_coupler;
 
 	/** The matrix used for each IceModel, used to convert from
-	the elevation grid to ice grid */
+	the elevation grid to ice grid.  Each hp_to_ice_rec is one
+	non-zero element of the matrix. */
 	std::map<int, std::vector<hp_to_ice_rec>> hp_to_ices;
 
 	/** Last time the coupler was called (or start of run) */
 	int itime_last;
+
+	// Stuff to store inputs as we received them (modele_out.nc)
 };
+
 }}	// namespace glint2::modele
 // ================================================
 extern "C" glint2::modele::glint2_modele *glint2_modele_new(
@@ -70,11 +74,6 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 	int i0, int i1, int j0, int j1,
 	int j0s, int j1s,
 
-	// Info about size of a timestep (DTsrc defined in ModelE's MODEL_COM.f)
-	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
-	int itimei,			// itime of start of simulation
-	double dtsrc,
-
 	// MPI Stuff
 	MPI_Fint comm_f, int root,
 
@@ -82,6 +81,10 @@ extern "C" glint2::modele::glint2_modele *glint2_modele_new(
 	double LHM, double SHI);
 
 extern "C" void glint2_modele_delete(glint2::modele::glint2_modele *&api);
+
+extern "C"
+void glint2_modele_set_start_time(glint2::modele::glint2_modele *api,
+	int iyear1, int itimei, double dtsrc);
 
 /** @param replace_fgice_b Should we replace existing fgice1 values with new ones, where the ice sheet overlaps the GCM grid? */
 extern "C"

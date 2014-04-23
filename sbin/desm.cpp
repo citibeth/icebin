@@ -139,10 +139,10 @@ int main(int argc, char **argv)
 		j0s, j1s,
 
 		// iyear1
-		iyear1, itimei,
+//		iyear1, itimei,
 
 		// dtsrc  (see MODEL_COM.f)
-		dtsrc,
+//		dtsrc,
 
 		// MPI Stuff
 		// int comm_f, int root;
@@ -151,6 +151,8 @@ int main(int argc, char **argv)
 		// Constants
 		// (which come directly from ModelE, because this is called from ModelE)
 		LHM, SHI);
+
+	glint2_modele_set_start_time(api, iyear1, itimei, dtsrc);
 
 	int nhp = api->maker->nhp(-1);
 	printf("desm.cpp: Number Elevation Points (nhp)== %d\n", nhp);
@@ -220,7 +222,7 @@ int main(int argc, char **argv)
 		// itime: ModelE calls GLINT2 at the END of a time interval
 		int itime = (end_time_s / dtsrc * .5);
 
-		printf("**** itime=%d, time_s=%f\n", itime, time_s);
+		printf("**** itime=%d, end_time_s=%f\n", itime, end_time_s);
 
 		// Read the variables
 		for (int vi=0; vi<nvar; ++vi) {

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <sstream>
 #include <string>
+#include <glint2/GCMCoupler.hpp>
 
 using namespace giss;
 
@@ -14,10 +15,10 @@ namespace glint2 {
 namespace pism {
 
 
-IceModel_PISM::IceModel_PISM(bool with_dismal)
-	: IceModel_Decode(IceModel::Type::PISM)
+IceModel_PISM::IceModel_PISM(GCMCoupler const *_coupler, bool with_dismal)
+	: IceModel_Decode(IceModel::Type::PISM, _coupler)
 {
-	if (with_dismal) dismal.reset(new IceModel_DISMAL());
+	if (with_dismal) dismal.reset(new IceModel_DISMAL(_coupler));
 }
 
 
@@ -68,16 +69,16 @@ int IceModel_PISM::process_options()
 /** Initialize any grid information, etc. from the IceSheet struct.
 @param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 void IceModel_PISM::init(
-	IceModel::GCMParams const &_gcm_params,
 	std::shared_ptr<glint2::Grid> const &grid2,
 	NcFile &nc,
 	std::string const &vname_base,
 	NcVar *const_var)
 {
 	printf("BEGIN IceModel_PISM::init(%s)\n", vname_base.c_str());
-	IceModel_Decode::init(_gcm_params, grid2->ndata());
+	GCMParams const &_gcm_params(coupler->gcm_params);
+	IceModel_Decode::init(grid2->ndata());
 
-	if (dismal.get()) dismal->init(_gcm_params, grid2, nc, vname_base, const_var);
+	if (dismal.get()) dismal->init(grid2, nc, vname_base, const_var);
 
 	std::shared_ptr<Grid_XY const> grid2_xy = std::dynamic_pointer_cast<Grid_XY const>(grid2);
 
@@ -86,7 +87,7 @@ void IceModel_PISM::init(
 	// PISM parameters, passed to PISM via argv
 	auto pism_var = nc.get_var((vname_base + ".pism").c_str());
 	if (allocate(grid2_xy, pism_var, info_var, const_var) != 0) {
-		PetscPrintf(gcm_params.gcm_comm, "IceModel_PISM::IceModel_PISM(...): allocate() failed\n");
+		PetscPrintf(coupler->gcm_params.gcm_comm, "IceModel_PISM::IceModel_PISM(...): allocate() failed\n");
 		PISMEnd();
 	}
 	printf("END IceModel_PISM::init()\n");
@@ -102,7 +103,7 @@ void IceModel_PISM::update_ice_sheet(
 	auto pism_var = nc.get_var((vname + ".pism").c_str());	// PISM parameters
 	auto pism_i_att(giss::get_att(pism_var, "i"));	// PISM -i argument (input file)
 	std::string pism_i = boost::filesystem::absolute(boost::filesystem::path(
-		pism_i_att->as_string(0)), gcm_params.config_dir).string();
+		pism_i_att->as_string(0)), coupler->gcm_params.config_dir).string();
 
 	// Read variables from PISM input file
 	// byte mask(time, x, y) ;
@@ -188,7 +189,7 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
 // For stable0.5 branch
 // static std::set<std::string> path_args = {"config_override", "i", "o", "surface_given_file", "extra_file", "ts_file"};
 // For dev branch
-static std::set<std::string> path_args = {"i", "o", "surface_given_file", "ocean_kill", "extra_file", "ts_file"};
+static std::set<std::string> path_args = {"i", "o", "surface_given_file", "ocean_kill", "ocean_kill_file", "extra_file", "ts_file"};
 
 /** Called from within init().  We could get rid of this method... */
 PetscErrorCode IceModel_PISM::allocate(
@@ -200,9 +201,7 @@ PetscErrorCode IceModel_PISM::allocate(
 	this->glint2_grid = glint2_grid;
 
 	// Get simple arguments
-	update_elevation = giss::nc_str_to_bool(giss::get_att(
-		info_var, "update_elevation")->as_string(0));
-
+	update_elevation = giss::get_att_as_bool(info_var, "update_elevation");
 
 	// Create arguments from PISM configuration
 	std::vector<std::string> args;
@@ -221,7 +220,7 @@ PetscErrorCode IceModel_PISM::allocate(
 			// Resolve path names according to the configuration directory
 			val = boost::filesystem::absolute(
 				boost::filesystem::path(att->as_string(0)),
-				gcm_params.config_dir).string();
+				coupler->gcm_params.config_dir).string();
 			printf("IceModel_PISM resolving %s: %s --> %s\n", name.c_str(), att->as_string(0), val.c_str());
 		}
 
@@ -255,7 +254,7 @@ printf("\n");
 	// Use same group of processes.
 	// No spawning or intercommunicators for now --- maybe not ever.
 //	MPI_Comm_dup(gcm_params.gcm_comm, &pism_comm);
-	pism_comm = gcm_params.gcm_comm;
+	pism_comm = coupler->gcm_params.gcm_comm;
 	PetscErrorCode ierr;
 	ierr = MPI_Comm_rank(pism_comm, &pism_rank); CHKERRQ(ierr);
 	ierr = MPI_Comm_size(pism_comm, &pism_size); CHKERRQ(ierr);
@@ -275,14 +274,14 @@ printf("Initializing PETSc\n");
 //	args.push_back("-calendar");
 //	args.push_back("365_day");
 //	args.push_back("-reference_date");
-	giss::time::tm const &tb(gcm_params.time_base);
+	giss::time::tm const &tb(coupler->gcm_params.time_base);
 	std::string reference_date = (boost::format("%04d-%02d-%02d") % tb.year() % tb.month() % tb.mday()).str();
 //	args.push_back(reference_date);
 	config->set_string("reference_date", reference_date);
 
 //#if 0
 //	if (pism_rank == 0) {
-		auto full_fname(gcm_params.config_dir / "glint2_pism_config.nc");
+		auto full_fname(coupler->gcm_params.config_dir / "glint2_pism_config.nc");
 		printf("IceModel_PISM writing config (1) to: %s\n", full_fname.c_str());
 		config->write(full_fname.c_str());
 //	}
@@ -291,7 +290,7 @@ printf("Initializing PETSc\n");
     pism_grid.reset(new ::IceGrid(pism_comm, *config));
 printf("pism_grid=%p: (xs,xm,ys,ym,Mx,My) = %d %d %d %d %d %d %ld %ld\n", &*pism_grid, pism_grid->xs, pism_grid->xm, pism_grid->ys, pism_grid->ym, pism_grid->Mx, pism_grid->My, pism_grid->x.size(), pism_grid->y.size());
 	PISMIceModel::Params params;
-		params.time_start_s = gcm_params.time_start_s;
+		params.time_start_s = coupler->gcm_params.time_start_s;
     ice_model.reset(new PISMIceModel(*pism_grid, *config, *overrides, params));
 
 
@@ -500,7 +499,7 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 		std::string const &fnpart = contract[INPUT][i];
 
 		fname << time_day << "-" << fnpart << ".nc";
-		boost::filesystem::path pfname(gcm_params.config_dir / "dismal_out2" / fname.str());
+		boost::filesystem::path pfname(coupler->gcm_params.config_dir / "dismal_out2" / fname.str());
 
 		printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
 		pism_var->dump(pfname.c_str());
@@ -543,7 +542,7 @@ printf("[%d] END ice_model->run_to()\n", pism_rank);
 		char fname[30];
 		long time_day = (int)(time_s / 86400. + .5);
 		sprintf(fname, "%ld-pismout.nc", time_day);
-		auto full_fname(gcm_params.config_dir / "dismal_out2" / fname);
+		auto full_fname(coupler->gcm_params.config_dir / "dismal_out2" / fname);
 		NcFile ncout(full_fname.c_str(), NcFile::Replace);
 
 		NcDim *ny_dim = ncout.add_dim("ny", ny());

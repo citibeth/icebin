@@ -110,10 +110,10 @@ int main(int argc, char **argv)
 		j0s, j1s,
 //		2, jm-1,
 
-		// iyear, itimei
-		1950, 0,
+//		// iyear, itimei
+//		1950, 0,
 		// dtsrc  (see MODEL_COM.f)
-		3600.,
+//		3600.,
 
 		// MPI Stuff
 		// int comm_f, int root;
@@ -121,6 +121,9 @@ int main(int argc, char **argv)
 
 		// Constants
 		LHM, SHI);
+
+	glint2_modele_set_start_time(api,
+		1950, 0, 1800.);	// iyear, itimei
 
 	int nhp = api->maker->nhp(-1);
 

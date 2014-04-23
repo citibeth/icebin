@@ -58,7 +58,15 @@ template<class KeyT>
 inline std::unique_ptr<NcAtt> get_att(NcVar *var, KeyT key)
 {
 	NcAtt *att = var->get_att(key);
+	if (!att) return std::unique_ptr<NcAtt>();
 	return std::unique_ptr<NcAtt>(att);
+}
+
+/** Retrieve a boolean-valued attribute. */
+template<class KeyT>
+inline bool get_att_as_bool(NcVar *var, KeyT key)
+{
+	return nc_str_to_bool(get_att(var, key)->as_string(0));
 }
 // --------------------------------------------------------------------
 

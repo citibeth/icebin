@@ -22,6 +22,8 @@
 #include <cstdio>
 #include <cmath>
 #include <cassert>
+#include <glint2/GCMParams.hpp>
+#include <glint2/GCMCoupler.hpp>
 
 namespace glint2 {
 
@@ -29,7 +31,6 @@ namespace glint2 {
 static std::set<std::string> path_args = {"output_dir"};
 
 void IceModel_DISMAL::IceModel_DISMAL::init(
-		IceModel::GCMParams const &_gcm_params,
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
 		std::string const &vname_base,
@@ -37,7 +38,8 @@ void IceModel_DISMAL::IceModel_DISMAL::init(
 {
 	printf("BEGIN IceModel_DISMAL::init(%s)\n", vname_base.c_str());
 
-	IceModel_Decode::init(_gcm_params, grid2->ndata());
+	GCMParams const &gcm_params(coupler->gcm_params);
+	IceModel_Decode::init(grid2->ndata());
 	auto grid2_xy = dynamic_cast<Grid_XY const *>(&*grid2);
 	nx = grid2_xy->nx();
 	ny = grid2_xy->ny();
@@ -65,6 +67,7 @@ void IceModel_DISMAL::run_decoded(double time_s,
 	std::vector<blitz::Array<double,1>> const &vals2)
 {
 	// Only need to run one copy of this
+	GCMParams const &gcm_params(coupler->gcm_params);
 	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
 
 printf("BEGIN IceModel_DISMAL::run_decoded\n");
@@ -83,15 +86,12 @@ printf("BEGIN IceModel_DISMAL::run_decoded\n");
 	NcDim *ny_dim = ncout.add_dim("ny", ny);
 	assert(ny_dim);
 
-printf("contract[INPUT].size_nounit() == %ld\n", contract[INPUT].size_nounit());
 	// Define variables
 	for (int i=0; i < contract[INPUT].size_nounit(); ++i) {
 		CoupledField const &field(contract[INPUT].field(i));
 		printf("IceModel_DISMAL: Defining variable %s\n", field.name.c_str());
 
 		// Convert from 1D indexing to 2D
-//std::cout << "strides = " << vals2[i].stride() << std::endl;
-//std::cout << "extents = " << vals2[i].extent() << std::endl;
 		auto val2_xy(reshape_xy(vals2[i]));
 		fns.push_back(giss::netcdf_define(ncout, "", field, val2_xy, {ny_dim, nx_dim}));
 	}

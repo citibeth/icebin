@@ -1,22 +1,20 @@
 #include <mpi.h>		// Must be first
 
-#include <glint2/pism/IceModel_PISM.hpp>
+#include <glint2/IceModel_DISMAL.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
 
 using namespace giss;
 using namespace glint2::modele;
-using namespace glint2::pism;
 
 // --------------------------------------------------------
 namespace glint2 {
-namespace pism {
 
 /** GCM-specific contract */
-void IceModel_PISM::setup_contract_modele(
+void IceModel_DISMAL::setup_contract_modele(
 	glint2::modele::GCMCoupler_ModelE const &coupler,
 	glint2::modele::ContractParams_ModelE const &params)
 {
-	printf("BEGIN IceModel_PISM::setup_contract_modele\n");
+	printf("BEGIN IceModel_DISMAL::setup_contract_modele\n");
 	IceModel &model(*this);
 
 	// ============ GCM -> Ice
@@ -53,14 +51,8 @@ void IceModel_PISM::setup_contract_modele(
 	out = "surface_downward_sensible_heat_flux";	// W m-2
 		// Zero for now
 
-	// ============== Ice -> GCM
+	// ============== Ice -> GCM (none)
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
-	ice_output.add_field("upward_geothermal_flux_sum", "J m-2", "");
-	ice_output.add_field("geothermal_flux_sum", "J m-2", "");
-	ice_output.add_field("basal_frictional_heating_sum", "J m-2", "");
-	ice_output.add_field("strain_heating_sum", "J m-2", "");
-	ice_output.add_field("total_enthalpy", "J m-2", "");
-	ice_output.add_field("unit", "", "");
 
 	// Outputs (Ice -> GCM) are same fields as inputs
 	CouplingContract *gcm_inputs = new_CouplingContract();
@@ -82,13 +74,9 @@ void IceModel_PISM::setup_contract_modele(
 		ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
 	}
 
-	// Now give our contracts to our dismal slave IceModel
-	if (dismal.get()) {
-		dismal->contract = contract;
-	}
 
-	printf("END IceModel_PISM::setup_contract_modele\n");
+	printf("END IceModel_DISMAL::setup_contract_modele\n");
 }
 
-}}		// namespace glint2::pism
+}		// namespace glint2
 // --------------------------------------------------------

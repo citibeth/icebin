@@ -38,11 +38,13 @@ public :
 
 //	IceModel_Decode(Grid const &grid) : ndata(grid.ndata()) {}
 //	IceModel_Decode(int _ndata) : ndata(_ndata) {}
-	IceModel_Decode(IceModel::Type _type) : IceModel(_type) {}
+	IceModel_Decode(IceModel::Type _type, GCMCoupler const *_coupler)
+		: IceModel(_type, _coupler) {}
 
-	void init(IceModel::GCMParams const &gcm_params, int ndata)
+	// Function special just to IceModel_Decode
+	void init(int ndata)
 	{
-		IceModel::init(gcm_params);
+//		IceModel::init();
 		this->_ndata = ndata;
 	}
 

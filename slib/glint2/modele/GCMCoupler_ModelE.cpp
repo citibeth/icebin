@@ -5,12 +5,12 @@ namespace glint2 {
 namespace modele {
 
 
-GCMCoupler_ModelE::GCMCoupler_ModelE(IceModel::GCMParams const &_gcm_params) :
+GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams const &_gcm_params) :
 	GCMCoupler(GCMCoupler::Type::MODELE, _gcm_params)
 {
-	gcm_outputs.add_field("lismb", "kg m-2", "Surface mass balance");
-	gcm_outputs.add_field("liseb", "J m-2", "Latent heat flux");
-	gcm_outputs.add_field("litg2", "degC s", "T of bottom layer of snow/firn");
+	gcm_outputs.add_field("lismb", "kg m-2 s-1", "Surface mass balance");
+	gcm_outputs.add_field("liseb", "W m-2", "Latent heat flux");
+	gcm_outputs.add_field("litg2", "degC", "T of bottom layer of snow/firn");
 	gcm_outputs.add_field("unit", "", "Dimensionless identity");
 
 	ice_input_scalars.add_field("by_dt", "s-1", "Inverse of coupling timestep");
@@ -51,11 +51,6 @@ void GCMCoupler_ModelE::setup_contracts(
 
 	printf("END GCMCoupler_ModelE::setup_contracts()\n");
 }
-
-
-
-
-
 
 
 }}

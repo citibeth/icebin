@@ -71,12 +71,12 @@ namespace modele {
 
 // ------------------------------------------------
 class ModelEDomain : public GridDomain {
-	int im, jm;
-	int i0h_f, i1h_f, j0h_f, j1h_f;
-	int i0_f, i1_f, j0_f, j1_f;
-	int j0s_f, j1s_f;
-
 public:
+	int const im, jm;
+
+	int const i0h_f, i1h_f, j0h_f, j1h_f;
+	int const i0_f, i1_f, j0_f, j1_f;
+	int const j0s_f, j1s_f;
 
 	ModelEDomain(
 		// Info about the global grid

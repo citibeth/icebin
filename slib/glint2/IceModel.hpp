@@ -27,6 +27,8 @@
 
 namespace glint2 {
 
+class GCMCoupler;
+
 // -------------------------------------------------------
 // GCM-specific types for parameters to setup_contract_xxxxx()
 
@@ -36,29 +38,8 @@ namespace modele{
 }
 // -------------------------------------------------------
 class IceModel {
-public:
-	/** Parameters passed from the GCM through to the ice model.
-	These parameters cannot be specific to either the ice model or the GCM. */
-	struct GCMParams {
-		MPI_Comm gcm_comm;		// MPI communicator used by the GCM
-		int gcm_rank;			// Rank of this process in gcm_comm
-		int gcm_root;			// Rank of root process in gcm_comm
-		boost::filesystem::path config_dir;	// Where to look for Ice Model configuration files
-		giss::time::tm time_base;	// Corresponds to time_s == 0
-		double time_start_s;		// Start of simulation, as far as ice model is concerned (seconds since time_base).
-
-		GCMParams();
-
-		GCMParams(
-			MPI_Comm const _gcm_comm,
-			int _gcm_root,
-			boost::filesystem::path const &_config_dir,
-			giss::time::tm const &_time_base,
-			double time_start_s);
-	};
-
 protected:
-	GCMParams gcm_params;
+	GCMCoupler const * const coupler;		// parent back-pointer
 	
 public:
 	BOOST_ENUM_VALUES( Type, int,
@@ -87,7 +68,7 @@ public:
 		return _extra_contracts[_extra_contracts.size()-1].get();
 	}
 
-	IceModel(IceModel::Type _type) : type(_type) {}
+	IceModel(IceModel::Type _type, GCMCoupler const *_coupler) : type(_type), coupler(_coupler) {}
 	virtual ~IceModel() {}
 
 	// --------------------------------------------------
@@ -97,7 +78,7 @@ public:
 		glint2::modele::GCMCoupler_ModelE const &coupler,
 		glint2::modele::ContractParams_ModelE const &params)
 	{
-		fprintf(stderr, "setup_contract_modele() not implemented for IceModel type %s", type.str());
+		fprintf(stderr, "Error: setup_contract_modele() not implemented for IceModel type %s\n", type.str());
 		throw std::exception();
 	}
 
@@ -109,13 +90,10 @@ public:
 
 	// --------------------------------------------------
 
-	void init(IceModel::GCMParams const &_gcm_params)
-	{ gcm_params = _gcm_params; }
-
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 	virtual void init(
-		IceModel::GCMParams const &gcm_params,
+//		IceModel::GCMParams const &gcm_params,
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
 		std::string const &vname_base,
@@ -145,7 +123,7 @@ public:
 };
 
 extern std::unique_ptr<IceModel> read_icemodel(
-	IceModel::GCMParams const &gcm_params,
+	GCMCoupler const *coupler,
 	NcFile &nc, std::string const &vname, IceSheet *sheet = NULL);
 
 }

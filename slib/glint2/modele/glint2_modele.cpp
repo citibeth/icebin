@@ -18,6 +18,7 @@
 
 #include <mpi.h>	// For Intel MPI, mpi.h must be included before stdio.h
 #include <netcdfcpp.h>
+#include <giss/mpi.hpp>
 #include <giss/blitz.hpp>
 #include <giss/f90blitz.hpp>
 #include <glint2/HCIndex.hpp>
@@ -25,9 +26,149 @@
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
 //#include <glint2/IceModel_TConv.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/format.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
+
+
+// ================================================================
+
+struct ModelEMsg {
+	int i, j, k;	// Indices into ModelE
+	double vals[1];		// Always at least one val; but this could be extended, based on # of inputs
+
+	double &operator[](int i) { return *(vals + i); }
+
+	/** @return size of the struct, given a certain number of values */
+	static size_t size(int nfields)
+		{ return sizeof(ModelEMsg) + (nfields-1) * sizeof(double); }
+
+	static MPI_Datatype new_MPI_struct(int nfields);
+
+	/** for use with qsort */
+//	static int compar(void const * a, void const * b);
+
+};
+
+MPI_Datatype ModelEMsg::new_MPI_struct(int nfields)
+{
+	int nele = 3 + nfields;
+	int blocklengths[] = {1, 1, 1, nfields};
+	MPI_Aint displacements[] = {offsetof(ModelEMsg,i), offsetof(ModelEMsg,j), offsetof(ModelEMsg,k), offsetof(ModelEMsg, vals)};
+	MPI_Datatype types[] = {MPI_INT, MPI_INT, MPI_INT, MPI_DOUBLE};
+	MPI_Datatype ret;
+	MPI_Type_create_struct(4, blocklengths, displacements, types, &ret);
+	MPI_Type_commit(&ret);
+	return ret;
+}
+
+
+
+
+
+/** @param hpvals Values on height-points GCM grid for various fields
+	the GCM has decided to provide. */
+void  glint2_modele_save_gcm_outputs(
+glint2_modele *api,
+double time_s,
+std::vector<blitz::Array<double,3>> &inputs)
+{
+
+	// Get dimensions of full domain
+	int nhp = api->maker->nhp(-1) + 1;
+	ModelEDomain const *domain(&*api->domain);
+
+	int const rank = api->gcm_coupler->rank();	// MPI rank; debugging
+
+	GCMCoupler &coupler(*api->gcm_coupler);
+	printf("[%d] BEGIN glint2_modele_save_gcm_outputs(time_s=%f)\n", rank, time_s);
+
+	CouplingContract &gcm_outputs(coupler.gcm_outputs);
+
+	// Count total number of elements in the inputs (for this MPI domain)
+	blitz::Array<double,3> &input0(inputs[0]);
+	int nele_l =
+		(input0.ubound(2) - input0.lbound(2) + 1) *
+		(domain->j1_f - domain->j0_f + 1) *
+		(domain->i1_f - domain->i0_f + 1);
+
+	// Find the max. number of fields (for input) used for any ice sheet.
+	// This will determine the size of our MPI messages.
+	int nfields = gcm_outputs.size_nounit();
+
+	// Allocate buffer for that amount of stuff
+	giss::DynArray<ModelEMsg> sbuf(ModelEMsg::size(nfields), nele_l);
+
+	// Fill it in....
+	int nmsg = 0;
+	for (int k=input0.lbound(2); k<=input0.ubound(2); ++k)		// nhp
+	for (int j=domain->j0_f; j <= domain->j1_f; ++j)
+	for (int i=domain->i0_f; i <= domain->i1_f; ++i) {
+		ModelEMsg &msg = sbuf[nmsg];
+		msg.i = i;
+		msg.j = j;
+		msg.k = k;
+		for (unsigned int l=0; l<nfields; ++l) msg[l] = inputs[l](i,j,k);
+		++nmsg;
+	}
+
+	// Sanity check: make sure we haven't overrun our buffer
+	if (nmsg != sbuf.size) {
+		fprintf(stderr, "Wrong number of items in buffer: %d vs %d expected\n", nmsg, sbuf.size);
+		throw std::exception();
+	}
+
+	// Gather it to root
+	GCMParams const &gcm_params(api->gcm_coupler->gcm_params);
+	std::unique_ptr<giss::DynArray<ModelEMsg>> rbuf = giss::gather_msg_array(
+		gcm_params.gcm_comm, gcm_params.gcm_root, sbuf, nfields, nmsg, 0);
+
+	// Process the gathered data
+	if (rank == gcm_params.gcm_root) {
+
+		// Allocate ijk arrays
+		std::vector<blitz::Array<double,3>> outputs;
+		for (unsigned int i=0; i<nfields; ++i) {
+			outputs.push_back(blitz::Array<double,3>(nhp, domain->jm, domain->im));
+		}
+
+		// Turn messages into ijk arrays
+		for (auto msg=rbuf->begin(); msg != rbuf->end(); ++msg) {
+			for (unsigned int i=0; i<nfields; ++i) {
+				int mi = msg->i - 1;
+				int mj = msg->j - 1;
+				int mk = msg->k - 1;		// Convert Fortran --> C indexing
+				outputs[i](mk, mj, mi) = (*msg)[i];
+			}
+		}
+
+		// Write the arrays to a file
+		NcFile ncout(api->gcm_coupler->gcm_out_file.c_str(), NcFile::Write);	// Read/Write
+		NcDim *time_dim = ncout.get_dim("time");
+		NcDim *nhp_dim = ncout.get_dim("nhp");
+		NcDim *jm_dim = ncout.get_dim("jm");
+		NcDim *im_dim = ncout.get_dim("im");
+
+		long cur[4]{time_dim->size(),0,0,0};		// time, nhp, jm, im
+		long counts[4]{1, nhp_dim->size(), jm_dim->size(), im_dim->size()};
+
+		NcVar *time_var = ncout.get_var("time");
+		time_var->set_cur(cur);
+		time_var->put(&time_s, counts);
+
+		for (int i=0; i<nfields; ++i) {
+			NcVar *nc_var = ncout.get_var(gcm_outputs[i].c_str());
+			nc_var->set_cur(cur);
+			nc_var->put(outputs[i].data(), counts);
+		}
+
+		ncout.close();
+	}
+	printf("[%d] END glint2_modele_save_gcm_outputs(time_s=%f)\n", rank, time_s);
+}
+
+// ================================================================
 
 // ---------------------------------------------------
 
@@ -45,9 +186,9 @@ extern "C" glint2_modele *glint2_modele_new(
 	int j0s, int j1s,
 
 	// Info about size of a timestep
-	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
-	int itimei,			// itime of start of simulation
-	double dtsrc,		// Conversion from itime to seconds
+//	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
+//	int itimei,			// itime of start of simulation
+//	double dtsrc,		// Conversion from itime to seconds
 
 	// MPI Stuff
 	MPI_Fint comm_f, int root,
@@ -69,19 +210,19 @@ printf("glint2_config_rfname = %s\n", glint2_config_rfname.c_str());
 std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 
 	// Set up parmaeters from the GCM to the ice model
-	IceModel::GCMParams gcm_params(
+	GCMParams gcm_params(
 		MPI_Comm_f2c(comm_f),
 		root,
-		glint2_config_dir,
-		giss::time::tm(iyear1, 1, 1),
-		itimei*dtsrc);
+		glint2_config_dir);
+//		giss::time::tm(iyear1, 1, 1),
+//		itimei*dtsrc);
 
-printf("iyear1 = %d\n", iyear1);
+//printf("iyear1 = %d\n", iyear1);
 
 	// Allocate our return variable
 	std::unique_ptr<glint2_modele> api(new glint2_modele());
-	api->itime_last = itimei;
-	api->dtsrc = dtsrc;
+//	api->itime_last = itimei;
+//	api->dtsrc = dtsrc;
 
 #if 1
 	// Set up the domain
@@ -118,6 +259,8 @@ printf("iyear1 = %d\n", iyear1);
 	// TODO: Test that im and jm are consistent with the grid read.
 #endif
 
+	// -------------------------------------------------
+
 	printf("***** END glint2_modele_new()\n");
 
 	// No exception, we can release our pointer back to Fortran
@@ -144,6 +287,79 @@ int glint2_modele_nhp(glint2_modele *api)
 }
 // -----------------------------------------------------
 extern "C"
+void glint2_modele_set_start_time(glint2_modele *api, int iyear1, int itimei, double dtsrc)
+{
+	GCMParams &gcm_params(api->gcm_coupler->gcm_params);
+
+	api->dtsrc = dtsrc;
+	double time0_s = itimei * api->dtsrc;
+
+printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f\n", iyear1, itimei, api->dtsrc, time0_s);
+	gcm_params.set_start_time(
+		giss::time::tm(iyear1, 1, 1),
+		time0_s);
+
+	api->itime_last = itimei;
+
+	// Finish initialization...
+	// -------------------------------------------------
+	if (api->gcm_coupler->gcm_out_file.length() > 0) {
+		// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
+		int nhp = api->maker->nhp(-1) + 1;
+		NcFile ncout(api->gcm_coupler->gcm_out_file.c_str(), NcFile::Replace);
+		NcDim *im_dim = ncout.add_dim("im", api->domain->im);
+		NcDim *jm_dim = ncout.add_dim("jm", api->domain->jm);
+		NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
+		NcDim *one_dim = ncout.add_dim("one", 1);
+		NcDim *time_dim = ncout.add_dim("time");		// No dimsize --> unlimited
+		const NcDim *dims[4]{time_dim, nhp_dim, jm_dim, im_dim};
+
+		std::string time_units = str(boost::format("seconds since %04d-01-01 00:00:00") % iyear1);		// Technically, I should be getting start date from gcm_params giss::tm struct, rather than assuming it starts on January 1.
+
+		const NcDim *dims_b[1]{one_dim};
+		NcVar *time0_var = ncout.add_var("time0", giss::get_nc_type<double>(), 1, dims_b);
+		time0_var->add_att("units", time_units.c_str());
+		time0_var->add_att("calendar", "365_day");
+		time0_var->add_att("axis", "T");
+		time0_var->add_att("long_name", "Simulation start time");
+
+		NcVar *time_var = ncout.add_var("time", giss::get_nc_type<double>(), 1, dims);
+		time_var->add_att("units", time_units.c_str());
+		time_var->add_att("calendar", "365_day");
+		time_var->add_att("axis", "T");
+		time_var->add_att("long_name", "Coupling times");
+
+
+
+		CouplingContract &gcm_outputs(api->gcm_coupler->gcm_outputs);
+
+		for (unsigned int i=0; i < gcm_outputs.size_nounit(); ++i) {
+			NcVar *nc_var = ncout.add_var(gcm_outputs[i].c_str(),
+				giss::get_nc_type<double>(), 4, dims);
+
+			auto comment(boost::format(
+				"%s[t,...] holds the mean from time[t-1] to time[t].  See time0[0] if t=0.")
+				% gcm_outputs[i]);
+			nc_var->add_att("comment", comment.str().c_str());
+
+			std::string const &description(gcm_outputs.field(i).get_description());
+			if (description != "") nc_var->add_att("long_name", description.c_str());
+
+			std::string const &units(gcm_outputs.field(i).get_units());
+			if (units != "") nc_var->add_att("units", units.c_str());
+		}
+
+		// Put initial time in it...
+		long cur[1]{0};
+		long counts[1]{1};
+		time0_var->set_cur(cur);
+		time0_var->put(&time0_s, counts);
+
+		ncout.close();
+	}
+}
+// -----------------------------------------------------
+extern "C"
 void glint2_modele_compute_fgice_c(glint2_modele *api,
 	int replace_fgice_b,
 	giss::F90Array<double, 2> &fgice1_glint2_f,		// OUT
@@ -153,6 +369,7 @@ void glint2_modele_compute_fgice_c(glint2_modele *api,
 	giss::F90Array<double, 2> &flake1_f			// IN
 )
 {
+
 printf("BEGIN glint2_modele_compute_fgice_c()\n");
 std::cout << "fgice1_f: " << fgice1_f << std::endl;
 std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
@@ -480,12 +697,14 @@ giss::F90Array<double,3> &tg21h_f)		// C
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
 	std::vector<blitz::Array<double,3>> inputs(gcm_outputs.size_nounit());
-printf("gcm_outputs[smb] = %d\n", gcm_outputs["smb"]);
-printf("gcm_outputs[seb] = %d\n", gcm_outputs["seb"]);
-printf("gcm_outputs[tg2] = %d\n", gcm_outputs["tg2"]);
 	inputs[gcm_outputs["lismb"]].reference(smb1h_f.to_blitz());
 	inputs[gcm_outputs["liseb"]].reference(seb1h_f.to_blitz());
 	inputs[gcm_outputs["litg2"]].reference(tg21h_f.to_blitz());
+
+	if (coupler.gcm_out_file.length() > 0) {
+		// Write out to DESM file
+		glint2_modele_save_gcm_outputs(api, time_s, inputs);
+	}
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
@@ -498,8 +717,10 @@ printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %ld\n", api->hp_to_ic
 	// Find the max. number of fields (for input) used for any ice sheet.
 	// This will determine the size of our MPI messages.
 	int nfields_max = 0;
-	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
-		int sheetno = ii->first;
+	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
+		int sheetno = sheet->index;
+//	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
+//		int sheetno = ii->first;
 		giss::VarTransformer &vt(api->gcm_coupler->models[sheetno]->var_transformer[IceModel::INPUT]);
 		nfields_max = std::max(nfields_max, (int)vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit());
 	}
@@ -576,3 +797,5 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 
 	printf("END glint2_modele_couple_to_ice_c(itime=%d)\n", itime);
 }
+
+// ===============================================================

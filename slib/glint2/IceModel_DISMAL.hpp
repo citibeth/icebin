@@ -33,12 +33,11 @@ class IceModel_DISMAL : public IceModel_Decode
 
 public:
 
-	IceModel_DISMAL() : IceModel_Decode(IceModel::Type::DISMAL) {}
+	IceModel_DISMAL(GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::DISMAL, _coupler) {}
 
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 	void init(
-		IceModel::GCMParams const &gcm_params,
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
 		std::string const &vname_base,
@@ -56,6 +55,11 @@ protected :
 	in giss/blitz.hpp */
 	blitz::Array<double,2> const reshape_xy(
 		blitz::Array<double,1> const &vals2);
+public:
+
+	void setup_contract_modele(
+		glint2::modele::GCMCoupler_ModelE const &coupler,
+		glint2::modele::ContractParams_ModelE const &params);
 
 
 

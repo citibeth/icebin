@@ -74,7 +74,7 @@ NcVar *get_var_safe(NcFile &nc, std::string const &var_name, bool report_error)
 		}
 	}
 	if (report_error)
-		fprintf(stderr, "Cannot find variable '%s' in NetCDF file\n", var_name.c_str());
+		fprintf(stderr, "Warning: cannot find variable '%s' in NetCDF file\n", var_name.c_str());
 	return NULL;
 }
 

@@ -891,7 +891,7 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 
 	printf("MatrixMaker::read_from_netcdf(%s) 1\n", vname.c_str());
 	grid1.reset(read_grid(nc, vname + ".grid1").release());
-	if (giss::get_var_safe(nc, vname + ".mask1")) {
+	if (giss::get_var_safe(nc, vname + ".mask1", false)) {
 		mask1.reset(new blitz::Array<int,1>(
 		giss::read_blitz<int,1>(nc, vname + ".mask1")));
 printf("2 Set mask1 = %p\n", mask1.get());

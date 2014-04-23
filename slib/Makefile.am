@@ -26,10 +26,12 @@ libglint2_la_SOURCES = \
 	giss/sparsemult.cpp \
 	giss/VarTransformer.cpp \
 	glint2/contracts/modele_pism.cpp \
+	glint2/contracts/modele_dismal.cpp \
 	glint2/clippers.cpp \
 	glint2/CouplingContract.cpp \
 	glint2/ExchangeGrid.cpp \
 	glint2/GCMCoupler.cpp \
+	glint2/GCMParams.cpp \
 	glint2/Grid.cpp \
 	glint2/Grid_LonLat.cpp \
 	glint2/Grid_XY.cpp \
@@ -37,7 +39,6 @@ libglint2_la_SOURCES = \
 	glint2/GridDomain_Listed.cpp \
 	glint2/gridutil.cpp \
 	glint2/HCIndex.cpp \
-	glint2/IceModel.cpp \
 	glint2/IceModel_Decode.cpp \
 	glint2/IceModel_DISMAL.cpp \
 	glint2/IceSheet.cpp \

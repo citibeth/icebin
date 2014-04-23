@@ -73,7 +73,6 @@ public:
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 	void init(
-		IceModel::GCMParams const &gcm_params,
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
 		std::string const &vname_base,
@@ -119,7 +118,7 @@ public:
 		std::string const &vname,
 		IceSheet *sheet);
 
-	IceModel_PISM(bool with_dismal=true);
+	IceModel_PISM(GCMCoupler const *_coupler, bool with_dismal=true);
 
 	~IceModel_PISM();
 
