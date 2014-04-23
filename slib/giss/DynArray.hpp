@@ -38,6 +38,58 @@ elements of a DynArray.
 template<class T>
 class DynArray {
 public:
+	// -------------------------------------------------------
+	// See: http://www.cplusplus.com/reference/iterator/BidirectionalIterator/
+	// See: http://www.cplusplus.com/reference/iterator/RandomAccessIterator/
+	class iterator {
+		DynArray<T> *array;
+		T *cur;
+	public:
+		T *get() {return cur; }
+
+		iterator(DynArray<T> *_array, T *_cur) : array(_array), cur(_cur) {}
+		iterator() : array(0), cur(0) {}
+		iterator(iterator const &b) : array(b.array), cur(b.cur) {}
+
+		void operator=(iterator const &b) {
+			array = b.array;
+			cur = b.cur;
+		}
+		~iterator() {}
+
+		bool operator==(iterator const &b)
+			{ return (cur == b.cur); }
+		bool operator!=(iterator  const &b)
+			{ return !(*this == b); }
+
+		T & operator*() { return *cur; }
+		T * operator->() { return cur; }
+
+		iterator &operator++() { array->incr(cur); return *this; }		// prefix ++
+		// http://stackoverflow.com/questions/3846296/overloading-of-the-operator/3846374#3846374
+		iterator operator++(int) {		// postfix
+			iterator result(*this);
+			++(*this);
+			return result;
+		}
+
+		iterator &operator--() { array->decr(cur); return *this; }		// prefix --
+		// http://stackoverflow.com/questions/3846296/overloading-of-the-operator/3846374#3846374
+		iterator operator--(int) {		// postfix
+			iterator result(*this);
+			--(*this);
+			return result;
+		}
+
+		bool operator<(iterator const &b) { return cur < b.cur; }
+		bool operator>(iterator const &b) { return cur > b.cur; }
+		bool operator<=(iterator const &b) { return cur <= b.cur; }
+		bool operator>=(iterator const &b) { return cur >= b.cur; }
+
+
+	};			// iterator
+	// -------------------------------------------------------
+
 	size_t const size;
 	size_t const ele_size;
 	char * const buf;
@@ -59,8 +111,8 @@ public:
 	void operator=(DynArray const &b) = delete;
 	void operator=(DynArray &&b) = delete;
 
-	T *begin() { return reinterpret_cast<T *>(buf); }
-	T *end() { return  reinterpret_cast<T *>(buf_end); }
+	iterator begin() { return iterator(this, reinterpret_cast<T *>(buf)); }
+	iterator end() { return  iterator(this, reinterpret_cast<T *>(buf_end)); }
 
 	T &operator[](int ix)
 		{ return *reinterpret_cast<T *>(buf + ele_size * ix); }
