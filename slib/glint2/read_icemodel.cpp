@@ -42,7 +42,7 @@ std::unique_ptr<IceModel> read_icemodel(
 			ice_model.reset(new IceModel_DISMAL(coupler));
 			break;
 		case IceModel::Type::PISM :
-			ice_model.reset(new glint2::pism::IceModel_PISM(coupler));
+			ice_model.reset(new glint2::gpism::IceModel_PISM(coupler));
 			break;
 	}
 

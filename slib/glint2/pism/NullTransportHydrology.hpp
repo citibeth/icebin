@@ -39,20 +39,20 @@ Here is a talk which illustrates the "till-can" metaphor:
  */
 
 namespace glint2 {
-namespace pism {
+namespace gpism {
 
-class NullTransportHydrology : public PISMNullTransportHydrology {
+class NullTransportHydrology : public pism::PISMNullTransportHydrology {
   friend class IceModel_PISM;
 
 public:
-  NullTransportHydrology(IceGrid &g, const PISMConfig &conf);
+  NullTransportHydrology(pism::IceGrid &g, const pism::PISMConfig &conf);
   virtual ~NullTransportHydrology() {}
 
   // solves an implicit step of a highly-simplified ODE
   virtual PetscErrorCode update(double icet, double icedt);
 
 protected:
-  IceModelVec2S basal_runoff_sum;      // Cumulative effective thickness of water removed from till
+  pism::IceModelVec2S basal_runoff_sum;      // Cumulative effective thickness of water removed from till
 };
 
 }}

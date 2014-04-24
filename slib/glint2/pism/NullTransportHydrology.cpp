@@ -20,8 +20,10 @@
 #include <glint2/pism/NullTransportHydrology.hpp>
 #include "hydrology/hydrology_diagnostics.hh"
 
+using namespace pism;
+
 namespace glint2 {
-namespace pism {
+namespace gpism {
 
 
 NullTransportHydrology::NullTransportHydrology(IceGrid &g, const PISMConfig &conf)
@@ -79,7 +81,7 @@ PetscErrorCode NullTransportHydrology::update(double icet, double icedt)
 
   if (tillwat_max < 0.0) {
     PetscPrintf(grid.com,
-       "glint2::pism::NullTransportHydrology ERROR: hydrology_tillwat_max is negative\n"
+       "glint2::gpism::NullTransportHydrology ERROR: hydrology_tillwat_max is negative\n"
        "            this is not allowed ... ENDING ... \n\n");
     PISMEnd();
   }

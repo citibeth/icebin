@@ -10,9 +10,10 @@
 #include <glint2/GCMCoupler.hpp>
 
 using namespace giss;
+using namespace pism;
 
 namespace glint2 {
-namespace pism {
+namespace gpism {
 
 
 IceModel_PISM::IceModel_PISM(GCMCoupler const *_coupler, bool with_dismal)
@@ -491,7 +492,7 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 
 		// Copy to the output variable
 		// (Could we just do DMDANaturalToGlobal() directly to this?)
-		ierr = pism_var->copy_from(g2); CHKERRQ(ierr);
+		ierr = pism_var->copy_from_vec(g2); CHKERRQ(ierr);
 
 		// ================ BEGIN Write PISM Inputs
 		long time_day = (int)(time_s / 86400. + .5);
@@ -513,7 +514,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 
 	// Time of last time we coupled
 	auto old_pism_time(pism_grid->time->current());
-	ierr = ice_model->run_to(time_s); CHKERRQ(ierr);	// See glint2::pism::PISMIceModel::run_to()
+	ierr = ice_model->run_to(time_s); CHKERRQ(ierr);	// See glint2::gpism::PISMIceModel::run_to()
 	if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
 		throw std::exception();

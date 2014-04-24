@@ -23,7 +23,7 @@
 #include <glint2/Grid_XY.hpp>
 
 namespace glint2 {
-namespace pism {
+namespace gpism {
 
 // =================================================
 
@@ -38,11 +38,11 @@ class IceModel_PISM : public IceModel_Decode
 	// so they get destroyed in the proper reverse order.
 	// See: http://msdn.microsoft.com/en-us/library/8183zf3x%28v=vs.110%29.aspx
 	std::unique_ptr<PetscContext> petsc_context;
-	std::unique_ptr<::PISMUnitSystem> unit_system;
-	std::unique_ptr<::PISMConfig> config;
-	std::unique_ptr<::PISMConfig> overrides;
-	std::unique_ptr<::IceGrid> pism_grid;
-	std::unique_ptr<PISMIceModel> ice_model;   // No "::"
+	std::unique_ptr<pism::PISMUnitSystem> unit_system;
+	std::unique_ptr<pism::PISMConfig> config;
+	std::unique_ptr<pism::PISMConfig> overrides;
+	std::unique_ptr<pism::IceGrid> pism_grid;
+	std::unique_ptr<glint2::gpism::PISMIceModel> ice_model;
 	PSConstantGLINT2 *pism_surface_model;	// We don't own this.
 
 	// Stuff used for Scatter/Gather
@@ -52,7 +52,7 @@ class IceModel_PISM : public IceModel_Decode
 	Vec Hp0;			//!< Resulting vector on process 0
 
 	// Corresponding PISM variable for each field
-	std::vector<IceModelVec2S *> pism_vars;
+	std::vector<pism::IceModelVec2S *> pism_vars;
 
 	double BY_ICE_DENSITY;		// CONSTANT Used to prepare input for PISM
 
@@ -110,7 +110,7 @@ public:
 	}
 
 	// ----------------------------------------------
-	PetscErrorCode iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var, blitz::Array<double,2> &ret);
+	PetscErrorCode iceModelVec2S_to_blitz_xy(pism::IceModelVec2S &pism_var, blitz::Array<double,2> &ret);
 	// ----------------------------------------------
 
 	void update_ice_sheet(

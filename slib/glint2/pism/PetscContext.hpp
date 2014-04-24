@@ -4,7 +4,7 @@
 #include <mpi.h>
 
 namespace glint2 {
-namespace pism {
+namespace gpism {
 
 
 /* This explicit scoping forces destructors to be called before PetscFinalize() */

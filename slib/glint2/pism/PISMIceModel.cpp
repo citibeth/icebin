@@ -1,23 +1,11 @@
 #include <glint2/pism/PISMIceModel.hpp>
 #include "bedrockThermalUnit.hh"
 
-namespace glint2 {
-namespace pism {
+using namespace pism;
 
-// Not needed, already part of PISM
-// static PetscErrorCode accumulate(IceModelVec2S &X_sum, IceModelVec2S &X, double dt)
-// {
-// 	ierr = X_sum.begin_access(); CHKERRQ(ierr);
-// 	ierr = X.begin_access(); CHKERRQ(ierr);
-// 	for (int i=grid.xs; i<grid.xs+grid.xm; ++i) {
-// 	for (int j=grid.ys; j<grid.ys+grid.ym; ++j) {
-// 		X_sum(i,j) += X(i,j) * dt;
-// 	}}
-// 	ierr = X->end_access(); CHKERRQ(ierr);
-// 	ierr = X_sum->end_access(); CHKERRQ(ierr);
-// 	return 0;
-// }
-// 
+namespace glint2 {
+namespace gpism {
+
 // /** Sum a 3-D vector in the Z direction to create a 2-D vector.
 // 
 // <p>Note that this sums up all the values in a column, including ones
@@ -64,8 +52,8 @@ namespace pism {
 
 // ================================
 
-PISMIceModel::PISMIceModel(IceGrid &g, PISMConfig &config, PISMConfig &overrides, PISMIceModel::Params const &_params) :
-	::IceModel(g, config, overrides),
+PISMIceModel::PISMIceModel(pism::IceGrid &g, PISMConfig &config, PISMConfig &overrides, PISMIceModel::Params const &_params) :
+	pism::IceModel(g, config, overrides),
 	params(_params)
 {}
 
@@ -75,8 +63,8 @@ PISMIceModel::~PISMIceModel() {} // must be virtual merely because some members 
 PetscErrorCode PISMIceModel::allocate_subglacial_hydrology()
 {
 	printf("BEGIN PISMIceModel::allocate_subglacial_hydrology()\n");
-//	printf("subglacial_hydrology = %p %p\n", subglacial_hydrology, ::IceModel::subglacial_hydrology);
-	if (::IceModel::subglacial_hydrology != NULL) return 0; // indicates it has already been allocated
+//	printf("subglacial_hydrology = %p %p\n", subglacial_hydrology, pism::IceModel::subglacial_hydrology);
+	if (pism::IceModel::subglacial_hydrology != NULL) return 0; // indicates it has already been allocated
     subglacial_hydrology = new NullTransportHydrology(grid, config);
 	printf("END PISMIceModel::allocate_subglacial_hydrology()\n");
 	return 0;
@@ -256,7 +244,7 @@ PetscErrorCode PISMIceModel::prepare_nc(std::string const &fname, std::unique_pt
 
 	nc.reset(new PIO(grid, grid.config.get_string("output_format")));
 
-	ierr = nc->open(fname, PISM_WRITE); CHKERRQ(ierr);
+	ierr = nc->open(fname, PISM_READWRITE_MOVE); CHKERRQ(ierr);
     ierr = nc->def_time(config.get_string("time_dimension_name"),
                        grid.time->calendar(),
                        grid.time->CF_units_string()); CHKERRQ(ierr);
@@ -276,7 +264,7 @@ PetscErrorCode PISMIceModel::write_post_energy(double my_t0)
 
 	// ------ Write it out
 	PIO nc(grid, grid.config.get_string("output_format"));
-	nc.open("post_energy.nc", PISM_WRITE, true);	// append=true
+	nc.open("post_energy.nc", PISM_READWRITE);	// append to file
 	nc.append_time(config.get_string("time_dimension_name"), my_t0);
 	basal_frictional_heating_sum.write(nc, PISM_DOUBLE);
 	strain_heating_sum.write(nc, PISM_DOUBLE);
@@ -334,7 +322,7 @@ PetscErrorCode PISMIceModel::run_to(double time)
 {
 	PetscErrorCode ierr;
 
-	ierr = ::IceModel::run_to(time); CHKERRQ(ierr);
+	ierr = pism::IceModel::run_to(time); CHKERRQ(ierr);
 
 	// ============ Compute Total Enthalpy of Ice Sheet
 	double by_rhoi = 1e0 / config.get("ice_density");	// m^3 kg-1
@@ -343,5 +331,5 @@ PetscErrorCode PISMIceModel::run_to(double time)
 	return 0;
 }
 
-}}	// namespace glint2::pism
+}}	// namespace glint2::gpism
 

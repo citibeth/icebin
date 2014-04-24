@@ -5,11 +5,11 @@
 
 using namespace giss;
 using namespace glint2::modele;
-using namespace glint2::pism;
+using namespace glint2::gpism;
 
 // --------------------------------------------------------
 namespace glint2 {
-namespace pism {
+namespace gpism {
 
 /** GCM-specific contract */
 void IceModel_PISM::setup_contract_modele(
@@ -24,13 +24,13 @@ void IceModel_PISM::setup_contract_modele(
 
 	// ------ Decide on the coupling contract for this ice sheet
 	ice_input.add_cfname("land_ice_surface_specific_mass_balance_flux", "kg m-2 s-1");
-	ice_input.add_cfname("surface_downward_latent_heat_flux", "W m-2");
+	ice_input.add_field("land_ice_surface_specific_mass_balance_water_fraction", "1", "");
 	switch(params.coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
 			ice_input.add_cfname("surface_temperature", "K");
 		break;
 		case ModelE_CouplingType::NEUMANN_BC :
-			ice_input.add_cfname("surface_downward_sensible_heat_flux", "W m-2");
+			ice_input.add_cfname("land_ice_surface_downward_conductive_heat_flux", "W m-2");
 		break;
 	}
 
@@ -45,12 +45,12 @@ void IceModel_PISM::setup_contract_modele(
 	std::string out;
 	out = "land_ice_surface_specific_mass_balance_flux";
 		ice_input_vt.set(out, "lismb", "by_dt", 1.0);
-	out = "surface_downward_latent_heat_flux";
+	out = "land_ice_surface_downward_advective_heat_flux";
 		ice_input_vt.set(out, "liseb", "by_dt", 1.0);
 	out = "surface_temperature";	// K
 		ice_input_vt.set(out, "litg2", "by_dt", 1.0);
 		ice_input_vt.set(out, "unit", "unit", C2K);	// +273.15
-	out = "surface_downward_sensible_heat_flux";	// W m-2
+	out = "land_ice_surface_downward_conductive_heat_flux";	// W m-2
 		// Zero for now
 
 	// ============== Ice -> GCM
@@ -90,5 +90,5 @@ void IceModel_PISM::setup_contract_modele(
 	printf("END IceModel_PISM::setup_contract_modele\n");
 }
 
-}}		// namespace glint2::pism
+}}		// namespace glint2::gpism
 // --------------------------------------------------------

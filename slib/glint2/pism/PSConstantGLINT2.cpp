@@ -21,10 +21,12 @@
 #include <PISMVars.hh>
 #include <IceGrid.hh>
 
-namespace glint2 {
-namespace pism {
+using namespace pism;
 
-PSConstantGLINT2::PSConstantGLINT2(IceGrid &g, const ::PISMConfig &conf)
+namespace glint2 {
+namespace gpism {
+
+PSConstantGLINT2::PSConstantGLINT2(pism::IceGrid &g, const ::PISMConfig &conf)
 	: PISMSurfaceModel(g, conf)
 {
 	PetscErrorCode ierr = allocate_PSConstantGLINT2(); CHKERRCONTINUE(ierr);
@@ -217,5 +219,5 @@ PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, con
 	return 0;
 }
 
-}		// namespace glint2::pism
+}		// namespace glint2::gpism
 }		// namespace glint2
