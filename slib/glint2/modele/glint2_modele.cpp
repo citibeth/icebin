@@ -169,11 +169,20 @@ std::vector<blitz::Array<double,3>> &inputs)
 }
 
 // ================================================================
+extern "C" glint2_modele *new_glint2_modele(
+	std::unique_ptr<glint2_modele> api(new glint2_modele());
+	api->gcm_coupler.reset(new GCMCoupler_ModelE());
 
+	// No exception, we can release our pointer back to Fortran
+	glint2_modele *ret = api.release();
+	printf("***** END glint2_modele_new (for real) %p\n", ret);
+	return ret;
+}
 // ---------------------------------------------------
 
 /** @param glint2_config_fname_f Name of GLINT2 configuration file */
-extern "C" glint2_modele *glint2_modele_new(
+extern "C" void glint2_modele_init0(
+	glint2::modele::glint2_modele *api,
 	char const *glint2_config_fname_f, int glint2_config_fname_len,
 	char const *maker_vname_f, int maker_vname_len,
 
@@ -210,19 +219,10 @@ printf("glint2_config_rfname = %s\n", glint2_config_rfname.c_str());
 std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 
 	// Set up parmaeters from the GCM to the ice model
-	GCMParams gcm_params(
+	api->gcm_coupler->gcm_params = GCMParams(
 		MPI_Comm_f2c(comm_f),
 		root,
 		glint2_config_dir);
-//		giss::time::tm(iyear1, 1, 1),
-//		itimei*dtsrc);
-
-//printf("iyear1 = %d\n", iyear1);
-
-	// Allocate our return variable
-	std::unique_ptr<glint2_modele> api(new glint2_modele());
-//	api->itime_last = itimei;
-//	api->dtsrc = dtsrc;
 
 #if 1
 	// Set up the domain
@@ -244,8 +244,6 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 	api->maker->read_from_netcdf(glint2_config_nc, maker_vname);
 
 	// Read the coupler, along with ice model proxies
-	MPI_Comm comm_c = MPI_Comm_f2c(comm_f);
-	api->gcm_coupler.reset(new GCMCoupler_ModelE(gcm_params));
 	api->gcm_coupler->read_from_netcdf(glint2_config_nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
 	glint2_config_nc.close();
 
@@ -258,15 +256,6 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 
 	// TODO: Test that im and jm are consistent with the grid read.
 #endif
-
-	// -------------------------------------------------
-
-	printf("***** END glint2_modele_new()\n");
-
-	// No exception, we can release our pointer back to Fortran
-	glint2_modele *ret = api.release();
-	printf("***** END glint2_modele_new (for real) %p\n", ret);
-	return ret;
 }
 // -----------------------------------------------------
 extern "C" void glint2_modele_delete(glint2_modele *&api)

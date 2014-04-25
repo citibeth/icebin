@@ -6,7 +6,7 @@ namespace modele {
 
 
 GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams const &_gcm_params) :
-	GCMCoupler(GCMCoupler::Type::MODELE, _gcm_params)
+	GCMCoupler(GCMCoupler::Type::MODELE)
 {
 	gcm_outputs.add_field("lismb", "kg m-2 s-1", "Surface mass balance");
 	gcm_outputs.add_field("liseb", "W m-2", "Latent heat flux");

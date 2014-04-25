@@ -26,7 +26,7 @@ public:
 	/** Names of items used in the SCALARS dimension of VarTranslator */
 	CouplingContract ice_input_scalars;
 
-	GCMCoupler_ModelE(GCMParams const &_gcm_params);
+	GCMCoupler_ModelE();
 
 	virtual void setup_contracts(
 		IceModel &mod,

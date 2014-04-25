@@ -58,8 +58,13 @@ public:
 	);
 	Type const type;
 
+	/** Parameters passed from the GCM through to the ice model.
+	These parameters cannot be specific to either the ice model or the GCM. */
 	GCMParams gcm_params;
 	giss::MapDict<int,IceModel> models;
+
+	/** Constants provided by the GCM */
+	CouplingContract gcm_constants;
 
 	/** Fields we receive from the GCM */
 	CouplingContract gcm_outputs;
@@ -69,8 +74,8 @@ public:
 	/** File to which to write gcm_output.  If "", then don't write. */
 	std::string gcm_out_file;
 
-	GCMCoupler(Type _type, GCMParams const &_gcm_params) :
-		type(_type), gcm_params(_gcm_params) {}
+	GCMCoupler(Type _type) :
+		type(_type) {}
 
 	virtual ~GCMCoupler() {}
 

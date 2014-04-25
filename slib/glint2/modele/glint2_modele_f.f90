@@ -25,8 +25,11 @@ implicit none
 
 INTERFACE
 
+	function new_glint2_modele() bind(c) &
+		type(c_ptr) :: new_glint2_modele
+	end function
 
-	function glint2_modele_new( &
+	subroutine glint2_modele_init0(api, &
 		maker_fname_f, maker_fname_len, &
 		maker_vname_f, maker_vname_len, &
 		im,jm, &
@@ -36,6 +39,7 @@ INTERFACE
 		comm_f, root, &
 		LHM, SHI) bind(c)
 	use iso_c_binding
+		type(c_ptr), value :: api
 		character(c_char) :: maker_fname_f(*)
 		integer(c_int), value :: maker_fname_len
 		character(c_char) :: maker_vname_f(*)
@@ -46,8 +50,7 @@ INTERFACE
 		integer(c_int), value :: j0s,j1s
 		integer(c_int), value :: comm_f, root
 		real(c_double), value :: LHM, SHI
-		type(c_ptr) :: glint2_modele_new
-	end function
+	end subrotine
 
 	subroutine glint2_modele_delete(api) bind(c)
 		use iso_c_binding

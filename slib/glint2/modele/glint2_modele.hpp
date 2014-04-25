@@ -62,7 +62,12 @@ struct glint2_modele {
 
 }}	// namespace glint2::modele
 // ================================================
-extern "C" glint2::modele::glint2_modele *glint2_modele_new(
+/** Just allocate */
+extern "C" glint2::modele::glint2_modele *glint2_modele_new()
+
+// First init to be called after new
+extern "C" void glint2_modele_init0(
+	glint2::modele::glint2_modele *api,
 	char const *maker_fname_f, int maker_fname_len,
 	char const *maker_vname_f, int maker_vname_len,
 
