@@ -25,11 +25,6 @@
 using namespace glint2;
 using namespace glint2::modele;
 
-// !@param shi heat capacity of pure ice (at 0 C) (2060 J/kg C)
-const double SHI  = 2060.;
-//@param lhm   latent heat of melt at 0 C (334590 J/kg)
-const double LHM = 3.34e5;
-
 
 // --------------------------------------------------------
 int main(int argc, char **argv)
@@ -92,8 +87,15 @@ int main(int argc, char **argv)
 
 
 
+	glint2_modele *api = new_glint2_modele();
 
-	glint2_modele *api = glint2_modele_new(
+//	// Set up constants from ModelE here...
+//	NcFile cnc(constants_fname.c_str());
+//	giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
+//	gcm_constants.read_from_netcdf(cnc, "constants");
+//	cnc.close();
+
+	glint2_modele_init0(api,
 		maker_fname.c_str(), maker_fname.size(),
 		maker_vname.c_str(), maker_vname.size(),
 
@@ -119,8 +121,8 @@ int main(int argc, char **argv)
 		// int comm_f, int root;
 		MPI_Comm_c2f(comm), 0,
 
-		// Constants
-		LHM, SHI);
+		// API Control: write_constants = false
+		0);
 
 	glint2_modele_set_start_time(api,
 		1950, 0, 1800.);	// iyear, itimei

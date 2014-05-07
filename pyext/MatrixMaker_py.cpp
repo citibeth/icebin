@@ -211,9 +211,9 @@ static PyObject *MatrixMaker_add_ice_sheet(PyMatrixMaker *self, PyObject *args, 
 		sheet->grid2 = std::move(grid2);
 		int n2 = sheet->grid2->ndata();
 
-		// Cast up to ExchangeGrid
+		// Downcast to ExchangeGrid
 		{NcFile nc(exgrid_fname_py, NcFile::ReadOnly);
-		sheet->exgrid = giss::unique_cast<ExchangeGrid, Grid>(
+		sheet->exgrid = giss::dynamic_cast_unique_ptr<ExchangeGrid>(
 			read_grid(nc, "grid"));
 		}
 

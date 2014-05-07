@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 //	std::string glint2_config_fname = "modele_ll_g2x2_5-searise_g20-40-DISMAL.nc";
 	std::string glint2_config_vname = "m";
 	std::string desm_fname = "desm_in.nc";
-
+	std::string constants_fname = "modele_constants.nc";
 	// Initialize the MPI environment
 	MPI_Init(&argc, &argv);
 
@@ -122,7 +122,15 @@ int main(int argc, char **argv)
 	time_nc->get(&time_si, &counts1);	// Just get one item
 	int itimei = (time_si / dtsrc + .5);
 
-	glint2_modele *api = glint2_modele_new(
+	glint2_modele *api = new_glint2_modele();
+
+	// Set up constants from ModelE here...
+	NcFile cnc(constants_fname.c_str());
+	giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
+	gcm_constants.read_from_netcdf(cnc, "constants");
+	cnc.close();
+
+	glint2_modele_init0(api,
 		glint2_config_fname.c_str(), glint2_config_fname.size(),
 		glint2_config_vname.c_str(), glint2_config_vname.size(),
 
@@ -138,19 +146,12 @@ int main(int argc, char **argv)
 		// (Start and end of domain exclusive of poles
 		j0s, j1s,
 
-		// iyear1
-//		iyear1, itimei,
-
-		// dtsrc  (see MODEL_COM.f)
-//		dtsrc,
-
 		// MPI Stuff
 		// int comm_f, int root;
 		MPI_Comm_c2f(comm), 0,
 
-		// Constants
-		// (which come directly from ModelE, because this is called from ModelE)
-		LHM, SHI);
+		// API Control: write_constants = false
+		0);
 
 	glint2_modele_set_start_time(api, iyear1, itimei, dtsrc);
 

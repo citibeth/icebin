@@ -23,22 +23,33 @@
 #include <giss/time.hpp>
 #include <giss/VarTransformer.hpp>
 #include <glint2/IceSheet.hpp>
-#include <glint2/CouplingContract.hpp>
+#include <giss/CouplingContract.hpp>
+#include <giss/ConstantSet.hpp>
+#include <glint2/GCMPerIceSheetParams.hpp>
 
 namespace glint2 {
 
 class GCMCoupler;
 
 // -------------------------------------------------------
-// GCM-specific types for parameters to setup_contract_xxxxx()
+// GCM-specific types for parameters to setup_contracts_xxxxx()
 
 namespace modele{
 	class GCMCoupler_ModelE;
-	class ContractParams_ModelE;
+	class GCMPerIceSheetParams_ModelE;
 }
 // -------------------------------------------------------
 class IceModel {
+
+friend std::unique_ptr<IceModel> read_icemodel(
+	GCMCoupler const *coupler,
+	NcFile &nc, std::string const &vname,
+	std::unique_ptr<GCMPerIceSheetParams> &&gcm_per_ice_sheet_params,
+	IceSheet *sheet);
+
 protected:
+	// Parameters provided by the GCM, to inform the coupling
+	std::unique_ptr<GCMPerIceSheetParams> gcm_per_ice_sheet_params;
 	GCMCoupler const * const coupler;		// parent back-pointer
 	
 public:
@@ -49,44 +60,33 @@ public:
 	);
 	const IceModel::Type type;
 
-
 	enum IO {INPUT, OUTPUT};
+
+	/** Constants obtained from the GCM */
+	giss::ConstantSet ice_constants;
 
 	/** Ordered specification of the variables (w/ units)
 	to be passed GLINT2->IceModel */
-	std::array<CouplingContract, 2> contract;		// [INPUT|OUTPUT]
+	std::array<giss::CouplingContract, 2> contract;		// [INPUT|OUTPUT]
 	std::array<giss::VarTransformer, 2> var_transformer;
 
 	/** Placeholder for additional coupling contracts that had to be allocated. */
-	std::vector<std::unique_ptr<CouplingContract>> _extra_contracts;
+	std::vector<std::unique_ptr<giss::CouplingContract>> _extra_contracts;
 
-	/** Allocate a new CouplingContract, with the same lifetime as this IceModel. */
-	CouplingContract *new_CouplingContract() {
-		_extra_contracts.push_back(
-			std::unique_ptr<CouplingContract>(
-			new CouplingContract));
-		return _extra_contracts[_extra_contracts.size()-1].get();
-	}
+	/** Allocate a new giss::CouplingContract, with the same lifetime as this IceModel. */
+	giss::CouplingContract *new_CouplingContract();
 
-	IceModel(IceModel::Type _type, GCMCoupler const *_coupler) : type(_type), coupler(_coupler) {}
-	virtual ~IceModel() {}
+	IceModel(IceModel::Type _type, GCMCoupler const *_coupler);
+	virtual ~IceModel();
 
 	// --------------------------------------------------
 	// GCM-specific methods used to set up the contract for
 	// a particular GCM-IceModel pair
-	virtual void setup_contract_modele(
-		glint2::modele::GCMCoupler_ModelE const &coupler,
-		glint2::modele::ContractParams_ModelE const &params)
+	virtual void setup_contracts_modele()
 	{
-		fprintf(stderr, "Error: setup_contract_modele() not implemented for IceModel type %s\n", type.str());
+		fprintf(stderr, "Error: setup_contracts_modele() not implemented for IceModel type %s\n", type.str());
 		throw std::exception();
 	}
-
-
-	/** Non-GCM-specific portion of setting up contracts.  Called by
-	GCMCoupler_yyy setup AFTER setup_contract_yyy(). */
-	virtual void finish_contract_setup()
-		{ printf("IceModel::finish_contract_setup() does nothing.\n"); }
 
 	// --------------------------------------------------
 
@@ -96,8 +96,7 @@ public:
 //		IceModel::GCMParams const &gcm_params,
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
-		std::string const &vname_base,
-		NcVar *const_var)
+		std::string const &vname_base)
 	{
 		fprintf(stderr, "IceModel::init() must be implemented!\n");
 		throw std::exception();
@@ -124,6 +123,8 @@ public:
 
 extern std::unique_ptr<IceModel> read_icemodel(
 	GCMCoupler const *coupler,
-	NcFile &nc, std::string const &vname, IceSheet *sheet = NULL);
+	NcFile &nc, std::string const &vname,
+	std::unique_ptr<GCMPerIceSheetParams> &&gcm_per_ice_sheet_params,
+	IceSheet *sheet = NULL);
 
 }

@@ -21,9 +21,11 @@
 #include <cstdlib>
 #include <giss/DynArray.hpp>
 #include <giss/Dict.hpp>
+#include <giss/udunits2.hpp>
 #include <glint2/IceModel.hpp>
-#include <glint2/CouplingContract.hpp>
+#include <giss/ConstantSet.hpp>
 #include <glint2/GCMParams.hpp>
+#include <glint2/GCMPerIceSheetParams.hpp>
 
 namespace glint2 {
 
@@ -63,11 +65,16 @@ public:
 	GCMParams gcm_params;
 	giss::MapDict<int,IceModel> models;
 
-	/** Constants provided by the GCM */
-	CouplingContract gcm_constants;
+
+	giss::UTSystem ut_system;		//!< Unit system for ConstantSets and CouplingContracts
+	giss::ConstantSet gcm_constants;		//!< Constants provided by the GCM
 
 	/** Fields we receive from the GCM */
-	CouplingContract gcm_outputs;
+	giss::CouplingContract gcm_outputs;
+
+	/** Names of items used in the SCALARS dimension of VarTranslator.
+	Used to convert GCM outputs in terms of (eg) coupling timestep (known to the GCM) */
+	giss::CouplingContract ice_input_scalars;
 
 	// Fields we read from the config file...
 
@@ -75,17 +82,21 @@ public:
 	std::string gcm_out_file;
 
 	GCMCoupler(Type _type) :
-		type(_type) {}
+		type(_type), ut_system(""),
+		gcm_constants(&ut_system) {}
 
 	virtual ~GCMCoupler() {}
+
+	/** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
+	virtual std::unique_ptr<GCMPerIceSheetParams>
+	read_gcm_per_ice_sheet_params(
+		NcFile &nc,
+		std::string const &sheet_vname) = 0;
 
 	/** Called from within read_from_netcdf().  GCM-specific implementation
 	sets up the contracts for this GCM - IceModel pair.  (Usually by calling
 	through to GCM-specific virtual methods on the IceModel. */
-	virtual void setup_contracts(
-		IceModel &mod,
-		NcFile &nc,
-		std::string const &sheet_vname) = 0;
+	virtual void setup_contracts(IceModel &ice_model) const = 0;
 
 	/** @param sheets (OPTIONAL): IceSheet data structures w/ grids, etc. */
 	virtual void read_from_netcdf(

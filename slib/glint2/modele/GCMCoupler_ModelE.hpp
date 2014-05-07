@@ -16,22 +16,26 @@ BOOST_ENUM_VALUES( ModelE_CouplingType, int,
 	(NEUMANN_BC) (1)
 );
 
-struct ContractParams_ModelE {
+
+class GCMPerIceSheetParams_ModelE : public glint2::GCMPerIceSheetParams {
+public:
 	ModelE_CouplingType coupling_type;
 };
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
 public:
-	/** Names of items used in the SCALARS dimension of VarTranslator */
-	CouplingContract ice_input_scalars;
-
 	GCMCoupler_ModelE();
 
-	virtual void setup_contracts(
-		IceModel &mod,
+	/** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
+	std::unique_ptr<GCMPerIceSheetParams>
+	read_gcm_per_ice_sheet_params(
 		NcFile &nc,
 		std::string const &sheet_vname);
+
+	/** Does contract setup for ONE IceModel instance.
+	Calls throught to IceModel::setup_contract_xxx() */
+	virtual void setup_contracts(IceModel &mod) const;
 
 };
 

@@ -63,7 +63,16 @@ struct glint2_modele {
 }}	// namespace glint2::modele
 // ================================================
 /** Just allocate */
-extern "C" glint2::modele::glint2_modele *glint2_modele_new()
+extern "C" glint2::modele::glint2_modele *new_glint2_modele();
+
+/** Set one constant from ModelE into GLINT2.  This is used as a callback
+function for ModelE's set_constant() Fortran subroutine. */
+extern "C" void glint2_modele_set_const(
+	glint2::modele::glint2_modele *api,
+	char const *name_f, int name_len,
+	double val,
+	char const *units_f, int units_len,
+	char const *description_f, int description_len);
 
 // First init to be called after new
 extern "C" void glint2_modele_init0(
@@ -82,8 +91,8 @@ extern "C" void glint2_modele_init0(
 	// MPI Stuff
 	MPI_Fint comm_f, int root,
 
-	// Constants from ModelE
-	double LHM, double SHI);
+	// API  control
+	int write_constants);
 
 extern "C" void glint2_modele_delete(glint2::modele::glint2_modele *&api);
 

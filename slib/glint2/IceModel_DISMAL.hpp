@@ -40,8 +40,7 @@ public:
 	void init(
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
-		std::string const &vname_base,
-		NcVar *const_var);
+		std::string const &vname_base);
 
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
@@ -57,10 +56,7 @@ protected :
 		blitz::Array<double,1> const &vals2);
 public:
 
-	void setup_contract_modele(
-		glint2::modele::GCMCoupler_ModelE const &coupler,
-		glint2::modele::ContractParams_ModelE const &params);
-
+	void setup_contracts_modele();
 
 
 };

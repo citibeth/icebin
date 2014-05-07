@@ -25,22 +25,38 @@
 
 namespace giss {
 
-template <class T_DEST, class T_SRC>
-inline std::unique_ptr<T_DEST> unique_cast(std::unique_ptr<T_SRC> &&src)
+// http://ficksworkshop.com/blog/14-coding/86-how-to-static-cast-std-unique-ptr	
+template<typename D, typename B>
+std::unique_ptr<D> static_cast_unique_ptr(std::unique_ptr<B>& base)
 {
-	if (!src) return std::unique_ptr<T_DEST>();
-
-	// Throws a std::bad_cast() if this doesn't work out
-	T_DEST *dest_ptr = &dynamic_cast<T_DEST &>(*src.get());
-
-	src.release();
-	return std::unique_ptr<T_DEST>(dest_ptr);
+    return std::unique_ptr<D>(static_cast<D*>(base.release()));
+}
+  
+template<typename D, typename B>
+std::unique_ptr<D> static_cast_unique_ptr(std::unique_ptr<B>&& base)
+{
+    return std::unique_ptr<D>(static_cast<D*>(base.release()));
 }
 
-template <class T_DEST, class T_SRC>
-inline std::shared_ptr<T_DEST> shared_cast(std::unique_ptr<T_SRC> &&src)
+
+template<typename D, typename B>
+std::unique_ptr<D> dynamic_cast_unique_ptr(std::unique_ptr<B>& base)
 {
-	return std::shared_ptr<T_DEST>(unique_cast<T_DEST, T_SRC>(std::move(src)));
+    return std::unique_ptr<D>(dynamic_cast<D*>(base.release()));
+}
+  
+template<typename D, typename B>
+std::unique_ptr<D> dynamic_cast_unique_ptr(std::unique_ptr<B>&& base)
+{
+    return std::unique_ptr<D>(dynamic_cast<D*>(base.release()));
+}
+
+
+
+template <class T_DEST, class T_SRC>
+inline std::shared_ptr<T_DEST> dynamic_shared_cast(std::unique_ptr<T_SRC> &&src)
+{
+	return std::shared_ptr<T_DEST>(dynamic_cast_unique_ptr<T_DEST, T_SRC>(std::move(src)));
 }
 
 }	// namespace giss

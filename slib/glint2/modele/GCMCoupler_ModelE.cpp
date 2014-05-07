@@ -1,11 +1,12 @@
 #include <mpi.h>		// Intel MPI wants to be first
+#include <giss/memory.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
 
 namespace glint2 {
 namespace modele {
 
 
-GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams const &_gcm_params) :
+GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	GCMCoupler(GCMCoupler::Type::MODELE)
 {
 	gcm_outputs.add_field("lismb", "kg m-2 s-1", "Surface mass balance");
@@ -24,15 +25,11 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams const &_gcm_params) :
 }
 
 
-
-
-
-void GCMCoupler_ModelE::setup_contracts(
-	IceModel &model,
+std::unique_ptr<GCMPerIceSheetParams>
+GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
 	NcFile &nc,
 	std::string const &sheet_vname)
 {
-	printf("BEGIN GCMCoupler_ModelE::setup_contracts()\n");
 
 
 	// Read GCM-specific coupling parameters
@@ -42,15 +39,19 @@ void GCMCoupler_ModelE::setup_contracts(
 
 	auto gcm_var = giss::get_var_safe(nc, (sheet_vname + ".modele").c_str());
 
-	ContractParams_ModelE params;
-	params.coupling_type = giss::parse_enum<ModelE_CouplingType>(
+	std::unique_ptr<GCMPerIceSheetParams_ModelE> params(
+		new GCMPerIceSheetParams_ModelE());
+
+	params->coupling_type = giss::parse_enum<ModelE_CouplingType>(
 		giss::get_att(gcm_var, "coupling_type")->as_string(0));
 
-	model.setup_contract_modele(*this, params);
-	model.finish_contract_setup();
-
-	printf("END GCMCoupler_ModelE::setup_contracts()\n");
+	return giss::static_cast_unique_ptr<GCMPerIceSheetParams>(params);
 }
+
+
+
+void GCMCoupler_ModelE::setup_contracts(IceModel &ice_model) const
+	{ ice_model.setup_contracts_modele(); }
 
 
 }}

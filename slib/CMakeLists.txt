@@ -40,10 +40,12 @@ set(glint2_SOURCES
 	giss/geodesy.cpp
 	giss/ncutil.cpp
 	giss/sparsemult.cpp
+	giss/udunits2.cpp
 	giss/VarTransformer.cpp
 	glint2/contracts/modele_pism.cpp
 	glint2/contracts/modele_dismal.cpp
-	glint2/CouplingContract.cpp
+	giss/ConstantSet.cpp
+	giss/CouplingContract.cpp
 	glint2/ExchangeGrid.cpp
 	glint2/GCMCoupler.cpp
 	glint2/GCMParams.cpp
@@ -54,6 +56,7 @@ set(glint2_SOURCES
 	glint2/Grid_XY.cpp
 	glint2/HCIndex.cpp
 	glint2/HeightClassifier.cpp
+	glint2/IceModel.cpp
 	glint2/IceModel_DISMAL.cpp
 	glint2/IceModel_Decode.cpp
 	glint2/IceSheet.cpp

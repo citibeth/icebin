@@ -10,12 +10,16 @@ using namespace glint2::modele;
 namespace glint2 {
 
 /** GCM-specific contract */
-void IceModel_DISMAL::setup_contract_modele(
-	glint2::modele::GCMCoupler_ModelE const &coupler,
-	glint2::modele::ContractParams_ModelE const &params)
+void IceModel_DISMAL::setup_contracts_modele()
 {
+	// Get arguments we need from coupler
+	auto coupler(dynamic_cast<GCMCoupler_ModelE const *>(this->coupler));
+	auto params(dynamic_cast<GCMPerIceSheetParams_ModelE const *>(this->gcm_per_ice_sheet_params.get()));
+
 	printf("BEGIN IceModel_DISMAL::setup_contract_modele\n");
 	IceModel &model(*this);
+
+	// Don't bother transferring any constants...
 
 	// ============ GCM -> Ice
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
@@ -23,7 +27,7 @@ void IceModel_DISMAL::setup_contract_modele(
 	// ------ Decide on the coupling contract for this ice sheet
 	ice_input.add_cfname("land_ice_surface_specific_mass_balance_flux", "kg m-2 s-1");
 	ice_input.add_cfname("surface_downward_latent_heat_flux", "W m-2");
-	switch(params.coupling_type.index()) {
+	switch(params->coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
 			ice_input.add_cfname("surface_temperature", "K");
 		break;
@@ -34,9 +38,9 @@ void IceModel_DISMAL::setup_contract_modele(
 
 	// ------------- Convert the contract to a var transformer
 	VarTransformer &ice_input_vt(var_transformer[IceModel::INPUT]);
-	ice_input_vt.set_names(VarTransformer::INPUTS, &coupler.gcm_outputs);
+	ice_input_vt.set_names(VarTransformer::INPUTS, &coupler->gcm_outputs);
 	ice_input_vt.set_names(VarTransformer::OUTPUTS, &ice_input);
-	ice_input_vt.set_names(VarTransformer::SCALARS, &coupler.ice_input_scalars);
+	ice_input_vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
 	ice_input_vt.allocate();
 
 	// Add some recipes for gcm_to_ice

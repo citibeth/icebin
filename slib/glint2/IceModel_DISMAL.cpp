@@ -33,8 +33,7 @@ static std::set<std::string> path_args = {"output_dir"};
 void IceModel_DISMAL::IceModel_DISMAL::init(
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
-		std::string const &vname_base,
-		NcVar *const_var)
+		std::string const &vname_base)
 {
 	printf("BEGIN IceModel_DISMAL::init(%s)\n", vname_base.c_str());
 
@@ -88,7 +87,7 @@ printf("BEGIN IceModel_DISMAL::run_decoded\n");
 
 	// Define variables
 	for (int i=0; i < contract[INPUT].size_nounit(); ++i) {
-		CoupledField const &field(contract[INPUT].field(i));
+		giss::CoupledField const &field(contract[INPUT].field(i));
 		printf("IceModel_DISMAL: Defining variable %s\n", field.name.c_str());
 
 		// Convert from 1D indexing to 2D

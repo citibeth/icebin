@@ -21,6 +21,7 @@
 #include <glint2/pism/PSConstantGLINT2.hpp>
 #include <glint2/pism/PISMIceModel.hpp>		// Our specialized subclass of PISM's ::IceModel
 #include <glint2/Grid_XY.hpp>
+#include <glint2/GCMParams.hpp>
 
 namespace glint2 {
 namespace gpism {
@@ -67,16 +68,13 @@ class IceModel_PISM : public IceModel_Decode
 
 	// ------------------------
 public:
-	/** Not sure if this is used... */
-	int process_options();
 
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 	void init(
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
-		std::string const &vname_base,
-		NcVar *const_var);
+		std::string const &vname_base);
 
 	int nx() { return pism_grid->Mx; }
 	int ny() { return pism_grid->My; }
@@ -122,20 +120,26 @@ public:
 
 	~IceModel_PISM();
 
+protected:
 	PetscErrorCode allocate(
 		std::shared_ptr<const glint2::Grid_XY> &,
 		NcVar *pism_var,
-		NcVar *info_var,
-		NcVar *const_var);
+		NcVar *info_var);
 
 	PetscErrorCode deallocate();
 
-	void setup_contract_modele(
-		glint2::modele::GCMCoupler_ModelE const &coupler,
-		glint2::modele::ContractParams_ModelE const &params);
+public:
+	void setup_contracts_modele();
 
-	/** Non-GCM-specific portion of setting up contracts */
-	void finish_contract_setup();
+protected:
+	/** Transfers a constant from GCMCoupler::gcm_constants to PISM's configuration variable.
+	Runs from within transfer_constants_xxxx() */
+	void transfer_constant(std::string const &dest, std::string const &src, double multiply_by=1.0, bool set_new = false);
+
+	/** @param set_new If true, PISM constant will be set, even if it
+	was not already set in the configuration.  This defaults to false,
+	as a program error check against misspelled parameter names. */
+	void set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new = false);
 
 #if 0
 public:

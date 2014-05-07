@@ -5,6 +5,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <cmath>
+#include <cstdio>
 #include <sstream>
 #include <string>
 #include <glint2/GCMCoupler.hpp>
@@ -32,54 +33,18 @@ IceModel_PISM::~IceModel_PISM()
 }
 
 
-
-int IceModel_PISM::process_options()
-{
-	PetscErrorCode ierr;
-
-	// Look up relevant command line options
-    ierr = verbosityLevelFromOptions(); CHKERRQ(ierr);
-    ierr = verbPrintf(2,pism_comm, "PISMR %s (basic evolution run mode)\n",
-		      PISM_Revision); CHKERRQ(ierr);
-    ierr = stop_on_version_option(); CHKERRQ(ierr);
-    ierr = check_old_option_and_stop(pism_comm, "-boot_from", "-boot_file"); CHKERRQ(ierr); 
-
-    bool iset, bfset;
-    ierr = PISMOptionsIsSet("-i", iset); CHKERRQ(ierr);
-    ierr = PISMOptionsIsSet("-boot_file", bfset); CHKERRQ(ierr);
-    std::string usage =
-      "  pismr {-i IN.nc|-boot_file IN.nc} [OTHER PISM & PETSc OPTIONS]\n"
-      "where:\n"
-      "  -i          IN.nc is input file in NetCDF format: contains PISM-written model state\n"
-      "  -boot_file  IN.nc is input file in NetCDF format: contains a few fields, from which\n"
-      "              heuristics will build initial model state\n"
-      "notes:\n"
-      "  * one of -i or -boot_file is required\n"
-      "  * if -boot_file is used then also '-Mx A -My B -Mz C -Lz D' are required\n";
-    if ((iset == PETSC_FALSE) && (bfset == PETSC_FALSE)) {
-      ierr = PetscPrintf(pism_comm,
-         "\nPISM ERROR: one of options -i,-boot_file is required\n\n"); CHKERRQ(ierr);
-      ierr = show_usage_and_quit(pism_comm, "pismr", usage); CHKERRQ(ierr);
-    } else {
-      std::vector<std::string> required;  required.clear();
-      ierr = show_usage_check_req_opts(pism_comm, "pismr", required, usage.c_str()); CHKERRQ(ierr);
-    }
-	return 0;
-}
-
 /** Initialize any grid information, etc. from the IceSheet struct.
 @param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 void IceModel_PISM::init(
 	std::shared_ptr<glint2::Grid> const &grid2,
 	NcFile &nc,
-	std::string const &vname_base,
-	NcVar *const_var)
+	std::string const &vname_base)
 {
 	printf("BEGIN IceModel_PISM::init(%s)\n", vname_base.c_str());
 	GCMParams const &_gcm_params(coupler->gcm_params);
 	IceModel_Decode::init(grid2->ndata());
 
-	if (dismal.get()) dismal->init(grid2, nc, vname_base, const_var);
+	if (dismal.get()) dismal->init(grid2, nc, vname_base);
 
 	std::shared_ptr<Grid_XY const> grid2_xy = std::dynamic_pointer_cast<Grid_XY const>(grid2);
 
@@ -87,7 +52,7 @@ void IceModel_PISM::init(
 	auto info_var = nc.get_var((vname_base + ".info").c_str());
 	// PISM parameters, passed to PISM via argv
 	auto pism_var = nc.get_var((vname_base + ".pism").c_str());
-	if (allocate(grid2_xy, pism_var, info_var, const_var) != 0) {
+	if (allocate(grid2_xy, pism_var, info_var) != 0) {
 		PetscPrintf(coupler->gcm_params.gcm_comm, "IceModel_PISM::IceModel_PISM(...): allocate() failed\n");
 		PISMEnd();
 	}
@@ -185,6 +150,47 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
     return true;
 }
 
+void IceModel_PISM::transfer_constant(std::string const &dest, std::string const &src, double multiply_by, bool set_new)
+{
+
+	// Make sure the PISM constant already exists
+	if (!set_new && !config->is_set(dest)) {
+		fprintf(stderr, "IceModel_PISM::transfer_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?\n", dest.c_str());
+		throw std::exception();
+	}
+
+	// Discover the units PISM requires.
+	std::string doc = config->get_string(dest + "_doc");
+	std::string units = doc.substr(0, doc.find(';'));
+	double val = coupler->gcm_constants.get_as(src, units) * multiply_by;
+	config->set_double(dest, val);
+printf("IceModel_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), val, units.c_str(), src.c_str());
+}
+
+void IceModel_PISM::set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new)
+{
+	// Make sure the PISM constant already exists
+	if (!set_new && !config->is_set(dest)) {
+		fprintf(stderr, "IceModel_PISM::set_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?\n", dest.c_str());
+		throw std::exception();
+	}
+
+	ConstantSet const &gcm_constants(coupler->gcm_constants);
+
+	// Discover the units PISM requires.
+	std::string doc = config->get_string(dest + "_doc");
+	std::string dest_units = doc.substr(0, doc.find(';'));
+
+	UTUnit usrc(gcm_constants.ut_system->parse(src_units));
+	UTUnit udest(gcm_constants.ut_system->parse(dest_units));
+	CVConverter cv(usrc, udest);
+	double dest_val = cv.convert(src_val);
+
+	config->set_double(dest, dest_val);
+printf("IceModel_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), dest_val, dest_units.c_str(), usrc.c_str());
+}
+
+
 
 // Arguments that are paths, and thus need pathname resolution
 // For stable0.5 branch
@@ -196,8 +202,7 @@ static std::set<std::string> path_args = {"i", "o", "surface_given_file", "ocean
 PetscErrorCode IceModel_PISM::allocate(
 	std::shared_ptr<const glint2::Grid_XY> &glint2_grid,
 	NcVar *pism_var,
-	NcVar *info_var,
-	NcVar *const_var)
+	NcVar *info_var)
 {
 	this->glint2_grid = glint2_grid;
 
@@ -272,12 +277,8 @@ printf("Initializing PETSc\n");
 	ierr = init_config(pism_comm, *config, *overrides, true); CHKERRQ(ierr);
 
 	// Get arguments from the GCM
-//	args.push_back("-calendar");
-//	args.push_back("365_day");
-//	args.push_back("-reference_date");
 	giss::time::tm const &tb(coupler->gcm_params.time_base);
 	std::string reference_date = (boost::format("%04d-%02d-%02d") % tb.year() % tb.month() % tb.mday()).str();
-//	args.push_back(reference_date);
 	config->set_string("reference_date", reference_date);
 
 //#if 0
@@ -294,14 +295,11 @@ printf("pism_grid=%p: (xs,xm,ys,ym,Mx,My) = %d %d %d %d %d %d %ld %ld\n", &*pism
 		params.time_start_s = coupler->gcm_params.time_start_s;
     ice_model.reset(new PISMIceModel(*pism_grid, *config, *overrides, params));
 
-
-	// Transfer constants from GLINT2 to PISM
-	double ice_density = giss::get_att(const_var, "ice_density")->as_double(0);
-	config->set_double("ice_density", ice_density);
-	BY_ICE_DENSITY = 1.0d / ice_density;
-	config->set_double("ice_specific_heat_cpacity", giss::get_att(const_var, "ice_specific_heat_capacity")->as_double(0));
-	config->set_double("ideal_gas_constant", giss::get_att(const_var, "ideal_gas_constant")->as_double(0));
-
+	// Transfer constants from GCM to PISM, and also set up coupling contracts.
+	// This is the right place to do it, since the PISM systme is fully up and functional,
+	// and all PISM config files have been read.
+	// This call through the GCMCoupler will call back to setup_contracts_xxx().
+	coupler->setup_contracts(*this);
 
 printf("[%d] start = %f\n", pism_rank, pism_grid->time->start());
 printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
@@ -312,9 +310,7 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// 	IceModel::model_state_setup()		[iMinit.cc]
 	// 	IceModel::init_couplers()			[iMinit.cc]
 	// 	surface->init()
-printf("[%d] Before ice_model->init()\n", pism_rank);
     ierr = ice_model->init(); CHKERRQ(ierr);
-printf("[%d] After ice_model->init()\n", pism_rank);
 
 	// During the ice_model->init() call above the PISMIceModel
 	// class (derived from PISM's IceModel) allocated an instance
@@ -323,7 +319,6 @@ printf("[%d] After ice_model->init()\n", pism_rank);
 
 	// Fetch out our pism_surface_model
 	pism_surface_model = ice_model->ps_constant_glint2();
-printf("pism_surface_model = %p\n", pism_surface_model);
 
 	// Set up corresponence between GLINT2 fields and variables
 	// in the PISM data structures.
@@ -335,7 +330,6 @@ printf("pism_surface_model = %p\n", pism_surface_model);
 		pism_vars[ix] = &pism_surface_model->ice_surface_temp;
 
 	// Initialize scatter/gather stuff
-printf("pism_grid->max_stencil_width = %d\n", pism_grid->max_stencil_width);
 	ierr = pism_grid->get_dm(1, pism_grid->max_stencil_width, da2); CHKERRQ(ierr);
 
 	ierr = DMCreateGlobalVector(da2, &g2); CHKERRQ(ierr);
@@ -350,7 +344,6 @@ printf("pism_grid->max_stencil_width = %d\n", pism_grid->max_stencil_width);
 	ierr = VecScatterCreateToZero(g2natural, &scatter, &Hp0); CHKERRQ(ierr);
 
 	// Check that grid dimensions match
-printf("IceModel_PISM checking grid dimensions: pism=(%d, %d) glint2=(%d, %d)\n", pism_grid->Mx, pism_grid->My, glint2_grid->nx(), glint2_grid->ny());
 	if ((pism_grid->Mx != glint2_grid->nx()) || (pism_grid->My != glint2_grid->ny())) {
 		fprintf(stderr, "Grid mismatch: pism=(%d, %d) glint2=(%d, %d)\n", pism_grid->Mx, pism_grid->My, glint2_grid->nx(), glint2_grid->ny());
 		throw std::exception();
@@ -373,10 +366,6 @@ PetscErrorCode IceModel_PISM::deallocate()
 
 
 // --------------------------------------------------------
-void IceModel_PISM::finish_contract_setup()
-{
-}
-// -------------------------------------------------------------
 
 // --------------------------------------------------
 /** glint2_var Variable, already allocated, to receive data

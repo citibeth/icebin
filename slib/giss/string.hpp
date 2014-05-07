@@ -3,12 +3,21 @@
 
 namespace giss {
 
-void toupper(std::string &str) {
+inline void toupper(std::string &str) {
 	std::transform(str.begin(), str.end(), str.begin(), ::toupper);
 }
 
-void tolower(std::string &str) {
+inline void tolower(std::string &str) {
 	std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+}
+
+inline bool ends_with(std::string const &fullString, std::string const &ending)
+{
+    if (fullString.length() >= ending.length()) {
+        return (0 == fullString.compare (fullString.length() - ending.length(), ending.length(), ending));
+    } else {
+        return false;
+    }
 }
 
 }

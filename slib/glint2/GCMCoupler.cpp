@@ -47,37 +47,51 @@ void GCMCoupler::read_from_netcdf(
 		}
 	}
 
+#if 1
+	std::cout << "========= GCM Constants" << std::endl;
+
+	int ix=0;
+	for (auto field = gcm_constants.begin(); field != gcm_constants.end(); ++field, ++ix) {
+		std::cout << "    " << *field << " = " << gcm_constants[ix] << std::endl;
+	}
+	std::cout << "========= GCM Outputs" << std::endl;
+	std::cout << gcm_outputs << std::endl;
+
+#endif
+
 	int i = 0;
 	for (auto name = sheet_names.begin(); name != sheet_names.end(); ++name) {
 		std::string vname_sheet = vname + "." + *name;
 
 		// Create an IceModel corresponding to this IceSheet.
 		IceSheet *sheet = sheets[*name];
-		models.insert(i, read_icemodel(this, nc, vname_sheet, sheet));
-		IceModel *mod = models[i];
+		models.insert(i,
+			read_icemodel(this, nc, vname_sheet,
+				read_gcm_per_ice_sheet_params(nc, vname_sheet),
+				sheet));
+		IceModel *ice_model = models[i];
 
 		// Set up the contracts specifying the variables to be passed
 		// between the GCM and the ice model.  This contract is specific
 		// to both the GCM and the ice model.  Note that setup_contracts()
 		// is a virtual method.
-		setup_contracts(*mod, nc, vname_sheet);
+		setup_contracts(*ice_model);
 
 #if 1
 		// Print out the contract and var transformations
 		std::cout << "========= Contract for " << *name << std::endl;
 		std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
-		std::cout << mod->contract[IceModel::INPUT];
-		std::cout << mod->var_transformer[IceModel::INPUT];
+		std::cout << ice_model->contract[IceModel::INPUT];
+		std::cout << ice_model->var_transformer[IceModel::INPUT];
 		std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
-		std::cout << mod->contract[IceModel::OUTPUT];
-		std::cout << mod->var_transformer[IceModel::OUTPUT];
+		std::cout << ice_model->contract[IceModel::OUTPUT];
+		std::cout << ice_model->var_transformer[IceModel::OUTPUT];
 #endif
 
 		// Finish initializing the IceModel.
 		// This code MUST come after setup_contracts() above.
-		auto const_var = nc.get_var("const");	// Physical constants
-		mod->init(sheet->grid2, nc, vname_sheet, const_var);
-		mod->update_ice_sheet(nc, vname_sheet, sheet);
+		ice_model->init(sheet->grid2, nc, vname_sheet);
+		ice_model->update_ice_sheet(nc, vname_sheet, sheet);
 
 		++i;
 	}

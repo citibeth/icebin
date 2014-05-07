@@ -186,7 +186,7 @@ void IceSheet::read_from_netcdf(NcFile &nc, std::string const &vname)
 	interp_style = giss::parse_enum<InterpStyle>(sinterp_style.c_str());
 
 	grid2.reset(read_grid(nc, vname + ".grid2").release());
-	exgrid = giss::shared_cast<ExchangeGrid,Grid>(read_grid(nc, vname + ".exgrid"));
+	exgrid = giss::dynamic_shared_cast<ExchangeGrid,Grid>(read_grid(nc, vname + ".exgrid"));
 	if (giss::get_var_safe(nc, vname + ".mask2")) {
 		mask2.reset(new blitz::Array<int,1>(
 		giss::read_blitz<int,1>(nc, vname + ".mask2")));

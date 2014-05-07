@@ -84,7 +84,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 	GCMCoupler &coupler(*api->gcm_coupler);
 	printf("[%d] BEGIN glint2_modele_save_gcm_outputs(time_s=%f)\n", rank, time_s);
 
-	CouplingContract &gcm_outputs(coupler.gcm_outputs);
+	giss::CouplingContract &gcm_outputs(coupler.gcm_outputs);
 
 	// Count total number of elements in the inputs (for this MPI domain)
 	blitz::Array<double,3> &input0(inputs[0]);
@@ -169,18 +169,41 @@ std::vector<blitz::Array<double,3>> &inputs)
 }
 
 // ================================================================
-extern "C" glint2_modele *new_glint2_modele(
+extern "C" glint2_modele *new_glint2_modele()
+{
 	std::unique_ptr<glint2_modele> api(new glint2_modele());
 	api->gcm_coupler.reset(new GCMCoupler_ModelE());
 
-	// No exception, we can release our pointer back to Fortran
+	// No exception was thrown... we can release our pointer back to Fortran
 	glint2_modele *ret = api.release();
-	printf("***** END glint2_modele_new (for real) %p\n", ret);
+
+//	int const rank = ret->gcm_coupler->rank();	// MPI rank; debugging
+//	printf("[%d] Allocated glint2_modele api struct: %p\n", rank, ret);
 	return ret;
 }
 // ---------------------------------------------------
+/** Set a single constant value.  This is a callback, to be called
+from ModelE's (Fortran code) constant_set::set_all_constants() */
+extern "C" void glint2_modele_set_const(
+	glint2::modele::glint2_modele *api,
+	char const *name_f, int name_len,
+	double val,
+	char const *units_f, int units_len,
+	char const *description_f, int description_len)
+{
+//	int const rank = api->gcm_coupler->rank();	// MPI rank; debugging
+	giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
+	gcm_constants.set(
+		std::string(name_f, name_len),
+		val,
+		std::string(units_f, units_len),
+		std::string(description_f, description_len));
+}
 
-/** @param glint2_config_fname_f Name of GLINT2 configuration file */
+// ---------------------------------------------------
+
+/** Called immediately after glint2_model_set_const...
+@param glint2_config_fname_f Name of GLINT2 configuration file */
 extern "C" void glint2_modele_init0(
 	glint2::modele::glint2_modele *api,
 	char const *glint2_config_fname_f, int glint2_config_fname_len,
@@ -194,19 +217,14 @@ extern "C" void glint2_modele_init0(
 	int i0, int i1, int j0, int j1,
 	int j0s, int j1s,
 
-	// Info about size of a timestep
-//	int iyear1,			// MODEL_COM.f: year 1 of internal clock (Itime=0 to 365*NDAY)
-//	int itimei,			// itime of start of simulation
-//	double dtsrc,		// Conversion from itime to seconds
-
 	// MPI Stuff
 	MPI_Fint comm_f, int root,
 
-	// Constants passed in directly from ModelE
-	double LHM, double SHI)
+	// API  control
+	int write_constants)
 {
 //iyear1=1950;		// Hard-code iyear1 because it hasn't been initialized yet in ModelE
-	printf("***** BEGIN glint2_modele_new()\n");
+	printf("***** BEGIN glint2_modele_init0()\n");
 
 	// Convert Fortran arguments
 	std::string glint2_config_fname(glint2_config_fname_f, glint2_config_fname_len);
@@ -223,6 +241,16 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 		MPI_Comm_f2c(comm_f),
 		root,
 		glint2_config_dir);
+
+	if (write_constants) {
+		// Store constants int NetCDF file, so we can desm without ModelE.
+		giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
+		GCMParams const &gcm_params(api->gcm_coupler->gcm_params);
+	
+		NcFile nc((gcm_params.config_dir / "modele_constants.nc").c_str(), NcFile::Replace);
+		gcm_constants.netcdf_define(nc, "constants");
+		nc.close();
+	}
 
 #if 1
 	// Set up the domain
@@ -320,7 +348,7 @@ printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f
 
 
 
-		CouplingContract &gcm_outputs(api->gcm_coupler->gcm_outputs);
+		giss::CouplingContract &gcm_outputs(api->gcm_coupler->gcm_outputs);
 
 		for (unsigned int i=0; i < gcm_outputs.size_nounit(); ++i) {
 			NcVar *nc_var = ncout.add_var(gcm_outputs[i].c_str(),
@@ -682,7 +710,7 @@ giss::F90Array<double,3> &tg21h_f)		// C
 	printf("BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f)\n", itime, time_s);
 
 	GCMCoupler &coupler(*api->gcm_coupler);
-	CouplingContract &gcm_outputs(coupler.gcm_outputs);
+	giss::CouplingContract &gcm_outputs(coupler.gcm_outputs);
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
 	std::vector<blitz::Array<double,3>> inputs(gcm_outputs.size_nounit());
