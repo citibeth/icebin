@@ -60,12 +60,30 @@ PISMIceModel::PISMIceModel(pism::IceGrid &g, PISMConfig &config, PISMConfig &ove
 PISMIceModel::~PISMIceModel() {} // must be virtual merely because some members are virtual
 
 
+//! \brief Decide which enthalpy converter to use.
+PetscErrorCode PISMIceModel::allocate_enthalpy_converter() {
+	PetscErrorCode ierr;
+
+	if (EC != NULL)
+		return 0;
+
+	EC = new GLINT2EnthalpyConverter(config);
+
+	if (getVerbosityLevel() > 3) {
+		PetscViewer viewer;
+		ierr = PetscViewerASCIIGetStdout(PETSC_COMM_WORLD,&viewer); CHKERRQ(ierr);
+		ierr = EC->viewConstants(viewer); CHKERRQ(ierr);
+	}
+
+	return 0;
+}
+
 PetscErrorCode PISMIceModel::allocate_subglacial_hydrology()
 {
 	printf("BEGIN PISMIceModel::allocate_subglacial_hydrology()\n");
 //	printf("subglacial_hydrology = %p %p\n", subglacial_hydrology, pism::IceModel::subglacial_hydrology);
 	if (pism::IceModel::subglacial_hydrology != NULL) return 0; // indicates it has already been allocated
-    subglacial_hydrology = new NullTransportHydrology(grid, config);
+	subglacial_hydrology = new NullTransportHydrology(grid, config);
 	printf("END PISMIceModel::allocate_subglacial_hydrology()\n");
 	return 0;
 }

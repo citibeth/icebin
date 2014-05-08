@@ -76,6 +76,7 @@ public:
 	PISMIceModel(pism::IceGrid &g, pism::PISMConfig &config, pism::PISMConfig &overrides, Params const &params);
 	virtual ~PISMIceModel(); // must be virtual merely because some members are virtual
 
+	virtual PetscErrorCode allocate_enthalpy_converter();
 	virtual PetscErrorCode allocate_subglacial_hydrology();
 	virtual PetscErrorCode allocate_couplers();
 	virtual PetscErrorCode grid_setup();
