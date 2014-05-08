@@ -26,8 +26,8 @@ using namespace pism;
 namespace glint2 {
 namespace gpism {
 
-PSConstantGLINT2::PSConstantGLINT2(pism::IceGrid &g, const ::PISMConfig &conf)
-	: PISMSurfaceModel(g, conf)
+PSConstantGLINT2::PSConstantGLINT2(pism::IceGrid &g, const pism::Config &conf)
+	: pism::SurfaceModel(g, conf)
 {
 	PetscErrorCode ierr = allocate_PSConstantGLINT2(); CHKERRCONTINUE(ierr);
 	if (ierr != 0) {
@@ -35,7 +35,7 @@ PSConstantGLINT2::PSConstantGLINT2(pism::IceGrid &g, const ::PISMConfig &conf)
 	}
 }
 
-void PSConstantGLINT2::attach_atmosphere_model(PISMAtmosphereModel *input)
+void PSConstantGLINT2::attach_atmosphere_model(pism::AtmosphereModel *input)
 {
 	delete input;
 }
@@ -69,7 +69,7 @@ printf("END PSConstantGLINT2::allocate_PSConstantGLINT2()\n");
 	return 0;
 }
 
-PetscErrorCode PSConstantGLINT2::init(PISMVars &vars)
+PetscErrorCode PSConstantGLINT2::init(pism::Vars &vars)
 {
 printf("BEGIN PSConstantGLINT2::init()\n");
 	PetscErrorCode ierr;
@@ -144,8 +144,8 @@ printf("PSConstantGLINT2::update(%f) done dumping variables\n", my_t);
 	return 0;
 }
 
-void PSConstantGLINT2::get_diagnostics(std::map<std::string, PISMDiagnostic*> &/*dict*/,
-	std::map<std::string, PISMTSDiagnostic*> &/*ts_dict*/)
+void PSConstantGLINT2::get_diagnostics(std::map<std::string, pism::Diagnostic*> &/*dict*/,
+	std::map<std::string, pism::TSDiagnostic*> &/*ts_dict*/)
 {
 	// empty (does not have an atmosphere model)
 }
@@ -181,10 +181,10 @@ void PSConstantGLINT2::add_vars_to_output(std::string /*keyword*/, std::set<std:
 	// does not call atmosphere->add_vars_to_output().
 }
 
-PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, const PIO &nc, PISM_IO_Type nctype) {
+PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, const PIO &nc, pism::IO_Type nctype) {
 	PetscErrorCode ierr;
 
-	ierr = PISMSurfaceModel::define_variables(vars, nc, nctype); CHKERRQ(ierr);
+	ierr = pism::SurfaceModel::define_variables(vars, nc, nctype); CHKERRQ(ierr);
 
 	if (set_contains(vars, "ice_surface_temp")) {
 		ierr = ice_surface_temp.define(nc, nctype); CHKERRQ(ierr);

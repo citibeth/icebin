@@ -39,9 +39,9 @@ class IceModel_PISM : public IceModel_Decode
 	// so they get destroyed in the proper reverse order.
 	// See: http://msdn.microsoft.com/en-us/library/8183zf3x%28v=vs.110%29.aspx
 	std::unique_ptr<PetscContext> petsc_context;
-	std::unique_ptr<pism::PISMUnitSystem> unit_system;
-	std::unique_ptr<pism::PISMConfig> config;
-	std::unique_ptr<pism::PISMConfig> overrides;
+	std::unique_ptr<pism::UnitSystem> unit_system;
+	std::unique_ptr<pism::Config> config;
+	std::unique_ptr<pism::Config> overrides;
 	std::unique_ptr<pism::IceGrid> pism_grid;
 	std::unique_ptr<glint2::gpism::PISMIceModel> ice_model;
 	PSConstantGLINT2 *pism_surface_model;	// We don't own this.

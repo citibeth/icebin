@@ -17,7 +17,7 @@ protected:
 
 public:
 
-  GLINT2EnthalpyConverter(const ConfigI &config);
+  GLINT2EnthalpyConverter(const pism::ConfigI &config);
 
   PetscErrorCode viewConstants(PetscViewer viewer) const;
 

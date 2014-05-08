@@ -73,7 +73,7 @@ public:
 
 	// see iceModel.cc for implementation of constructor and destructor:
 	/** @param gcm_params Pointer to IceModel::gcm_params.  Lives at least as long as this object. */
-	PISMIceModel(pism::IceGrid &g, pism::PISMConfig &config, pism::PISMConfig &overrides, Params const &params);
+	PISMIceModel(pism::IceGrid &g, pism::Config &config, pism::Config &overrides, Params const &params);
 	virtual ~PISMIceModel(); // must be virtual merely because some members are virtual
 
 	virtual PetscErrorCode allocate_enthalpy_converter();

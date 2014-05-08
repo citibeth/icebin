@@ -34,7 +34,7 @@ namespace gpism {
 //! Ice surface temperature is parameterized as in PISM-GLINT2, using a latitude
 //! and surface elevation-dependent formula.
 
-class PSConstantGLINT2 : public pism::PISMSurfaceModel {
+class PSConstantGLINT2 : public pism::SurfaceModel {
 public:
 	/** Experiment with b.c. in terms of conductive heat flow. */
 //	virtual BCType get_conduction_bc_type() { return NEUMANN; }
@@ -42,20 +42,20 @@ public:
 
 	/** @param conf Not Used (Looked up all the constructors, it just
 	sets this->config, whic his not used */
-	PSConstantGLINT2(pism::IceGrid &g, const pism::PISMConfig &conf);
+	PSConstantGLINT2(pism::IceGrid &g, const pism::Config &conf);
 
-	virtual PetscErrorCode init(pism::PISMVars &vars);
+	virtual PetscErrorCode init(pism::Vars &vars);
 
 	/** Just deletes input, no atmosphere is needed for this surface model. */
-	virtual void attach_atmosphere_model(pism::PISMAtmosphereModel *input);
+	virtual void attach_atmosphere_model(pism::AtmosphereModel *input);
 
-	virtual void get_diagnostics(std::map<std::string, pism::PISMDiagnostic*> &dict,
-															 std::map<std::string, pism::PISMTSDiagnostic*> &ts_dict);
+	virtual void get_diagnostics(std::map<std::string, pism::Diagnostic*> &dict,
+															 std::map<std::string, pism::TSDiagnostic*> &ts_dict);
 	virtual PetscErrorCode update(PetscReal my_t, PetscReal my_dt);
 	virtual PetscErrorCode ice_surface_mass_flux(pism::IceModelVec2S &result);
 	virtual PetscErrorCode ice_surface_hflux(pism::IceModelVec2S &result);
 	virtual PetscErrorCode ice_surface_temperature(pism::IceModelVec2S &result);
-	virtual PetscErrorCode define_variables(std::set<std::string> vars, const pism::PIO &nc, pism::PISM_IO_Type nctype);
+	virtual PetscErrorCode define_variables(std::set<std::string> vars, const pism::PIO &nc, pism::IO_Type nctype);
 	virtual PetscErrorCode write_variables(std::set<std::string> vars, const pism::PIO &nc);
 	virtual void add_vars_to_output(std::string keyword, std::set<std::string> &result);
 protected:

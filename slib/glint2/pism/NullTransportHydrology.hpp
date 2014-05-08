@@ -41,11 +41,11 @@ Here is a talk which illustrates the "till-can" metaphor:
 namespace glint2 {
 namespace gpism {
 
-class NullTransportHydrology : public pism::PISMNullTransportHydrology {
+class NullTransportHydrology : public pism::NullTransportHydrology {
   friend class IceModel_PISM;
 
 public:
-  NullTransportHydrology(pism::IceGrid &g, const pism::PISMConfig &conf);
+  NullTransportHydrology(pism::IceGrid &g, const pism::Config &conf);
   virtual ~NullTransportHydrology() {}
 
   // solves an implicit step of a highly-simplified ODE

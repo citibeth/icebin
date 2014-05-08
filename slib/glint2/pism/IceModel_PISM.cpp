@@ -271,9 +271,9 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
 printf("Initializing PETSc\n");
 	petsc_context.reset(new PetscContext(pism_comm, argc, argv));
 
-    unit_system.reset(new ::PISMUnitSystem(NULL));
-    config.reset(new ::PISMConfig(pism_comm, "pism_config", *unit_system));
-	overrides.reset(new ::PISMConfig(pism_comm, "pism_overrides", *unit_system));
+    unit_system.reset(new pism::UnitSystem(NULL));
+    config.reset(new pism::Config(pism_comm, "pism_config", *unit_system));
+	overrides.reset(new pism::Config(pism_comm, "pism_overrides", *unit_system));
 	ierr = init_config(pism_comm, *config, *overrides, true); CHKERRQ(ierr);
 
 	// Get arguments from the GCM

@@ -1,4 +1,5 @@
 #include <glint2/pism/PISMIceModel.hpp>
+#include <glint2/pism/GLINT2EnthalpyConverter.hpp>
 #include "bedrockThermalUnit.hh"
 
 using namespace pism;
@@ -52,7 +53,7 @@ namespace gpism {
 
 // ================================
 
-PISMIceModel::PISMIceModel(pism::IceGrid &g, PISMConfig &config, PISMConfig &overrides, PISMIceModel::Params const &_params) :
+PISMIceModel::PISMIceModel(pism::IceGrid &g, pism::Config &config, pism::Config &overrides, PISMIceModel::Params const &_params) :
 	pism::IceModel(g, config, overrides),
 	params(_params)
 {}
@@ -97,7 +98,7 @@ PetscErrorCode PISMIceModel::allocate_couplers()
 	PAFactory pa(grid, config);
 	PSFactory ps(grid, config);
 	POFactory po(grid, config);
-	PISMAtmosphereModel *atmosphere;
+	pism::AtmosphereModel *atmosphere;
 
 	ierr = PetscOptionsBegin(grid.com, "", "Options choosing PISM boundary models", ""); CHKERRQ(ierr);
 

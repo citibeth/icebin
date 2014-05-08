@@ -26,8 +26,8 @@ namespace glint2 {
 namespace gpism {
 
 
-NullTransportHydrology::NullTransportHydrology(IceGrid &g, const PISMConfig &conf)
-    : PISMNullTransportHydrology(g, conf)
+NullTransportHydrology::NullTransportHydrology(IceGrid &g, const pism::Config &conf)
+    : pism::NullTransportHydrology(g, conf)
 {
 
   PetscErrorCode ierr1, ierr2;

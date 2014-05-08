@@ -1,6 +1,6 @@
 #include <mpi.h>		// Must be first
 
-#include "enthalpyConverter.hh"
+#include <glint2/pism/GLINT2EnthalpyConverter.hpp>
 
 #include <glint2/pism/IceModel_PISM.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
@@ -87,7 +87,7 @@ void IceModel_PISM::setup_contracts_modele()
 	// NOTE: Pressure in PISM is RELATIVE to atmospheric pressure.
 	//       Thus, p=0 is the correct to use at the top surface of
 	//       the ice sheet (where ModelE operates).
-	pism::EnthalpyConverter enth(*config);
+	GLINT2EnthalpyConverter enth(*config);
 	double const pressure = 0;
 	double E_s, E_l;
 	enth.getEnthalpyInterval(pressure, E_s, E_l);
