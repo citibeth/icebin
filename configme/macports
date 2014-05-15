@@ -34,7 +34,7 @@ NETCDFF_HOME=$MACPORTS
 export NETCDFF_CFLAGS="-I$NETCDFF_HOME/include"
 export NETCDFF_LIBS="-L$NETCDFF_HOME/lib -lnetcdff"
 
-export NETCDFCXX_HOME=$MACPORTS
+NETCDFCXX_HOME=$MACPORTS
 export NETCDFCXX_CFLAGS="-I$NETCDFCXX_HOME/include"
 export NETCDFCXX_LIBS="""-L$NETCDFCXX_HOME/lib -lnetcdf_c++"
 
@@ -101,7 +101,8 @@ export UDUNITS2_CFLAGS="-I$MACPORTS/include/udunits2"
 export UDUNITS2_LIBS="-L$MACPORTS/lib -ludunits2"
 
 # Needed for Boost
-BOOST_HOME=$HOME/opt/boost-1.55.0
+#BOOST_HOME=$HOME/opt/boost-1.55.0
+BOOST_HOME=$MACPORTS
 
 ./configure --prefix=$DEST_PREFIX \
 	--with-boost=$BOOST_HOME \
