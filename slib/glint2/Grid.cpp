@@ -275,10 +275,22 @@ printf("netcdf_define(%s) 1\n", vname.c_str());
 		info_var->add_att("version", 1);		// File format versioning
 		info_var->add_att("name", name.c_str());
 		info_var->add_att("type", type.str());
+		info_var->add_att("type.comment",
+			giss::ncwrap("The overall type of grid, controlling the C++ class used to represent the grid.  See Grid::Type in slib/glint2/Grid.hpp").c_str());
+
 		info_var->add_att("coordinates", coordinates.str());
+		info_var->add_att("coordinates.comment",
+			giss::ncwrap("The coordinate system used to represent grid vertices (See Grid::Coordinates in slib/glint2/Grid.hpp.  May be either XY or LONLAT (longitude comes before latitude).  Note that this is different from grid.info.type.  A GENERIC grid, for example, could be expressed in either XY or LONLAT coordinates.").c_str());
+
 		info_var->add_att("parameterization", parameterization.str());
+		info_var->add_att("parameterization.comment",
+			giss::ncwrap("Indicates how values are interpolated between grid points (See Grid::Parameterization in  slib/glint2/Grid.hpp).  Most finite difference models will use L0, while finite element models would use L1 or something else.").c_str());
+
 		if (coordinates == Coordinates::XY) {
 			info_var->add_att("projection", sproj.c_str());
+			info_var->add_att("projection.comment",
+				giss::ncwrap("If grid.info.coordinates = XY, this indicates the projection used to convert local XY coordinates to LONLAT coordinates on the surface of the earth.  See http://trac.osgeo.org/proj/Proj.4 for format of these strings.").c_str());
+
 //			giss::Proj proj(sproj);
 //			giss::Proj llproj(proj.latlong_from_proj());
 //			info_var->add_att("llprojection", llproj.get_def().c_str());
@@ -287,7 +299,12 @@ printf("netcdf_define(%s) 1\n", vname.c_str());
 		char buf[32];
 		sprintf(buf, "%ld", ncells_full());
 		info_var->add_att("cells.num_full", buf);
+		info_var->add_att("cells.num_full.comment",
+			giss::ncwrap("The total theoretical number of grid cells (polygons) in this grid.  Depending on grid.info:parameterization, either cells or vertices will correspond to the dimensionality of the grid's vector space.").c_str());
+
 		info_var->add_att("vertices.num_full", (int)nvertices_full());
+		info_var->add_att("vertices.num_full.comment",
+			giss::ncwrap("The total theoretical of vertices (of polygons) on this grid.").c_str());
 printf("CC\n");
 
 printf("netcdf_define(%s) 2\n", vname.c_str());
@@ -301,6 +318,9 @@ printf("netcdf_define(%s) 2\n", vname.c_str());
 
 	NcDim *nvertices_dim = nc.add_dim(
 		(vname + ".vertices.num_realized").c_str(), nvertices_realized());
+	info_var->add_att((vname + ".vertices.num_realized.comment").c_str(),
+		giss::ncwrap("The number of 'realized' cells in this grid.  Only the outlines of realized cells are computed and stored.  not all cells need to be realized.  For example, a grid file representing a GCM grid, in preparation for use with ice models, would only need to realize GCM grid cells that are close to the relevant ice sheets.  In this case, all grid cells are realized.").c_str());
+
 	NcDim *ncells_dim = nc.add_dim(
 		(vname + ".cells.num_realized").c_str(), ncells_realized());
 	NcDim *ncells_plus_1_dim = nc.add_dim(
@@ -312,14 +332,18 @@ printf("netcdf_define(%s) 2\n", vname.c_str());
 
 printf("netcdf_define(%s) 3\n", vname.c_str());
 	// --------- Variables
-	nc.add_var((vname + ".vertices.index").c_str(), ncInt, nvertices_dim);
+	NcVar *ncvar;
+	ncvar = nc.add_var((vname + ".vertices.index").c_str(), ncInt, nvertices_dim);
+	ncvar->add_att("comment",
+		giss::ncwrap("For grids that index on cells (eg, L0): a dense, zero-based 1D index used to identify each realized cell.  This will be used for vectors representing fields on the grid.").c_str());
 	nc.add_var((vname + ".vertices.xy").c_str(), ncDouble, nvertices_dim, two_dim);
+	ncvar = nc.add_var((vname + ".cells.index").c_str(), ncInt, ncells_dim);
+	ncvar->add_att("comment",
+		giss::ncwrap("For grids that index on vertices (eg, L1): a dense, zero-based 1D index used to identify each realized vertex.  This will be used for vectors representing fields on the grid.").c_str());
+	ncvar = nc.add_var((vname + ".cells.ijk").c_str(), ncInt, ncells_dim, three_dim);
+	ncvar->add_att("comment",
+		giss::ncwrap("OPTIONAL: Up to 3 dimensions can be used to assign a 'real-world' index to each grid cell.  If grid.info:type = EXCHANGE, then i and j correspond to grid.vertices.index of the two overlapping source cells.").c_str());
 
-	nc.add_var((vname + ".cells.index").c_str(), ncInt, ncells_dim);
-	nc.add_var((vname + ".cells.ijk").c_str(), ncInt, ncells_dim, three_dim);
-//	nc.add_var((vname + ".cells.i").c_str(), ncInt, ncells_dim);
-//	nc.add_var((vname + ".cells.j").c_str(), ncInt, ncells_dim);
-//	nc.add_var((vname + ".cells.k").c_str(), ncInt, ncells_dim);
 	nc.add_var((vname + ".cells.area").c_str(), ncDouble, ncells_dim);
 //	nc.add_var((vname + ".cells.native_area").c_str(), ncDouble, ncells_dim);
 //	nc.add_var((vname + ".cells.proj_area").c_str(), ncDouble, ncells_dim);

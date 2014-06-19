@@ -154,8 +154,8 @@ AC_ARG_WITH([pism],
   [with_pism=yes],
   [with_pism=no])
 
-#AS_IF([test "x$with_pism" != xno],
-#	[AC_SUBST([PISM_CFLAGS])])
+# see: http://www.guyrutenberg.com/2012/07/12/conditional-compilation-in-autoconf-and-automake/
+AS_IF([test "x$with_pism" != xno],    [AC_DEFINE(WITH_PISM)])
 
 AC_SUBST([PISM_SRC])
 AC_SUBST([PISM_HOME])

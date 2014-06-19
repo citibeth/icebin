@@ -248,6 +248,10 @@ boost::function<void ()> netcdf_define(
 }
 // ----------------------------------------------------
 
+/** Do linewrap for strings that are intended to be used as comment attributes in NetCDF files.
+       see: http://www.cplusplus.com/forum/beginner/19034/
+*/
+extern std::string ncwrap( std::string const &str, size_t width = 55 );
 
 
 }

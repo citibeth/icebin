@@ -40,9 +40,9 @@ export NETCDFCXX_LIBS="""-L$NETCDFCXX_HOME/lib -lnetcdf_c++"
 
 #MPI_HOME=$HOME/opt/openmpi-1.6.4
 MPI_HOME=$MACPORTS
-export MPI_INCLUDE="$MPI_HOME/include/openmpi"
+export MPI_INCLUDE="$MPI_HOME/include/openmpi-gcc48"
 export MPI_CFLAGS="-I$MPI_INCLUDE"
-export MPI_LIBS="-L$MPI_HOME/lib -lmpi -lmpi_cxx"
+export MPI_LIBS="-L$MPI_HOME/lib/openmpi-gcc48 -lmpi -lmpi_cxx"
 
 export PROJ_HOME=$MACPORTS
 export PROJ_CFLAGS="-I$PROJ_HOME/include"
@@ -61,7 +61,7 @@ MPFR_HOME=$MACPORTS
 export MPFR_CFLAGS="-I$MPFR_HOME/include"
 export MPFR_LIBS="-L$MPFR_HOME/lib -lmpfr"
 
-export CGAL_HOME=$HOME/opt/cgal-4.3
+export CGAL_HOME=$MACPORTS
 export CGAL_CFLAGS="-I$CGAL_HOME/include"
 export CGAL_LIBS="-L$CGAL_HOME/lib -lCGAL"
 #export CGAL_LIBS="$CGAL_HOME/lib/libCGAL.dylib"
@@ -101,7 +101,7 @@ export UDUNITS2_CFLAGS="-I$MACPORTS/include/udunits2"
 export UDUNITS2_LIBS="-L$MACPORTS/lib -ludunits2"
 
 # Needed for Boost
-BOOST_HOME=$HOME/opt/boost-1.55.0
+BOOST_HOME=$MACPORTS
 
 ./configure --prefix=$DEST_PREFIX \
 	--with-boost=$BOOST_HOME \

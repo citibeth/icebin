@@ -40,7 +40,11 @@ int main(int argc, char **argv)
 	printf("------------- Set up the local ice grid\n");
 
 	Grid_XY grid;
-	grid.name = "searise";
+	char xname[100];
+	sprintf(xname, "searise_g%d", size);
+	std::string name(xname);
+
+	grid.name = name;
 	grid.sproj = "+proj=stere +lon_0=-39 +lat_0=90 +lat_ts=71.0 +ellps=WGS84";
 
 	// The true exact SeaRISE grid
@@ -58,6 +62,5 @@ int main(int argc, char **argv)
 //	boost::filesystem::path exe_path(argv[0]);
 //	grid.to_netcdf(exe_path.stem().string() + ".nc");
 	char fname[100];
-	sprintf(fname, "searise_g%d.nc", size);
-	grid.to_netcdf(std::string(fname));
+	grid.to_netcdf(name + ".nc");
 }

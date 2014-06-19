@@ -1,0 +1,84 @@
+#!/bin/sh
+#
+
+# Uncomment this line if you have MacPorts in the standard location
+#export MACPORTS=/opt/local
+
+DEST_PREFIX=$HOME/opt/glint2
+
+## ----- Where is your GALAHAD installation?
+GALAHAD_HOME=$HOME/opt/galahad
+GALAHAD_ARCH=mac64.osx.gfo
+export GALAHAD_INC_DIR="$GALAHAD_HOME/modules/$GALAHAD_ARCH/double"
+export GALAHAD_LIB_DIR="$GALAHAD_HOME/objects/$GALAHAD_ARCH/double"
+
+
+# =========================================================
+# The following prerequisites do not need to be touched, if they were
+# installed via MacPorts.
+
+# Which python we want to use --- whether it's the default, or some other
+export PYTHON=$MACPORTS/bin/python
+
+export EIGEN_DIR="$MACPORTS/include/eigen3"
+export EIGEN_CFLAGS="-I$EIGEN_DIR"
+export EIGEN_LIBS=""
+
+#NETCDF_HOME=$HOME/opt/netcdf-4.1.3
+NETCDF_HOME=$MACPORTS
+export NETCDF_CFLAGS="-I$NETCDF_HOME/include"
+export NETCDF_LIBS="-L$NETCDF_HOME/lib -lnetcdf"
+
+#NETCDFF_HOME=$HOME/opt/netcdf-fortran
+NETCDFF_HOME=$MACPORTS
+export NETCDFF_CFLAGS="-I$NETCDFF_HOME/include"
+export NETCDFF_LIBS="-L$NETCDFF_HOME/lib -lnetcdff"
+
+export NETCDFCXX_HOME=$MACPORTS
+export NETCDFCXX_CFLAGS="-I$NETCDFCXX_HOME/include"
+export NETCDFCXX_LIBS="""-L$NETCDFCXX_HOME/lib -lnetcdf_c++"
+
+#MPI_HOME=$HOME/opt/openmpi-1.6.4
+MPI_HOME=$MACPORTS
+export MPI_INCLUDE="$MPI_HOME/include/openmpi-gcc48"
+export MPI_CFLAGS="-I$MPI_INCLUDE"
+export MPI_LIBS="-L$MPI_HOME/lib/openmpi-gcc48 -lmpi -lmpi_cxx"
+
+export PROJ_HOME=$MACPORTS
+export PROJ_CFLAGS="-I$PROJ_HOME/include"
+export PROJ_LIBS="-L$PROJ_HOME/lib -lproj"
+
+BLITZ_HOME=$MACPORTS
+export BLITZ_CFLAGS="-I$BLITZ_HOME/include"
+export BLITZ_LIBS="-L$BLITZ_HOME/lib -lblitz"
+
+
+GMP_HOME=$MACPORTS
+export GMP_CFLAGS="-I$GMP_HOME/include"
+export GMP_LIBS="-L$GMP_HOME/lib -lgmp"
+
+MPFR_HOME=$MACPORTS
+export MPFR_CFLAGS="-I$MPFR_HOME/include"
+export MPFR_LIBS="-L$MPFR_HOME/lib -lmpfr"
+
+export CGAL_HOME=$MACPORTS
+export CGAL_CFLAGS="-I$CGAL_HOME/include"
+export CGAL_LIBS="-L$CGAL_HOME/lib -lCGAL"
+#export CGAL_LIBS="$CGAL_HOME/lib/libCGAL.dylib"
+
+
+# Link fortran libraries into Python extension.  Other linking steps are
+# done with the $(FCC), so this is not needed.
+export FORTRAN_LIBS="-lgfortran"
+
+# ===================================================================
+# Special rounding is required for CGAL
+# -fp-model strict for intel
+export CPPFLAGS="-frounding-math"
+
+# Needed for Boost
+BOOST_HOME=$MACPORTS
+
+./configure --prefix=$DEST_PREFIX \
+	--with-boost=$BOOST_HOME \
+	--with-galahad

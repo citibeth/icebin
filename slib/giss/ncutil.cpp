@@ -86,4 +86,24 @@ void netcdf_write_functions(std::vector<boost::function<void ()>> const &functio
 	for (auto fn = functions.begin(); fn != functions.end(); ++fn) (*fn)();
 }
 
+
+/** Do linewrap for strings that are intended to be used as comment attributes in NetCDF files.
+       see: http://www.cplusplus.com/forum/beginner/19034/
+*/
+std::string ncwrap( std::string const &str2, size_t width) {
+	std::string str = "\n" + str2;
+    size_t curWidth = width;
+    while( curWidth < str.length() ) {
+        std::string::size_type spacePos = str.rfind( ' ', curWidth );
+        if( spacePos == std::string::npos )
+            spacePos = str.find( ' ', curWidth );
+        if( spacePos != std::string::npos ) {
+            str[ spacePos ] = '\n';
+            curWidth = spacePos + width + 1;
+        }
+    }
+
+    return str;
+}
+
 }
