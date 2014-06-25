@@ -150,6 +150,18 @@ static PyMemberDef Grid_members[] = {
 	{NULL}
 };
 
+static char *Grid_doc =
+	"Encapsulates all information about a grid in Glint2.\n"
+	"Python wrapper of glint2::Grid.\n"
+	"\n"
+	"Constructor: Grid(fname, vname)\n"
+	"    Read from an existing Grid file.\n"
+	"    fname : str\n"
+	"        Name of Glint2 configuration file>\n"
+	"    vname (OPTIONAL):\n"
+	"        Name of variable to read in config file\n";
+
+
 PyTypeObject GridType = {
    PyObject_HEAD_INIT(NULL)
    0,                         /* ob_size */
@@ -172,16 +184,16 @@ PyTypeObject GridType = {
    0,                         /* tp_setattro */
    0,                         /* tp_as_buffer */
    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags*/
-   "Grid object",        /* tp_doc */
+   Grid_doc,                  /* tp_doc */
    0,                         /* tp_traverse */
    0,                         /* tp_clear */
    0,                         /* tp_richcompare */
    0,                         /* tp_weaklistoffset */
    0,                         /* tp_iter */
    0,                         /* tp_iternext */
-   Grid_methods,         /* tp_methods */
-   Grid_members,         /* tp_members */
-//   0,                         /* tp_members */
+   Grid_methods,              /* tp_methods */
+   Grid_members,              /* tp_members */
+//   0,                       /* tp_members */
    0,                         /* tp_getset */
    0,                         /* tp_base */
    0,                         /* tp_dict */

@@ -719,7 +719,32 @@ static void MatrixMaker_dealloc(PyMatrixMaker *self)
 static PyMethodDef MatrixMaker_methods[] = {
 
 	{"init", (PyCFunction)MatrixMaker_init, METH_KEYWORDS,
-		""},
+		"Function used to contruct a MatrixMaker from scratch\n"
+		"(rather than loading from a file.)\n"
+		"\n"
+		"grid1_fname : str\n"
+		"    Name of the grid file containing the GCM grid\n"
+		"\n"
+		"hc_index_type : str (see HCIndex::Type)\n"
+		"    Indexing convention for elevation class arrays where:\n"
+		"        nhc = index for elevation class (zero-based)\n"
+		"        n1 = 1D collapsed index of GCM grid cell (zero-based)\n"
+		"    'MODELE' : A[nhc, n1]\n"
+		"\n"
+		"hpdefs : double[nhp] (m)\n"
+		"    The elevation points to use.  The same elevation points will be\n"
+		"    used for all GCM grid cells.\n"
+		"\n"
+		"mask1 : int[n1] (OPTIONAL)\n"
+		"    Use to mark GCM cells as not used.  Masking convention is the same\n"
+		"    as in Matplotlib: zero means the cell is OK, non-zero means it is\n"
+		"    not used.\n"
+		"\n"
+		"correct_area1 : int/bool (DEFAULT 1)\n"
+		"    if non-zero: account for projection error in transformations.\n"
+	}
+,
+
 	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS,
 		""},
 	{"hp_to_iceinterp", (PyCFunction)MatrixMaker_hp_to_iceinterp, METH_KEYWORDS,
