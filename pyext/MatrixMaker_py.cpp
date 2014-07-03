@@ -115,6 +115,7 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 			return 0;
 		}
 
+
 		// Instantiate C++ Ice Maker
 		std::unique_ptr<GridDomain> domain(new GridDomain_Identity());
 		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(
@@ -424,7 +425,7 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 
 		// Get arguments
 		PyObject *f2s_py;		// Should be [(1 : [...]), (2 : [...])]
-		PyObject *initial_py;		// array[n3]
+		PyObject *initial_py = NULL;		// array[n3]
 		const char *src_py = "ICE";
 		const char *qp_algorithm_py = "SINGLE_QP";
 		static char const *keyword_list[] = {"f2s", "initial3", "src", "qp_algorithm", NULL};
@@ -768,9 +769,16 @@ static PyMethodDef MatrixMaker_methods[] = {
 	{"set_mask1",  (PyCFunction)MatrixMaker_set_mask1, METH_VARARGS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
-		""},
+		"Call this after constructing a MatrixMaker with init() and\n"
+		"add_ice_sheet() methods.  Takes no arguments are returns\n"
+		"nothing."},
 	{"write", (PyCFunction)MatrixMaker_write, METH_VARARGS,
-		""},
+		"Write the MatrixMaker structure to a netCDF file."
+		"\n"
+		"nc : netCDF4.Dataset\n"
+		"    The open netCDF file\n"
+		"vname : str\n"
+		"    The name of the variable to write it to.\n"},
 	{"load", (PyCFunction)MatrixMaker_load, METH_VARARGS,
 		""},
 	{NULL}     /* Sentinel - marks the end of this structure */
