@@ -675,7 +675,6 @@ bool force_lambda)
 	// sum1(RM) = x means that height point = 1 gets scaled to x in atm grid.
 	// So we must divide by x to rescale from atm to height point
 	for (auto ii=sum1.begin(); ii!=sum1.end(); ++ii) {
-printf("sum1[%d] = %g\n", ii->first, ii->second);
 		ii->second = 1.0d / ii->second;
 	}
 	std::unordered_map<int,double> sum1_inv(std::move(sum1));

@@ -52,6 +52,7 @@ libglint2_la_SOURCES = \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
 	glint2/read_matrixmaker.cpp \
+	glint2/contracts/modele_dismal.cpp \
 	$(FORTRAN_SOURCES)
 
 # Deprecated, at least temporarily
@@ -80,6 +81,7 @@ endif
 
 if USE_PISM
 libglint2_la_SOURCES += \
+	glint2/pism/GLINT2EnthalpyConverter.cpp \
 	glint2/pism/PISMIceModel.cpp \
 	glint2/pism/PSConstantGLINT2.cpp \
 	glint2/pism/IceModel_PISM.cpp \

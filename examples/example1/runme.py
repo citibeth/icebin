@@ -252,10 +252,11 @@ if 5 in steps :
 
 if 6 in steps:
 	# ============ Step 6: Run the GCM to create output file
+	gf = Glint2Files(grid1_name, grid2_name, 5, 40, 'DISMAL', searise_fname)
 	print \
 		"""We will not run the climate model here, just
 		use output from a previous run.
-		See the file: %s""" % gcm_ijhc_fname
+		See the file: %s""" % gf.gcm_ijhc_fname
 
 if 7 in steps:
 	# ============ Step 7: Load GCM output, regrid and plot

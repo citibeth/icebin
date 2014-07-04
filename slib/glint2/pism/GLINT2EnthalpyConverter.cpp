@@ -6,7 +6,7 @@
 namespace glint2 {
 namespace gpism {
 
-GLINT2EnthalpyConverter::GLINT2EnthalpyConverter(const ConfigI &config) :
+GLINT2EnthalpyConverter::GLINT2EnthalpyConverter(const pism::ConfigI &config) :
 	EnthalpyConverter(config)
 {
   c_w   = config.get("water_specific_heat_capacity");            // J kg-1 K-1
