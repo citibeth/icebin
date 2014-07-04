@@ -94,7 +94,6 @@ int N_ndim);
 
 /** Convert a Numpy array to a blitz one, using the original's data (no copy).
 N is the rank of the array.
-This should be called AFTER appropriate typechecking has taken place.
 @see: http://mail.scipy.org/pipermail/numpy-discussion/2004-March/002892.html
 
 Use this template to convert from PyObject to a blitz::Array of a specific
@@ -132,7 +131,7 @@ int const *dims)
     }
 //printf("py_to_blitz: vec->data = %p\n", vec->data);
 
-    return blitz::Array<T,N>((T*) vec->data,shape,strides,
+    return blitz::Array<T,N>((T*) PyArray_DATA(vec),shape,strides,
 		blitz::neverDeleteData);
 }
 

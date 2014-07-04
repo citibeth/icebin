@@ -44,9 +44,9 @@ struct CouplingContract : public giss::DynamicEnum
 public:
 	CouplingContract() {}
 
-	std::vector<CoupledField>::const_iterator begin() const
+	auto begin() const -> decltype(_ix_to_field.begin())
 		{ return _ix_to_field.begin(); }
-	std::vector<CoupledField>::const_iterator end() const
+	auto end() const -> decltype(_ix_to_field.end())
 		{ return _ix_to_field.end(); }
 
 	int add_field(CoupledField &&cf);

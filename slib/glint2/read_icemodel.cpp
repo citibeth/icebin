@@ -16,7 +16,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <mpi.h>
+#ifdef USE_PISM
 #include <glint2/pism/IceModel_PISM.hpp>	// PISM insists on being included first
+#endif
+
 #include <glint2/IceModel.hpp>
 #include <glint2/IceModel_DISMAL.hpp>
 
@@ -42,9 +46,11 @@ std::unique_ptr<IceModel> read_icemodel(
 		case IceModel::Type::DISMAL :
 			ice_model.reset(new IceModel_DISMAL(coupler));
 			break;
+#ifdef USE_PISM
 		case IceModel::Type::PISM :
 			ice_model.reset(new glint2::gpism::IceModel_PISM(coupler));
 			break;
+#endif
 	}
 
 	// After this, the caller must run the following to finish IceModel setup:

@@ -26,8 +26,6 @@ libglint2_la_SOURCES = \
 	giss/sparsemult.cpp \
 	giss/udunits2.cpp \
 	giss/VarTransformer.cpp \
-	glint2/contracts/modele_pism.cpp \
-	glint2/contracts/modele_dismal.cpp \
 	glint2/clippers.cpp \
 	giss/ConstantSet.cpp \
 	giss/CouplingContract.cpp \
@@ -54,10 +52,6 @@ libglint2_la_SOURCES = \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
 	glint2/read_matrixmaker.cpp \
-	glint2/pism/PSConstantGLINT2.cpp \
-	glint2/pism/IceModel_PISM.cpp \
-	glint2/pism/NullTransportHydrology.cpp \
-	glint2/pism/PISMIceModel.cpp \
 	$(FORTRAN_SOURCES)
 
 # Deprecated, at least temporarily
@@ -76,11 +70,24 @@ FORTRAN_SOURCES += \
 	galahad/x_loc_f.f90 \
 	galahad/zd11_f.f90
 
+
 libglint2_la_SOURCES += \
 	galahad/zd11_c.cpp \
 	galahad/qpt_c.cpp
 
 endif
+
+
+if USE_PISM
+libglint2_la_SOURCES += \
+	glint2/pism/PISMIceModel.cpp \
+	glint2/pism/PSConstantGLINT2.cpp \
+	glint2/pism/IceModel_PISM.cpp \
+	glint2/pism/NullTransportHydrology.cpp \
+	glint2/contracts/modele_pism.cpp
+endif
+
+
 
 # # ------------------------------------------------------
 giss/f90blitz_f.f90 giss/f90blitz_f.h : giss/f90blitz_f.py

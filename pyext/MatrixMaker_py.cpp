@@ -115,6 +115,7 @@ static PyObject *MatrixMaker_init(PyMatrixMaker *self, PyObject *args, PyObject 
 			return 0;
 		}
 
+
 		// Instantiate C++ Ice Maker
 		std::unique_ptr<GridDomain> domain(new GridDomain_Identity());
 		std::unique_ptr<glint2::MatrixMaker> maker(new MatrixMaker(
@@ -424,7 +425,7 @@ printf("BEGIN MatrixMaker_ice_to_hp()\n");
 
 		// Get arguments
 		PyObject *f2s_py;		// Should be [(1 : [...]), (2 : [...])]
-		PyObject *initial_py;		// array[n3]
+		PyObject *initial_py = NULL;		// array[n3]
 		const char *src_py = "ICE";
 		const char *qp_algorithm_py = "SINGLE_QP";
 		static char const *keyword_list[] = {"f2s", "initial3", "src", "qp_algorithm", NULL};
@@ -719,7 +720,32 @@ static void MatrixMaker_dealloc(PyMatrixMaker *self)
 static PyMethodDef MatrixMaker_methods[] = {
 
 	{"init", (PyCFunction)MatrixMaker_init, METH_KEYWORDS,
-		""},
+		"Function used to contruct a MatrixMaker from scratch\n"
+		"(rather than loading from a file.)\n"
+		"\n"
+		"grid1_fname : str\n"
+		"    Name of the grid file containing the GCM grid\n"
+		"\n"
+		"hc_index_type : str (see HCIndex::Type)\n"
+		"    Indexing convention for elevation class arrays where:\n"
+		"        nhc = index for elevation class (zero-based)\n"
+		"        n1 = 1D collapsed index of GCM grid cell (zero-based)\n"
+		"    'MODELE' : A[nhc, n1]\n"
+		"\n"
+		"hpdefs : double[nhp] (m)\n"
+		"    The elevation points to use.  The same elevation points will be\n"
+		"    used for all GCM grid cells.\n"
+		"\n"
+		"mask1 : int[n1] (OPTIONAL)\n"
+		"    Use to mark GCM cells as not used.  Masking convention is the same\n"
+		"    as in Matplotlib: zero means the cell is OK, non-zero means it is\n"
+		"    not used.\n"
+		"\n"
+		"correct_area1 : int/bool (DEFAULT 1)\n"
+		"    if non-zero: account for projection error in transformations.\n"
+	}
+,
+
 	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS,
 		""},
 	{"hp_to_iceinterp", (PyCFunction)MatrixMaker_hp_to_iceinterp, METH_KEYWORDS,
@@ -743,9 +769,16 @@ static PyMethodDef MatrixMaker_methods[] = {
 	{"set_mask1",  (PyCFunction)MatrixMaker_set_mask1, METH_VARARGS,
 		""},
 	{"realize", (PyCFunction)MatrixMaker_realize, METH_VARARGS,
-		""},
+		"Call this after constructing a MatrixMaker with init() and\n"
+		"add_ice_sheet() methods.  Takes no arguments are returns\n"
+		"nothing."},
 	{"write", (PyCFunction)MatrixMaker_write, METH_VARARGS,
-		""},
+		"Write the MatrixMaker structure to a netCDF file."
+		"\n"
+		"nc : netCDF4.Dataset\n"
+		"    The open netCDF file\n"
+		"vname : str\n"
+		"    The name of the variable to write it to.\n"},
 	{"load", (PyCFunction)MatrixMaker_load, METH_VARARGS,
 		""},
 	{NULL}     /* Sentinel - marks the end of this structure */
