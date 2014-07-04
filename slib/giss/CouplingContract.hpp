@@ -3,7 +3,6 @@
 #include <giss/cfnames.hpp>
 #include <giss/DynamicEnum.hpp>
 #include <giss/VarMetaData.hpp>
-#include <giss/udunits2.hpp>
 #include <ostream>
 
 namespace giss {
