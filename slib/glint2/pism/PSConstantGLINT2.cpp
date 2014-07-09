@@ -27,7 +27,7 @@ namespace glint2 {
 namespace gpism {
 
 PSConstantGLINT2::PSConstantGLINT2(pism::IceGrid &g, const pism::Config &conf)
-	: pism::SurfaceModel(g, conf)
+	: pism::SurfaceModel(g, conf), _initialized(false)
 {
 	PetscErrorCode ierr = allocate_PSConstantGLINT2(); CHKERRCONTINUE(ierr);
 	if (ierr != 0) {
@@ -71,7 +71,11 @@ printf("END PSConstantGLINT2::allocate_PSConstantGLINT2()\n");
 
 PetscErrorCode PSConstantGLINT2::init(pism::Vars &vars)
 {
-printf("BEGIN PSConstantGLINT2::init()\n");
+	// This is called (via pism::IceModel::init_couplers()) from both
+	// pism::IceModel::misc_setup() and pism::IceModel::model_state_setup()
+	if (_initialized) return 0;
+
+printf("BEGIN PSConstantGLINT2::init(this=%p)\n", this);
 	PetscErrorCode ierr;
 	bool do_regrid = false;
 	int start = -1;
@@ -115,6 +119,7 @@ printf("AA1\n");
 				"		parameterizing the ice surface temperature 'ice_surface_temp' ... \n"); CHKERRQ(ierr);
 
 printf("END PSConstantGLINT2::init()\n");
+	_initialized = true;
 	return 0;
 }
 

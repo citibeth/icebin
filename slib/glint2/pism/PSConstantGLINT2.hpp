@@ -35,6 +35,8 @@ namespace gpism {
 //! and surface elevation-dependent formula.
 
 class PSConstantGLINT2 : public pism::SurfaceModel {
+	bool _initialized;
+
 public:
 	/** Experiment with b.c. in terms of conductive heat flow. */
 //	virtual BCType get_conduction_bc_type() { return NEUMANN; }

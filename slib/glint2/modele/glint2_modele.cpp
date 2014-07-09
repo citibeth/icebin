@@ -182,7 +182,7 @@ extern "C" glint2_modele *new_glint2_modele()
 	return ret;
 }
 // ---------------------------------------------------
-/** Set a single constant value.  This is a callback, to be called
+/** Set a single constant value in Glint2.  This is a callback, to be called
 from ModelE's (Fortran code) constant_set::set_all_constants() */
 extern "C" void glint2_modele_set_const(
 	glint2::modele::glint2_modele *api,

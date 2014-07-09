@@ -20,7 +20,9 @@ namespace gpism {
 IceModel_PISM::IceModel_PISM(GCMCoupler const *_coupler, bool with_dismal)
 	: IceModel_Decode(IceModel::Type::PISM, _coupler)
 {
+	printf("BEGIN IceModel_PISM::IceModel_PISM\n");
 	if (with_dismal) dismal.reset(new IceModel_DISMAL(_coupler));
+	printf("END IceModel_PISM::IceModel_PISM\n");
 }
 
 
@@ -204,6 +206,7 @@ PetscErrorCode IceModel_PISM::allocate(
 	NcVar *pism_var,
 	NcVar *info_var)
 {
+	printf("BEGIN IceModel_PISM::allocate()\n");
 	this->glint2_grid = glint2_grid;
 
 	// Get simple arguments
@@ -349,6 +352,7 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 		throw std::exception();
 	}
 
+	printf("END IceModel_PISM::allocate()\n");
 	return 0;
 }
 

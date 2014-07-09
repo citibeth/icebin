@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 	std::string glint2_config_fname = "modele_ll_g2x2_5-searise_g20-40-PISM.nc";
 //	std::string glint2_config_fname = "modele_ll_g2x2_5-searise_g20-40-DISMAL.nc";
 	std::string glint2_config_vname = "m";
-	std::string desm_fname = "desm_in.nc";
+	std::string desm_fname = "modele_out-1.nc";
 	std::string constants_fname = "modele_constants.nc";
 	// Initialize the MPI environment
 	MPI_Init(&argc, &argv);
@@ -106,11 +106,16 @@ int main(int argc, char **argv)
 	NcFile dnc(desm_fname.c_str());
 
 	// Get parameters
+#if 0
 	NcVar *rparam = dnc.get_var("rparam");
 	double dtsrc = giss::get_att(rparam, "dtsrc")->as_double(0);
 	int iyear1 = giss::get_att(rparam, "iyear1")->as_int(0);
 	printf("dtsrc = %f\n", dtsrc);
 	printf("iyear1 = %d\n", iyear1);
+#else
+	double dtsrc=1800.;
+	int iyear1 = 1950;
+#endif
 
 	// -----------------------------------------------------
 	// Initialize GLINT2 (via a Fortran-ish interface)
@@ -124,12 +129,15 @@ int main(int argc, char **argv)
 
 	glint2_modele *api = new_glint2_modele();
 
-	// Set up constants from ModelE here...
+	// Read constants from ModelE into Glint2 data structures.
+	// This is in lieu of the "set_all_constants()" code in the standard ModelE coupler.
+	printf("Reading constants file %s\n", constants_fname.c_str());
 	NcFile cnc(constants_fname.c_str());
 	giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
 	gcm_constants.read_from_netcdf(cnc, "constants");
 	cnc.close();
 
+	printf("glint2_modele_init(fname = %s)\n", glint2_config_fname.c_str());
 	glint2_modele_init0(api,
 		glint2_config_fname.c_str(), glint2_config_fname.size(),
 		glint2_config_vname.c_str(), glint2_config_vname.size(),
@@ -169,9 +177,9 @@ int main(int argc, char **argv)
 	// Get Data
 	const int nvar = 3;
 	NcVar *vars_nc[nvar] = {
-		dnc.get_var("impm_lndice"),
-		dnc.get_var("imph_lndice"),
-		dnc.get_var("tice_lndice")};
+		dnc.get_var("lismb"),
+		dnc.get_var("liseb"),
+		dnc.get_var("litg2")};
 
 	// Get dimensions by querying one variable
 	NcVar *var_nc = vars_nc[0];

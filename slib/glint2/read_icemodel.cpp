@@ -59,8 +59,8 @@ std::unique_ptr<IceModel> read_icemodel(
 	// 3. ice_model->update_ice_sheet(nc, vname, sheet);
 
 	ice_model->gcm_per_ice_sheet_params = std::move(gcm_per_ice_sheet_params);
-	return ice_model;
 	printf("END read_icemodel(%s)\n", vname.c_str());
+	return ice_model;
 }
 // -----------------------------------------------------
 

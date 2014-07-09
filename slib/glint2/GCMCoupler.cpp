@@ -75,7 +75,10 @@ void GCMCoupler::read_from_netcdf(
 		// between the GCM and the ice model.  This contract is specific
 		// to both the GCM and the ice model.  Note that setup_contracts()
 		// is a virtual method.
-		setup_contracts(*ice_model);
+		
+		// THis code MUST call GCMCoupler::setup_contracts() somewhere inside.
+		ice_model->init(sheet->grid2, nc, vname_sheet);
+		ice_model->update_ice_sheet(nc, vname_sheet, sheet);
 
 #if 1
 		// Print out the contract and var transformations
@@ -88,10 +91,7 @@ void GCMCoupler::read_from_netcdf(
 		std::cout << ice_model->var_transformer[IceModel::OUTPUT];
 #endif
 
-		// Finish initializing the IceModel.
-		// This code MUST come after setup_contracts() above.
-		ice_model->init(sheet->grid2, nc, vname_sheet);
-		ice_model->update_ice_sheet(nc, vname_sheet, sheet);
+
 
 		++i;
 	}

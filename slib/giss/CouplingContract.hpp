@@ -41,7 +41,7 @@ struct CouplingContract : public giss::DynamicEnum
 	int _unit_ix;
 
 public:
-	CouplingContract() {}
+	CouplingContract() : _size_nounit(0), _unit_ix(1) {}
 
 	auto begin() const -> decltype(_ix_to_field.begin())
 		{ return _ix_to_field.begin(); }

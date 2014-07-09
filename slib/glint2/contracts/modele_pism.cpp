@@ -126,7 +126,7 @@ void IceModel_PISM::setup_contracts_modele()
 	// Outputs (Ice -> GCM) are same fields as inputs
 	CouplingContract *gcm_inputs = new_CouplingContract();
 	for (auto ii = ice_output.begin(); ii != ice_output.end(); ++ii) {
-		gcm_inputs->add_field(*ii);
+		gcm_inputs->add_field(CoupledField(*ii));
 	}
 
 	CouplingContract *ice_output_scalars = new_CouplingContract();

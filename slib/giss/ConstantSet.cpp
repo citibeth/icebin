@@ -50,11 +50,16 @@ double ConstantSet::get_as(std::string const &name,
 	std::string const &susrc(fields.field(src_ix).units);
 	UTUnit usrc(ut_system->parse(susrc));
 
-	CVConverter cv(usrc, units);
-	double ret = cv.convert((*this)[src_ix]);
-	
+	try {
+		CVConverter cv(usrc, units);
+		double ret = cv.convert((*this)[src_ix]);
 printf("ConstantSet: Converting %s: %f %s --> %f %s\n", name.c_str(), (*this)[src_ix], usrc.c_str(), ret, units.c_str());
-	return ret;
+		return ret;
+	} catch(const std::exception &ex) {
+		fprintf(stderr, "Exception in ConstantSet::get_as(%s, %s)\n", name.c_str(), units.c_str());
+		throw std::exception();
+	}
+	
 }
 
 double ConstantSet::get_as(std::string const &name,
@@ -80,11 +85,16 @@ double ConstantSet::set(std::string const &name,
 	std::string const &sudst(fields.field(dst_ix).units);
 	UTUnit udst(ut_system->parse(sudst));
 
-	CVConverter cv(usrc, udst);
-	double ret = cv.convert(src[src_ix]);
-	(*this)[dst_ix] = ret;
+	try {
+		CVConverter cv(usrc, udst);
+		double ret = cv.convert(src[src_ix]);
+		(*this)[dst_ix] = ret;
 printf("ConstantSet: Converting %f %d --> %f %d\n", src[src_ix], usrc.c_str(), ret, udst.c_str());
-	return ret;
+		return ret;
+	} catch(const std::exception &ex) {
+		fprintf(stderr, "Exception in ConstantSet::set(%s, ConstantSet, %s)\n", name.c_str(), src_name.c_str());
+		throw std::exception();
+	}
 }
 #endif
 
@@ -110,6 +120,10 @@ void ConstantSet::netcdf_define(NcFile &nc, std::string const &vname)
 void ConstantSet::read_from_netcdf(NcFile &nc, std::string const &vname)
 {
 	NcVar *ncvar = giss::get_var_safe(nc, vname.c_str(), true);
+	if (!ncvar) {
+		fprintf(stderr, "ConstantSet::read_from_netcdf() cannot find variable %s\n", vname.c_str());
+		throw std::exception();
+	}
 	int n = ncvar->num_atts();
 
 	// Read through the attributes, getting units and names separately
@@ -121,7 +135,7 @@ void ConstantSet::read_from_netcdf(NcFile &nc, std::string const &vname)
 		std::string att_name(att->name());
 		if (giss::ends_with(att_name, "_description")) {
 			descriptions.insert(std::make_pair(
-				att_name.substr(0, att_name.size() - std::strlen("_descriptions")),
+				att_name.substr(0, att_name.size() - std::strlen("_description")),
 				std::string(att->as_string(0))));
 		} else if (giss::ends_with(att_name, "_units")) {
 			units.insert(std::make_pair(
@@ -137,6 +151,17 @@ void ConstantSet::read_from_netcdf(NcFile &nc, std::string const &vname)
 	for (auto ii = consts.begin(); ii != consts.end(); ++ii) {
 		std::string const &name = ii->first;
 		double const val = ii->second;
+
+		auto ui = units.find(name);
+		if (ui == units.end()) {
+			fprintf(stderr, "Could not find _units attribute for %s\n", name.c_str());
+		}
+
+		auto di = descriptions.find(name);
+		if (di == descriptions.end()) {
+			fprintf(stderr, "Could not find _description attribute for %s\n", name.c_str());
+		}
+
 		std::string const &u = units.find(name)->second;
 		std::string const &d = descriptions.find(name)->second;
 

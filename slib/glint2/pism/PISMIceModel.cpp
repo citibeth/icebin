@@ -93,6 +93,7 @@ PetscErrorCode PISMIceModel::allocate_subglacial_hydrology()
 
 PetscErrorCode PISMIceModel::allocate_couplers()
 {
+	printf("BEGIN PISMIceModel::allocate_couplers()\n");
 	PetscErrorCode ierr;
 	// Initialize boundary models:
 	PAFactory pa(grid, config);
@@ -117,6 +118,7 @@ PetscErrorCode PISMIceModel::allocate_couplers()
 	}
 	ierr = PetscOptionsEnd(); CHKERRQ(ierr);
 
+	printf("END PISMIceModel::allocate_couplers()\n");
 	return 0;
 }
 

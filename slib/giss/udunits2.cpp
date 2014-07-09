@@ -100,15 +100,15 @@ namespace giss {
 
 		switch(ut_get_status()) {
 			case UT_BAD_ARG :
-				fprintf(stderr, "CVConverter(): UT_BAD_ARG\n"); break;
+				fprintf(stderr, "CVConverter(%s -> %s): UT_BAD_ARG\n", from.c_str(), to.c_str()); break;
 			case UT_NOT_SAME_SYSTEM :
-				fprintf(stderr, "CVConverter(): UT_NOT_SAME_SYSTEM\n"); break;
+				fprintf(stderr, "CVConverter(%s -> %s): UT_NOT_SAME_SYSTEM\n", from.c_str(), to.c_str()); break;
 			case UT_MEANINGLESS :
-				fprintf(stderr, "CVConverter(): UT_MEANINGLESS\n"); break;
+				fprintf(stderr, "CVConverter(%s -> %s): UT_MEANINGLESS\n", from.c_str(), to.c_str()); break;
 			case UT_OS :
-				fprintf(stderr, "CVConverter(): UT_OS\n"); break;
+				fprintf(stderr, "CVConverter(%s -> %s): UT_OS\n", from.c_str(), to.c_str()); break;
 			default :
-				fprintf(stderr, "CVConverter(): Unknown problem\n"); break;
+				fprintf(stderr, "CVConverter(%s -> %s): Unknown problem\n", from.c_str(), to.c_str()); break;
 		}
 		throw std::exception();
 
