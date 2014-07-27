@@ -161,7 +161,7 @@ of elements.  Assumes a dense array on both sides. */
 template<class T, int src_ndim, int dest_ndim>
 extern blitz::Array<T, dest_ndim> reshape(
 	blitz::Array<T, src_ndim> &src,
-	blitz::TinyVector<int,dest_ndim> const dest_shape)
+	blitz::TinyVector<int,dest_ndim> const &dest_shape)
 { RESHAPE_BODY; }
 
 /** Reshape an array.  As long as src and dest have same total number
@@ -169,7 +169,62 @@ of elements.  Assumes a dense array on both sides. */
 template<class T, int src_ndim, int dest_ndim>
 extern blitz::Array<T, dest_ndim> const reshape(
 	blitz::Array<T, src_ndim> const &src,
-	blitz::TinyVector<int,dest_ndim> const dest_shape)
+	blitz::TinyVector<int,dest_ndim> const &dest_shape)
 { RESHAPE_BODY; }
 
+#undef RESHAPE_BODY
+
+#if 0
+// These templates SHOULD work.  But they haven't been tested or used,
+// so they're commented out for now.
+// ------------------------------------------------
+template<class T, int len>
+blitz::TinyVector<T, len> vector_to_tiny(std::vector<T> const &vec)
+{
+	if (vec.size() != len) {
+		fprintf(stderr,
+			"vector_to_tiny(): vector length %ld does not match declared length %d\n", vec.size(), len);
+		throw std::exception();
+	}
+
+	blitz::TinyVector<T, len> ret;
+	for (int i=0; i < len; ++i) {
+		ret[i] = vec[i];
+	}
+	return ret;
 }
+// ------------------------------------------------
+/** Reshape an array.  As long as src and dest have same total number
+of elements.  Assumes a dense array on both sides. */
+template<class T, int src_ndim, int dest_ndim>
+extern blitz::Array<T, dest_ndim> reshape(
+	blitz::Array<T, src_ndim> &src,
+	std::vector<int> const &dest_shape)
+{
+	return reshape(src, dest_shape,
+		vector_to_tiny<int, dest_ndim>(dest_shape));
+}
+
+/** Reshape an array.  As long as src and dest have same total number
+of elements.  Assumes a dense array on both sides. */
+template<class T, int src_ndim, int dest_ndim>
+extern blitz::Array<T, dest_ndim> reshape(
+	blitz::Array<T, src_ndim> const &src,
+	std::vector<int> const &dest_shape)
+{
+	return reshape(src, dest_shape,
+		vector_to_tiny<int, dest_ndim>(dest_shape));
+}
+// ------------------------------------------------
+template<class T, int len>
+std::vector<T> tiny_to_vector(blitz::TinyVector<T, len> const &tiny)
+{
+	std::vector<T> ret;
+	ret.reserve(len);
+	for (int i=0; i<len; ++i) ret[i] = tiny[i];
+	return ret;
+}
+#endif
+
+}
+
