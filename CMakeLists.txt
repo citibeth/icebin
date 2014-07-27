@@ -94,3 +94,4 @@ SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 # the project's entire directory structure.
 add_subdirectory (slib)
 add_subdirectory (sbin)
+add_subdirectory (pyext)
