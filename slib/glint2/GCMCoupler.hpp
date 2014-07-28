@@ -23,6 +23,7 @@
 #include <giss/Dict.hpp>
 #include <giss/udunits2.hpp>
 #include <glint2/IceModel.hpp>
+#include <glint2/IceModel_Writer.hpp>
 #include <giss/ConstantSet.hpp>
 #include <glint2/GCMParams.hpp>
 #include <glint2/GCMPerIceSheetParams.hpp>
@@ -65,6 +66,9 @@ public:
 	GCMParams gcm_params;
 	giss::MapDict<int,IceModel> models;
 
+	/** Associated data structures to write out the exact inputs seen
+	by each ice model. */
+	giss::MapDict<int,IceModel_Writer> writers;
 
 	giss::UTSystem ut_system;		//!< Unit system for ConstantSets and CouplingContracts
 	giss::ConstantSet gcm_constants;		//!< Constants provided by the GCM
@@ -93,7 +97,7 @@ public:
 		NcFile &nc,
 		std::string const &sheet_vname) = 0;
 
-	/** Called from within read_from_netcdf().  GCM-specific implementation
+	/** Called from just after read_from_netcdf().  GCM-specific implementation
 	sets up the contracts for this GCM - IceModel pair.  (Usually by calling
 	through to GCM-specific virtual methods on the IceModel. */
 	virtual void setup_contracts(IceModel &ice_model) const = 0;
@@ -117,6 +121,7 @@ protected:
 	@see gmc_inputs*/
 	void call_ice_model(
 		IceModel *model,
+		IceModel_Writer *writer,
 		double time_s,
 		giss::DynArray<SMBMsg> &rbuf,
 		SMBMsg *begin, SMBMsg *end);

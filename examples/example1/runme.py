@@ -339,6 +339,7 @@ if 7 in steps:
 	# ------------------------------------------
 	# Regrid back to elevation grid
 
+	print 'BEGINBEGIN'
 	impm323 = mm.iceinterp_to_hp(
 		{'greenland' : impm32},
 		src='ICE',

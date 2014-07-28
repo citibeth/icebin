@@ -42,6 +42,7 @@ libglint2_la_SOURCES = \
 	glint2/IceModel.cpp \
 	glint2/IceModel_Decode.cpp \
 	glint2/IceModel_DISMAL.cpp \
+	glint2/IceModel_Writer.cpp \
 	glint2/IceSheet.cpp \
 	glint2/IceSheet_L0.cpp \
 	glint2/matrix_ops.cpp \

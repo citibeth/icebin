@@ -48,6 +48,9 @@ friend std::unique_ptr<IceModel> read_icemodel(
 	IceSheet *sheet);
 
 protected:
+	/** The grid for this IceModel. */
+	std::shared_ptr<glint2::Grid> grid2;
+
 	// Parameters provided by the GCM, to inform the coupling
 	std::unique_ptr<GCMPerIceSheetParams> gcm_per_ice_sheet_params;
 	GCMCoupler const * const coupler;		// parent back-pointer
@@ -57,6 +60,7 @@ public:
 		(DISMAL)		(0)		// Demo Ice Sheet Model and LandIce
 		(PISM)			(1)
 		(ISSM)			(2)
+		(WRITER)		(3)
 	);
 	const IceModel::Type type;
 
@@ -78,6 +82,8 @@ public:
 
 	IceModel(IceModel::Type _type, GCMCoupler const *_coupler);
 	virtual ~IceModel();
+
+	long ndata() const { return grid2->ndata(); }
 
 	// --------------------------------------------------
 	// GCM-specific methods used to set up the contract for

@@ -27,9 +27,6 @@
 
 namespace glint2 {
 
-// Arguments that are paths, and thus need pathname resolution
-static std::set<std::string> path_args = {"output_dir"};
-
 void IceModel_DISMAL::IceModel_DISMAL::init(
 		std::shared_ptr<glint2::Grid> const &grid2,
 		NcFile &nc,
@@ -37,26 +34,17 @@ void IceModel_DISMAL::IceModel_DISMAL::init(
 {
 	printf("BEGIN IceModel_DISMAL::init(%s)\n", vname_base.c_str());
 
-	GCMParams const &gcm_params(coupler->gcm_params);
-	IceModel_Decode::init(grid2->ndata());
-	auto grid2_xy = dynamic_cast<Grid_XY const *>(&*grid2);
-	nx = grid2_xy->nx();
-	ny = grid2_xy->ny();
-	auto dismal_var = giss::get_var_safe(nc, (vname_base + ".dismal").c_str());	// DISMAL parameters
-	output_dir = boost::filesystem::absolute(
-		boost::filesystem::path(giss::get_att(dismal_var, "output_dir")->as_string(0)),
-		gcm_params.config_dir);
+	this->grid2 = grid2;
+
+	// Transfer constants from GCM to PISM, and also set up coupling contracts.
+	// This is the right place to do it, since the PISM systme is fully up and functional,
+	// and all PISM config files have been read.
+	// This call through the GCMCoupler will call back to setup_contracts_xxx().
+	coupler->setup_contracts(*this);
+
 	printf("END IceModel_DISMAL::int()\n");
 }
 
-
-blitz::Array<double,2> const IceModel_DISMAL::reshape_xy(
-	blitz::Array<double,1> const &vals2)
-{
-	const double *data = vals2.data();
-	return blitz::Array<double,2>(const_cast<double *>(data),
-		blitz::shape(ny,nx), blitz::neverDeleteData);
-}
 
 
 /** @param index Index of each grid value.
@@ -65,40 +53,6 @@ TODO: More params need to be added.  Time, return values, etc. */
 void IceModel_DISMAL::run_decoded(double time_s,
 	std::vector<blitz::Array<double,1>> const &vals2)
 {
-	// Only need to run one copy of this
-	GCMParams const &gcm_params(coupler->gcm_params);
-	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
-
-printf("BEGIN IceModel_DISMAL::run_decoded\n");
-
-	char fname[30];
-	long time_day = (int)(time_s / 86400. + .5);
-	sprintf(fname, "%ld-dismal.nc", time_day);
-	auto full_fname(output_dir / fname);
-	printf("IceModel_DISMAL writing to: %s\n", full_fname.c_str());
-	NcFile ncout(full_fname.c_str(), NcFile::Replace);
-	assert(ncout.is_valid());
-
-	std::vector<boost::function<void ()>> fns;
-	NcDim *nx_dim = ncout.add_dim("nx", nx);
-	assert(nx_dim);
-	NcDim *ny_dim = ncout.add_dim("ny", ny);
-	assert(ny_dim);
-
-	// Define variables
-	for (int i=0; i < contract[INPUT].size_nounit(); ++i) {
-		giss::CoupledField const &field(contract[INPUT].field(i));
-		printf("IceModel_DISMAL: Defining variable %s\n", field.name.c_str());
-
-		// Convert from 1D indexing to 2D
-		auto val2_xy(reshape_xy(vals2[i]));
-		fns.push_back(giss::netcdf_define(ncout, "", field, val2_xy, {ny_dim, nx_dim}));
-	}
-
-	// Write data to netCDF file
-	for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
-	ncout.close();
-printf("END IceModel_DISMAL::run_decoded\n");
 }
 
 

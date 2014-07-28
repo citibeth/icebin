@@ -33,6 +33,19 @@ const double LHM = 3.34e5;
 
 
 // --------------------------------------------------------
+#if 0
+class ITimeConverter {
+	int year1;
+
+	double time_s(int time_i) {
+	}
+
+	double time_i(int time_s) {
+	}
+
+};
+#endif
+// --------------------------------------------------------
 int main(int argc, char **argv)
 {
 	std::string glint2_config_fname = "modele_ll_g2x2_5-searise_g20-40-PISM.nc";
@@ -113,19 +126,20 @@ int main(int argc, char **argv)
 	printf("dtsrc = %f\n", dtsrc);
 	printf("iyear1 = %d\n", iyear1);
 #else
-	double dtsrc=1800.;
+	double const dtsrc=1800.;
 	int iyear1 = 1950;
 #endif
 
 	// -----------------------------------------------------
 	// Initialize GLINT2 (via a Fortran-ish interface)
+	NcVar *time0_nc = dnc.get_var("time0");
 	NcVar *time_nc = dnc.get_var("time");
 	long cur[4] = {0, 0, 0, 0};
 	long counts1 = 1;
-	time_nc->set_cur(cur);	// Just use cur[0]
-	double time_si;		// itimei
-	time_nc->get(&time_si, &counts1);	// Just get one item
-	int itimei = (time_si / dtsrc + .5);
+	time0_nc->set_cur(cur);	// Just use cur[0]
+	double time0_s;		// time0_i
+	time0_nc->get(&time0_s, &counts1);	// Just get one item
+	int time0_i = (time0_s / dtsrc + .5);	// Also called itime in ModelE
 
 	glint2_modele *api = new_glint2_modele();
 
@@ -161,7 +175,7 @@ int main(int argc, char **argv)
 		// API Control: write_constants = false
 		0);
 
-	glint2_modele_set_start_time(api, iyear1, itimei, dtsrc);
+	glint2_modele_set_start_time(api, iyear1, time0_i, dtsrc);
 
 	int nhp = api->maker->nhp(-1);
 	printf("desm.cpp: Number Elevation Points (nhp)== %d\n", nhp);
@@ -173,7 +187,6 @@ int main(int argc, char **argv)
 
 	// Get Time...
 //	NcVar *date_nc = dnc.get_var("date");
-
 	// Get Data
 	const int nvar = 3;
 	NcVar *vars_nc[nvar] = {
@@ -210,28 +223,29 @@ int main(int argc, char **argv)
 
 
 	// The main loop
-	for (long time_i=0; time_i<ntime-1; ++time_i) {
-		// End of this time interval
-		cur[1] = time_i+1;
-		time_nc->set_cur(cur);	// Just use cur[0]
-		double end_time_s;
-		time_nc->get(&end_time_s, counts);
+	double begin_time_s;
+	double end_time_s = time0_s;
+	for (long time_index=0; time_index<ntime-1; ++time_index) {
+		// Roll forward the time interval
+		begin_time_s = end_time_s;
 
-		// Beginning of this time interval.
-		cur[0] = time_i;
+		cur[0] = time_index;
 		time_nc->set_cur(cur);	// Just use cur[0]
-		double begin_time_s;
-		time_nc->get(&begin_time_s, counts);
+		time_nc->get(&end_time_s, counts);
 
 		// Copuling time interval (in seconds)
 		double dt_s = end_time_s - begin_time_s;
 
+printf("begin_time_s = %f s (%f d)\n", begin_time_s, begin_time_s / 86400.);
+printf("end_time_s = %f s (%f d)\n", end_time_s, end_time_s / 86400.);
+printf("dt_s = %f (%f d)\n", dt_s, dt_s / 86400.);
+
 		// Leave cur[] set at the beginning of the time interval, for reading variable below
 
 		// itime: ModelE calls GLINT2 at the END of a time interval
-		int itime = (end_time_s / dtsrc * .5);
+		int end_time_i = (end_time_s / dtsrc + .5);
 
-		printf("**** itime=%d, end_time_s=%f\n", itime, end_time_s);
+		printf("**** end_time_i=%d, time_s interval = [%f - %f]\n", end_time_i, begin_time_s, end_time_s);
 
 		// Read the variables
 		for (int vi=0; vi<nvar; ++vi) {
@@ -239,6 +253,8 @@ int main(int argc, char **argv)
 			blitz::Array<double,3> &var_c = vars_c[vi];
 			blitz::Array<double,3> &var_f = vars_f[vi];
 
+printf("cur = [%ld %ld %ld %ld]\n", cur[0], cur[1], cur[2], cur[3]);
+printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3]);
 			// Read the variable (over the time interval)
 			var_nc->set_cur(cur);
 			var_nc->get(var_c.data(), counts);
@@ -266,7 +282,7 @@ int main(int argc, char **argv)
 		imph_c *= dt_s;
 
 		// Run the coupling step
-		glint2_modele_couple_to_ice_c(api, itime, impm_ff, imph_ff, tice_ff);
+		glint2_modele_couple_to_ice_c(api, end_time_i, impm_ff, imph_ff, tice_ff);
 	}
 
 	// Finish up

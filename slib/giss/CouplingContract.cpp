@@ -19,6 +19,11 @@ int CouplingContract::add_field(CoupledField &&cf)
 
 
 std::ostream &operator<<(std::ostream &out, CouplingContract const &con) {
+	if (con.begin() == con.end()) {
+		out << "    <Blank Contract>" << std::endl;
+		return out;
+	}
+
 	for (auto field = con.begin(); field != con.end(); ++field) {
 		out << "    " << *field << std::endl;
 	}

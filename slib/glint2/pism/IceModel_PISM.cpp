@@ -17,12 +17,10 @@ namespace glint2 {
 namespace gpism {
 
 
-IceModel_PISM::IceModel_PISM(GCMCoupler const *_coupler, bool with_dismal)
+IceModel_PISM::IceModel_PISM(GCMCoupler const *_coupler)
 	: IceModel_Decode(IceModel::Type::PISM, _coupler)
 {
-	printf("BEGIN IceModel_PISM::IceModel_PISM\n");
-	if (with_dismal) dismal.reset(new IceModel_DISMAL(_coupler));
-	printf("END IceModel_PISM::IceModel_PISM\n");
+	printf("BEGIN/END IceModel_PISM::IceModel_PISM\n");
 }
 
 
@@ -43,10 +41,9 @@ void IceModel_PISM::init(
 	std::string const &vname_base)
 {
 	printf("BEGIN IceModel_PISM::init(%s)\n", vname_base.c_str());
+	this->grid2 = grid2;
 	GCMParams const &_gcm_params(coupler->gcm_params);
 	IceModel_Decode::init(grid2->ndata());
-
-	if (dismal.get()) dismal->init(grid2, nc, vname_base);
 
 	std::shared_ptr<Grid_XY const> grid2_xy = std::dynamic_pointer_cast<Grid_XY const>(grid2);
 
@@ -417,7 +414,6 @@ void IceModel_PISM::run_decoded(double time_s,
 	std::vector<blitz::Array<double,1>> const &vals2)
 {
 	printf("BEGIN IceModel_PISM::run_decoded(%f)\n", time_s);
-	if (dismal.get()) dismal->run_decoded(time_s, vals2);
 
 	if (run_decoded_petsc(time_s, vals2) != 0) {
 		PetscPrintf(pism_comm, "IceModel_PISM::runtimestep() failed\n");
@@ -487,17 +483,19 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 		// (Could we just do DMDANaturalToGlobal() directly to this?)
 		ierr = pism_var->copy_from_vec(g2); CHKERRQ(ierr);
 
+#if 0
 		// ================ BEGIN Write PISM Inputs
 		long time_day = (int)(time_s / 86400. + .5);
 		std::stringstream fname;
 		std::string const &fnpart = contract[INPUT][i];
 
 		fname << time_day << "-" << fnpart << ".nc";
-		boost::filesystem::path pfname(coupler->gcm_params.config_dir / "dismal_out2" / fname.str());
+		boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());
 
 		printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
 		pism_var->dump(pfname.c_str());
 		// ================ END Write PISM Inputs
+#endif
 				
 	}	// For each pism_var
 
@@ -536,7 +534,7 @@ printf("[%d] END ice_model->run_to()\n", pism_rank);
 		char fname[30];
 		long time_day = (int)(time_s / 86400. + .5);
 		sprintf(fname, "%ld-pismout.nc", time_day);
-		auto full_fname(coupler->gcm_params.config_dir / "dismal_out2" / fname);
+		auto full_fname(coupler->gcm_params.config_dir / "pism_inputs" / fname);
 		NcFile ncout(full_fname.c_str(), NcFile::Replace);
 
 		NcDim *ny_dim = ncout.add_dim("ny", ny());

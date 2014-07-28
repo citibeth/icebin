@@ -21,7 +21,7 @@ void IceModel_PISM::setup_contracts_modele()
 	auto params(dynamic_cast<GCMPerIceSheetParams_ModelE const *>(this->gcm_per_ice_sheet_params.get()));
 
 
-	printf("BEGIN IceModel_PISM::setup_contract_modele\n");
+	printf("BEGIN IceModel_PISM::setup_contracts_modele\n");
 	IceModel &model(*this);
 
 	// =========== Transfer  constants
@@ -91,7 +91,7 @@ void IceModel_PISM::setup_contracts_modele()
 	double const pressure = 0;
 	double E_s, E_l;
 	enth.getEnthalpyInterval(pressure, E_s, E_l);
-	double const enth_modele_to_pism = E_l;		// Add to convert ModelE enthalpies to PISM enthalpies
+	double const enth_modele_to_pism = E_l;		// (J/kg): Add to convert ModelE specific enthalpies (J/kg) to PISM specific enthalpies (J/kg)
 	if (pism_rank == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
 
 	// ------------- Convert the contract to a var transformer
@@ -104,12 +104,12 @@ void IceModel_PISM::setup_contracts_modele()
 	// Add some recipes for gcm_to_ice
 	std::string out;
 	out = "land_ice_surface_specific_mass_balance_flux";
-		ice_input_vt.set(out, "lismb", "by_dt", 1.0);
-		ice_input_vt.set(out, "unit", "unit", enth_modele_to_pism);
+		ice_input_vt.set(out, "lismb", "unit", 1.0);
 	out = "land_ice_surface_downward_advective_heat_flux";
-		ice_input_vt.set(out, "liseb", "by_dt", 1.0);
+		ice_input_vt.set(out, "liseb", "unit", 1.0);
+		ice_input_vt.set(out, "lismb", "unit", enth_modele_to_pism);
 	out = "surface_temperature";	// K
-		ice_input_vt.set(out, "litg2", "by_dt", 1.0);
+		ice_input_vt.set(out, "litg2", "unit", 1.0);
 		ice_input_vt.set(out, "unit", "unit", C2K);	// +273.15
 	out = "land_ice_surface_downward_conductive_heat_flux";	// W m-2
 		// Zero for now
@@ -143,16 +143,7 @@ void IceModel_PISM::setup_contracts_modele()
 		ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
 	}
 
-	// Now give our contracts to our dismal slave IceModel
-	if (dismal.get()) {
-//		std::array<giss::CouplingContract, 2> dup(contract);
-		dismal->contract = {
-			CouplingContract(contract[0]), CouplingContract(contract[1])};
-
-//std::move(dup);
-	}
-
-	printf("END IceModel_PISM::setup_contract_modele\n");
+	printf("END IceModel_PISM::setup_contracts_modele\n");
 }
 
 

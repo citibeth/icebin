@@ -16,7 +16,7 @@
 #include <mpi.h>
 #include <glint2/pism/PetscContext.hpp>
 #include <glint2/IceModel.hpp>
-#include <glint2/IceModel_DISMAL.hpp>
+#include <glint2/IceModel_Decode.hpp>
 #include <memory>
 #include <glint2/pism/PSConstantGLINT2.hpp>
 #include <glint2/pism/PISMIceModel.hpp>		// Our specialized subclass of PISM's ::IceModel
@@ -62,9 +62,6 @@ class IceModel_PISM : public IceModel_Decode
 	set of elevations than the ice model is using --- then this can cause problems
 	in the generated SMB fields. */
 	bool update_elevation = true;
-
-	/** Use a DISMAL ice model to save stuff easily (for debugging) */
-	std::unique_ptr<IceModel_DISMAL> dismal;
 
 	// ------------------------
 public:
@@ -116,7 +113,7 @@ public:
 		std::string const &vname,
 		IceSheet *sheet);
 
-	IceModel_PISM(GCMCoupler const *_coupler, bool with_dismal=true);
+	IceModel_PISM(GCMCoupler const *_coupler);
 
 	~IceModel_PISM();
 

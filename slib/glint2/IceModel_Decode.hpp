@@ -30,23 +30,25 @@ given. */
 class IceModel_Decode : public IceModel {
 private:
 	// Dimensionality Ice Model's vector space (grid)
-	int _ndata;
+//	int _ndata;
 
 public :
 	/** @return Dimensionality of ice model's vector space. */
-	int ndata() { return _ndata; }
+//	int ndata() { return _ndata; }
 
 //	IceModel_Decode(Grid const &grid) : ndata(grid.ndata()) {}
 //	IceModel_Decode(int _ndata) : ndata(_ndata) {}
 	IceModel_Decode(IceModel::Type _type, GCMCoupler const *_coupler)
 		: IceModel(_type, _coupler) {}
 
+#if 0
 	// Function special just to IceModel_Decode
 	void init(int ndata)
 	{
 //		IceModel::init();
 		this->_ndata = ndata;
 	}
+#endif
 
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...

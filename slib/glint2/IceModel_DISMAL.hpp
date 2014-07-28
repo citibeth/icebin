@@ -25,14 +25,8 @@ namespace glint2 {
 
 class IceModel_DISMAL : public IceModel_Decode
 {
-	// Assume a simple X-Y Cartesian grid
-	int nx, ny;
-
-	// Where should we put our output
-	boost::filesystem::path output_dir;
 
 public:
-
 	IceModel_DISMAL(GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::DISMAL, _coupler) {}
 
 	/** Initialize any grid information, etc. from the IceSheet struct.
@@ -48,14 +42,9 @@ public:
 	void run_decoded(double time_s,
 		std::vector<blitz::Array<double,1>> const &vals2);
 
-protected :
-	/** Utility class to reshape blitz arrays.
-	TODO: This should not be necessary, there is a general reshape
-	in giss/blitz.hpp */
-	blitz::Array<double,2> const reshape_xy(
-		blitz::Array<double,1> const &vals2);
 public:
 
+	// Defined in contracts/ folder
 	void setup_contracts_modele();
 
 

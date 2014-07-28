@@ -80,6 +80,13 @@ void GCMCoupler::read_from_netcdf(
 		ice_model->init(sheet->grid2, nc, vname_sheet);
 		ice_model->update_ice_sheet(nc, vname_sheet, sheet);
 
+
+		// Create the affiliated writer
+		std::unique_ptr<IceModel_Writer> writer(new IceModel_Writer(this));
+		writer->init_from_ice_model(ice_model, *name);
+		writers.insert(i, std::move(writer));
+
+
 #if 1
 		// Print out the contract and var transformations
 		std::cout << "========= Contract for " << *name << std::endl;
@@ -143,6 +150,7 @@ public:
 /** PROTECTED method */
 void GCMCoupler::call_ice_model(
 	IceModel *model,
+	IceModel_Writer *writer,		// The affiliated input-writer (if it exists).
 	double time_s,
 	giss::DynArray<SMBMsg> &rbuf,
 	SMBMsg *begin, SMBMsg *end)		// Messages have the MAX number of fields for any ice model contract
@@ -169,7 +177,12 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 			&rbegin[i], shape, stride, blitz::neverDeleteData));
 	}
 
+	// Record exactly the same inputs that this ice model is seeing.
+	if (writer) writer->run_timestep(time_s, indices, vals2);
+
+	// Now call to the ice model
 	model->run_timestep(time_s, indices, vals2);
+
 printf("[%d] END GCMCoupler::call_ice_model(nfields=%ld)\n", gcm_params.gcm_rank, nfields);
 };
 
@@ -244,7 +257,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
 			auto params(im_params.find(sheetno));
-			call_ice_model(&*model, time_s, *rbuf,
+			call_ice_model(&*model, writers[sheetno], time_s, *rbuf,
 				params->second.begin, params->second.next);
 
 		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
@@ -257,7 +270,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			int sheetno = model.key();
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
-			call_ice_model(&*model, time_s, *rbuf,
+			call_ice_model(&*model, writers[sheetno], time_s, *rbuf,
 				NULL, NULL);
 
 		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)

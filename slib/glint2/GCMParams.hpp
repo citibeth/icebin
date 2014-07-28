@@ -13,6 +13,7 @@ struct GCMParams {
 	int gcm_root;			// Rank of root process in gcm_comm
 	boost::filesystem::path config_dir;	// Where to look for Ice Model configuration files
 	giss::time::tm time_base;	// Corresponds to time_s == 0
+	std::string time_units;		// CF-compliant string describing the time units
 	double time_start_s;		// Start of simulation, as far as ice model is concerned (seconds since time_base).
 
 	GCMParams();

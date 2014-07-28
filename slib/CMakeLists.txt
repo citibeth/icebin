@@ -58,6 +58,7 @@ set(glint2_SOURCES
 	glint2/HeightClassifier.cpp
 	glint2/IceModel.cpp
 	glint2/IceModel_DISMAL.cpp
+	glint2/IceModel_Writer.cpp
 	glint2/IceModel_Decode.cpp
 	glint2/IceSheet.cpp
 	glint2/IceSheet_L0.cpp

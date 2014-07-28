@@ -10,7 +10,8 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	GCMCoupler(GCMCoupler::Type::MODELE)
 {
 	gcm_outputs.add_field("lismb", "kg m-2 s-1", "Surface mass balance");
-	gcm_outputs.add_field("liseb", "W m-2", "Latent heat flux");
+//	gcm_outputs.add_field("liseb", "J kg-1", "Specific ethalpy of SMB");
+	gcm_outputs.add_field("liseb", "J m-2 s-1", "Ethalpy of SMB");
 	gcm_outputs.add_field("litg2", "degC", "T of bottom layer of snow/firn");
 	gcm_outputs.add_field("unit", "", "Dimensionless identity");
 

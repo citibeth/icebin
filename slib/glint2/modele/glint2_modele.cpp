@@ -331,22 +331,18 @@ printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f
 		NcDim *time_dim = ncout.add_dim("time");		// No dimsize --> unlimited
 		const NcDim *dims[4]{time_dim, nhp_dim, jm_dim, im_dim};
 
-		std::string time_units = str(boost::format("seconds since %04d-01-01 00:00:00") % iyear1);		// Technically, I should be getting start date from gcm_params giss::tm struct, rather than assuming it starts on January 1.
-
 		const NcDim *dims_b[1]{one_dim};
 		NcVar *time0_var = ncout.add_var("time0", giss::get_nc_type<double>(), 1, dims_b);
-		time0_var->add_att("units", time_units.c_str());
+		time0_var->add_att("units", gcm_params.time_units.c_str());
 		time0_var->add_att("calendar", "365_day");
 		time0_var->add_att("axis", "T");
 		time0_var->add_att("long_name", "Simulation start time");
 
 		NcVar *time_var = ncout.add_var("time", giss::get_nc_type<double>(), 1, dims);
-		time_var->add_att("units", time_units.c_str());
+		time_var->add_att("units", gcm_params.time_units.c_str());
 		time_var->add_att("calendar", "365_day");
 		time_var->add_att("axis", "T");
 		time_var->add_att("long_name", "Coupling times");
-
-
 
 		giss::CouplingContract &gcm_outputs(api->gcm_coupler->gcm_outputs);
 
@@ -370,7 +366,7 @@ printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f
 		long cur[1]{0};
 		long counts[1]{1};
 		time0_var->set_cur(cur);
-		time0_var->put(&time0_s, counts);
+		time0_var->put(&gcm_params.time_start_s, counts);
 
 		ncout.close();
 	}
@@ -707,16 +703,16 @@ giss::F90Array<double,3> &tg21h_f)		// C
 	int rank = api->gcm_coupler->rank();	// MPI rank; debugging
 	double time_s = itime * api->dtsrc;
 
-	printf("BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f)\n", itime, time_s);
+	printf("BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f, dtsrc=%f)\n", itime, time_s, api->dtsrc);
 
 	GCMCoupler &coupler(*api->gcm_coupler);
-	giss::CouplingContract &gcm_outputs(coupler.gcm_outputs);
+	giss::CouplingContract &gcm_outputs_contract(coupler.gcm_outputs);
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
-	std::vector<blitz::Array<double,3>> inputs(gcm_outputs.size_nounit());
-	inputs[gcm_outputs["lismb"]].reference(smb1h_f.to_blitz());
-	inputs[gcm_outputs["liseb"]].reference(seb1h_f.to_blitz());
-	inputs[gcm_outputs["litg2"]].reference(tg21h_f.to_blitz());
+	std::vector<blitz::Array<double,3>> inputs(gcm_outputs_contract.size_nounit());
+	inputs[gcm_outputs_contract["lismb"]].reference(smb1h_f.to_blitz());
+	inputs[gcm_outputs_contract["liseb"]].reference(seb1h_f.to_blitz());
+	inputs[gcm_outputs_contract["litg2"]].reference(tg21h_f.to_blitz());
 
 	if (coupler.gcm_out_file.length() > 0) {
 		// Write out to DESM file
@@ -736,8 +732,6 @@ printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %ld\n", api->hp_to_ic
 	int nfields_max = 0;
 	for (auto sheet=api->maker->sheets.begin(); sheet != api->maker->sheets.end(); ++sheet) {
 		int sheetno = sheet->index;
-//	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
-//		int sheetno = ii->first;
 		giss::VarTransformer &vt(api->gcm_coupler->models[sheetno]->var_transformer[IceModel::INPUT]);
 		nfields_max = std::max(nfields_max, (int)vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit());
 	}
@@ -775,7 +769,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 			msg.i2 = jj.row;
 
 #if 1
-			// Convert from inputs to outputs while regridding
+			// Convert from input to output units while regridding
 			for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {
 				double inp = 0;
 				std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
@@ -787,6 +781,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 				msg[xi] = jj.val * (inp + trans.units[xi]);
 			}
 #else
+			// This is the old code for the above (that doesn't convert units)
 			msg[0] = jj.val * inputs[0](jj.col_i, jj.col_j, jj.col_k);
 			msg[1] = jj.val * inputs[1](jj.col_i, jj.col_j, jj.col_k);
 			msg[2] = jj.val * inputs[2](jj.col_i, jj.col_j, jj.col_k);

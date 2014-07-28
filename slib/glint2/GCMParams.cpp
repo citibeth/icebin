@@ -1,4 +1,5 @@
 #include <mpi.h>		// Must be first
+#include <boost/format.hpp>
 #include <glint2/GCMParams.hpp>
 
 namespace glint2 {
@@ -12,6 +13,14 @@ void GCMParams::set_start_time(
 {
 	time_base = _time_base;
 	time_start_s = _time_start_s;
+	time_units = str(boost::format("seconds since %04d-%02d-%02d %02d:%02d:%02d")
+		% time_base.tm_year
+		% time_base.tm_year
+		% time_base.tm_mon
+		% time_base.tm_mday
+		% time_base.tm_hour
+		% time_base.tm_min
+		% time_base.tm_sec);
 }
 
 GCMParams::GCMParams(
