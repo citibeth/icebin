@@ -82,7 +82,7 @@ void GCMCoupler::read_from_netcdf(
 
 		// Create the affiliated writer
 		std::unique_ptr<IceModel_Writer> writer(new IceModel_Writer(this));
-		writer->init_from_ice_model(ice_model, *name);
+		writer->init(sheet->grid2, ice_model, *name);
 		writers.insert(i, std::move(writer));
 
 #if 1

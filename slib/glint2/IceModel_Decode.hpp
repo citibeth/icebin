@@ -33,6 +33,8 @@ public :
 	IceModel_Decode(IceModel::Type _type, GCMCoupler const *_coupler)
 		: IceModel(_type, _coupler) {}
 
+	~IceModel_Decode() {}
+
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc.

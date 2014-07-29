@@ -28,14 +28,42 @@
 namespace glint2 {
 
 
-/** Initialize any grid information, etc. from the IceSheet struct.
-@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
+std::vector<NcDim const *> IceModel_Writer::add_dims(NcFile &nc)
+{
+	printf("BEGIN add_dims()\n");
+
+	std::vector<NcDim const *> ret;
+	unsigned int ndim = dim_names.size();
+	ret.reserve(ndim);
+	ret.push_back(nc.add_dim(dim_names[0].c_str()));	// No dimsize --> unlimited
+	for (unsigned int i=1; i < ndim; ++i) {
+		ret.push_back(nc.add_dim(dim_names[i].c_str(), counts[i]));
+	}
+
+	printf("END add_dims()\n");
+	return ret;
+}
+
+std::vector<NcDim const *> IceModel_Writer::get_dims(NcFile &nc)
+{
+	std::vector<NcDim const *> ret;
+	unsigned int ndim = dim_names.size();
+	ret.reserve(ndim);
+	for (unsigned int i=0; i < ndim; ++i)
+		ret.push_back(nc.get_dim(dim_names[i].c_str()));
+	return ret;
+}
+
+
+/** Specialized init signature for IceModel_Writer */
 void IceModel_Writer::init(
 	std::shared_ptr<glint2::Grid> const &grid2,
-	NcFile &nc,
-	std::string const &vname_base)
+	IceModel const *model, std::string const &sheet_name)
+
 {
-	this->grid2 = grid2;
+	printf("BEGIN IceModel_Writer::init(%s)\n", sheet_name.c_str());
+
+	IceModel::init(grid2);
 
 	// Try to be clever about making multi-dimensional arrays
 	// in the output according to the grid the user expects.
@@ -54,33 +82,7 @@ void IceModel_Writer::init(
 			cur = {0, 0};
 		} break;
 	};
-}
 
-std::vector<NcDim const *> IceModel_Writer::add_dims(NcFile &nc)
-{
-	std::vector<NcDim const *> ret;
-	unsigned int ndim = dim_names.size();
-	ret.reserve(ndim);
-	ret.push_back(nc.add_dim(dim_names[0].c_str()));	// No dimsize --> unlimited
-	for (unsigned int i=1; i < ndim; ++i)
-		ret.push_back(nc.add_dim(dim_names[i].c_str(), counts[i]));
-	return ret;
-}
-
-std::vector<NcDim const *> IceModel_Writer::get_dims(NcFile &nc)
-{
-	std::vector<NcDim const *> ret;
-	unsigned int ndim = dim_names.size();
-	ret.reserve(ndim);
-	for (unsigned int i=0; i < ndim; ++i)
-		ret.push_back(nc.get_dim(dim_names[i].c_str()));
-	return ret;
-}
-
-
-/** Init from the parent ice model.  Copy contracts, etc.  This also opens a file to write to. */
-void IceModel_Writer::init_from_ice_model(IceModel const *model, std::string const &sheet_name)
-{
 	// We just need the input coupling contract
 	contract[INPUT] = model->contract[INPUT];
 
@@ -128,6 +130,7 @@ void IceModel_Writer::init_from_ice_model(IceModel const *model, std::string con
 	time0_var->put(&gcm_params.time_start_s, counts_b);
 
 	nc.close();
+	printf("END IceModel_Writer::init_from_ice_model(%s)\n", sheet_name.c_str());
 }
 
 /** @param index Index of each grid value.

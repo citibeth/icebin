@@ -71,6 +71,9 @@ export CGAL_LIBS="-L$CGAL_HOME/lib -lCGAL"
 # done with the $(FCC), so this is not needed.
 export FORTRAN_LIBS="-lgfortran"
 
+export UDUNITS2_CFLAGS="-I$MACPORTS/include/udunits2"
+export UDUNITS2_LIBS="-L$MACPORTS/lib -ludunits2"
+
 # ===================================================================
 # Special rounding is required for CGAL
 # -fp-model strict for intel

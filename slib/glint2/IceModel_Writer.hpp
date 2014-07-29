@@ -37,15 +37,11 @@ public:
 
 	IceModel_Writer(GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::WRITER, _coupler) {}
 
-	/** Initialize any grid information, etc. from the IceSheet struct.
-	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
+
+	/** Specialized init signature for IceModel_Writer */
 	void init(
 		std::shared_ptr<glint2::Grid> const &grid2,
-		NcFile &nc,
-		std::string const &vname_base);
-
-	/** Init from the parent ice model.  Copy contracts, etc.  This also opens a file to write to. */
-	void init_from_ice_model(IceModel const *model, std::string const &sheet_name);
+		IceModel const *model, std::string const &sheet_name);
 
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
