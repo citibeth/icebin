@@ -18,7 +18,8 @@ namespace gpism {
 
 
 IceModel_PISM::IceModel_PISM(GCMCoupler const *_coupler)
-	: IceModel_Decode(IceModel::Type::PISM, _coupler)
+	: IceModel_Decode(IceModel::Type::PISM, _coupler),
+	write_pism_inputs(false)
 {
 	printf("BEGIN/END IceModel_PISM::IceModel_PISM\n");
 }
@@ -41,9 +42,8 @@ void IceModel_PISM::init(
 	std::string const &vname_base)
 {
 	printf("BEGIN IceModel_PISM::init(%s)\n", vname_base.c_str());
-	this->grid2 = grid2;
+	IceModel::init(grid2);
 	GCMParams const &_gcm_params(coupler->gcm_params);
-	IceModel_Decode::init(grid2->ndata());
 
 	std::shared_ptr<Grid_XY const> grid2_xy = std::dynamic_pointer_cast<Grid_XY const>(grid2);
 
@@ -483,19 +483,19 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 		// (Could we just do DMDANaturalToGlobal() directly to this?)
 		ierr = pism_var->copy_from_vec(g2); CHKERRQ(ierr);
 
-#if 0
-		// ================ BEGIN Write PISM Inputs
-		long time_day = (int)(time_s / 86400. + .5);
-		std::stringstream fname;
-		std::string const &fnpart = contract[INPUT][i];
+		if (write_pism_inputs) {
+			// ================ BEGIN Write PISM Inputs
+			long time_day = (int)(time_s / 86400. + .5);
+			std::stringstream fname;
+			std::string const &fnpart = contract[INPUT][i];
 
-		fname << time_day << "-" << fnpart << ".nc";
-		boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());
+			fname << time_day << "-" << fnpart << ".nc";
+			boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());
 
-		printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
-		pism_var->dump(pfname.c_str());
-		// ================ END Write PISM Inputs
-#endif
+			printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
+			pism_var->dump(pfname.c_str());
+			// ================ END Write PISM Inputs
+		}
 				
 	}	// For each pism_var
 
@@ -515,7 +515,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
 printf("[%d] END ice_model->run_to()\n", pism_rank);
 
-#if 0
+#if 0	// Section commented out because it's the next step.
 	// ============= Collect PISM Outputs into blitz::Array<double,2>
 	// Retrieve stuff from PISM
 	blitz::Array<double,2> geothermal_flux_sum;

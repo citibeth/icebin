@@ -35,6 +35,11 @@ class IceModel_PISM : public IceModel_Decode
 	MPI_Comm pism_comm;			// Commnicator used by ice model
 	PetscMPIInt pism_rank, pism_size;
 
+	/** Should we write inputs to PISM via PISM's dump() functionality?
+	This is (almost certainly) supercede by the IceModel_Writer class,
+	except in cases of extreme debugging. */
+	const bool write_pism_inputs = false;
+
 	// These should be declared in the same order they're created,
 	// so they get destroyed in the proper reverse order.
 	// See: http://msdn.microsoft.com/en-us/library/8183zf3x%28v=vs.110%29.aspx
@@ -138,26 +143,12 @@ protected:
 	as a program error check against misspelled parameter names. */
 	void set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new = false);
 
-#if 0
-public:
-	/** Inherited from IceModel */
-	void run_timestep(double time_s,
-		blitz::Array<int,1> const &indices,
-		std::vector<blitz::Array<double,1>> const &vals2);
-private:
-	PetscErrorCode run_timestep_petsc(double time_s,
-		blitz::Array<int,1> const &indices,
-		std::vector<blitz::Array<double,1>> const &vals2);
-
-#else
 public:
 	void run_decoded(double time_s,
 		std::vector<blitz::Array<double,1>> const &vals2);
 private:
 	PetscErrorCode run_decoded_petsc(double time_s,
 		std::vector<blitz::Array<double,1>> const &vals2);
-
-#endif
 
 };
 

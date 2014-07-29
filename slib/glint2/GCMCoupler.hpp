@@ -121,7 +121,7 @@ protected:
 	@see gmc_inputs*/
 	void call_ice_model(
 		IceModel *model,
-		IceModel_Writer *writer,
+		int sheetno,
 		double time_s,
 		giss::DynArray<SMBMsg> &rbuf,
 		SMBMsg *begin, SMBMsg *end);

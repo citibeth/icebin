@@ -786,6 +786,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 			msg[1] = jj.val * inputs[1](jj.col_i, jj.col_j, jj.col_k);
 			msg[2] = jj.val * inputs[2](jj.col_i, jj.col_j, jj.col_k);
 #endif
+//			// This is even older code (variables are hardwired)
 //			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
 //			msg[1] = jj.val * seb1h(jj.col_i, jj.col_j, jj.col_k);
 //			msg[2] = jj.val * tg21h(jj.col_i, jj.col_j, jj.col_k);

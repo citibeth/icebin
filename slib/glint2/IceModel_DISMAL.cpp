@@ -34,7 +34,7 @@ void IceModel_DISMAL::IceModel_DISMAL::init(
 {
 	printf("BEGIN IceModel_DISMAL::init(%s)\n", vname_base.c_str());
 
-	this->grid2 = grid2;
+	IceModel::init(grid2);
 
 	// Transfer constants from GCM to PISM, and also set up coupling contracts.
 	// This is the right place to do it, since the PISM systme is fully up and functional,

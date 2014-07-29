@@ -33,19 +33,6 @@ const double LHM = 3.34e5;
 
 
 // --------------------------------------------------------
-#if 0
-class ITimeConverter {
-	int year1;
-
-	double time_s(int time_i) {
-	}
-
-	double time_i(int time_s) {
-	}
-
-};
-#endif
-// --------------------------------------------------------
 int main(int argc, char **argv)
 {
 	std::string glint2_config_fname = "modele_ll_g2x2_5-searise_g20-40-PISM.nc";

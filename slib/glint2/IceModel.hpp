@@ -96,6 +96,12 @@ public:
 
 	// --------------------------------------------------
 
+protected:
+	/** Call this from main init() method (below) */
+	void init(std::shared_ptr<glint2::Grid> const &_grid2)
+		{ this->grid2 = _grid2; }
+public:
+
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
 	virtual void init(
