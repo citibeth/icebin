@@ -15,7 +15,6 @@ void GCMParams::set_start_time(
 	time_start_s = _time_start_s;
 	time_units = str(boost::format("seconds since %04d-%02d-%02d %02d:%02d:%02d")
 		% time_base.tm_year
-		% time_base.tm_year
 		% time_base.tm_mon
 		% time_base.tm_mday
 		% time_base.tm_hour
