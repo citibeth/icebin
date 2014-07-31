@@ -11,14 +11,31 @@ void VarTransformer::allocate()
 }
 
 
-void VarTransformer::set(std::string output, std::string input, std::string scalar, double val)
+bool VarTransformer::set(std::string output, std::string input, std::string scalar, double val)
 {
 	int ioutput = dimension(OUTPUTS)[output];
-	if (ioutput < 0) return;		// No error if our output variable is not in this tensor.
 	int iinput = dimension(INPUTS)[input];
 	int iscalar = dimension(SCALARS)[scalar];
 
+	bool ret = true;
+	if (ioutput < 0) {
+		printf("ERROR: VarTransformer::set(): output variable %s not defined.\n", output.c_str());
+		ret = false;
+	}
+	if (iinput < 0) {
+		printf("ERROR: VarTransformer::set(): input variable %s not defined.\n", input.c_str());
+		ret = false;
+	}
+
+	if (iscalar < 0) {
+		printf("ERROR: VarTransformer::set(): scalar variable %s not defined.\n", output.c_str());
+		ret = false;
+	}
+
+	if (!ret) return ret;
+	
 	_tensor(ioutput, iinput, iscalar) = val;
+	return ret;
 }
 
 

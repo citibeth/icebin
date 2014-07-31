@@ -24,15 +24,20 @@ void IceModel_DISMAL::setup_contracts_modele()
 	// ============ GCM -> Ice
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
+	std::string const MASS_FLUX = "surface_downward_mass_flux";
+	std::string const ENTHALPY_FLUX = "surface_downward_enthalpy_flux";
+	std::string const T = "surface_temperature";
+	std::string const HEAT_FLUX = "surface_downward_conductive_heat_flux";
+
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_cfname("land_ice_surface_specific_mass_balance_flux", "kg m-2 s-1");
-	ice_input.add_cfname("surface_downward_latent_heat_flux", "W m-2");
+	ice_input.add_field(MASS_FLUX, "kg m-2 s-1");
+	ice_input.add_field(ENTHALPY_FLUX, "W m-2");
 	switch(params->coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
-			ice_input.add_cfname("surface_temperature", "K");
+			ice_input.add_field(T, "K");
 		break;
 		case ModelE_CouplingType::NEUMANN_BC :
-			ice_input.add_cfname("surface_downward_sensible_heat_flux", "W m-2");
+			ice_input.add_field(HEAT_FLUX, "W m-2");
 		break;
 	}
 
@@ -44,16 +49,25 @@ void IceModel_DISMAL::setup_contracts_modele()
 	ice_input_vt.allocate();
 
 	// Add some recipes for gcm_to_ice
+	double const enth_modele_to_pism = 437000;		// Taken from run with PISM
 	std::string out;
-	out = "land_ice_surface_specific_mass_balance_flux";
-		ice_input_vt.set(out, "lismb", "by_dt", 1.0);
-	out = "surface_downward_latent_heat_flux";
-		ice_input_vt.set(out, "liseb", "by_dt", 1.0);
-	out = "surface_temperature";	// K
-		ice_input_vt.set(out, "litg2", "by_dt", 1.0);
-		ice_input_vt.set(out, "unit", "unit", C2K);	// +273.15
-	out = "surface_downward_sensible_heat_flux";	// W m-2
-		// Zero for now
+	bool ok = true;
+	ok = ok && ice_input_vt.set(MASS_FLUX, "lismb", "unit", 1.0);
+
+	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "liseb", "unit", 1.0);
+	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "lismb", "unit", enth_modele_to_pism);
+
+	switch(params->coupling_type.index()) {
+		case ModelE_CouplingType::DIRICHLET_BC :
+			ok = ok && ice_input_vt.set(T, "litg2", "unit", 1.0);
+			ok = ok && ice_input_vt.set(T, "unit", "unit", C2K);	// +273.15
+		break;
+		case ModelE_CouplingType::NEUMANN_BC :
+// Nothing for now...
+//			ok = ok && ice_input_vt.set(HEAT_FLUX, "liseb", "unit", 1.0);
+		break;
+	}
+
 
 	// ============== Ice -> GCM (none)
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
@@ -75,9 +89,13 @@ void IceModel_DISMAL::setup_contracts_modele()
 
 	// Set up transformations: just copy inputs to outputs
 	for (auto ii = ice_output.begin(); ii != ice_output.end(); ++ii) {
-		ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
+		ok = ok && ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
 	}
 
+	if (!ok) {
+		printf("modele_dismal.cpp quitting due to errors.\n");
+		throw std::exception();
+	}
 
 	printf("END IceModel_DISMAL::setup_contract_modele\n");
 }

@@ -61,7 +61,7 @@ public:
 	}
 
 	int add_field(std::string const &name, std::string const &units,
-		std::string const &description)
+		std::string const &description = "<no description>")
 	{ return add_field(CoupledField(name, units, description)); }
 
 

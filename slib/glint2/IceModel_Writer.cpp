@@ -99,6 +99,15 @@ void IceModel_Writer::init(
 	// Set up the output file
 	// Create netCDF variables based on details of the coupling contract.xs
 	output_fname = (output_dir / (sheet_name + ".nc")).string();
+
+	printf("END IceModel_Writer::init_from_ice_model(%s)\n", sheet_name.c_str());
+}
+
+
+void IceModel_Writer::init_output_file()
+{
+	GCMParams const &gcm_params(coupler->gcm_params);
+
 	NcFile nc(output_fname.c_str(), NcFile::Replace);
 	std::vector<const NcDim *> dims = add_dims(nc);
 	NcDim *one_dim = nc.add_dim("one", 1);
@@ -130,7 +139,8 @@ void IceModel_Writer::init(
 	time0_var->put(&gcm_params.time_start_s, counts_b);
 
 	nc.close();
-	printf("END IceModel_Writer::init_from_ice_model(%s)\n", sheet_name.c_str());
+
+	output_file_initialized = true;
 }
 
 /** @param index Index of each grid value.
@@ -144,6 +154,7 @@ void IceModel_Writer::run_decoded(double time_s,
 	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
 
 printf("BEGIN IceModel_Writer::run_decoded\n");
+	if (!output_file_initialized) init_output_file();
 	NcFile nc(output_fname.c_str(), NcFile::Write);
 
 	// Read index info

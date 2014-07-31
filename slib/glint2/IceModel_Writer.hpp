@@ -43,6 +43,12 @@ public:
 		std::shared_ptr<glint2::Grid> const &grid2,
 		IceModel const *model, std::string const &sheet_name);
 
+protected:
+	bool output_file_initialized;
+	/** This is called on-demand, the first time through run_decoded(). */
+	void init_output_file();
+
+public:
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc. */

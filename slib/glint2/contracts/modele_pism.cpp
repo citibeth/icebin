@@ -61,20 +61,25 @@ void IceModel_PISM::setup_contracts_modele()
 	// ============ GCM -> Ice
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
+	std::string const MASS_FLUX = "surface_downward_mass_flux";
+	std::string const ENTHALPY_FLUX = "surface_downward_enthalpy_flux";
+	std::string const T = "surface_temperature";
+	std::string const HEAT_FLUX = "surface_downward_conductive_heat_flux";
+
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field("land_ice_surface_downward_mass_flux", "kg m-2 s-1",
+	ice_input.add_field(MASS_FLUX, "kg m-2 s-1",
 		"'Surface Mass Balance' over the coupling interval.\n"
 		"Convention: Down is positive");
-	ice_input.add_field("land_ice_surface_downward_enthalpy_flux", "J m-2",
+	ice_input.add_field(ENTHALPY_FLUX, "W m-2",
 		"Advective enthalpy associated with land_ice_surface_downward_mass_flux."
 		"Convention: Down is positive");
 
 	switch(params->coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
-			ice_input.add_cfname("surface_temperature", "K");
+			ice_input.add_cfname(T, "K");
 		break;
 		case ModelE_CouplingType::NEUMANN_BC :
-			ice_input.add_field("land_ice_surface_downward_conductive_heat_flux", "W m-2",
+			ice_input.add_field(HEAT_FLUX, "W m-2",
 				"Conductive heat between ice sheet and snow/firn model on top of it.\n"
 				"Convention: Down is positive");
 		break;
@@ -92,6 +97,7 @@ void IceModel_PISM::setup_contracts_modele()
 	double E_s, E_l;
 	enth.getEnthalpyInterval(pressure, E_s, E_l);
 	double const enth_modele_to_pism = E_l;		// (J/kg): Add to convert ModelE specific enthalpies (J/kg) to PISM specific enthalpies (J/kg)
+	// NOTE: enth_modele_to_pism == 437000 J/kg
 	if (pism_rank == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
 
 	// ------------- Convert the contract to a var transformer
@@ -103,16 +109,22 @@ void IceModel_PISM::setup_contracts_modele()
 
 	// Add some recipes for gcm_to_ice
 	std::string out;
-	out = "land_ice_surface_specific_mass_balance_flux";
-		ice_input_vt.set(out, "lismb", "unit", 1.0);
-	out = "land_ice_surface_downward_advective_heat_flux";
-		ice_input_vt.set(out, "liseb", "unit", 1.0);
-		ice_input_vt.set(out, "lismb", "unit", enth_modele_to_pism);
-	out = "surface_temperature";	// K
-		ice_input_vt.set(out, "litg2", "unit", 1.0);
-		ice_input_vt.set(out, "unit", "unit", C2K);	// +273.15
-	out = "land_ice_surface_downward_conductive_heat_flux";	// W m-2
-		// Zero for now
+	bool ok = true;
+	ok = ok && ice_input_vt.set(MASS_FLUX, "lismb", "unit", 1.0);
+
+	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "liseb", "unit", 1.0);
+	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "lismb", "unit", enth_modele_to_pism);
+
+	switch(params->coupling_type.index()) {
+		case ModelE_CouplingType::DIRICHLET_BC :
+			ok = ok && ice_input_vt.set(T, "litg2", "unit", 1.0);
+			ok = ok && ice_input_vt.set(T, "unit", "unit", C2K);	// +273.15
+		break;
+		case ModelE_CouplingType::NEUMANN_BC :
+// Nothing for now...
+//			ok = ok && ice_input_vt.set(HEAT_FLUX, "liseb", "unit", 1.0);
+		break;
+	}
 
 	// ============== Ice -> GCM
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
@@ -140,7 +152,12 @@ void IceModel_PISM::setup_contracts_modele()
 
 	// Set up transformations: just copy inputs to outputs
 	for (auto ii = ice_output.begin(); ii != ice_output.end(); ++ii) {
-		ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
+		ok = ok && ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
+	}
+
+	if (!ok) {
+		printf("modele_pism.cpp quitting due to errors.\n");
+		throw std::exception();
 	}
 
 	printf("END IceModel_PISM::setup_contracts_modele\n");

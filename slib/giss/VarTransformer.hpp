@@ -103,8 +103,9 @@ public:
 	DynamicEnum const &dimension(int idim) const
 		{ return *_ele_names[idim]; }
 
-	/** Set an element of the tensor, using name-based indexing. */
-	void set(std::string output, std::string input, std::string scalar, double val);
+	/** Set an element of the tensor, using name-based indexing.
+	@return true if all OK, false on error. */
+	bool set(std::string output, std::string input, std::string scalar, double val);
 
 	/** Instantiates the scalars with specific values, and returns a 2nd-order
 	matrix derived from the 3d-order tensor, in CSR format. */
