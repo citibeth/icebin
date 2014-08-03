@@ -28,6 +28,7 @@ namespace glint2 {
 
 /** @param sheet (OPTIONAL): Info on the ice sheet data structure */
 std::unique_ptr<IceModel> read_icemodel(
+	std::string const &name,
 	GCMCoupler const *coupler,
 	NcFile &nc,
 	std::string const &vname,
@@ -44,11 +45,11 @@ std::unique_ptr<IceModel> read_icemodel(
 	std::unique_ptr<IceModel> ice_model;
 	switch(type.index()) {
 		case IceModel::Type::DISMAL :
-			ice_model.reset(new IceModel_DISMAL(coupler));
+			ice_model.reset(new IceModel_DISMAL(name, coupler));
 			break;
 #ifdef USE_PISM
 		case IceModel::Type::PISM :
-			ice_model.reset(new glint2::gpism::IceModel_PISM(coupler));
+			ice_model.reset(new glint2::gpism::IceModel_PISM(name, coupler));
 			break;
 #endif
 	}

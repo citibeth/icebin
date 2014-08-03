@@ -108,6 +108,11 @@ public:
 		std::vector<std::string> const &sheet_names,
 	    giss::MapDict<std::string, IceSheet> &sheets);
 
+	void set_start_time(
+		giss::time::tm const &time_base,
+		double time_start_s);
+
+
 	/** Returns a unique rank number for each node in the parallel computation.
 	Useful for debugging-type output. */
 	int rank() const;

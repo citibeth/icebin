@@ -27,7 +27,7 @@ class IceModel_DISMAL : public IceModel_Decode
 {
 
 public:
-	IceModel_DISMAL(GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::DISMAL, _coupler) {}
+	IceModel_DISMAL(std::string const &_name, GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::DISMAL, name, _coupler) {}
 
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */

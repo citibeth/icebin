@@ -65,6 +65,8 @@ void IceModel_Writer::init(
 
 	IceModel::init(grid2);
 
+	main_model = model;
+
 	// Try to be clever about making multi-dimensional arrays
 	// in the output according to the grid the user expects.
 	switch(grid2->type.index()) {
@@ -83,9 +85,6 @@ void IceModel_Writer::init(
 		} break;
 	};
 
-	// We just need the input coupling contract
-	contract[INPUT] = model->contract[INPUT];
-
 	// Only need to run one copy of this
 	GCMParams const &gcm_params(coupler->gcm_params);
 	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
@@ -103,6 +102,12 @@ void IceModel_Writer::init(
 	printf("END IceModel_Writer::init_from_ice_model(%s)\n", sheet_name.c_str());
 }
 
+void IceModel_Writer::start_time_set()
+{
+	// We just need the input coupling contract
+	contract[INPUT] = main_model->contract[INPUT];
+
+}
 
 void IceModel_Writer::init_output_file()
 {

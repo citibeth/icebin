@@ -42,12 +42,19 @@ namespace modele{
 class IceModel {
 
 friend std::unique_ptr<IceModel> read_icemodel(
+	std::string const &name,
 	GCMCoupler const *coupler,
-	NcFile &nc, std::string const &vname,
+	NcFile &nc,
+	std::string const &vname,
 	std::unique_ptr<GCMPerIceSheetParams> &&gcm_per_ice_sheet_params,
 	IceSheet *sheet);
 
+public:
+	/** The name given to this IceModel, used to index */
+	std::string const name;
+
 protected:
+
 	/** The grid for this IceModel. */
 	std::shared_ptr<glint2::Grid> grid2;
 
@@ -80,7 +87,7 @@ public:
 	/** Allocate a new giss::CouplingContract, with the same lifetime as this IceModel. */
 	giss::CouplingContract *new_CouplingContract();
 
-	IceModel(IceModel::Type _type, GCMCoupler const *_coupler);
+	IceModel(IceModel::Type _type, std::string const &_name, GCMCoupler const *_coupler);
 	virtual ~IceModel();
 
 	long ndata() const { return grid2->ndata(); }
@@ -114,6 +121,9 @@ public:
 		throw std::exception();
 	}
 
+	/** Event handler to let IceModels know the start time is (finally) set */
+	virtual void start_time_set() {}
+
 	/** @param index Index of each grid value.
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc.
@@ -134,6 +144,7 @@ public:
 };
 
 extern std::unique_ptr<IceModel> read_icemodel(
+	std::string const &name,
 	GCMCoupler const *coupler,
 	NcFile &nc, std::string const &vname,
 	std::unique_ptr<GCMPerIceSheetParams> &&gcm_per_ice_sheet_params,

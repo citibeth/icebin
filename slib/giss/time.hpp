@@ -52,11 +52,6 @@ public:
 		tm_min = 0;
 		tm_sec = 0;
 	}
-#if 0
-			tm_year(year-1900), tm_mon(mon-1), tm_day(day),
-			tm_isdst(0), tm_yday(0), tm_wday(0),
-			tm_hour(0), tm_min(0), tm_sec(0) {}
-#endif
 
 		int year() const { return tm_year + 1900; }
 		int mon() const { return tm_mon + 1; }

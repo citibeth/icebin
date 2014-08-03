@@ -25,6 +25,9 @@ namespace glint2 {
 
 class IceModel_Writer : public IceModel_Decode
 {
+	/** The IceModel we're affiliated with */
+	IceModel const *main_model;
+
 	// Dimensions to use when writing to netCDF
 	std::vector<std::string> dim_names;
 	std::vector<long> cur;		// Base index to write in netCDF
@@ -35,13 +38,15 @@ class IceModel_Writer : public IceModel_Decode
 
 public:
 
-	IceModel_Writer(GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::WRITER, _coupler), output_file_initialized(false) {}
+	IceModel_Writer(std::string const &_name, GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::WRITER, _name, _coupler), output_file_initialized(false) {}
 
 
 	/** Specialized init signature for IceModel_Writer */
 	void init(
 		std::shared_ptr<glint2::Grid> const &grid2,
 		IceModel const *model, std::string const &sheet_name);
+
+	void start_time_set();
 
 protected:
 	bool output_file_initialized;

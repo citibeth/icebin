@@ -30,8 +30,8 @@ given. */
 class IceModel_Decode : public IceModel {
 public :
 
-	IceModel_Decode(IceModel::Type _type, GCMCoupler const *_coupler)
-		: IceModel(_type, _coupler) {}
+	IceModel_Decode(IceModel::Type _type, std::string const &_name, GCMCoupler const *_coupler)
+		: IceModel(_type, _name, _coupler) {}
 
 	~IceModel_Decode() {}
 

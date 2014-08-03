@@ -312,7 +312,7 @@ void glint2_modele_set_start_time(glint2_modele *api, int iyear1, int itimei, do
 	double time0_s = itimei * api->dtsrc;
 
 printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f\n", iyear1, itimei, api->dtsrc, time0_s);
-	gcm_params.set_start_time(
+	api->gcm_coupler->set_start_time(
 		giss::time::tm(iyear1, 1, 1),
 		time0_s);
 

@@ -37,12 +37,14 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 	//     vals2d = Vector of DECODED values-arrays on grid2
 	//     vals = Individual value array from vals2
 	//     valsd = Individual valu array from vals2d
-
+printf("AA1\n");
 	// Loop through the fields we require
 	int i=0;
 	for (auto ii = vals2.begin(); ii != vals2.end(); ++ii, ++i) {
+printf("AA2\n");
 		blitz::Array<double,1> const &vals(*ii);
 
+printf("AA2.1\n");
 		// Decode the field!
 		blitz::Array<double,1> valsd(ndata());
 		valsd = nan;
@@ -55,22 +57,16 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 				throw std::exception();
 			}
 
-#if 0
-			// Sanity check for NaN coming through
-			if (std::isnan(vals(i))) {
-				fprintf(stderr, "IceModel::decode: vals[%d] (index=%d) is NaN!\n", i, ix);
-				throw std::exception();
-			}
-#endif
-
 			// Add this value to existing field
 			double &oval = valsd(ix);
 			if (std::isnan(oval)) oval = vals(i);
 			else oval += vals(i);
 		}
 
+printf("AA2.2\n");
 		// Store decoded field in our output
 		vals2d.push_back(valsd);
+printf("AA2.3\n");
 printf("Done decoding required field, %s\n", contract[IceModel::INPUT][i].c_str());
 	}
 

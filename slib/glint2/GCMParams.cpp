@@ -11,15 +11,17 @@ void GCMParams::set_start_time(
 	giss::time::tm const &_time_base,
 	double _time_start_s)
 {
+	printf("GCMParams::set_start_time: time_units = %s\n", time_units.c_str());
 	time_base = _time_base;
 	time_start_s = _time_start_s;
 	time_units = str(boost::format("seconds since %04d-%02d-%02d %02d:%02d:%02d")
-		% (time_base.tm_year + 1900)
-		% (time_base.tm_mon + 1)
-		% time_base.tm_mday
+		% time_base.year()
+		% time_base.month()
+		% time_base.mday()
 		% time_base.tm_hour
 		% time_base.tm_min
 		% time_base.tm_sec);
+	printf("GCMParams::set_start_time: %s\n", time_units.c_str());
 }
 
 GCMParams::GCMParams(

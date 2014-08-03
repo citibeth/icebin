@@ -35,6 +35,9 @@ class IceModel_PISM : public IceModel_Decode
 	MPI_Comm pism_comm;			// Commnicator used by ice model
 	PetscMPIInt pism_rank, pism_size;
 
+	/** Arguments to be passed to PISM at PISM initialization */
+	std::vector<std::string> pism_args;
+
 	/** Should we write inputs to PISM via PISM's dump() functionality?
 	This is (almost certainly) supercede by the IceModel_Writer class,
 	except in cases of extreme debugging. */
@@ -78,6 +81,9 @@ public:
 		NcFile &nc,
 		std::string const &vname_base);
 
+	/** Event handler to let IceModels know the start time is (finally) set */
+	void start_time_set();
+
 	int nx() { return pism_grid->Mx; }
 	int ny() { return pism_grid->My; }
 
@@ -118,15 +124,13 @@ public:
 		std::string const &vname,
 		IceSheet *sheet);
 
-	IceModel_PISM(GCMCoupler const *_coupler);
+	IceModel_PISM(std::string const &_name, GCMCoupler const *_coupler);
 
 	~IceModel_PISM();
 
 protected:
-	PetscErrorCode allocate(
-		std::shared_ptr<const glint2::Grid_XY> &,
-		NcVar *pism_var,
-		NcVar *info_var);
+
+	PetscErrorCode allocate();
 
 	PetscErrorCode deallocate();
 

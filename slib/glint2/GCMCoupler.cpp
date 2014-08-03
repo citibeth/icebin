@@ -66,7 +66,7 @@ void GCMCoupler::read_from_netcdf(
 		// Create an IceModel corresponding to this IceSheet.
 		IceSheet *sheet = sheets[*name];
 		models.insert(i,
-			read_icemodel(this, nc, vname_sheet,
+			read_icemodel(*name, this, nc, vname_sheet,
 				read_gcm_per_ice_sheet_params(nc, vname_sheet),
 				sheet));
 		IceModel *ice_model = models[i];
@@ -81,27 +81,46 @@ void GCMCoupler::read_from_netcdf(
 		ice_model->update_ice_sheet(nc, vname_sheet, sheet);
 
 		// Create the affiliated writer
-		std::unique_ptr<IceModel_Writer> writer(new IceModel_Writer(this));
+		std::unique_ptr<IceModel_Writer> writer(new IceModel_Writer(*name, this));
 		writer->init(sheet->grid2, ice_model, *name);
 		writers.insert(i, std::move(writer));
-
-#if 1
-		// Print out the contract and var transformations
-		std::cout << "========= Contract for " << *name << std::endl;
-		std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
-		std::cout << ice_model->contract[IceModel::INPUT];
-		std::cout << ice_model->var_transformer[IceModel::INPUT];
-		std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
-		std::cout << ice_model->contract[IceModel::OUTPUT];
-		std::cout << ice_model->var_transformer[IceModel::OUTPUT];
-#endif
-
-
 
 		++i;
 	}
 	printf("END GCMCoupler::read_from_netcdf()\n");
 }
+
+
+void GCMCoupler::set_start_time(
+	giss::time::tm const &time_base,
+	double time_start_s)
+{
+	gcm_params.set_start_time(time_base, time_start_s);
+
+	for (auto model = models.begin(); model != models.end(); ++model) {
+		int sheetno = model.key();
+		IceModel_Writer *writer = writers[sheetno];		// The affiliated input-writer (if it exists).
+
+		model->start_time_set();
+		writer->start_time_set();
+
+		// This function is the last phase of initialization.
+		// Only now can we assume that the contracts are fully set up.
+#if 1
+		// Print out the contract and var transformations
+		std::cout << "========= Contract for " << model->name << std::endl;
+		std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
+		std::cout << model->contract[IceModel::INPUT];
+		std::cout << model->var_transformer[IceModel::INPUT];
+		std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
+		std::cout << model->contract[IceModel::OUTPUT];
+		std::cout << model->var_transformer[IceModel::OUTPUT];
+#endif
+	}
+
+}
+
+
 
 // ===================================================
 // SMBMsg

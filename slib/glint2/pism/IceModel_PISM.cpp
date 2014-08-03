@@ -17,8 +17,8 @@ namespace glint2 {
 namespace gpism {
 
 
-IceModel_PISM::IceModel_PISM(GCMCoupler const *_coupler)
-	: IceModel_Decode(IceModel::Type::PISM, _coupler),
+IceModel_PISM::IceModel_PISM(std::string const &_name, GCMCoupler const *_coupler)
+	: IceModel_Decode(IceModel::Type::PISM, _name, _coupler),
 	write_pism_inputs(false)
 {
 	printf("BEGIN/END IceModel_PISM::IceModel_PISM\n");
@@ -33,30 +33,6 @@ IceModel_PISM::~IceModel_PISM()
 	}
 }
 
-
-/** Initialize any grid information, etc. from the IceSheet struct.
-@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
-void IceModel_PISM::init(
-	std::shared_ptr<glint2::Grid> const &grid2,
-	NcFile &nc,
-	std::string const &vname_base)
-{
-	printf("BEGIN IceModel_PISM::init(%s)\n", vname_base.c_str());
-	IceModel::init(grid2);
-	GCMParams const &_gcm_params(coupler->gcm_params);
-
-	std::shared_ptr<Grid_XY const> grid2_xy = std::dynamic_pointer_cast<Grid_XY const>(grid2);
-
-	// General args passed to the ice sheet, regardless of which ice model is being used
-	auto info_var = nc.get_var((vname_base + ".info").c_str());
-	// PISM parameters, passed to PISM via argv
-	auto pism_var = nc.get_var((vname_base + ".pism").c_str());
-	if (allocate(grid2_xy, pism_var, info_var) != 0) {
-		PetscPrintf(coupler->gcm_params.gcm_comm, "IceModel_PISM::IceModel_PISM(...): allocate() failed\n");
-		PISMEnd();
-	}
-	printf("END IceModel_PISM::init()\n");
-}
 
 void IceModel_PISM::update_ice_sheet(
 	NcFile &nc,
@@ -197,21 +173,27 @@ printf("IceModel_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c
 // For dev branch
 static std::set<std::string> path_args = {"i", "o", "surface_given_file", "ocean_kill", "ocean_kill_file", "extra_file", "ts_file"};
 
-/** Called from within init().  We could get rid of this method... */
-PetscErrorCode IceModel_PISM::allocate(
-	std::shared_ptr<const glint2::Grid_XY> &glint2_grid,
-	NcVar *pism_var,
-	NcVar *info_var)
+void IceModel_PISM::init(
+	std::shared_ptr<glint2::Grid> const &grid2,
+	NcFile &nc,
+	std::string const &vname_base)
 {
-	printf("BEGIN IceModel_PISM::allocate()\n");
-	this->glint2_grid = glint2_grid;
+	printf("BEGIN IceModel_PISM::init(%s)\n", vname_base.c_str());
+	IceModel::init(grid2);
+	GCMParams const &_gcm_params(coupler->gcm_params);
+
+	this->glint2_grid = std::dynamic_pointer_cast<Grid_XY const>(grid2);
+
+	// General args passed to the ice sheet, regardless of which ice model is being used
+	auto info_var = nc.get_var((vname_base + ".info").c_str());
+	// PISM parameters, passed to PISM via argv
+	auto pism_var = nc.get_var((vname_base + ".pism").c_str());
 
 	// Get simple arguments
 	update_elevation = giss::get_att_as_bool(info_var, "update_elevation");
 
 	// Create arguments from PISM configuration
-	std::vector<std::string> args;
-	args.push_back("glint2_pism");
+	pism_args.push_back("glint2_pism");
 
 	// Get arguments from GLINT2 configuration
 	for (int i=0; i<pism_var->num_atts(); ++i) {
@@ -230,22 +212,34 @@ PetscErrorCode IceModel_PISM::allocate(
 			printf("IceModel_PISM resolving %s: %s --> %s\n", name.c_str(), att->as_string(0), val.c_str());
 		}
 
-		args.push_back("-" + name);
-		args.push_back(val);
+		pism_args.push_back("-" + name);
+		pism_args.push_back(val);
 	}
 
-	// Convert those arguments to old C style
-	int argc = args.size();
+}
+
+void IceModel_PISM::start_time_set()
+{
+	if (allocate() != 0) {
+		PetscPrintf(coupler->gcm_params.gcm_comm, "IceModel_PISM::start_time_set(...): allocate() failed\n");
+		PISMEnd();
+	}
+}
+
+PetscErrorCode IceModel_PISM::allocate()
+{
+	// Convert PISM arguments to old C style
+	int argc = pism_args.size();
 	char *argv_array[argc];
 	std::vector<char> all_str;
 	for (int i=0; i<argc; ++i) {
-		std::string &arg = args[i];
+		std::string &arg = pism_args[i];
 		for (unsigned int j=0; j<arg.size(); ++j) all_str.push_back(arg[j]);
 		all_str.push_back('\0');
 	}
 	char *pos = &all_str[0];
 	for (int i=0; i<argc; ++i) {
-		std::string &arg = args[i];
+		std::string &arg = pism_args[i];
 		argv_array[i] = pos;
 		pos +=arg.size() + 1;
 	}
