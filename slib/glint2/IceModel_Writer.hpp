@@ -35,7 +35,7 @@ class IceModel_Writer : public IceModel_Decode
 
 public:
 
-	IceModel_Writer(GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::WRITER, _coupler) {}
+	IceModel_Writer(GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::WRITER, _coupler), output_file_initialized(false) {}
 
 
 	/** Specialized init signature for IceModel_Writer */

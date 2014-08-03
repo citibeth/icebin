@@ -35,11 +35,21 @@ const double LHM = 3.34e5;
 // --------------------------------------------------------
 int main(int argc, char **argv)
 {
-	std::string glint2_config_fname = "modele_ll_g2x2_5-searise_g20-40-PISM.nc";
-//	std::string glint2_config_fname = "modele_ll_g2x2_5-searise_g20-40-DISMAL.nc";
+	if (argc < 2) {
+		fprintf(stderr, "Usage: desm <modele-input-dir>\n"
+			"The input directory must contain:\n"
+			"    glint2_config.nc\n"
+			"    modele_out.nc\n"
+			"    modele_constants.nc\n");
+		return -1;
+	}
+
+	boost::filesystem::path desm_input_dir(argv[1]);
+
+	std::string glint2_config_fname = "desm_glint2_config.nc";
 	std::string glint2_config_vname = "m";
-	std::string desm_fname = "modele_out-1.nc";
-	std::string constants_fname = "modele_constants.nc";
+	std::string desm_fname = (desm_input_dir / "modele_out.nc").string();
+	std::string constants_fname = (desm_input_dir / "modele_constants.nc").string();
 	// Initialize the MPI environment
 	MPI_Init(&argc, &argv);
 
@@ -212,7 +222,7 @@ int main(int argc, char **argv)
 	// The main loop
 	double begin_time_s;
 	double end_time_s = time0_s;
-	for (long time_index=0; time_index<ntime-1; ++time_index) {
+	for (long time_index=0; time_index<ntime; ++time_index) {
 		// Roll forward the time interval
 		begin_time_s = end_time_s;
 
@@ -261,12 +271,6 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 				var_f(blitz::Range::all(), j, blitz::Range::all()) = 0;
 
 		}
-
-		// ModelE writes out NetCDF files in units X/s.
-		// But internally, impm_lndice/etc. are stored in just X.
-		// So we multiply by dt_s to get back to the internal ModelE units.
-		impm_c *= dt_s;
-		imph_c *= dt_s;
 
 		// Run the coupling step
 		glint2_modele_couple_to_ice_c(api, end_time_i, impm_ff, imph_ff, tice_ff);
