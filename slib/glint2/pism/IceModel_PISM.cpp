@@ -509,44 +509,6 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
 printf("[%d] END ice_model->run_to()\n", pism_rank);
 
-#if 0	// Section commented out because it's the next step.
-	// ============= Collect PISM Outputs into blitz::Array<double,2>
-	// Retrieve stuff from PISM
-	blitz::Array<double,2> geothermal_flux_sum;
-	iceModelVec2S_to_blitz_xy(ice_model->geothermal_flux_sum, geothermal_flux_sum);
-	blitz::Array<double,2> strain_heating_sum;
-	iceModelVec2S_to_blitz_xy(ice_model->strain_heating_sum, strain_heating_sum);
-	blitz::Array<double,2> ice_surface_elevation;
-	iceModelVec2S_to_blitz_xy(ice_model->ice_surface_elevation, ice_surface_elevation);
-	blitz::Array<double,2> basal_runoff_sum;
-	iceModelVec2S_to_blitz_xy(ice_model->null_hydrology()->basal_runoff_sum, basal_runoff_sum);
-	blitz::Array<double,2> total_enthalpy;
-	iceModelVec2S_to_blitz_xy(ice_model->total_enthalpy, total_enthalpy);
-
-	// ============= Write PISM Outputs to a file
-	if (pism_rank == 0) {
-		char fname[30];
-		long time_day = (int)(time_s / 86400. + .5);
-		sprintf(fname, "%ld-pismout.nc", time_day);
-		auto full_fname(coupler->gcm_params.config_dir / "pism_inputs" / fname);
-		NcFile ncout(full_fname.c_str(), NcFile::Replace);
-
-		NcDim *ny_dim = ncout.add_dim("ny", ny());
-		NcDim *nx_dim = ncout.add_dim("nx", nx());
-
-		std::vector<boost::function<void ()>> fns;
-		fns.push_back(giss::netcdf_define(ncout, "strain_heating_sum", strain_heating_sum, {ny_dim, nx_dim}));
-		fns.push_back(giss::netcdf_define(ncout, "geothermal_flux_sum", geothermal_flux_sum, {ny_dim, nx_dim}));
-		fns.push_back(giss::netcdf_define(ncout, "ice_surface_elevation", ice_surface_elevation, {ny_dim, nx_dim}));
-		fns.push_back(giss::netcdf_define(ncout, "basal_runoff_sum", basal_runoff_sum, {ny_dim, nx_dim}));
-		fns.push_back(giss::netcdf_define(ncout, "total_enthalpy", total_enthalpy, {ny_dim, nx_dim}));
-		
-	    // Write data to netCDF file
-	    for (auto ii = fns.begin(); ii != fns.end(); ++ii) (*ii)();
-	    ncout.close();
-	}
-#endif
-
 	return 0;
 }
 
