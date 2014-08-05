@@ -46,10 +46,10 @@ int main(int argc, char **argv)
 
 	boost::filesystem::path desm_input_dir(argv[1]);
 
-	std::string glint2_config_fname = "desm_glint2_config.nc";
+	std::string glint2_config_fname = (desm_input_dir / "modele_ll_g2x2_5-searise_g20-40-PISM.nc").string();
 	std::string glint2_config_vname = "m";
-	std::string desm_fname = (desm_input_dir / "modele_out.nc").string();
-	std::string constants_fname = (desm_input_dir / "modele_constants.nc").string();
+	std::string desm_fname = (desm_input_dir / "desm_input" / "modele_out.nc").string();
+	std::string constants_fname = (desm_input_dir / "desm_input" / "modele_constants.nc").string();
 	// Initialize the MPI environment
 	MPI_Init(&argc, &argv);
 

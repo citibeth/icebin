@@ -13,6 +13,7 @@
 
 #include <PISMTime.hh>
 // --------------------------------
+#include <boost/filesystem.hpp>
 #include <glint2/pism/PSConstantGLINT2.hpp>
 #include <glint2/pism/NullTransportHydrology.hpp>
 
@@ -42,6 +43,7 @@ public:
 	typedef pism::IceModel super;
 	struct Params {
 		double time_start_s;
+		boost::filesystem::path output_dir;
 	};
 	Params const params;
 protected:

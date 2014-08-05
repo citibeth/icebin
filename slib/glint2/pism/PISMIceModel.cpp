@@ -137,15 +137,15 @@ PetscErrorCode PISMIceModel::createVecs()
 		"W m-2", ""); CHKERRQ(ierr);
 
 	// ---- Geothermal Flux: cumulative
-	ierr = geothermal_flux_sum.create(grid, "geothermal_flux_sum", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
+	ierr = geothermal_flux_sum.create(grid, "geothermal_flux", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
 	ierr = geothermal_flux_sum.set_attrs("climate_steady",
-		"Cumulative geothermal energy from bedrock surface", "J m-2", ""); CHKERRQ(ierr);
+		"Geothermal energy from bedrock surface", "W m-2", ""); CHKERRQ(ierr);
 	// ierr = geothermal_flux.set_glaciological_units("mJ m-2");
 
 	// ---- Geothermal Flux: cumulative
-	ierr = upward_geothermal_flux_sum.create(grid, "upward_geothermal_flux_sum", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
+	ierr = upward_geothermal_flux_sum.create(grid, "upward_geothermal_flux", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
 	ierr = upward_geothermal_flux_sum.set_attrs("climate_steady",
-		"Cumulative geothermal energy from bedrock surface", "J m-2", ""); CHKERRQ(ierr);
+		"Geothermal energy from bedrock surface", "W m-2", ""); CHKERRQ(ierr);
 	// ierr = upward_geothermal_flux.set_glaciological_units("mJ m-2");
 
 
@@ -158,16 +158,16 @@ PetscErrorCode PISMIceModel::createVecs()
 #endif
 
 	// ---- Basal Frictional Heating: cumulative
-	ierr = basal_frictional_heating_sum.create(grid, "basal_frictional_heating_sum", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = basal_frictional_heating_sum.create(grid, "basal_frictional_heating", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = basal_frictional_heating_sum.set_attrs("internal",
-		"Total cumulative basal frictional heating",
-		"J m-2", ""); CHKERRQ(ierr);
+		"Basal frictional heating",
+		"W m-2", ""); CHKERRQ(ierr);
 
 	// ---- Strain Heating: cumulative
-	ierr = strain_heating_sum.create(grid, "strain_heating_sum", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = strain_heating_sum.create(grid, "strain_heating", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = strain_heating_sum.set_attrs("internal",
-		"Total cumulative strain heating",
-		"J m-2", ""); CHKERRQ(ierr);
+		"Strain heating",
+		"W m-2", ""); CHKERRQ(ierr);
 
 	// ---- Enthalpy: vertically integrated, and converted to J/m^2
 	ierr = total_enthalpy.create(grid, "total_enthalpy", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
@@ -279,21 +279,45 @@ PetscErrorCode PISMIceModel::prepare_nc(std::string const &fname, std::unique_pt
 }
 
 
-PetscErrorCode PISMIceModel::write_post_energy(double my_t0)
+/** @param t0 Time of last time we coupled. */
+PetscErrorCode PISMIceModel::write_post_energy(double t0)
 {
+	PetscErrorCode ierr;
+
 	printf("BEGIN PISMIceModel::write_post_energy()\n");
+
+	double t1 = enthalpy_t();	// Current time of the enthalpy portion of ice model.
 
 	// ------ Write it out
 	PIO nc(grid, grid.config.get_string("output_format"));
-	nc.open("post_energy.nc", PISM_READWRITE);	// append to file
-	nc.append_time(config.get_string("time_dimension_name"), my_t0);
-	basal_frictional_heating_sum.write(nc, PISM_DOUBLE);
-	strain_heating_sum.write(nc, PISM_DOUBLE);
 
-	geothermal_flux_sum.write(nc, PISM_DOUBLE);
-	upward_geothermal_flux_sum.write(nc, PISM_DOUBLE);
-	total_enthalpy.write(nc, PISM_DOUBLE);
+	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
+	nc.append_time(config.get_string("time_dimension_name"), t1);
+
+	// ------ Divide by dt
+	double by_dt = 1.0 / (t1 - t0);
+	ierr = basal_frictional_heating_sum.scale(by_dt); CHKERRQ(ierr);
+	ierr = strain_heating_sum.scale(by_dt); CHKERRQ(ierr);
+	ierr = geothermal_flux_sum.scale(by_dt); CHKERRQ(ierr);
+	ierr = upward_geothermal_flux_sum.scale(by_dt); CHKERRQ(ierr);
+//	ierr = total_enthalpy.scale(by_dt); CHKERRQ(ierr);
+
+	// Write out the fields
+	ierr = basal_frictional_heating_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	ierr = strain_heating_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	ierr = geothermal_flux_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	ierr = upward_geothermal_flux_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	ierr = total_enthalpy.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	nc.close();
+
+	// ----- Zero the sum variables
+	ierr = basal_frictional_heating_sum.set(0); CHKERRQ(ierr);
+	ierr = strain_heating_sum.set(0); CHKERRQ(ierr);
+	ierr = geothermal_flux_sum.set(0); CHKERRQ(ierr);
+	ierr = upward_geothermal_flux_sum.set(0); CHKERRQ(ierr);
+//	ierr = total_enthalpy.set(0); CHKERRQ(ierr);
+
+
 	printf("END PISMIceModel::write_post_energy()\n");
 
 	return 0;
@@ -305,7 +329,6 @@ PetscErrorCode PISMIceModel::grid_setup()
 	super::grid_setup();
 
 	// super::grid_setup() trashes grid.time->start().  Now set it correctly.
-printf("time_start_s = %f\n", params.time_start_s);
 	grid.time->set_start(params.time_start_s);
 	grid.time->set(params.time_start_s);
 
@@ -325,7 +348,8 @@ PetscErrorCode PISMIceModel::misc_setup()
 //	nc = prepare_nc("post_mass.nc");
 //	nc = prepare_nc("pre_energy.nc");
 
-	ierr = prepare_nc("post_energy.nc", nc); CHKERRQ(ierr);
+	std::string ofname = (params.output_dir / "post_energy.nc").string();
+	ierr = prepare_nc(ofname, nc); CHKERRQ(ierr);
 	basal_frictional_heating_sum.define(*nc, PISM_DOUBLE);
 	strain_heating_sum.define(*nc, PISM_DOUBLE);
 

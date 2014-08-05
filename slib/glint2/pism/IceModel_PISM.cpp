@@ -275,18 +275,24 @@ printf("Initializing PETSc\n");
 	std::string reference_date = (boost::format("%04d-%02d-%02d") % tb.year() % tb.month() % tb.mday()).str();
 	config->set_string("reference_date", reference_date);
 
-//#if 0
-//	if (pism_rank == 0) {
-		auto full_fname(coupler->gcm_params.config_dir / "glint2_pism_config.nc");
-		printf("IceModel_PISM writing config (1) to: %s\n", full_fname.c_str());
-		config->write(full_fname.c_str());
-//	}
-//#endif
+#if 0
+	// We don't need to write this file, it is essentially the
+	// same as one PISM already writes.
+	if (pism_rank == 0) {
+		// PISM isn't able to write a new file, so we must create it first.
+		NcFile nc(full_fname.c_str(), NcFile::Replace);
+		nc.close();
+	}
+	auto full_fname(coupler->gcm_params.config_dir / "glint2_pism_config.nc");
+	printf("IceModel_PISM writing config (1) to: %s\n", full_fname.c_str());
+	config->write(full_fname.c_str());
+#endif
 
     pism_grid.reset(new ::IceGrid(pism_comm, *config));
 printf("pism_grid=%p: (xs,xm,ys,ym,Mx,My) = %d %d %d %d %d %d %ld %ld\n", &*pism_grid, pism_grid->xs, pism_grid->xm, pism_grid->ys, pism_grid->ym, pism_grid->Mx, pism_grid->My, pism_grid->x.size(), pism_grid->y.size());
 	PISMIceModel::Params params;
 		params.time_start_s = coupler->gcm_params.time_start_s;
+		params.output_dir = boost::filesystem::absolute(coupler->gcm_params.config_dir).string();
     ice_model.reset(new PISMIceModel(*pism_grid, *config, *overrides, params));
 
 	// Transfer constants from GCM to PISM, and also set up coupling contracts.
@@ -504,7 +510,9 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
 		throw std::exception();
 	}
-	ice_model->write_post_energy(ice_model->enthalpy_t());
+
+	// ice_model->enthalpy_t() == time_s here
+	ice_model->write_post_energy(old_pism_time);
 
 printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
 printf("[%d] END ice_model->run_to()\n", pism_rank);

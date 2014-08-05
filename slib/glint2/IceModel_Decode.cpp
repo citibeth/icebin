@@ -67,7 +67,7 @@ printf("Done decoding required field, %s\n", contract[IceModel::INPUT][i].c_str(
 
 	// Pass decoded fields on to subclass
 	run_decoded(time_s, vals2d);
-printf("END IceModel_Decode::run_timestep(%ld)\n", time_s);
+printf("END IceModel_Decode::run_timestep(%f)\n", time_s);
 }
 
 
