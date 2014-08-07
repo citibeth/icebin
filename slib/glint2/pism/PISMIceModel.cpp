@@ -174,6 +174,12 @@ PetscErrorCode PISMIceModel::createVecs()
 	ierr = total_enthalpy.set_attrs("total_enthalpy",
 		"Vertically integrated enthalpy of ice sheet", "J m-2", ""); CHKERRQ(ierr);
 
+	// ----- Calving rate
+	ierr = calving_mass.create(grid, "calving_mass", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = calving_mass.set_attrs("diagnostic",
+		"discharge (calving) flux (positive means ice loss)",
+		"kg m-2 s-1", ""); CHKERRQ(ierr);
+
 	return 0;
 }
 
@@ -294,6 +300,15 @@ PetscErrorCode PISMIceModel::write_post_energy(double t0)
 	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
 	nc.append_time(config.get_string("time_dimension_name"), t1);
 
+	// -------- Get variables that are not in this class
+	pism::IceModelVec2 &basal_runoff_sum(null_hydrology()->basal_runoff_sum);
+	bool update_2d_discharge = discharge_flux_2D_cumulative.was_created();
+	if (!update_2d_discharge) {
+		fprintf(stderr, "WARNING: You must us '-extra_vars discharge_flux_cumulative' on the PISM command line in order to get calving discharge from PISM.\n");
+	}
+
+	calving_mass.copy_from(discharge_flux_2D_cumulative);
+
 	// ------ Divide by dt
 	double by_dt = 1.0 / (t1 - t0);
 	ierr = basal_frictional_heating_sum.scale(by_dt); CHKERRQ(ierr);
@@ -301,6 +316,11 @@ PetscErrorCode PISMIceModel::write_post_energy(double t0)
 	ierr = geothermal_flux_sum.scale(by_dt); CHKERRQ(ierr);
 	ierr = upward_geothermal_flux_sum.scale(by_dt); CHKERRQ(ierr);
 //	ierr = total_enthalpy.scale(by_dt); CHKERRQ(ierr);
+	ierr = basal_runoff_sum.scale(by_dt); CHKERRQ(ierr);
+	if (update_2d_discharge) {		// Calving, iceberg removal
+		ierr = calving_mass.scale(by_dt); CHKERRQ(ierr);
+		// ierr = discharge_flux_2D_cumulative.scale(by_dt); CHKERRQ(ierr);
+	}
 
 	// Write out the fields
 	ierr = basal_frictional_heating_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
@@ -308,6 +328,12 @@ PetscErrorCode PISMIceModel::write_post_energy(double t0)
 	ierr = geothermal_flux_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	ierr = upward_geothermal_flux_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	ierr = total_enthalpy.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	ierr = basal_runoff_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	if (update_2d_discharge) {
+		ierr = calving_mass.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+		// ierr = discharge_flux_2D_cumulative.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	}
+
 	nc.close();
 
 	// ----- Zero the sum variables
@@ -316,7 +342,11 @@ PetscErrorCode PISMIceModel::write_post_energy(double t0)
 	ierr = geothermal_flux_sum.set(0); CHKERRQ(ierr);
 	ierr = upward_geothermal_flux_sum.set(0); CHKERRQ(ierr);
 //	ierr = total_enthalpy.set(0); CHKERRQ(ierr);
-
+	ierr = basal_runoff_sum.set(0); CHKERRQ(ierr);
+	if (update_2d_discharge) {
+		// ierr = calving_mass.set(0); CHKERRQ(ierr);
+		ierr = discharge_flux_2D_cumulative.set(0); CHKERRQ(ierr);
+	}
 
 	printf("END PISMIceModel::write_post_energy()\n");
 

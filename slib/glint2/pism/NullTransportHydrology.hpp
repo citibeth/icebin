@@ -42,7 +42,8 @@ namespace glint2 {
 namespace gpism {
 
 class NullTransportHydrology : public pism::NullTransportHydrology {
-  friend class IceModel_PISM;
+//  friend class IceModel_PISM;
+  friend class PISMIceModel;
 
 public:
   NullTransportHydrology(pism::IceGrid &g, const pism::Config &conf);

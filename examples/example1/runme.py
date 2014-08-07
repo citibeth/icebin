@@ -142,7 +142,7 @@ def make_glint2_in(gf) :
 		pism.ts_times = '0:1:1000'
 		pism.extra_file = 'ex_g20km_10ka_run2.nc'
 		pism.extra_times = '0:.1:1000'
-		pism.extra_vars = 'climatic_mass_balance,ice_surface_temp,diffusivity,temppabase,tempicethk_basal,bmelt,tillwat,csurf,mask,thk,topg,usurf'
+		pism.extra_vars = 'climatic_mass_balance,ice_surface_temp,diffusivity,temppabase,tempicethk_basal,bmelt,tillwat,csurf,mask,thk,topg,usurf,discharge_flux_cumulative'
 		pism.o = 'g20km_10ka_run2.nc'
 
 	if True :

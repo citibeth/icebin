@@ -57,6 +57,7 @@ protected:
 	pism::IceModelVec2S geothermal_flux_sum;	//!< Total amount of geothermal energy (J/m^2)
 	pism::IceModelVec2S upward_geothermal_flux_sum;	//!< Total amount of geothermal energy (J/m^2)
 	pism::IceModelVec2S total_enthalpy;		//!< Total enthalpy of ice sheet (J/m^2)
+	pism::IceModelVec2S calving_mass;		//!< Equal to IceModel::discharge_flux_2D_cumulative
 
 protected:
 	// see iceModel.cc

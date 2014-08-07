@@ -35,11 +35,11 @@ NullTransportHydrology::NullTransportHydrology(IceGrid &g, const pism::Config &c
   printf("BEGIN NullTransportHydrology::NullTransportHydrology()\n");
 
   // *all* PISMHydrology classes have layer of water stored in till
-  ierr1 = basal_runoff_sum.create(grid, "tillwat", WITHOUT_GHOSTS);
+  ierr1 = basal_runoff_sum.create(grid, "basal_runoff", WITHOUT_GHOSTS);
   ierr2 = basal_runoff_sum.set_attrs("excess water",
-                     "Cumulative effective thickness of subglacial water expelled from till",
-                     "m", "");
-  basal_runoff_sum.metadata().set_double("valid_min", 0.0);
+                     "Effective thickness of subglacial water expelled from till (thickness of water, not ice)",
+                     "m s-1", "");
+//  basal_runoff_sum.metadata().set_double("valid_min", 0.0);
   if ((ierr1 != 0) || (ierr2 != 0)) {
       PetscPrintf(grid.com,
         "PISM ERROR: memory allocation failed in NullTransportHydrology constructor (basal_runoff_sum).\n");
