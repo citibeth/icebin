@@ -122,7 +122,7 @@ template<
 class Dict
 {
 protected:
-	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> BaseClass;
+	typedef BaseTpl<KeyT, ValT *> BaseClass;
 	BaseClass base;
 
 public:
@@ -143,10 +143,21 @@ public:
 	ValIterator end() { return ValIterator(base.end()); }
 
 	ValIterator erase(ValIterator &ii)
-		{ return ValIterator(base.erase(ii)); }
+	{
+		delete &*ii;
+		return ValIterator(base.erase(ii));
+	}
 	void clear()
-		{ base.clear(); }
+	{
+		for (auto ii = begin(); ii != end(); ++ii) delete &*ii;
+		base.clear();
+	}
 
+	~Dict() {
+		for (auto ii = begin(); ii != end(); ++ii) delete &*ii;
+	}
+
+	
 	/** const version of ValIterator.
 	@see ValIteratorIterator */
 	typedef SecondIterator<typename BaseClass::const_iterator, KeyT, ValT> const_ValIterator;
@@ -182,8 +193,9 @@ public:
 	value, and a boolean telling whether or not it was inserted.
 	Analogous to the return values of standard STL insert()
 	methods. */
-	std::pair<ValT *, bool> insert(KeyT const &key, std::unique_ptr<ValT> &&valp) {
-		auto ret = base.insert(std::make_pair(key, std::move(valp)));
+	std::pair<ValT *, bool> insert(KeyT const &key, std::unique_ptr<ValT> &&valp)
+	{
+		auto ret = base.insert(std::make_pair(key, valp.release()));
 		typename BaseClass::iterator nw_it;
 			nw_it = ret.first;
 		ValT *nw_valp = &*(nw_it->second);
@@ -247,10 +259,7 @@ struct Dict_Create : public Dict<BaseTpl, KeyT, ValT>
 	ValT *operator[](KeyT const &key) {
 		auto ii = super::base.find(key);
 		if (ii == super::base.end()) {
-//			std::unique_ptr<ValT> ptr(new ValT());
-			auto ret = super::base.insert(std::make_pair(key, // std::move(ptr)));
-				std::unique_ptr<ValT>(new ValT())));
-			// typename super::base.iterator nw_it = ret.first;
+			auto ret = super::base.insert(std::make_pair(key, new ValT()));
 			return &*(ret.first->second);
 		}
 		return &*(ii->second);
