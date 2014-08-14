@@ -119,50 +119,59 @@ This template is normally accessed through MapDict and HashDict, not directly.
 template<
 	template<class KeyTT, class ValTT> class BaseTpl,
 	class KeyT, class ValT>
-struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
+class Dict
 {
-	/** The superclass, which is also the underlying class for this wrapper. */
-	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super;
+protected:
+	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> BaseClass;
+	BaseClass base;
+
+public:
+	size_t size() const { return base.size();}
 
 	/** An iterator through the values of this Dict.  Can also be used
 	to get keys via ValIterator.key().
-	 MyDiict::ValIterator ii = myDict.begin();
+	MyDiict::ValIterator ii = myDict.begin();
 	 
 	@see SecondIterator */
-	typedef SecondIterator<typename super::iterator, KeyT, ValT> ValIterator;
+	typedef SecondIterator<typename BaseClass::iterator, KeyT, ValT> ValIterator;
 
 	/** Alias ValIterator so this class may be used like a standard
 	STL class when iterating through, completely hiding the use of
 	unique_ptr. */
 	typedef ValIterator iterator;
-	ValIterator begin() { return ValIterator(super::begin()); }
-	ValIterator end() { return ValIterator(super::end()); }
+	ValIterator begin() { return ValIterator(base.begin()); }
+	ValIterator end() { return ValIterator(base.end()); }
+
+	ValIterator erase(ValIterator &ii)
+		{ return ValIterator(base.erase(ii)); }
+	void clear()
+		{ base.clear(); }
 
 	/** const version of ValIterator.
 	@see ValIteratorIterator */
-	typedef SecondIterator<typename super::const_iterator, KeyT, ValT> const_ValIterator;
+	typedef SecondIterator<typename BaseClass::const_iterator, KeyT, ValT> const_ValIterator;
 
 	/** Alias const_ValIterator so this class may be used like a standard
 	STL class when iterating through, completely hiding the use of
 	unique_ptr. */
 	typedef const_ValIterator const_iterator;
-	const_ValIterator begin() const { return const_ValIterator(super::begin()); }
-	const_ValIterator end() const { return const_ValIterator(super::end()); }
+	const_ValIterator begin() const { return const_ValIterator(base.begin()); }
+	const_ValIterator end() const { return const_ValIterator(base.end()); }
 
 
 	/** Looks up an item in the Dict by key.
 	@return A pointer to the item.  Returns the null pointer if the key does not exist. */
 	ValT *operator[](KeyT const &key) {
-		auto ii = super::find(key);
-		if (ii == super::end()) return 0;
+		auto ii = base.find(key);
+		if (ii == base.end()) return 0;
 		return &*(ii->second);
 	}
 
 	/** Looks up an item in the Dict by key.
 	@return A pointer to the item.  Returns the null pointer if the key does not exist. */
 	ValT const *operator[](KeyT const &key) const {
-		auto ii = super::find(key);
-		if (ii == super::end()) return 0;
+		auto ii = base.find(key);
+		if (ii == base.end()) return 0;
 		return &*(ii->second);
 	}
 
@@ -174,8 +183,8 @@ struct Dict : public BaseTpl<KeyT, std::unique_ptr<ValT>>
 	Analogous to the return values of standard STL insert()
 	methods. */
 	std::pair<ValT *, bool> insert(KeyT const &key, std::unique_ptr<ValT> &&valp) {
-		auto ret = super::insert(std::make_pair(key, std::move(valp)));
-		typename super::iterator nw_it;
+		auto ret = base.insert(std::make_pair(key, std::move(valp)));
+		typename BaseClass::iterator nw_it;
 			nw_it = ret.first;
 		ValT *nw_valp = &*(nw_it->second);
 		bool &is_inserted(ret.second);
@@ -210,7 +219,7 @@ public :
 	{
 		// Make a vector of pointers
 		std::vector<ValT *> ret;
-		for (auto ii = super::begin(); ii != super::end(); ++ii)
+		for (auto ii = base.begin(); ii != base.end(); ++ii)
 			ret.push_back(&*(ii->second));
 
 		// Sort the vector		
@@ -232,17 +241,16 @@ template<
 struct Dict_Create : public Dict<BaseTpl, KeyT, ValT>
 {
 	typedef Dict<BaseTpl, KeyT, ValT> super;
-//	typedef BaseTpl<KeyT, std::unique_ptr<ValT>> super2;
 
 	/** Access the value of an existing key.  Creates a new item if it
 	does not already exist. */
 	ValT *operator[](KeyT const &key) {
-		auto ii = super::find(key);
-		if (ii == super::end()) {
+		auto ii = super::base.find(key);
+		if (ii == super::base.end()) {
 //			std::unique_ptr<ValT> ptr(new ValT());
-			auto ret = super::super::insert(std::make_pair(key, // std::move(ptr)));
+			auto ret = super::base.insert(std::make_pair(key, // std::move(ptr)));
 				std::unique_ptr<ValT>(new ValT())));
-			// typename super::super::iterator nw_it = ret.first;
+			// typename super::base.iterator nw_it = ret.first;
 			return &*(ret.first->second);
 		}
 		return &*(ii->second);
