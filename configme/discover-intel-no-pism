@@ -6,10 +6,10 @@ HOME_OPT=/gpfsm/dnb32/ccruz/devel/GLINT2/libraries
 DEST_PREFIX=$HOME_OPT/glint2
 
 ## ----- Where is your GALAHAD installation?
-#GALAHAD_HOME=$NOBACKUP/devel/GLINT2/galahad
-#GALAHAD_ARCH=mac64.osx.gfo
-#export GALAHAD_INC_DIR="$GALAHAD_HOME/modules/$GALAHAD_ARCH/double"
-#export GALAHAD_LIB_DIR="$GALAHAD_HOME/objects/$GALAHAD_ARCH/double"
+GALAHAD_HOME=/gpfsm/dnb32/ccruz/devel/GLINT2/galahad
+GALAHAD_ARCH=pc64.lnx.ifr
+export GALAHAD_INC_DIR="$GALAHAD_HOME/modules/$GALAHAD_ARCH/double"
+export GALAHAD_LIB_DIR="$GALAHAD_HOME/objects/$GALAHAD_ARCH/double"
 
 
 export CC=icc
@@ -45,7 +45,7 @@ export MPI_HOME=/usr/local/intel/mpi/4.1.3.048
 export MPI_INCLUDE="$MPI_HOME/include64"
 export MPI_CFLAGS="-I $MPI_INCLUDE"
 #export MPI_LIBS="-L$MPI_HOME/lib -lmpi -lmpi_cxx"
-export MPI_LIBS="-L$MPI_HOME/lib -lmpi"
+export MPI_LIBS="-L$MPI_HOME/lib64 -lmpi"
 # Do I need -lmpiif or -lmpiic here????
 
 export PROJ_HOME=/usr/local/other/SLES11.1/proj/4.7.0/intel-12.1.0.233
@@ -85,5 +85,8 @@ export CGAL_LIBS="-L$CGAL_HOME/lib -lCGAL"
 export CPPFLAGS="-frounding-math"
 export AM_LDFLAGS="-Wl,-rpath=$CGAL_HOME/lib"	# cause it doesn't use libtool
 
-./configure --prefix=$DEST_PREFIX --with-boost=$BOOST_HOME
+./configure --prefix=$DEST_PREFIX \
+	--with-boost=$BOOST_HOME \
+	--with-galahad
+
 
