@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include <boost/enum.hpp>
 #include <boost/filesystem/path.hpp>
 #include <giss/time.hpp>

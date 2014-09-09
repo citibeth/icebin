@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <algorithm>
+#include <vector>
 
 namespace giss {
 
@@ -130,7 +131,7 @@ public:
 
 	/** An iterator through the values of this Dict.  Can also be used
 	to get keys via ValIterator.key().
-	MyDiict::ValIterator ii = myDict.begin();
+	MyDict::ValIterator ii = myDict.begin();
 	 
 	@see SecondIterator */
 	typedef SecondIterator<typename BaseClass::iterator, KeyT, ValT> ValIterator;
@@ -144,8 +145,11 @@ public:
 
 	ValIterator erase(ValIterator &ii)
 	{
+		// Workaround for Intel C++ that doesn't return iterator from erase().
+		auto ii_next = std::next(ii);
 		delete &*ii;
-		return ValIterator(base.erase(ii));
+		base.erase(ii);
+		return ValIterator(ii_next);
 	}
 	void clear()
 	{

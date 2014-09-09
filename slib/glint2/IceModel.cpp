@@ -5,9 +5,10 @@
 namespace glint2 {
 
 IceModel::IceModel(IceModel::Type _type, std::string const &_name, GCMCoupler const *_coupler)
-	: type(_type), name(_name), coupler(_coupler), ice_constants(&_coupler->ut_system),
-	contract({giss::CouplingContract(), giss::CouplingContract()})
- {}
+	: type(_type), name(_name), coupler(_coupler), ice_constants(&_coupler->ut_system)
+//	contract({giss::CouplingContract(), giss::CouplingContract()})
+{
+}
 
 IceModel::~IceModel() {}
 
