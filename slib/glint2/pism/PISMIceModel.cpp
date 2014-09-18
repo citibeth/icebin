@@ -128,57 +128,10 @@ PetscErrorCode PISMIceModel::createVecs()
 	super::createVecs();
 
 	PetscErrorCode ierr;
-	int WIDE_STENCIL = grid.max_stencil_width;
 
-	// ---- Geothermal Flux: instantaneous
-	ierr = upward_geothermal_flux.create(grid, "upward_geothermal_flux", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = upward_geothermal_flux.set_attrs("internal",
-		"upward_geothermal_flux",
-		"W m-2", ""); CHKERRQ(ierr);
-
-	// ---- Geothermal Flux: cumulative
-	ierr = geothermal_flux_sum.create(grid, "geothermal_flux", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
-	ierr = geothermal_flux_sum.set_attrs("climate_steady",
-		"Geothermal energy from bedrock surface", "W m-2", ""); CHKERRQ(ierr);
-	// ierr = geothermal_flux.set_glaciological_units("mJ m-2");
-
-	// ---- Geothermal Flux: cumulative
-	ierr = upward_geothermal_flux_sum.create(grid, "upward_geothermal_flux", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
-	ierr = upward_geothermal_flux_sum.set_attrs("climate_steady",
-		"Geothermal energy from bedrock surface", "W m-2", ""); CHKERRQ(ierr);
-	// ierr = upward_geothermal_flux.set_glaciological_units("mJ m-2");
-
-
-#if 0
-	// ---- Strain Heating: instantaneous
-	ierr = strain_heating2.create(grid, "strain_heating2", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = strain_heating2.set_attrs("internal",
-		"rate of strain heating in ice (dissipation heating), summed over column",
-		"W m-2", ""); CHKERRQ(ierr);
-#endif
-
-	// ---- Basal Frictional Heating: cumulative
-	ierr = basal_frictional_heating_sum.create(grid, "basal_frictional_heating", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = basal_frictional_heating_sum.set_attrs("internal",
-		"Basal frictional heating",
-		"W m-2", ""); CHKERRQ(ierr);
-
-	// ---- Strain Heating: cumulative
-	ierr = strain_heating_sum.create(grid, "strain_heating", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = strain_heating_sum.set_attrs("internal",
-		"Strain heating",
-		"W m-2", ""); CHKERRQ(ierr);
-
-	// ---- Enthalpy: vertically integrated, and converted to J/m^2
-	ierr = total_enthalpy.create(grid, "total_enthalpy", WITH_GHOSTS, WIDE_STENCIL); CHKERRQ(ierr);
-	ierr = total_enthalpy.set_attrs("total_enthalpy",
-		"Vertically integrated enthalpy of ice sheet", "J m-2", ""); CHKERRQ(ierr);
-
-	// ----- Calving rate
-	ierr = calving_mass.create(grid, "calving_mass", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = calving_mass.set_attrs("diagnostic",
-		"discharge (calving) flux (positive means ice loss)",
-		"kg m-2 s-1", ""); CHKERRQ(ierr);
+	ierr = base.createVecs(grid, "", WITHOUT_GHOSTS);
+	ierr = cur.createVecs(grid, "", WITHOUT_GHOSTS);
+	ierr = rate.createVecs(grid, "", WITHOUT_GHOSTS);
 
 	return 0;
 }
@@ -240,26 +193,22 @@ PetscErrorCode PISMIceModel::energyStep()
 	// Use actual geothermal flux, not the long-term average..
 	// See: file:///Users/rpfische/git/pism/build/doc/browser/html/classPISMBedThermalUnit.html#details
 	ierr = btu->get_upward_geothermal_flux(upward_geothermal_flux); CHKERRQ(ierr);
-	ierr = upward_geothermal_flux_sum.add(dt, upward_geothermal_flux); CHKERRQ(ierr);
+	ierr = cur.upward_geothermal_flux.add(dt, upward_geothermal_flux); CHKERRQ(ierr);
 
 	// ----------- Geothermal Flux
-	ierr = geothermal_flux_sum.add(dt, geothermal_flux); CHKERRQ(ierr);
+	ierr = cur.geothermal_flux.add(dt, geothermal_flux); CHKERRQ(ierr);
 
 	// ---------- Basal Frictional Heating (see iMenthalpy.cc l. 220)
 	IceModelVec2S *Rb = NULL;
 	ierr = stress_balance->get_basal_frictional_heating(Rb); CHKERRQ(ierr);
-	basal_frictional_heating_sum.add(dt, *Rb);
+	cur.basal_frictional_heating.add(dt, *Rb);
 
 	// ------------ Volumetric Strain Heating
 	// strain_heating_sum += dt * sum_columns(strainheating3p)
 	IceModelVec3 *strain_heating3p;
 	stress_balance->get_volumetric_strain_heating(strain_heating3p);
-#if 0
-	ierr = strain_heating3p->sumColumns(strain_heating2); CHKERRQ(ierr);
-	ierr = strain_heating_sum.add(dt, strain_heating2); CHKERRQ(ierr);
-#else
-	ierr = strain_heating3p->sumColumns(strain_heating_sum, 1e0, dt); CHKERRQ(ierr);
-#endif
+	// cur.strain_heating = cur.strain_heating * 1.0 + dt * sum_columns(strain_heating3p)
+	ierr = strain_heating3p->sumColumns(cur.strain_heating, 1d0, dt); CHKERRQ(ierr);
 
 	printf("END PISMIceModel::energyStep(time=%f)\n", t_TempAge);
 	return 0;
@@ -286,76 +235,65 @@ PetscErrorCode PISMIceModel::prepare_nc(std::string const &fname, std::unique_pt
 
 
 /** @param t0 Time of last time we coupled. */
+PetscErrorCode PISMIceModel::set_rate(double dt)
+{
+	double by_dt = 1d0 / dt;
+
+	// Compute differences, and set base = cur
+	auto base_ii(base.all_vecs.iterator());
+	auto cur_ii(cur.all_vecs.iterator());
+	auto rate_ii(rate.all_vecs.iterator());
+	for (; base_ii != base.all_vecs.end(); ++base_ii, ++cur_ii, ++rate_ii) {
+		IceModelVec2S &vbase(base_ii->vec);
+		IceModelVec2S &vcur(cur_ii->vec);
+		IceModelVec2S &vrate(rate_ii->vec);
+
+		ierr = vbase.begin_access(); CHKERRQ(ierr);
+		ierr = (*bii)->begin_access(); CHKERRQ(ierr);
+		ierr = (*cii)->begin_access(); CHKERRQ(ierr);
+		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+		for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+			// rate = cur - base: Just for DELTA and EPISLON flagged vectors
+			if (base_ii->flags & (DELTA | EPSILON))
+				vbase(i,j) = (vcur(i,j) - vbase(i,j)) * by_dt;
+
+			// base = cur: For ALL vectors
+			if (base_ii 
+			vbase(i,j) = vcur(i,j);
+		}}
+		ierr = (*cii)->end_access(); CHKERRQ(ierr);
+		ierr = (*bii)->end_access(); CHKERRQ(ierr);
+		ierr = vbase.end_access(); CHKERRQ(ierr);
+	}
+}
+
+
+/** @param t0 Time of last time we coupled. */
 PetscErrorCode PISMIceModel::write_post_energy(double t0)
 {
 	PetscErrorCode ierr;
 
 	printf("BEGIN PISMIceModel::write_post_energy()\n");
 
+	// ------ Difference between now and the last time we were called
 	double t1 = enthalpy_t();	// Current time of the enthalpy portion of ice model.
+	set_rate(t1 - t0);
 
 	// ------ Write it out
 	PIO nc(grid, grid.config.get_string("output_format"));
-
 	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
 	nc.append_time(config.get_string("time_dimension_name"), t1);
-
-	// -------- Get variables that are not in this class
-	pism::IceModelVec2 &basal_runoff_sum(null_hydrology()->basal_runoff_sum);
-	bool update_2d_discharge = discharge_flux_2D_cumulative.was_created();
-	if (!update_2d_discharge) {
-		fprintf(stderr, "WARNING: You must us '-extra_vars discharge_flux_cumulative' on the PISM command line in order to get calving discharge from PISM.\n");
+	for (ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++i) {
+		ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
-
-	calving_mass.copy_from(discharge_flux_2D_cumulative);
-
-	// ------ Divide by dt
-	double by_dt = 1.0 / (t1 - t0);
-	ierr = basal_frictional_heating_sum.scale(by_dt); CHKERRQ(ierr);
-	ierr = strain_heating_sum.scale(by_dt); CHKERRQ(ierr);
-	ierr = geothermal_flux_sum.scale(by_dt); CHKERRQ(ierr);
-	ierr = upward_geothermal_flux_sum.scale(by_dt); CHKERRQ(ierr);
-//	ierr = total_enthalpy.scale(by_dt); CHKERRQ(ierr);
-	ierr = basal_runoff_sum.scale(by_dt); CHKERRQ(ierr);
-	if (update_2d_discharge) {		// Calving, iceberg removal
-		ierr = calving_mass.scale(by_dt); CHKERRQ(ierr);
-		// ierr = discharge_flux_2D_cumulative.scale(by_dt); CHKERRQ(ierr);
-	}
-
-	// Write out the fields
-	ierr = basal_frictional_heating_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	ierr = strain_heating_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	ierr = geothermal_flux_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	ierr = upward_geothermal_flux_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	ierr = total_enthalpy.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	ierr = basal_runoff_sum.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	if (update_2d_discharge) {
-		ierr = calving_mass.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-		// ierr = discharge_flux_2D_cumulative.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	}
-
 	nc.close();
 
-	// ----- Zero the sum variables
-	ierr = basal_frictional_heating_sum.set(0); CHKERRQ(ierr);
-	ierr = strain_heating_sum.set(0); CHKERRQ(ierr);
-	ierr = geothermal_flux_sum.set(0); CHKERRQ(ierr);
-	ierr = upward_geothermal_flux_sum.set(0); CHKERRQ(ierr);
-//	ierr = total_enthalpy.set(0); CHKERRQ(ierr);
-	ierr = basal_runoff_sum.set(0); CHKERRQ(ierr);
-	if (update_2d_discharge) {
-		// ierr = calving_mass.set(0); CHKERRQ(ierr);
-		ierr = discharge_flux_2D_cumulative.set(0); CHKERRQ(ierr);
-	}
-
 	printf("END PISMIceModel::write_post_energy()\n");
-
 	return 0;
 }
 
 PetscErrorCode PISMIceModel::grid_setup()
 {
-//	PetscErrorCode ierr;
 	super::grid_setup();
 
 	// super::grid_setup() trashes grid.time->start().  Now set it correctly.
@@ -366,32 +304,101 @@ PetscErrorCode PISMIceModel::grid_setup()
 }
 
 
-
-PetscErrorCode PISMIceModel::misc_setup()
+PetscErrorCode PISMIceModel::allocate_internal_objects()
 {
-	super::misc_setup();
+	super::allocate_internal_objects();
 
-	PetscErrorCode ierr;
-	std::unique_ptr<PIO> nc;
-
-//	nc = prepare_nc("pre_mass.nc");
-//	nc = prepare_nc("post_mass.nc");
-//	nc = prepare_nc("pre_energy.nc");
-
-	std::string ofname = (params.output_dir / "post_energy.nc").string();
-	ierr = prepare_nc(ofname, nc); CHKERRQ(ierr);
-	basal_frictional_heating_sum.define(*nc, PISM_DOUBLE);
-	strain_heating_sum.define(*nc, PISM_DOUBLE);
-
-	geothermal_flux_sum.define(*nc, PISM_DOUBLE);
-	upward_geothermal_flux_sum.define(*nc, PISM_DOUBLE);
-	total_enthalpy.define(*nc, PISM_DOUBLE);
-	nc->close();
-
-	return 0;
+	base.allocate();
+	cur.allocate();
+	rate.allocate();
 }
 
 
+PetscErrorCode PISMIceModel::misc_setup()
+{
+	PetscErrorCode ierr;
+	ierr = super::misc_setup(); CHKERRQ(ierr);
+
+	std::unique_ptr<PIO> nc;
+
+	// ---------- Create the netCDF output file
+	std::string ofname = (params.output_dir / "post_energy.nc").string();
+	ierr = prepare_nc(ofname, nc); CHKERRQ(ierr);
+
+//	Enth3.define(*nc, PISM_DOUBLE);
+
+	// ------ Initialize MassEnth structures: base, cur, rate
+	for (auto &vec : cur.all_vecs) {
+		ierr = vec->set(0); CHKERRQ(ierr);
+	}
+	ierr = compute_enth2(cur.total.enth, cur.total.mass); CHKERRQ(ierr);
+
+	// base = cur
+	auto bii(base.all_vec.iterator());
+	auto cii(cur.all_vec.iterator());
+	for (; bii != base.end(); ++bii, ++cii) {
+		cii->vec.copy_to(bii->vec);
+	}
+
+	// -------- Define MethEnth structres in netCDF file
+	for (auto ii = rate.all_vec.begin(); ii != rate.all_vec.end(); ++ii) {
+		ierr = ii->vec.define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
+	}
+
+	// --------- Close and return
+	nc->close();
+	return 0;
+}
+
+/** Sums over columns to compute enthalpy on 2D grid.
+
+NOTE: Unfortunately so far PISM does not keep track of enthalpy in
+"partially-filled" cells, so Enth2(i,j) is not valid at locations like
+this one. We need to address this, but so far, it seems to me, the
+best thing we can do is estimate Enth2(i,j) at partially-filled cells
+by computing the average over icy neighbors. I think you can re-use
+the idea from IceModel::get_threshold_thickness(...) (iMpartgrid.cc).  */
+
+
+PetscErrorCode PISMIceModel::compute_enth2(IceModelVec2S &enth2, IceModelVec2S &mass2)
+{
+	PetscErrorCode ierr;
+
+	//	 getInternalColumn() is allocated already
+	double ice_density = config.get("ice_density");
+	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
+	ierr = Enth3.begin_access(); CHKERRQ(ierr);
+	ierr = enth2.begin_access(); CHKERRQ(ierr);
+	ierr = mass2.begin_access(); CHKERRQ(ierr);
+	for (int i=grid.xs; i<grid.xs+grid.xm; ++i) {
+		for (int j=grid.ys; j<grid.ys+grid.ym; ++j) {
+			// count all ice, including cells that have so little they
+			// are considered "ice-free"
+			if (ice_thickness(i,j) > 0) {
+				double *Enth;	// do NOT delete this pointer: space returned by
+				const int ks = grid.kBelowHeight(ice_thickness(i,j));
+				ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
+				for (int k=0; k<ks; ++k) {
+					double dz = (grid.zlevels[k+1] - grid.zlevels[k]);
+					enth2(i,j) += Enth[k] * dz;
+				}
+
+				// Do the last layer a bit differently
+				double dz = (ice_thickness(i,j) - grid.zlevels[ks]);
+				enth2(i,j) += Enth[ks] * dz;
+				enth2(i,j) *= ice_density;		// --> J/m^2
+				mass2(i,j) = ice_thickness(i,j) * ice_density;		// --> kg/m^2
+			} else {
+				enth2(i,j) = 0;
+				mass2(i,j) = 0;
+			}
+		}
+	}
+	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
+	ierr = Enth3.end_access(); CHKERRQ(ierr);
+	ierr = enth2.end_access(); CHKERRQ(ierr);
+	return 0;
+}
 
 PetscErrorCode PISMIceModel::run_to(double time)
 {
@@ -401,7 +408,6 @@ PetscErrorCode PISMIceModel::run_to(double time)
 
 	// ============ Compute Total Enthalpy of Ice Sheet
 	double by_rhoi = 1e0 / config.get("ice_density");	// m^3 kg-1
-	Enth3.sumColumns(total_enthalpy, 0.0, by_rhoi);
 
 	return 0;
 }

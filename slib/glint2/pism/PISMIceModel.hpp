@@ -48,20 +48,17 @@ public:
 	Params const params;
 protected:
 
-	// Temporary stuff to hold returns from PISM
-//	pism::IceModelVec2S strain_heating2;		//!< Rate of strain heating (W/m^2)
-	pism::IceModelVec2S upward_geothermal_flux;	//!< Per-timestep upward geothermal flux (W/m^2)
-
-	pism::IceModelVec2S basal_frictional_heating_sum;	//!< Total amount of basal friction heating (J/m^2)
-	pism::IceModelVec2S strain_heating_sum;	//!< Total amount of strain heating (J/m^2)
-	pism::IceModelVec2S geothermal_flux_sum;	//!< Total amount of geothermal energy (J/m^2)
-	pism::IceModelVec2S upward_geothermal_flux_sum;	//!< Total amount of geothermal energy (J/m^2)
-	pism::IceModelVec2S total_enthalpy;		//!< Total enthalpy of ice sheet (J/m^2)
-	pism::IceModelVec2S calving_mass;		//!< Equal to IceModel::discharge_flux_2D_cumulative
+	MassEnergyBudget base;		// Cumulative totals at start of this timestep
+	MassEnergyBudget cur;		// Cumulative totals now
+	MassEnergyBudget rate;		// At end of coupling timestep, set to (cur - base) / dt
 
 protected:
 	// see iceModel.cc
 	virtual PetscErrorCode createVecs();
+	virtual PetscErrorCode allocate_internal_objects();
+
+	// Will probably want to implement this, pulling code from PISM's iMgeometry.cc
+	// virtual PetscErrorCode massContExplicitStep();
 
 private:
 	// Utility function
