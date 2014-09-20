@@ -72,6 +72,7 @@ set(glint2_SOURCES
 	glint2/modele/grids_ll.cpp
 	glint2/pism/IceModel_PISM.cpp
 	glint2/pism/NullTransportHydrology.cpp
+	glint2/pism/MassEnergyBudget.cpp
 	glint2/pism/PISMIceModel.cpp
 	glint2/pism/PSConstantGLINT2.cpp
 	glint2/read_grid.cpp

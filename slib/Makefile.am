@@ -83,6 +83,7 @@ endif
 if USE_PISM
 libglint2_la_SOURCES += \
 	glint2/pism/GLINT2EnthalpyConverter.cpp \
+	glint2/pism/MassEnergyBudget.cpp \
 	glint2/pism/PISMIceModel.cpp \
 	glint2/pism/PSConstantGLINT2.cpp \
 	glint2/pism/IceModel_PISM.cpp \

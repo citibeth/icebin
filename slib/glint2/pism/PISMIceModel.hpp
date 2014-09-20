@@ -16,6 +16,7 @@
 #include <boost/filesystem.hpp>
 #include <glint2/pism/PSConstantGLINT2.hpp>
 #include <glint2/pism/NullTransportHydrology.hpp>
+#include <glint2/pism/MassEnergyBudget.hpp>
 
 namespace glint2 {
 namespace gpism {
@@ -66,6 +67,10 @@ private:
 
 public:
 
+	/** @param t0 Time of last time we coupled. */
+	PetscErrorCode set_rate(double dt);
+
+
 	std::unique_ptr<pism::PIO> pre_mass_nc;	//!< Write variables every time massContPostHook() is called.
 	std::unique_ptr<pism::PIO> post_mass_nc;
 	std::unique_ptr<pism::PIO> pre_energy_nc;
@@ -81,6 +86,8 @@ public:
 	virtual PetscErrorCode allocate_couplers();
 	virtual PetscErrorCode grid_setup();
     virtual PetscErrorCode misc_setup();
+
+	PetscErrorCode compute_enth2(pism::IceModelVec2S &enth2, pism::IceModelVec2S &mass2);
 
 	virtual PetscErrorCode run_to(double time);
 

@@ -129,9 +129,9 @@ PetscErrorCode PISMIceModel::createVecs()
 
 	PetscErrorCode ierr;
 
-	ierr = base.createVecs(grid, "", WITHOUT_GHOSTS);
-	ierr = cur.createVecs(grid, "", WITHOUT_GHOSTS);
-	ierr = rate.createVecs(grid, "", WITHOUT_GHOSTS);
+	ierr = base.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = cur.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = rate.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
 
 	return 0;
 }
@@ -192,23 +192,26 @@ PetscErrorCode PISMIceModel::energyStep()
 	// --------- Upward Geothermal Flux
 	// Use actual geothermal flux, not the long-term average..
 	// See: file:///Users/rpfische/git/pism/build/doc/browser/html/classPISMBedThermalUnit.html#details
-	ierr = btu->get_upward_geothermal_flux(upward_geothermal_flux); CHKERRQ(ierr);
-	ierr = cur.upward_geothermal_flux.add(dt, upward_geothermal_flux); CHKERRQ(ierr);
+	{
+		IceModelVec2S &upward_geothermal_flux(vWork2d[0]);
+		ierr = btu->get_upward_geothermal_flux(upward_geothermal_flux); CHKERRQ(ierr);
+		ierr = cur.upward_geothermal_flux.add(my_dt, upward_geothermal_flux); CHKERRQ(ierr);
+	}
 
 	// ----------- Geothermal Flux
-	ierr = cur.geothermal_flux.add(dt, geothermal_flux); CHKERRQ(ierr);
+	ierr = cur.geothermal_flux.add(my_dt, geothermal_flux); CHKERRQ(ierr);
 
 	// ---------- Basal Frictional Heating (see iMenthalpy.cc l. 220)
 	IceModelVec2S *Rb = NULL;
 	ierr = stress_balance->get_basal_frictional_heating(Rb); CHKERRQ(ierr);
-	cur.basal_frictional_heating.add(dt, *Rb);
+	cur.basal_frictional_heating.add(my_dt, *Rb);
 
 	// ------------ Volumetric Strain Heating
-	// strain_heating_sum += dt * sum_columns(strainheating3p)
+	// strain_heating_sum += my_dt * sum_columns(strainheating3p)
 	IceModelVec3 *strain_heating3p;
 	stress_balance->get_volumetric_strain_heating(strain_heating3p);
-	// cur.strain_heating = cur.strain_heating * 1.0 + dt * sum_columns(strain_heating3p)
-	ierr = strain_heating3p->sumColumns(cur.strain_heating, 1d0, dt); CHKERRQ(ierr);
+	// cur.strain_heating = cur.strain_heating * 1.0 + my_dt * sum_columns(strain_heating3p)
+	ierr = strain_heating3p->sumColumns(cur.strain_heating, 1.0, my_dt); CHKERRQ(ierr);
 
 	printf("END PISMIceModel::energyStep(time=%f)\n", t_TempAge);
 	return 0;
@@ -237,32 +240,33 @@ PetscErrorCode PISMIceModel::prepare_nc(std::string const &fname, std::unique_pt
 /** @param t0 Time of last time we coupled. */
 PetscErrorCode PISMIceModel::set_rate(double dt)
 {
-	double by_dt = 1d0 / dt;
+	PetscErrorCode ierr;
+
+	double by_dt = 1.0 / dt;
 
 	// Compute differences, and set base = cur
-	auto base_ii(base.all_vecs.iterator());
-	auto cur_ii(cur.all_vecs.iterator());
-	auto rate_ii(rate.all_vecs.iterator());
+	auto base_ii(base.all_vecs.begin());
+	auto cur_ii(cur.all_vecs.begin());
+	auto rate_ii(rate.all_vecs.begin());
 	for (; base_ii != base.all_vecs.end(); ++base_ii, ++cur_ii, ++rate_ii) {
 		IceModelVec2S &vbase(base_ii->vec);
 		IceModelVec2S &vcur(cur_ii->vec);
 		IceModelVec2S &vrate(rate_ii->vec);
 
 		ierr = vbase.begin_access(); CHKERRQ(ierr);
-		ierr = (*bii)->begin_access(); CHKERRQ(ierr);
-		ierr = (*cii)->begin_access(); CHKERRQ(ierr);
+		ierr = vcur.begin_access(); CHKERRQ(ierr);
+		ierr = vrate.begin_access(); CHKERRQ(ierr);
 		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 		for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 			// rate = cur - base: Just for DELTA and EPISLON flagged vectors
-			if (base_ii->flags & (DELTA | EPSILON))
+			if (base_ii->flags & (MassEnergyBudget::DELTA | MassEnergyBudget::EPSILON))
 				vbase(i,j) = (vcur(i,j) - vbase(i,j)) * by_dt;
 
 			// base = cur: For ALL vectors
-			if (base_ii 
 			vbase(i,j) = vcur(i,j);
 		}}
-		ierr = (*cii)->end_access(); CHKERRQ(ierr);
-		ierr = (*bii)->end_access(); CHKERRQ(ierr);
+		ierr = vrate.end_access(); CHKERRQ(ierr);
+		ierr = vcur.end_access(); CHKERRQ(ierr);
 		ierr = vbase.end_access(); CHKERRQ(ierr);
 	}
 }
@@ -283,8 +287,8 @@ PetscErrorCode PISMIceModel::write_post_energy(double t0)
 	PIO nc(grid, grid.config.get_string("output_format"));
 	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
 	nc.append_time(config.get_string("time_dimension_name"), t1);
-	for (ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++i) {
-		ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
+		ierr = ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
 	nc.close();
 
@@ -306,11 +310,16 @@ PetscErrorCode PISMIceModel::grid_setup()
 
 PetscErrorCode PISMIceModel::allocate_internal_objects()
 {
-	super::allocate_internal_objects();
+	PetscErrorCode ierr;
 
-	base.allocate();
-	cur.allocate();
-	rate.allocate();
+	ierr = super::allocate_internal_objects(); CHKERRQ(ierr);
+
+
+	ierr = base.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = cur.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = rate.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+
+	return 0;
 }
 
 
@@ -328,20 +337,20 @@ PetscErrorCode PISMIceModel::misc_setup()
 //	Enth3.define(*nc, PISM_DOUBLE);
 
 	// ------ Initialize MassEnth structures: base, cur, rate
-	for (auto &vec : cur.all_vecs) {
-		ierr = vec->set(0); CHKERRQ(ierr);
+	for (auto &ii : cur.all_vecs) {
+		ierr = ii.vec.set(0); CHKERRQ(ierr);
 	}
 	ierr = compute_enth2(cur.total.enth, cur.total.mass); CHKERRQ(ierr);
 
 	// base = cur
-	auto bii(base.all_vec.iterator());
-	auto cii(cur.all_vec.iterator());
-	for (; bii != base.end(); ++bii, ++cii) {
+	auto bii(base.all_vecs.begin());
+	auto cii(cur.all_vecs.begin());
+	for (; bii != base.all_vecs.end(); ++bii, ++cii) {
 		cii->vec.copy_to(bii->vec);
 	}
 
 	// -------- Define MethEnth structres in netCDF file
-	for (auto ii = rate.all_vec.begin(); ii != rate.all_vec.end(); ++ii) {
+	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
 		ierr = ii->vec.define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
 
@@ -360,7 +369,7 @@ by computing the average over icy neighbors. I think you can re-use
 the idea from IceModel::get_threshold_thickness(...) (iMpartgrid.cc).  */
 
 
-PetscErrorCode PISMIceModel::compute_enth2(IceModelVec2S &enth2, IceModelVec2S &mass2)
+PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::IceModelVec2S &mass2)
 {
 	PetscErrorCode ierr;
 
@@ -414,3 +423,61 @@ PetscErrorCode PISMIceModel::run_to(double time)
 
 }}	// namespace glint2::gpism
 
+
+
+// This subroutine might be useful in the future.
+// It is like an optimized version of calling compute_enth2() twice.
+// /** Computes enth(vH1 configuration) - enth(vH0 configuration).
+// vH1 is new height of ice sheet, vH0 is old height.
+// NOTE: Caller MUST have already called Enth3.begin_access()!
+// @param i The gridcell for which enthalpy difference is to be computed.
+// @param j
+// @param vH0 Old ice thickness.
+// @param vH1 New ice thickness.
+// @param dMass OUT: Difference in mass [kg m-2]
+// @param dEnth OUT: Difference in enthalpy [J m-2] */
+// PetscErrorCode PISMIceModel::enth_diff(int i, int j, double vH0, double vH1,
+// double &dMass, double &dEnth)
+// {
+//   PetscErrorCode ierr;
+//   
+//   double sign = 1.0;
+//   if (vH1 < vH0) {
+//     std::swap(vH0, vH1);
+//     sign = -1.0;
+//   }
+// 
+//   // This is inefficient...
+//   const int ks0 = grid.kBelowHeight(vH0);
+//   const int ks1 = grid.kBelowHeight(vH1);
+// 
+//   double *Enth;  // J/kg do NOT delete this pointer: space returned by
+//   ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
+// 
+//   if (ks0 == ks1) {
+//     return Enth(ks0) * (vH1 - vH0);
+//   } else {
+//     double sum_enth = 0;
+// 
+//     // First level is partial
+//     zhi = grid.zlevels[ks0+1];
+//     sum_enth += Enth(ks0) * (zhi - vH0);
+// 
+//     // Middle full levels
+//     for (ks=ks0+1; ks<ks1; ++ks) {
+//       zlo = grid.zlevels[ks0];
+//       zhi = grid.zlevels[ks0+1];
+//       sum_enth += Enth(ks) * (zhi - zlo);
+//     }
+// 
+//     // Last level is partial
+//     zlo = grid.zlevels[ks1];
+//     sum_enth += Enth(ks0) * (vH1 - zlo);
+// 
+//   }
+// 
+//   dEnth = sum_enth * sign;
+//   dMass = (vH1 - vH0) * sign * ice_density;
+// 
+//   return 0;
+// }

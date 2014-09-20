@@ -4,8 +4,11 @@
 // PISM Includes... want to be included first
 #include <petsc.h>
 #include "IceGrid.hh"
-#include "iceModel.hh"
+#include "iceModelVec.hh"
 // --------------------------------
+
+namespace glint2{
+namespace gpism{
 
 /** Encapsulates mass and enthalpy together.  Used to tabulate total
 enthalpy of a bunch of advected H2O based on its mass and specific
@@ -48,6 +51,7 @@ struct VecWithFlags {
 };
 
 class MassEnergyBudget {
+public:
 	// ============================================================
 	// Total State
 
@@ -92,12 +96,12 @@ class MassEnergyBudget {
 	MassEnthVec2S epsilon;
 
 	// ======================== Different sets (flags)
-	const int MASS = 1;
-	const int ENTH = 2;
+	static const int MASS = 1;
+	static const int ENTH = 2;
 
-	const int TOTAL = 4;		// To be differenced at the end.
-	const int DELTA = 8;
-	const int EPSILON = 16;		// To be differenced at the end.
+	static const int TOTAL = 4;		// To be differenced at the end.
+	static const int DELTA = 8;
+	static const int EPSILON = 16;		// To be differenced at the end.
 
 	// ======================== Summary of above variables
 	// This makes it easy to difference two MassEnergyBudget instances.
@@ -106,7 +110,7 @@ class MassEnergyBudget {
 // =====================================================================
 
 protected:
-	void add_enth(IceModelVec2S &vec, int flags)
+	void add_enth(pism::IceModelVec2S &vec, int flags)
 		{ all_vecs.push_back(VecWithFlags(vec, ENTH | flags)); }
 
 	void add_massenth(MassEnthVec2S &massenth, int flags) {
@@ -120,7 +124,9 @@ public:
 	MassEnergyBudget();
 
 	PetscErrorCode create(pism::IceGrid &grid, std::string const &prefix,
-		pism::IceModelVecKind ghostedp, int width = 1);
+		pism::IceModelVecKind ghostedp, unsigned int width = 1);
 
-	PetscErrorCode MassEnergyBudget::set_epislon();
+	PetscErrorCode set_epsilon(pism::IceGrid &grid);
 };
+
+}}
