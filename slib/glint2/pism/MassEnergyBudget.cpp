@@ -24,7 +24,7 @@ PetscErrorCode MassEnthVec2S::set_attrs(
 
 	ierr = mass.set_attrs(my_pism_intent, my_long_name + " (mass portion)",
 		"kg " + my_units, "", 0); CHKERRQ(ierr);
-	ierr = enth.set_attrs(my_long_name + " (enthalpy portion)",
+	ierr = enth.set_attrs(my_pism_intent, my_long_name + " (enthalpy portion)",
 		"J " + my_units, "", 0); CHKERRQ(ierr);
 
 	return 0;
@@ -32,6 +32,8 @@ PetscErrorCode MassEnthVec2S::set_attrs(
 
 MassEnergyBudget::MassEnergyBudget()
 {
+	add_massenth(total, TOTAL);
+
 	// Energy deltas
 	add_enth(basal_frictional_heating, DELTA);
 	add_enth(basal_frictional_heating, DELTA);
@@ -58,12 +60,14 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 {
 	PetscErrorCode ierr;
 
+	printf("BEGIN MassEnergyBudget::create()\n");
+
 	// ----------- Mass and Enthalpy State of the Ice Sheet
 	ierr = total.create(grid, prefix+"total",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = total.set_attrs("diagnostic",
 		"State of the ice sheet (NOT a difference between timetseps)",
-		"m-2 s-1"); CHKERRQ(ierr);
+		"m-2"); CHKERRQ(ierr);
 
 	// ----------- Heat generation of flows [vertical]
 	// Postive means heat is flowing INTO the ice sheet.
@@ -145,6 +149,7 @@ PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 	PetscErrorCode ierr;
 
 	// ==> epsilon = (sum of fluxes) - total
+	printf("BEGIN MassEnergyBudget::set_epsilon()\n");
 
 	// -------- Mass
 	ierr = epsilon.mass.begin_access(); CHKERRQ(ierr);
@@ -179,6 +184,7 @@ PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 	for (auto &ii : all_vecs) {
 		if (!(ii.flags & (DELTA | ENTH))) continue;
 
+		ierr = ii.vec.begin_access(); CHKERRQ(ierr);
 		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 		for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 			epsilon.enth(i,j) += ii.vec(i,j);
@@ -186,6 +192,8 @@ PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 		ierr = ii.vec.end_access(); CHKERRQ(ierr);
 	}
 	ierr = epsilon.enth.end_access(); CHKERRQ(ierr);
+
+	printf("END MassEnergyBudget::set_epsilon()\n");
 	return 0;
 }
 

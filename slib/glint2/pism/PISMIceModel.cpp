@@ -129,9 +129,11 @@ PetscErrorCode PISMIceModel::createVecs()
 
 	PetscErrorCode ierr;
 
+	printf("BEGIN PISMIceModel::createVecs()\n");
 	ierr = base.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = cur.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = rate.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	printf("END PISMIceModel::createVecs()\n");
 
 	return 0;
 }
@@ -206,12 +208,16 @@ PetscErrorCode PISMIceModel::energyStep()
 	ierr = stress_balance->get_basal_frictional_heating(Rb); CHKERRQ(ierr);
 	cur.basal_frictional_heating.add(my_dt, *Rb);
 
+#if 0
+Temporarily comment out.  For now, this creates problems in ncView.
+Maybe some NaN issues here.
 	// ------------ Volumetric Strain Heating
 	// strain_heating_sum += my_dt * sum_columns(strainheating3p)
 	IceModelVec3 *strain_heating3p;
 	stress_balance->get_volumetric_strain_heating(strain_heating3p);
 	// cur.strain_heating = cur.strain_heating * 1.0 + my_dt * sum_columns(strain_heating3p)
 	ierr = strain_heating3p->sumColumns(cur.strain_heating, 1.0, my_dt); CHKERRQ(ierr);
+#endif
 
 	printf("END PISMIceModel::energyStep(time=%f)\n", t_TempAge);
 	return 0;
@@ -244,6 +250,9 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 
 	double by_dt = 1.0 / dt;
 
+	ierr = compute_enth2(cur.total.enth, cur.total.mass); CHKERRQ(ierr);
+	ierr = cur.set_epsilon(grid); CHKERRQ(ierr);
+
 	// Compute differences, and set base = cur
 	auto base_ii(base.all_vecs.begin());
 	auto cur_ii(cur.all_vecs.begin());
@@ -259,8 +268,12 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 		for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 			// rate = cur - base: Just for DELTA and EPISLON flagged vectors
-			if (base_ii->flags & (MassEnergyBudget::DELTA | MassEnergyBudget::EPSILON))
-				vbase(i,j) = (vcur(i,j) - vbase(i,j)) * by_dt;
+			if (base_ii->flags & (MassEnergyBudget::DELTA | MassEnergyBudget::EPSILON)) {
+				vrate(i,j) = (vcur(i,j) - vbase(i,j)) * by_dt;
+			} else {
+				// Or else just copy the to rate
+				vrate(i,j) = vcur(i,j);
+			}
 
 			// base = cur: For ALL vectors
 			vbase(i,j) = vcur(i,j);
@@ -341,6 +354,7 @@ PetscErrorCode PISMIceModel::misc_setup()
 		ierr = ii.vec.set(0); CHKERRQ(ierr);
 	}
 	ierr = compute_enth2(cur.total.enth, cur.total.mass); CHKERRQ(ierr);
+	ierr = cur.set_epsilon(grid); CHKERRQ(ierr);
 
 	// base = cur
 	auto bii(base.all_vecs.begin());
@@ -381,6 +395,9 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	ierr = mass2.begin_access(); CHKERRQ(ierr);
 	for (int i=grid.xs; i<grid.xs+grid.xm; ++i) {
 		for (int j=grid.ys; j<grid.ys+grid.ym; ++j) {
+			enth2(i,j) = 0;
+			mass2(i,j) = 0;
+
 			// count all ice, including cells that have so little they
 			// are considered "ice-free"
 			if (ice_thickness(i,j) > 0) {
@@ -397,9 +414,6 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 				enth2(i,j) += Enth[ks] * dz;
 				enth2(i,j) *= ice_density;		// --> J/m^2
 				mass2(i,j) = ice_thickness(i,j) * ice_density;		// --> kg/m^2
-			} else {
-				enth2(i,j) = 0;
-				mass2(i,j) = 0;
 			}
 		}
 	}
