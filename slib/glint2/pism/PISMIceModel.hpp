@@ -58,8 +58,21 @@ protected:
 	virtual PetscErrorCode createVecs();
 	virtual PetscErrorCode allocate_internal_objects();
 
-	// Will probably want to implement this, pulling code from PISM's iMgeometry.cc
-	// virtual PetscErrorCode massContExplicitStep();
+public:
+	virtual PetscErrorCode massContExplicitStep();
+	virtual PetscErrorCode accumulateFluxes_massContExplicitStep(
+		int i, int j,
+		double surface_mass_balance,		   // [m s-1] ice equivalent
+		double meltrate_grounded,			  // [m s-1] ice equivalent
+		double meltrate_floating,			  // [m s-1] ice equivalent
+		double divQ_SIA,					   // [m s-1] ice equivalent
+		double divQ_SSA,					   // [m s-1] ice equivalent
+		double Href_to_H_flux,				 // [m s-1] ice equivalent
+		double nonneg_rule_flux);			  // [m s-1] ice equivalent
+private:
+	// Temporary variables inside massContExplicitStep()
+	double _meter_per_s_to_kg_per_m2;
+
 
 private:
 	// Utility function
@@ -85,11 +98,9 @@ public:
 	virtual PetscErrorCode allocate_subglacial_hydrology();
 	virtual PetscErrorCode allocate_couplers();
 	virtual PetscErrorCode grid_setup();
-    virtual PetscErrorCode misc_setup();
+	virtual PetscErrorCode misc_setup();
 
 	PetscErrorCode compute_enth2(pism::IceModelVec2S &enth2, pism::IceModelVec2S &mass2);
-
-	virtual PetscErrorCode run_to(double time);
 
 	/** @return Our instance of PSConstantGLINT2 */
 	PSConstantGLINT2 *ps_constant_glint2()

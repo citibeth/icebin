@@ -216,6 +216,11 @@ void IceModel_PISM::init(
 		pism_args.push_back(val);
 	}
 
+#if 0
+	// Hard-code these variables because we will always need them
+	pism_args.push_back("-extra_vars");
+	pism_args.push_back("climatic_mass_balance_cumulative,nonneg_flux_cumulative,grounded_basal_flux_cumulative,floating_basal_flux_cumulative,flux_divergence");
+#endif
 }
 
 void IceModel_PISM::start_time_set()
@@ -324,10 +329,12 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// in the PISM data structures.
 	int ix;
 	pism_vars.resize(contract[INPUT].size_nounit(), NULL);
-	ix = contract[INPUT]["land_ice_surface_specific_mass_balance_flux"];
+	ix = contract[INPUT]["surface_downward_mass_flux"];
 		pism_vars[ix] = &pism_surface_model->climatic_mass_balance;
+//printf("PV1: pism_vars[%d] = %p (climatic_mass_balance)\n", ix, pism_vars[ix]);
 	ix = contract[INPUT]["surface_temperature"];
 		pism_vars[ix] = &pism_surface_model->ice_surface_temp;
+//printf("PV1: pism_vars[%d] = %p (ice_surface_temp)\n", ix, pism_vars[ix]);
 
 	// Initialize scatter/gather stuff
 	ierr = pism_grid->get_dm(1, pism_grid->max_stencil_width, da2); CHKERRQ(ierr);

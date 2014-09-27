@@ -27,6 +27,22 @@ struct MassEnthVec2S {
 		const std::string &my_long_name,
 		const std::string &my_units);
 
+	PetscErrorCode begin_access()
+	{
+		PetscErrorCode ierr;
+
+		ierr = mass.begin_access(); CHKERRQ(ierr);
+		ierr = enth.begin_access(); CHKERRQ(ierr);
+	}
+
+	PetscErrorCode end_access()
+	{
+		PetscErrorCode ierr;
+
+		ierr = mass.end_access(); CHKERRQ(ierr);
+		ierr = enth.end_access(); CHKERRQ(ierr);
+	}
+
 #if 0
 	/** @param mass [kg m-2]
 	@param specific_enthalpy [J kg-1] */
@@ -72,7 +88,6 @@ public:
 	pism::IceModelVec2S strain_heating;	//!< Total amount of strain heating [J/m^2]
 	pism::IceModelVec2S geothermal_flux;	//!< Total amount of geothermal energy [J/m^2]
 	pism::IceModelVec2S upward_geothermal_flux;	//!< Total amount of geothermal energy [J/m^2]
-
 
 	// ----------- Mass advection, with accompanying enthalpy change
 	// The enthalpy reported for these mass fluxes are the enthalpies

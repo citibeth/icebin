@@ -177,7 +177,7 @@ PetscErrorCode PISMIceModel::energyStep()
 
 	// Enthalpy and mass continuity are stepped with different timesteps.
 	// Fish out the timestep relevant to US.
-	const double my_t0 = t_TempAge;			// Time at beginning of timestep
+	// const double my_t0 = t_TempAge;			// Time at beginning of timestep
 	const double my_dt = dt_TempAge;
 
 	// =========== BEFORE Energy Step
@@ -208,9 +208,10 @@ PetscErrorCode PISMIceModel::energyStep()
 	ierr = stress_balance->get_basal_frictional_heating(Rb); CHKERRQ(ierr);
 	cur.basal_frictional_heating.add(my_dt, *Rb);
 
-#if 0
-Temporarily comment out.  For now, this creates problems in ncView.
-Maybe some NaN issues here.
+#if 1
+//Temporarily comment out.  For now, this creates problems in ncView.
+//strain_heating is inf at the coastlines.
+// See: https://github.com/pism/pism/issues/292
 	// ------------ Volumetric Strain Heating
 	// strain_heating_sum += my_dt * sum_columns(strainheating3p)
 	IceModelVec3 *strain_heating3p;
@@ -222,6 +223,107 @@ Maybe some NaN issues here.
 	printf("END PISMIceModel::energyStep(time=%f)\n", t_TempAge);
 	return 0;
 }
+
+PetscErrorCode PISMIceModel::massContExplicitStep() {
+	PetscErrorCode ierr;
+
+	printf("BEGIN PISMIceModel::MassContExplicitStep()\n");
+
+	double ice_density = config.get("ice_density");
+	_meter_per_s_to_kg_per_m2 = dt * ice_density;
+printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_s_to_kg_per_m2);
+
+
+	// =========== The Mass Continuity Step Itself
+	// This will call through to accumulateFluxes_massContExplicitStep()
+	// in the inner loop
+	ierr = Enth3.begin_access(); CHKERRQ(ierr);
+	ierr = cur.basal_runoff.mass.begin_access(); CHKERRQ(ierr);
+	ierr = cur.basal_runoff.enth.begin_access(); CHKERRQ(ierr);
+	ierr = cur.internal_advection.mass.begin_access(); CHKERRQ(ierr);
+	ierr = cur.internal_advection.enth.begin_access(); CHKERRQ(ierr);
+
+	ierr = super::massContExplicitStep(); CHKERRQ(ierr);
+
+	ierr = cur.internal_advection.enth.begin_access(); CHKERRQ(ierr);
+	ierr = cur.internal_advection.mass.begin_access(); CHKERRQ(ierr);
+	ierr = cur.basal_runoff.mass.begin_access(); CHKERRQ(ierr);
+	ierr = cur.basal_runoff.enth.begin_access(); CHKERRQ(ierr);
+	ierr = Enth3.end_access(); CHKERRQ(ierr);
+
+
+
+	// =========== AFTER the Mass Continuity Step
+
+	// ----------- SMB: mass and enthalpy
+	PSConstantGLINT2 *surface = ps_constant_glint2();
+	double p_air = EC->getPressureFromDepth(0.0);
+	ierr = surface->climatic_mass_balance.begin_access(); CHKERRQ(ierr);
+	ierr = surface->ice_surface_temp.begin_access(); CHKERRQ(ierr);
+	ierr = cur.surface_mass_balance.mass.begin_access(); CHKERRQ(ierr);
+	ierr = cur.surface_mass_balance.enth.begin_access(); CHKERRQ(ierr);
+	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+		double mass = surface->climatic_mass_balance(i,j);		// Our input is in [kg m-2 s-1]
+		double specific_enth;
+		double T = surface->ice_surface_temp(i,j);
+		ierr = EC->getEnthPermissive(T,
+			0.0, p_air, specific_enth);	CHKERRQ(ierr); // [J kg-1]
+
+		cur.surface_mass_balance.mass(i,j) += dt * mass;					// [kg m-2]
+		cur.surface_mass_balance.enth(i,j) += dt * mass * specific_enth;	// [J m-2]
+	}}
+	ierr = cur.surface_mass_balance.enth.end_access(); CHKERRQ(ierr);
+	ierr = cur.surface_mass_balance.mass.end_access(); CHKERRQ(ierr);
+	ierr = surface->ice_surface_temp.end_access(); CHKERRQ(ierr);
+	ierr = surface->climatic_mass_balance.end_access(); CHKERRQ(ierr);
+
+	printf("END PISMIceModel::MassContExplicitStep()\n");
+	return 0;
+}
+
+
+
+PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
+	int i, int j,
+	double surface_mass_balance,		   // [m s-1] ice equivalent
+	double meltrate_grounded,			  // [m s-1] ice equivalent
+	double meltrate_floating,			  // [m s-1] ice equivalent
+	double divQ_SIA,					   // [m s-1] ice equivalent
+	double divQ_SSA,					   // [m s-1] ice equivalent
+	double Href_to_H_flux,				 // [m] ice equivalent
+	double nonneg_rule_flux)			  // [m s-1] ice equivalent
+{
+	PetscErrorCode ierr;
+
+	// -------------- Basal Runoff
+	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
+	double T = EC->getMeltingTemp(p_basal);
+	double specific_enth;
+	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth); CHKERRQ(ierr);
+	double mass;
+
+	mass = -meltrate_grounded * _meter_per_s_to_kg_per_m2;
+	cur.basal_runoff.mass(i,j) += mass;
+	cur.basal_runoff.enth(i,j) += mass * specific_enth;
+
+	// -------------- internal_advection
+	const int ks = grid.kBelowHeight(ice_thickness(i,j));
+	double *Enth;
+	ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
+	specific_enth = Enth[ks];		// Approximate...
+
+	mass = -(divQ_SIA + divQ_SSA) * _meter_per_s_to_kg_per_m2;
+
+	cur.internal_advection.mass(i,j) += mass;
+	cur.internal_advection.enth(i,j) += mass * specific_enth;
+
+
+//	printf("END PISMIceModel::accumulateFluxes_MassContExplicitStep()\n");
+	return 0;
+}
+
+
 
 PetscErrorCode PISMIceModel::prepare_nc(std::string const &fname, std::unique_ptr<PIO> &nc)
 {
@@ -282,6 +384,8 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 		ierr = vcur.end_access(); CHKERRQ(ierr);
 		ierr = vbase.end_access(); CHKERRQ(ierr);
 	}
+
+	return 0;
 }
 
 
@@ -423,18 +527,6 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	return 0;
 }
 
-PetscErrorCode PISMIceModel::run_to(double time)
-{
-	PetscErrorCode ierr;
-
-	ierr = pism::IceModel::run_to(time); CHKERRQ(ierr);
-
-	// ============ Compute Total Enthalpy of Ice Sheet
-	double by_rhoi = 1e0 / config.get("ice_density");	// m^3 kg-1
-
-	return 0;
-}
-
 }}	// namespace glint2::gpism
 
 
@@ -495,3 +587,5 @@ PetscErrorCode PISMIceModel::run_to(double time)
 // 
 //   return 0;
 // }
+
+

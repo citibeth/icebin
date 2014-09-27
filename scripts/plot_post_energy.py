@@ -164,4 +164,4 @@ giss.plot.plot_var(**pp)
 figure.savefig('fig.png', dpi=300, transparent=True)
 
 # Also show on screen
-#matplotlib.pyplot.show()
+matplotlib.pyplot.show()

@@ -161,7 +161,7 @@ PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 	ierr = total.mass.end_access(); CHKERRQ(ierr);
 
 	for (auto &ii : all_vecs) {
-		if (!(ii.flags & (DELTA | MASS))) continue;
+		if ((ii.flags & (DELTA | MASS)) != (DELTA | MASS)) continue;
 
 		ierr = ii.vec.begin_access(); CHKERRQ(ierr);
 		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
@@ -182,7 +182,7 @@ PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 	ierr = total.enth.end_access(); CHKERRQ(ierr);
 
 	for (auto &ii : all_vecs) {
-		if (!(ii.flags & (DELTA | ENTH))) continue;
+		if ((ii.flags & (DELTA | ENTH)) != (DELTA | ENTH)) continue;
 
 		ierr = ii.vec.begin_access(); CHKERRQ(ierr);
 		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
