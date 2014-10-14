@@ -36,7 +36,6 @@ MassEnergyBudget::MassEnergyBudget()
 
 	// Energy deltas
 	add_enth(basal_frictional_heating, DELTA);
-	add_enth(basal_frictional_heating, DELTA);
 	add_enth(strain_heating, DELTA);	//!< Total amount of strain heating [J/m^2]
 	add_enth(geothermal_flux, DELTA);	//!< Total amount of geothermal energy [J/m^2]
 	add_enth(upward_geothermal_flux, DELTA);	//!< Total amount of geothermal energy [J/m^2]
@@ -51,7 +50,7 @@ MassEnergyBudget::MassEnergyBudget()
 	// ----------- Mass advection WITHIN the ice sheet
 	add_massenth(internal_advection, DELTA);
 
-	add_massenth(epsilon, DELTA);
+	add_massenth(epsilon, EPSILON);
 
 }
 
@@ -156,17 +155,19 @@ PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 	ierr = total.mass.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		epsilon.mass(i,j) = -total.mass(i,j);
+		epsilon.mass(i,j) = total.mass(i,j);
 	}}
 	ierr = total.mass.end_access(); CHKERRQ(ierr);
 
 	for (auto &ii : all_vecs) {
 		if ((ii.flags & (DELTA | MASS)) != (DELTA | MASS)) continue;
 
+		printf("epsilon.mass: %s\n", ii.vec.name().c_str());
+
 		ierr = ii.vec.begin_access(); CHKERRQ(ierr);
 		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 		for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-			epsilon.mass(i,j) += ii.vec(i,j);
+			epsilon.mass(i,j) -= ii.vec(i,j);
 		}}
 		ierr = ii.vec.end_access(); CHKERRQ(ierr);
 	}
@@ -177,20 +178,24 @@ PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 	ierr = total.enth.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		epsilon.enth(i,j) = -total.enth(i,j);
+		epsilon.enth(i,j) = total.enth(i,j);
 	}}
 	ierr = total.enth.end_access(); CHKERRQ(ierr);
 
+#if 1
 	for (auto &ii : all_vecs) {
 		if ((ii.flags & (DELTA | ENTH)) != (DELTA | ENTH)) continue;
+
+		printf("epsilon.energy: %s\n", ii.vec.name().c_str());
 
 		ierr = ii.vec.begin_access(); CHKERRQ(ierr);
 		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 		for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-			epsilon.enth(i,j) += ii.vec(i,j);
+			epsilon.enth(i,j) -= ii.vec(i,j);
 		}}
 		ierr = ii.vec.end_access(); CHKERRQ(ierr);
 	}
+#endif
 	ierr = epsilon.enth.end_access(); CHKERRQ(ierr);
 
 	printf("END MassEnergyBudget::set_epsilon()\n");

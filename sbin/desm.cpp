@@ -191,6 +191,8 @@ int main(int argc, char **argv)
 		dnc.get_var("liseb"),
 		dnc.get_var("litg2")};
 
+//const int LITG2 = 2;
+
 	// Get dimensions by querying one variable
 	NcVar *var_nc = vars_nc[0];
 	long ntime = var_nc->get_dim(0)->size();
@@ -250,6 +252,7 @@ printf("dt_s = %f (%f d)\n", dt_s, dt_s / 86400.);
 			blitz::Array<double,3> &var_c = vars_c[vi];
 			blitz::Array<double,3> &var_f = vars_f[vi];
 
+printf("vi=%d extent = (%d, %d, %d)\n", vi, var_c.extent(0),var_c.extent(1),var_c.extent(2));
 printf("cur = [%ld %ld %ld %ld]\n", cur[0], cur[1], cur[2], cur[3]);
 printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3]);
 			// Read the variable (over the time interval)
@@ -257,11 +260,33 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 			var_nc->get(var_c.data(), counts);
 
 			// Zero out nans
-			for (int i=0; i<var_c.extent(0); ++i) {
+			for (int k=0; k<var_c.extent(0); ++k) {
 			for (int j=0; j<var_c.extent(1); ++j) {
-			for (int k=0; k<var_c.extent(2); ++k) {
-				double &var_ijk = var_c(i,j,k);
-				if (fabs(var_ijk) >= 1e10) var_ijk = 0;
+			for (int i=0; i<var_c.extent(2); ++i) {
+				double &var_kji = var_c(k,j,i);
+				if (fabs(var_kji) >= 1e10) var_kji = 0;
+
+#if 0
+if (vi != LITG2) var_kji = 0;
+//if (i < 20) var_kji = -90.;		// Really should be k
+//if (i < 20) var_kji = 239. - 273.15;		// Really should be k
+//else var_kji = 10. * (j + k) - 1600. + 200. -40.;
+
+//var_kji = -90.;
+//var_kji = -100.;
+
+if (k > 30) {
+if ((i + j) % 2 == 0) {
+	var_kji = 245.482732342 - 273.15; - k + 30.;
+} else {
+	var_kji = 250.7892746 - 273.15; - k + 30.;
+}
+var_kji += 7. + time_index;
+}
+//var_kji = -100. + (double)time_index*1.;
+var_kji = -3. + (double)time_index*1.;
+#endif
+
 			}}}
 				
 			// HACK: Clear things not in our domain on this MPI node

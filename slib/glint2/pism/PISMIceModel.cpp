@@ -404,6 +404,11 @@ PetscErrorCode PISMIceModel::write_post_energy(double t0)
 	PIO nc(grid, grid.config.get_string("output_format"));
 	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
 	nc.append_time(config.get_string("time_dimension_name"), t1);
+	Enth3.write(nc, PISM_DOUBLE);
+	ice_thickness.write(nc, PISM_DOUBLE);
+	ice_surface_temp.write(nc, PISM_DOUBLE);
+	PSConstantGLINT2 *surface = ps_constant_glint2();
+	surface->ice_surface_temp.write(nc, PISM_DOUBLE);
 	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
 		ierr = ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
@@ -445,13 +450,6 @@ PetscErrorCode PISMIceModel::misc_setup()
 	PetscErrorCode ierr;
 	ierr = super::misc_setup(); CHKERRQ(ierr);
 
-	std::unique_ptr<PIO> nc;
-
-	// ---------- Create the netCDF output file
-	std::string ofname = (params.output_dir / "post_energy.nc").string();
-	ierr = prepare_nc(ofname, nc); CHKERRQ(ierr);
-
-//	Enth3.define(*nc, PISM_DOUBLE);
 
 	// ------ Initialize MassEnth structures: base, cur, rate
 	for (auto &ii : cur.all_vecs) {
@@ -467,7 +465,17 @@ PetscErrorCode PISMIceModel::misc_setup()
 		cii->vec.copy_to(bii->vec);
 	}
 
+	// ---------- Create the netCDF output file
+	std::unique_ptr<PIO> nc;
+	std::string ofname = (params.output_dir / "post_energy.nc").string();
+	ierr = prepare_nc(ofname, nc); CHKERRQ(ierr);
+
 	// -------- Define MethEnth structres in netCDF file
+	Enth3.define(*nc, PISM_DOUBLE);
+	ice_thickness.define(*nc, PISM_DOUBLE);
+	ice_surface_temp.define(*nc, PISM_DOUBLE);
+	PSConstantGLINT2 *surface = ps_constant_glint2();
+	surface->ice_surface_temp.define(*nc, PISM_DOUBLE);
 	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
 		ierr = ii->vec.define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
@@ -494,6 +502,7 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	//	 getInternalColumn() is allocated already
 	double ice_density = config.get("ice_density");
 	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
+//	ierr = ice_surface_temp.begin_access(); CHKERRQ(ierr);
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
 	ierr = enth2.begin_access(); CHKERRQ(ierr);
 	ierr = mass2.begin_access(); CHKERRQ(ierr);
@@ -510,7 +519,7 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 				ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
 				for (int k=0; k<ks; ++k) {
 					double dz = (grid.zlevels[k+1] - grid.zlevels[k]);
-					enth2(i,j) += Enth[k] * dz;
+					enth2(i,j) += Enth[k] * dz;		// m J / kg
 				}
 
 				// Do the last layer a bit differently
@@ -524,6 +533,7 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 	ierr = enth2.end_access(); CHKERRQ(ierr);
+	ierr = mass2.end_access(); CHKERRQ(ierr);
 	return 0;
 }
 

@@ -54,7 +54,7 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 	ierr = climatic_mass_balance.set_glaciological_units("kg m-2 year-1"); CHKERRQ(ierr);
 	climatic_mass_balance.write_in_glaciological_units = true;
 
-	ierr = ice_surface_temp.create(grid, "ice_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = ice_surface_temp.create(grid, "ps_ice_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = ice_surface_temp.set_attrs("climate_state",
 		"constant-in-time ice temperature at the ice surface",
 		"K", ""); CHKERRQ(ierr);
@@ -159,7 +159,6 @@ PetscErrorCode PSConstantGLINT2::ice_surface_mass_flux(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
 	ierr = climatic_mass_balance.copy_to(result); CHKERRQ(ierr);
-
 	return 0;
 }
 
@@ -167,7 +166,6 @@ PetscErrorCode PSConstantGLINT2::ice_surface_temperature(IceModelVec2S &result) 
 	PetscErrorCode ierr;
 
 	ierr = ice_surface_temp.copy_to(result); CHKERRQ(ierr);
-
 	return 0;
 }
 
@@ -175,7 +173,6 @@ PetscErrorCode PSConstantGLINT2::ice_surface_hflux(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
 	ierr = _ice_surface_hflux.copy_to(result); CHKERRQ(ierr);
-
 	return 0;
 }
 

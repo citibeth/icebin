@@ -443,6 +443,7 @@ printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 		throw std::exception();
 	}
 
+int surface_temperature_ix = contract[INPUT]["surface_temperature"];
 
 	// Transfer input to PISM variables (and scatter w/ PETSc as well)
 	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
@@ -462,9 +463,20 @@ printf("Doing pism_vars[%d]\n", i);
 		// Densify the values array
 		int nval = 0;
 		for (int ix0=0; ix0<ndata(); ++ix0) {
+#if 1
 			if (std::isnan(val(ix0))) continue;
 
 			g2_y[nval] = val(ix0);
+#else
+// The right way to do this is to construct ice-grid T field
+// from non-EP atmosphere first, then from EP land surface model.
+// One big problem here is this is being one for ALL variables,
+// not just temperature.
+			double v = val(ix0);
+			if ((i == surface_temperature_ix) && std::isnan(v)) v = 260.0;
+			g2_y[nval] = v;
+//			g2_y[nval] = 250.0;
+#endif
 			g2_ix[nval] = glint2_to_pism1d(ix0);
 			++nval;
 		}
@@ -505,6 +517,8 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 		}
 				
 	}	// For each pism_var
+
+//ierr = ice_model->ps_constant_glint2()->climatic_mass_balance.set(0); CHKERRQ(ierr);
 
 printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time->current(), time_s, ice_model.get());
 	// =========== Run PISM for one coupling timestep

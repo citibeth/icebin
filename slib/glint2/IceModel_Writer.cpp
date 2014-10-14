@@ -98,6 +98,7 @@ void IceModel_Writer::init(
 	// Set up the output file
 	// Create netCDF variables based on details of the coupling contract.xs
 	output_fname = (output_dir / (sheet_name + ".nc")).string();
+	printf("IceModel_Writer opening file %s\n", output_fname.c_str());
 
 	printf("END IceModel_Writer::init_from_ice_model(%s)\n", sheet_name.c_str());
 }
