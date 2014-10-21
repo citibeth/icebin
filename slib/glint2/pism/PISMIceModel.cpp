@@ -229,7 +229,7 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 
 	printf("BEGIN PISMIceModel::MassContExplicitStep()\n");
 
-	double ice_density = config.get("ice_density");
+	_ice_density = config.get("ice_density");
 	_meter_per_s_to_kg_per_m2 = dt * ice_density;
 printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_s_to_kg_per_m2);
 
@@ -238,17 +238,19 @@ printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_
 	// This will call through to accumulateFluxes_massContExplicitStep()
 	// in the inner loop
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
-	ierr = cur.basal_runoff.mass.begin_access(); CHKERRQ(ierr);
-	ierr = cur.basal_runoff.enth.begin_access(); CHKERRQ(ierr);
-	ierr = cur.internal_advection.mass.begin_access(); CHKERRQ(ierr);
-	ierr = cur.internal_advection.enth.begin_access(); CHKERRQ(ierr);
+	ierr = cur.pism_smb.begin_access(); CHKERRQ(ierr);
+	ierr = cur.melt_grounded.begin_access(); CHKERRQ(ierr);
+	ierr = cur.internal_advection.begin_access(); CHKERRQ(ierr);
+	ierr = cur.href_to_h.begin_access(); CHKERRQ(ierr);
+	ierr = cur.nonneg_rule.begin_access(); CHKERRQ(ierr);
 
 	ierr = super::massContExplicitStep(); CHKERRQ(ierr);
 
-	ierr = cur.internal_advection.enth.begin_access(); CHKERRQ(ierr);
-	ierr = cur.internal_advection.mass.begin_access(); CHKERRQ(ierr);
-	ierr = cur.basal_runoff.mass.begin_access(); CHKERRQ(ierr);
-	ierr = cur.basal_runoff.enth.begin_access(); CHKERRQ(ierr);
+	ierr = cur.nonneg_rule.end_access(); CHKERRQ(ierr);
+	ierr = cur.href_to_h.end_access(); CHKERRQ(ierr);
+	ierr = cur.internal_advection.end_access(); CHKERRQ(ierr);
+	ierr = cur.melt_grounded.end_access(); CHKERRQ(ierr);
+	ierr = cur.pism_smb.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 
 
@@ -260,8 +262,7 @@ printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_
 	double p_air = EC->getPressureFromDepth(0.0);
 	ierr = surface->climatic_mass_balance.begin_access(); CHKERRQ(ierr);
 	ierr = surface->ice_surface_temp.begin_access(); CHKERRQ(ierr);
-	ierr = cur.surface_mass_balance.mass.begin_access(); CHKERRQ(ierr);
-	ierr = cur.surface_mass_balance.enth.begin_access(); CHKERRQ(ierr);
+	ierr = cur.surface_mass_balance.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 		double mass = surface->climatic_mass_balance(i,j);		// Our input is in [kg m-2 s-1]
@@ -273,8 +274,7 @@ printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_
 		cur.surface_mass_balance.mass(i,j) += dt * mass;					// [kg m-2]
 		cur.surface_mass_balance.enth(i,j) += dt * mass * specific_enth;	// [J m-2]
 	}}
-	ierr = cur.surface_mass_balance.enth.end_access(); CHKERRQ(ierr);
-	ierr = cur.surface_mass_balance.mass.end_access(); CHKERRQ(ierr);
+	ierr = cur.surface_mass_balance.end_access(); CHKERRQ(ierr);
 	ierr = surface->ice_surface_temp.end_access(); CHKERRQ(ierr);
 	ierr = surface->climatic_mass_balance.end_access(); CHKERRQ(ierr);
 
@@ -284,19 +284,28 @@ printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_
 
 
 
+/** This is called IMMEDIATELY after ice is gained/lost in
+iMgeometry.cc (massContExplicitStep()).  Here we can record the same
+values that PISM saw when moving ice around. */
+
 PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	int i, int j,
-	double surface_mass_balance,		   // [m s-1] ice equivalent
-	double meltrate_grounded,			  // [m s-1] ice equivalent
-	double meltrate_floating,			  // [m s-1] ice equivalent
-	double divQ_SIA,					   // [m s-1] ice equivalent
-	double divQ_SSA,					   // [m s-1] ice equivalent
-	double Href_to_H_flux,				 // [m] ice equivalent
-	double nonneg_rule_flux)			  // [m s-1] ice equivalent
+	double surface_mass_balance,		// [m s-1] ice equivalent
+	double meltrate_grounded,			// [m s-1] ice equivalent
+	double meltrate_floating,			// [m s-1] ice equivalent
+	double divQ_SIA,					// [m s-1] ice equivalent
+	double divQ_SSA,					// [m s-1] ice equivalent
+	double Href_to_H_flux,				// [m] ice equivalent
+	double nonneg_rule_flux)			// [m] ice equivalent
 {
 	PetscErrorCode ierr;
 
-	// -------------- Basal Runoff
+	// -------------- Get the easy veriables out of the way...
+	cur.pism_smb(i,j) += surface_mass_balance * _meter_per_s_to_kg_per_m2;
+	cur.nonneg_rule(i,j) -= nonneg_rule_flux * _ice_density;
+	cur.href_to_h(i,j) += Href_to_H_flux * _ice_density;
+
+	// -------------- meltrate_grounded: Melting at base of ice sheet
 	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
 	double T = EC->getMeltingTemp(p_basal);
 	double specific_enth;
@@ -304,8 +313,30 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	double mass;
 
 	mass = -meltrate_grounded * _meter_per_s_to_kg_per_m2;
-	cur.basal_runoff.mass(i,j) += mass;
-	cur.basal_runoff.enth(i,j) += mass * specific_enth;
+	cur.melt_grounded.mass(i,j) += mass;
+	cur.melt_grounded.enth(i,j) += mass * specific_enth;
+
+	// -------------- meltrate_grounded: Melting at base of ice sheet
+	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
+	double T = EC->getMeltingTemp(p_basal);
+	double specific_enth;
+	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth); CHKERRQ(ierr);
+	double mass;
+
+	mass = -meltrate_grounded * _meter_per_s_to_kg_per_m2;
+	cur.melt_grounded.mass(i,j) += mass;
+	cur.melt_grounded.enth(i,j) += mass * specific_enth;
+
+	// -------------- meltrate_floating: Melting under ice shelf
+	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
+	double T = EC->getMeltingTemp(p_basal);
+	double specific_enth;
+	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth); CHKERRQ(ierr);
+	double mass;
+
+	mass = -meltrate_floating * _meter_per_s_to_kg_per_m2;
+	cur.melt_floating.mass(i,j) += mass;
+	cur.melt_floating.enth(i,j) += mass * specific_enth;
 
 	// -------------- internal_advection
 	const int ks = grid.kBelowHeight(ice_thickness(i,j));

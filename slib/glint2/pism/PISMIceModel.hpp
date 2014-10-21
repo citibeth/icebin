@@ -71,6 +71,7 @@ public:
 		double nonneg_rule_flux);			  // [m s-1] ice equivalent
 private:
 	// Temporary variables inside massContExplicitStep()
+	double _ice_density;		// From config
 	double _meter_per_s_to_kg_per_m2;
 
 

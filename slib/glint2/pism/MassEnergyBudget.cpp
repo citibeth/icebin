@@ -42,8 +42,11 @@ MassEnergyBudget::MassEnergyBudget()
 
 	// Mass and enthalpy deltas
 	add_massenth(calving, DELTA);
-	add_massenth(basal_runoff, DELTA);
+//	add_massenth(basal_runoff, DELTA);
 	add_massenth(surface_mass_balance, DELTA);
+	all_vecs.push_back(VecWithFlags(pism_smb, MASS));
+	all_vecs.push_back(VecWithFlags(href_to_h, MASS | DELTA));
+	all_vecs.push_back(VecWithFlags(nonneg_rule, MASS | DELTA));
 	add_massenth(melt_grounded, DELTA);
 	add_massenth(melt_floating, DELTA);
 
@@ -102,17 +105,39 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		"Mass/Enthalpy gain from calving.  Should be negative.",
 		"m-2 s-1"); CHKERRQ(ierr);
 
+#if 0
 	ierr = basal_runoff.create(grid, prefix+"basal_runoff",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = basal_runoff.set_attrs("diagnostic",
 		"Runoff from base, should be negative.  Enthalpy portion is predictable, since runoff is 0C 100% water fraction.",
 		"m-2 s-1"); CHKERRQ(ierr);
+#endif
 
 	ierr = surface_mass_balance.create(grid, prefix+"surface_mass_balance",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = surface_mass_balance.set_attrs("diagnostic",
 		"surface_mass_balance",
 		"m-2 s-1"); CHKERRQ(ierr);
+
+	ierr = pism_smb.create(grid, prefix+"pism_smb",
+		ghostedp, width); CHKERRQ(ierr);
+	ierr = pism_smb.set_attrs("diagnostic",
+		"pism_smb",
+		"kg m-2 s-1"); CHKERRQ(ierr);
+
+	ierr = href_to_h.create(grid, prefix+"href_to_h",
+		ghostedp, width); CHKERRQ(ierr);
+	ierr = href_to_h.set_attrs("diagnostic",
+		"href_to_h",
+		"kg m-2 s-1"); CHKERRQ(ierr);
+
+	ierr = nonneg_rule.create(grid, prefix+"nonneg_rule",
+		ghostedp, width); CHKERRQ(ierr);
+	ierr = nonneg_rule.set_attrs("diagnostic",
+		"nonneg_rule",
+		"kg m-2 s-1"); CHKERRQ(ierr);
+
+
 
 	ierr = melt_grounded.create(grid, prefix+"melt_grounded",
 		ghostedp, width); CHKERRQ(ierr);

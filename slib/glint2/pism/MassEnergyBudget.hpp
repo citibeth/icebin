@@ -33,6 +33,7 @@ struct MassEnthVec2S {
 
 		ierr = mass.begin_access(); CHKERRQ(ierr);
 		ierr = enth.begin_access(); CHKERRQ(ierr);
+		return 0;
 	}
 
 	PetscErrorCode end_access()
@@ -41,6 +42,7 @@ struct MassEnthVec2S {
 
 		ierr = mass.end_access(); CHKERRQ(ierr);
 		ierr = enth.end_access(); CHKERRQ(ierr);
+		return 0;
 	}
 
 #if 0
@@ -61,13 +63,18 @@ struct MassEnthVec2S {
 struct VecWithFlags {
 	pism::IceModelVec2S &vec;
 	int flags;
+	double sign_sense;		// POSTIVE_UP or POSITIVE_DOWN
 
-	VecWithFlags(pism::IceModelVec2S &_vec, int _flags) :
-		vec(_vec), flags(_flags) {}
+	VecWithFlags(pism::IceModelVec2S &_vec, int _flags, double _sign_sense) :
+		vec(_vec), flags(_flags), sign_sense(_sign_sense) {}
 };
 
 class MassEnergyBudget {
 public:
+	// The sense of PISM flux variables is not consistent.
+	const double POSTIVE_DOWN = 1.0;
+	const double POSITIVE_UP = -1.0;
+
 	// ============================================================
 	// Total State
 
@@ -79,7 +86,6 @@ public:
 
 	// ======================= Variables to accumulate PISM output
 	// These are accumulated as [kg m-2] or [J m-2]
-	// Sign: positive always means it ADDS to the ice sheet, negative REMOVES from the ice sheet.
 	// They are accumulated for the life of the simulation, and never zeroed.
 	// Other instances of MassEnergyBudget are used to compute differences.
 
@@ -94,8 +100,23 @@ public:
 	// AS REPORTED TO GLINT2!  That is not necessarily the same as the enthalpy
 	// that PISM sees internally.
 	MassEnthVec2S calving;			//!< Equal to IceModel::discharge_flux_2D_cumulative
-	MassEnthVec2S basal_runoff;		//!< Enthalpy here is predictable, since runoff is 0C 100% water fraction.
+
+	// Let's not use basal_runoff (which would be derived from the variables
+	// in NullTransportHydrology).
+	// 
+	// 1. It is derived directly from
+	//    bmelt/basal_meltrate/melt_grounded/meltrate_grounded, which is
+	//    already computed here.
+	// 
+	// 2. bmelt plays directly into removal of mass from the ice sheet (see
+	//    accumulateFluxes_massContExplicitStep() in iMgeometry.cc).
+	//    Including basal_runoff would be double-counting it.
+//	MassEnthVec2S basal_runoff;		//!< Enthalpy here is predictable, since runoff is 0C 100% water fraction.
+
 	MassEnthVec2S surface_mass_balance;		//!< accumulation / ablation, as provided by Glint2
+	IceModelVec2S pism_smb;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check surface_mass_balance.mass
+	IceModleVec2S href_to_h;
+	IceModelVec2S nonneg_rule;
 	MassEnthVec2S melt_grounded;		//!< basal melt (grounded) (from summing meltrate_grounded)
 	MassEnthVec2S melt_floating;		//!< sub-shelf melt (from summing meltrate_floating)
 
@@ -125,10 +146,10 @@ public:
 // =====================================================================
 
 protected:
-	void add_enth(pism::IceModelVec2S &vec, int flags)
+	void add_enth(pism::IceModelVec2S &vec, int flags, double sense)
 		{ all_vecs.push_back(VecWithFlags(vec, ENTH | flags)); }
 
-	void add_massenth(MassEnthVec2S &massenth, int flags) {
+	void add_massenth(MassEnthVec2S &massenth, int flags, double sense) {
 		all_vecs.push_back(VecWithFlags(massenth.mass, MASS | flags));
 		all_vecs.push_back(VecWithFlags(massenth.enth, ENTH | flags));
 	}
