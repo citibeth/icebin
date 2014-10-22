@@ -132,7 +132,8 @@ public:
 	Helps with debugging. */
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
-		std::vector<blitz::Array<double,1>> const &vals2) = 0;
+		std::vector<blitz::Array<double,1>> const &ivals2,
+		std::vector<blitz::Array<double,1>> &ovals2) = 0;			// Output values; we will allocate as needed
 
 	/** Allows the IceModel to change the inputs used to create the
 	regridding transformations.  This is used, for example, to make

@@ -129,20 +129,15 @@ void IceModel_PISM::setup_contracts_modele()
 	// ============== Ice -> GCM
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
 	ice_output.add_field("usurf", "m", "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
-	ice_output.add_field("ice_surface_temp", "K", "");
-
-	ice_output.add_field("runoff.mass", "kg m-2 s-1", "");		// melt_grounded + melt_floating
-	ice_output.add_field("runoff.enth", "W m-2", "");
+	ice_output.add_field("ice_surface_enth", "J kg-1", "");
+	ice_output.add_field("ice_surface_enth_depth", "m", "");
+	ice_output.add_field("basal_runoff.mass", "kg m-2 s-1", "");		// melt_grounded + melt_floating
+	ice_output.add_field("basal_runoff.enth", "W m-2", "")
 	ice_output.add_field("calving.mass", "kg m-2 s-1", "");
 	ice_output.add_field("calving.enth", "W m-2", "");
 	ice_output.add_field("strain_heating", "W m-2", "");
 	ice_output.add_field("epsilon.mass", "kg m-2 s-1", "");
 	ice_output.add_field("epsilon.enth", "W m-2", "");
-
-	ice_output.add_field("", "", "");
-	ice_output.add_field("", "", "");
-	ice_output.add_field("", "", "");
-	ice_output.add_field("unit", "", "");
 
 	// Outputs (Ice -> GCM) are same fields as inputs
 	CouplingContract *gcm_inputs = new_CouplingContract();

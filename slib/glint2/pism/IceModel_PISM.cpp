@@ -317,24 +317,24 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// 	surface->init()
     ierr = ice_model->init(); CHKERRQ(ierr);
 
+	// ============== Set up variables for INPUT contract
+
 	// During the ice_model->init() call above the PISMIceModel
 	// class (derived from PISM's IceModel) allocated an instance
 	// of PSConstantGLINT2. This instance is owned and will be
 	// de-allocated by PISMIceModel ice_model.
-
-	// Fetch out our pism_surface_model
 	pism_surface_model = ice_model->ps_constant_glint2();
 
 	// Set up corresponence between GLINT2 fields and variables
 	// in the PISM data structures.
 	int ix;
-	pism_vars.resize(contract[INPUT].size_nounit(), NULL);
+	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
 	ix = contract[INPUT]["surface_downward_mass_flux"];
-		pism_vars[ix] = &pism_surface_model->climatic_mass_balance;
-//printf("PV1: pism_vars[%d] = %p (climatic_mass_balance)\n", ix, pism_vars[ix]);
+		pism_ivars[ix] = &pism_surface_model->climatic_mass_balance;
+//printf("PV1: pism_ivars[%d] = %p (climatic_mass_balance)\n", ix, pism_ivars[ix]);
 	ix = contract[INPUT]["surface_temperature"];
-		pism_vars[ix] = &pism_surface_model->ice_surface_temp;
-//printf("PV1: pism_vars[%d] = %p (ice_surface_temp)\n", ix, pism_vars[ix]);
+		pism_ivars[ix] = &pism_surface_model->ice_surface_temp;
+//printf("PV1: pism_ivars[%d] = %p (ice_surface_temp)\n", ix, pism_ivars[ix]);
 
 	// Initialize scatter/gather stuff
 	ierr = pism_grid->get_dm(1, pism_grid->max_stencil_width, da2); CHKERRQ(ierr);
@@ -350,6 +350,39 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// next get context *and* allocate samplep0 (on proc zero only, naturally)
 	ierr = VecScatterCreateToZero(g2natural, &scatter, &Hp0); CHKERRQ(ierr);
 
+
+	// ============== Set up variables for OUTPUT contract
+	pism_ovars.resize(contract[OUTPUT].size_nounit(), NULL);
+	ix = contract[OUTPUT][];
+		pism_ovars[ix] = ice_model->rate.
+
+	ix = contract[OUTPUT]["usurf"];		// Elevation of top surface of ice sheet
+		pism_ovars[ix] = ice_model->ice_surface_elevation;	// see PISM's iceModel.hh
+	ix = contract[OUTPUT]["ice_surface_enth"];		// Specific enthalpy of top surface
+		pism_ovars[ix] = ice_model.ice_surface_enth;
+	ix = contract[OUTPUT]["ice_surface_enth_depth"];
+		pism_ovars[ix] = ice_model.ice_surface_enth_depth;
+
+	ix = contract[OUTPUT]["basal_runoff.mass"];
+		pism_ovars[ix] = ice_model->rate.basal_runoff.mass;
+	ix = contract[OUTPUT]["basal_runoff.enth"];
+		pism_ovars[ix] = ice_model->rate.basal_runoff.enth;
+
+	ix = contract[OUTPUT]["calving.mass"];
+		pism_ovars[ix] = ice_model->rate.calving.mass;
+	ix = contract[OUTPUT]["calving.enth"];
+		pism_ovars[ix] = ice_model->rate.calving.enth;
+
+	ix = contract[OUTPUT]["strain_heating"];
+		pism_ovars[ix] = ice_model->rate.strain_heating;
+
+	ix = contract[OUTPUT]["epsilon.mass"];
+		pism_ovars[ix] = ice_model->rate.epsilon.mass;
+	ix = contract[OUTPUT]["epsilon.enth"];
+		pism_ovars[ix] = ice_model->rate.epsilon.enth;
+
+
+	// ============== Miscellaneous
 	// Check that grid dimensions match
 	if ((pism_grid->Mx != glint2_grid->nx()) || (pism_grid->My != glint2_grid->ny())) {
 		fprintf(stderr, "Grid mismatch: pism=(%d, %d) glint2=(%d, %d)\n", pism_grid->Mx, pism_grid->My, glint2_grid->nx(), glint2_grid->ny());
@@ -418,11 +451,12 @@ printf("Mx My = %d, %d\n", pism_grid->Mx, pism_grid->My);
 }
 // --------------------------------------------------
 void IceModel_PISM::run_decoded(double time_s,
-	std::vector<blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &ivals2,
+	std::vector<blitz::Array<double,1>> &ovals2)			// Output values; we will allocate as needed
 {
 	printf("BEGIN IceModel_PISM::run_decoded(%f)\n", time_s);
 
-	if (run_decoded_petsc(time_s, vals2) != 0) {
+	if (run_decoded_petsc(time_s, ivals2, ovals2) != 0) {
 		PetscPrintf(pism_comm, "IceModel_PISM::runtimestep() failed\n");
 		PISMEnd();
 	}
@@ -432,14 +466,21 @@ void IceModel_PISM::run_decoded(double time_s,
 // --------------------------------------------------
 
 PetscErrorCode IceModel_PISM::run_decoded_petsc(double time_s,
-	std::vector<blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &ivals2,		// Input values
+	std::vector<blitz::Array<double,1>> &ovals2)			// Output values; we will allocate as needed
 {
 printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 	PetscErrorCode ierr;
 
-	// Check number of variables matches
-	if (vals2.size() != pism_vars.size()) {
-		fprintf(stderr, "IceModel_PISM::run_decoded_petsc: vals2.size()=%ld does not match pism_vars.size()=%ld\n", vals2.size(), pism_vars.size());
+	// Check number of variables matches for input
+	if (ivals2.size() != pism_ivars.size()) {
+		fprintf(stderr, "IceModel_PISM::run_decoded_petsc: ivals2.size()=%ld does not match pism_ivars.size()=%ld\n", ivals2.size(), pism_ivars.size());
+		throw std::exception();
+	}
+
+	// Check number of variables matches for output
+	if (ovals2.size() != pism_ovars.size()) {
+		fprintf(stderr, "IceModel_PISM::run_decoded_petsc: ovals2.size()=%ld does not match pism_ovars.size()=%ld\n", ovals2.size(), pism_ovars.size());
 		throw std::exception();
 	}
 
@@ -448,13 +489,13 @@ int surface_temperature_ix = contract[INPUT]["surface_temperature"];
 	// Transfer input to PISM variables (and scatter w/ PETSc as well)
 	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
 	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[ndata()]);
-	for (unsigned int i=0; i<pism_vars.size(); ++i) {
+	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
 
-printf("Doing pism_vars[%d]\n", i);
+printf("Doing pism_ivars[%d]\n", i);
 
 		// Get matching input (val) and output (pism_var) variables
-		blitz::Array<double,1> const &val(vals2[i]);
-		IceModelVec2S *pism_var = pism_vars[i];
+		blitz::Array<double,1> const &val(ivals2[i]);
+		IceModelVec2S *pism_var = pism_ivars[i];
 
 		// Inputs specified in the contract are not (necessarily) attached
 		// to any PISM var.  If they are not, just drop them on the ground.
@@ -533,7 +574,19 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 	}
 
 	// ice_model->enthalpy_t() == time_s here
-	ice_model->write_post_energy(old_pism_time);
+	ice_model->prepare_outputs(old_pism_time);
+
+	// Copy the outputs to the blitz arrays
+	for (unsigned int i=0; i<pism_ovars.size(); ++i) {
+
+		// Get matching input (val) and output (pism_var) variables
+		IceModelVec2S *pism_var = pism_ovars[i];
+		iceModelVec2S_to_blitz_xy(*pism_ovars[i], glint2_ovars[i]);	// Allocates val2_xy if needed
+		// Reshape to 1D
+		auto v1_shape(blitz::shape(ny()*nx()));
+		ovals2.reference(giss::reshape<double,2,1>(glint2_ovars[i], v1_shape));
+	}
+
 
 printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
 printf("[%d] END ice_model->run_to()\n", pism_rank);

@@ -342,7 +342,7 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	const int ks = grid.kBelowHeight(ice_thickness(i,j));
 	double *Enth;
 	ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
-	specific_enth = Enth[ks];		// Approximate...
+	specific_enth = Enth[ks];		// Approximate, we will use the enthalpy of the top layer...
 
 	mass = -(divQ_SIA + divQ_SSA) * _meter_per_s_to_kg_per_m2;
 
@@ -421,15 +421,50 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 
 
 /** @param t0 Time of last time we coupled. */
-PetscErrorCode PISMIceModel::write_post_energy(double t0)
+PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 {
 	PetscErrorCode ierr;
 
-	printf("BEGIN PISMIceModel::write_post_energy()\n");
+	printf("BEGIN PISMIceModel::prepare_outputs()\n");
 
 	// ------ Difference between now and the last time we were called
 	double t1 = enthalpy_t();	// Current time of the enthalpy portion of ice model.
 	set_rate(t1 - t0);
+
+	// ====================== Compute "custom" variables in output
+	// --------- basal_runoff = melt_grounded + melt_floating
+	ierr = rate.melt_grounded.begin_access(); CHKERRQ(ierr);
+	ierr = rate.melt_floating.begin_access(); CHKERRQ(ierr);
+	ierr = basal_runoff.begin_access(); CHKERRQ(ierr);
+	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+		basal_runoff(i,j) = melt_grounded(i,j) + melt_floating(i,j);
+	}}
+	ierr = basal_runoff.end_access(); CHKERRQ(ierr);
+	ierr = rate.melt_floating.end_access(); CHKERRQ(ierr);
+	ierr = rate.melt_grounded.end_access(); CHKERRQ(ierr);
+
+	// --------- ice_surface_enth from Enth3
+	ierr = Enth3.begin_access(); CHKERRQ(ierr);
+	ierr = ice_surface_enth.begin_access(); CHKERRQ(ierr);
+	ierr = ice_surface_enth_depth.begin_access(); CHKERRQ(ierr);
+	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
+	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+		double *Enth;
+		ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
+
+		const int ks = grid.kBelowHeight(ice_thickness(i,j));
+		ice_surface_enth(i,j) = Enth[ks];
+		// Depth at which enthalpy is as above (could be zero)
+		ice_surface_enth_depth(i,j) = ice_thickness(i,j) - grid.zlevels[ks];
+	}}
+	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
+	ierr = ice_surface_enth_depth.end_access(); CHKERRQ(ierr);
+	ierr = ice_surface_enth.end_access(); CHKERRQ(ierr);
+	ierr = Enth3.end_access(); CHKERRQ(ierr);
+
+	// ====================== Write to the post_energy.nc file (OPTIONAL)
 
 	// ------ Write it out
 	PIO nc(grid, grid.config.get_string("output_format"));
@@ -445,7 +480,7 @@ PetscErrorCode PISMIceModel::write_post_energy(double t0)
 	}
 	nc.close();
 
-	printf("END PISMIceModel::write_post_energy()\n");
+	printf("END PISMIceModel::prepare_outputs()\n");
 	return 0;
 }
 

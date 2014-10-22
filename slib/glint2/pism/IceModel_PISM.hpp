@@ -60,8 +60,13 @@ class IceModel_PISM : public IceModel_Decode
 	VecScatter scatter; //!< VecScatter used to transfer data to/from processor 0.
 	Vec Hp0;			//!< Resulting vector on process 0
 
-	// Corresponding PISM variable for each field
-	std::vector<pism::IceModelVec2S *> pism_vars;
+	// Corresponding PISM variable for each input field
+	std::vector<pism::IceModelVec2S *> pism_ivars;
+
+	// Corresponding PISM variable for each output field
+	std::vector<pism::IceModelVec2S *> pism_ovars;
+	std::vector<blitz::Array<double,2> glint2_ovars;
+
 
 	double BY_ICE_DENSITY;		// CONSTANT Used to prepare input for PISM
 
