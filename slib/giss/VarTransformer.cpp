@@ -19,16 +19,16 @@ bool VarTransformer::set(std::string output, std::string input, std::string scal
 
 	bool ret = true;
 	if (ioutput < 0) {
-		printf("ERROR: VarTransformer::set(): output variable %s not defined.\n", output.c_str());
+		fprintf(stderr, "ERROR: VarTransformer::set(): output variable %s not defined.\n", output.c_str());
 		ret = false;
 	}
 	if (iinput < 0) {
-		printf("ERROR: VarTransformer::set(): input variable %s not defined.\n", input.c_str());
+		fprintf(stderr, "ERROR: VarTransformer::set(): input variable %s not defined.\n", input.c_str());
 		ret = false;
 	}
 
 	if (iscalar < 0) {
-		printf("ERROR: VarTransformer::set(): scalar variable %s not defined.\n", output.c_str());
+		fprintf(stderr, "ERROR: VarTransformer::set(): scalar variable %s not defined.\n", output.c_str());
 		ret = false;
 	}
 

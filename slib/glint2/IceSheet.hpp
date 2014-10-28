@@ -105,23 +105,6 @@ public:
 	@param direction Direction to convert vectors (NATIVE_TO_PROJ or PROJ_TO_NATIVE) */
 	std::unique_ptr<giss::VectorSparseMatrix> atm_proj_correct(ProjCorrect direction);
 
-#if 0
-	double IceSheet::atm_proj_correct(
-		glint2::Cell *cell,
-		ProjCorrect direction,
-		FactorUse use = FactorUse::MULTIPLY)	// How we will use the factor
-	{
-		// Has sense like direction
-		ProjCorrect xdir = (ProjCorrect)((int)direction ^ (int)use);
-
-		double native_area = cell->area;
-		double proj_area = area_of_proj_polygon(*cell, proj);
-
-		return xdir == ProjCorrect::NATIVE_TO_PROJ ?
-				native_area / proj_area : proj_area / native_area);
-	}
-#endif
-
 	/** Puts GCM grid correction factors into the area1_m variable often
 	involved in regridding matrices.  Avoides having to create a new sparse
 	matrix just for this purpose.  This subroutine is only really useful when
@@ -136,13 +119,15 @@ public:
 	virtual void accum_areas(
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
-	/** Computes matrix to go from height-point space [nhp * n1] to ice grid [n2] */
+	/** Computes matrix to go from elevation point space [nhp * n1] to ice grid [n2] */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceinterp(IceInterp dest) = 0;
 
+	/** Convert from ice grid to the interpolation grid.
+	NOTE: This simple/stub implementation will generally be overridden. */
 	virtual blitz::Array<double,1> const ice_to_interp(blitz::Array<double,1> const &f2)
 		{ return f2; }
 
-	/** Computes matrix to go from height-point space [nhp * n1]
+	/** Computes matrix to go from elevation point space [nhp * n1]
 	to projected atmosphere grid [n1].  NOTE: Corrections for geometric
 	and projection error when going between Cartesian and Spherical
 	space are not accounted for here.

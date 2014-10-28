@@ -53,6 +53,13 @@ struct SMBMsg {
 
 
 class GCMCoupler {
+protected:
+	/** Number of doubles required to hold the output from the ice models on a
+	coupling timestep.  These arrays are temporary, since the data will be
+	regridded from the ice grid to the atmosphere / elevation grids.
+	It is equal to the max. of the required value for each ice model. */
+	long required_ice_model_output = 0;
+
 public:
 	/** Type tags for subclasses of GCMCoupler */
 	BOOST_ENUM_VALUES( Type, int,
@@ -61,6 +68,9 @@ public:
 	);
 	Type const type;
 
+	/** Main access to the core regridding of GLint2 */
+	std::unique_ptr<MatrixMaker> maker;
+
 	/** Parameters passed from the GCM through to the ice model.
 	These parameters cannot be specific to either the ice model or the GCM. */
 	GCMParams gcm_params;
@@ -68,7 +78,7 @@ public:
 
 	/** Associated data structures to write out the exact inputs seen
 	by each ice model. */
-	giss::MapDict<int,IceModel_Writer> writers;
+	giss::MapDict<int,IceModel_Writer> writers[2];	// INPUT and OUTPUT
 
 	giss::UTSystem ut_system;		//!< Unit system for ConstantSets and CouplingContracts
 	giss::ConstantSet gcm_constants;		//!< Constants provided by the GCM
@@ -76,9 +86,17 @@ public:
 	/** Fields we receive from the GCM */
 	giss::CouplingContract gcm_outputs;
 
+	/** Fields to send back to the GCM */
+	giss::CouplingContract gcm_inputs;
+
 	/** Names of items used in the SCALARS dimension of VarTranslator.
 	Used to convert GCM outputs in terms of (eg) coupling timestep (known to the GCM) */
 	giss::CouplingContract ice_input_scalars;
+
+	/** Names of items used in the SCALARS dimension of VarTranslator.
+	Used to convert ice outputs to GCM inputs in terms of (eg)
+	coupling timestep (known to the GCM) */
+	giss::CouplingContract gcm_input_scalars;
 
 	// Fields we read from the config file...
 
@@ -87,7 +105,14 @@ public:
 
 	GCMCoupler(Type _type) :
 		type(_type), ut_system(""),
-		gcm_constants(&ut_system) {}
+		gcm_constants(&ut_system)
+	{
+
+		// Glint2 requires orography on the ice grid, in order to
+		// regrid in elevation space when things change.  Therefore, this
+		// is added to the contract for all GCMs
+		gcm_inputs.add_field("elev2", "m", "ICE", "ice upper surface elevation");
+	}
 
 	virtual ~GCMCoupler() {}
 
@@ -105,8 +130,7 @@ public:
 	/** @param sheets (OPTIONAL): IceSheet data structures w/ grids, etc. */
 	virtual void read_from_netcdf(
 		NcFile &nc, std::string const &vname,
-		std::vector<std::string> const &sheet_names,
-	    giss::MapDict<std::string, IceSheet> &sheets);
+		std::unique_ptr<GridDomain> &&mdomain);
 
 	void set_start_time(
 		giss::time::tm const &time_base,

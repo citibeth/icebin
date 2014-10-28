@@ -10,25 +10,29 @@ namespace giss {
 struct CoupledField : public giss::VarMetaData {
 	std::string name;
 	std::string units;			//!< UDUnits-compatible string
+	std::string grid;
 	std::string description;
 
 	// Implementing giss::VarMetaData
 	std::string const &get_name() const { return name; }
 	std::string const &get_units() const { return units; }
+	std::string const &get_grid() const { return grid; }
 	std::string const &get_description() const { return description; }
 
 	CoupledField(std::string const &_name,
 		std::string const &_units,
+		std::string const &_grid,
 		std::string const &_description)
 	: name(_name),
-	units(std::move(_units)),
+	units(_units),
+	grid(_grid),
 	description(_description)
 	{}
 
 };
 
 inline std::ostream &operator<<(std::ostream &out, CoupledField const &cf)
-	{ return out << "(" << cf.name << ": " << cf.units << ")"; } 
+	{ return out << "(" << cf.name << ": " << cf.units << " [" << grid << "])"; } 
 
 
 
@@ -63,10 +67,6 @@ public:
 	int add_field(std::string const &name, std::string const &units,
 		std::string const &description = "<no description>")
 	{ return add_field(CoupledField(name, units, description)); }
-
-
-	int add_cfname(std::string const &name, std::string const &units = "")
-		{ return add_field(giss::get_cfname(name, units)); }
 
 
 	long size_withunit() const { return _ix_to_field.size(); }

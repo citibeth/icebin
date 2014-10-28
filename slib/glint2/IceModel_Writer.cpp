@@ -105,8 +105,8 @@ void IceModel_Writer::init(
 
 void IceModel_Writer::start_time_set()
 {
-	// We just need the input coupling contract
-	contract[INPUT] = main_model->contract[INPUT];
+	// We just need the input (or output) coupling contract
+	contract[io] = main_model->contract[io];
 
 }
 
@@ -131,7 +131,7 @@ void IceModel_Writer::init_output_file()
 	time_var->add_att("long_name", "Coupling times");
 
 
-	for (auto cf = contract[INPUT].begin(); cf != contract[INPUT].end(); ++cf) {
+	for (auto cf = contract[io].begin(); cf != contract[io].end(); ++cf) {
 		NcVar *var = nc.add_var(cf->name.c_str(), giss::get_nc_type<double>(),
 			dims.size(), &dims[0]);
 		var->add_att("units", cf->units.c_str());
@@ -153,7 +153,8 @@ void IceModel_Writer::init_output_file()
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
 void IceModel_Writer::run_decoded(double time_s,
-	std::vector<blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &ivals2,
+	std::vector<blitz::Array<double,1>> &ovals2)	// Not used for IceModel_Writer
 {
 	// Only need to run one copy of this
 	GCMParams const &gcm_params(coupler->gcm_params);
@@ -175,10 +176,12 @@ printf("BEGIN IceModel_Writer::run_decoded\n");
 
 	// Write the other variables
 	int i = 0;
-	for (auto cf = contract[INPUT].begin(); cf != contract[INPUT].end(); ++cf, ++i) {
+	for (auto cf = contract[io].begin(); cf != contract[io].end(); ++cf, ++i) {
 		NcVar *ncvar = nc.get_var(cf->name.c_str());
 		ncvar->set_cur(&cur[0]);
-		ncvar->put(vals2[i].data(), &counts[0]);
+
+		double *data = (io == IceModel::INPUT ? ivals2[i].data : ovals2[i].data);
+		ncvar->put(data, &counts[0]);
 	}
 
 	nc.close();

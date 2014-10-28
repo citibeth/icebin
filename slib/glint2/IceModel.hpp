@@ -56,8 +56,11 @@ public:
 
 protected:
 
-	/** The grid for this IceModel. */
-	std::shared_ptr<glint2::Grid> grid2;
+	/** Main access to the core regridding of Glint2 */
+	std::unique_ptr<MatrixMaker> maker;
+
+//	/** The grid for this IceModel. */
+//	std::shared_ptr<glint2::Grid> grid2;
 
 	// Parameters provided by the GCM, to inform the coupling
 	std::unique_ptr<GCMPerIceSheetParams> gcm_per_ice_sheet_params;
@@ -92,6 +95,7 @@ public:
 	virtual ~IceModel();
 
 	long ndata() const { return grid2->ndata(); }
+//	long n2() const { return ndata(); }
 
 	// --------------------------------------------------
 	// GCM-specific methods used to set up the contract for
@@ -125,15 +129,22 @@ public:
 	/** Event handler to let IceModels know the start time is (finally) set */
 	virtual void start_time_set() {}
 
-	/** @param index Index of each grid value.
-	@param vals The values themselves -- could be SMB, Energy, something else...
-	TODO: More params need to be added.  Time, return values, etc.
-	@param time_s Seconds since GCMParams::time_base
-	Helps with debugging. */
+	/** Run the ice model for one coupling timestep.
+	@param time_s Seconds since GCMParams::time_base.  Helps with debugging.
+	@param index Index of each input grid value in ivals2.
+	@param ivals2 The values themselves (sparse representation).
+           Their meaning (SMB, T, etc) is determined
+           by the place in the array, as specified by the appropriate
+           INPUT contract for this ice model.
+
+	@param ovals2 Place for the ice model to put its outputs that it
+           will communicate back to the GCM.  These are allocated
+           by the caller.
+	*/
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
 		std::vector<blitz::Array<double,1>> const &ivals2,
-		std::vector<blitz::Array<double,1>> &ovals2) = 0;			// Output values; we will allocate as needed
+		std::vector<blitz::Array<double,1>> &ovals2) = 0;			// Output variables; should be allocated by caller
 
 	/** Allows the IceModel to change the inputs used to create the
 	regridding transformations.  This is used, for example, to make

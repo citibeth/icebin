@@ -67,19 +67,29 @@ void IceModel_PISM::setup_contracts_modele()
 	std::string const HEAT_FLUX = "surface_downward_conductive_heat_flux";
 
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field(MASS_FLUX, "kg m-2 s-1",
+	ice_input.add_field(MASS_FLUX, "kg m-2 s-1", "ICE",
 		"'Surface Mass Balance' over the coupling interval.\n"
 		"Convention: Down is positive");
-	ice_input.add_field(ENTHALPY_FLUX, "W m-2",
+	ice_input.add_field(ENTHALPY_FLUX, "W m-2", "ICE",
 		"Advective enthalpy associated with land_ice_surface_downward_mass_flux."
 		"Convention: Down is positive");
 
 	switch(params->coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
-			ice_input.add_cfname(T, "K");
+			ice_input.add_field(T, "K", "ICE",
+				"The surface called \"surface\" means the lower boundary of the "
+				"atmosphere. The surface temperature is the temperature at the "
+				"interface, not the bulk temperature of the medium above or "
+				"below. Unless indicated in the cell_methods attribute, a quantity is "
+				"assumed to apply to the whole area of each horizontal grid "
+				"box. Previously, the qualifier where_type was used to specify that the "
+				"quantity applies only to the part of the grid box of the named type. "
+				"Names containing the where_type qualifier are deprecated and newly "
+				"created data should use the cell_methods attribute to indicate the "
+				"horizontal area to which the quantity applies.");
 		break;
 		case ModelE_CouplingType::NEUMANN_BC :
-			ice_input.add_field(HEAT_FLUX, "W m-2",
+			ice_input.add_field(HEAT_FLUX, "W m-2", "ICE",
 				"Conductive heat between ice sheet and snow/firn model on top of it.\n"
 				"Convention: Down is positive");
 		break;
@@ -112,6 +122,7 @@ void IceModel_PISM::setup_contracts_modele()
 	bool ok = true;
 	ok = ok && ice_input_vt.set(MASS_FLUX, "lismb", "unit", 1.0);
 
+	// enthalpy flux (PISM) = liseb + enth_modele_to_pism * lismb
 	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "liseb", "unit", 1.0);
 	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "lismb", "unit", enth_modele_to_pism);
 
@@ -128,42 +139,56 @@ void IceModel_PISM::setup_contracts_modele()
 
 	// ============== Ice -> GCM
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
-	ice_output.add_field("usurf", "m", "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
-	ice_output.add_field("ice_surface_enth", "J kg-1", "");
-	ice_output.add_field("ice_surface_enth_depth", "m", "");
-	ice_output.add_field("basal_runoff.mass", "kg m-2 s-1", "");		// melt_grounded + melt_floating
-	ice_output.add_field("basal_runoff.enth", "W m-2", "")
-	ice_output.add_field("calving.mass", "kg m-2 s-1", "");
-	ice_output.add_field("calving.enth", "W m-2", "");
-	ice_output.add_field("strain_heating", "W m-2", "");
-	ice_output.add_field("epsilon.mass", "kg m-2 s-1", "");
-	ice_output.add_field("epsilon.enth", "W m-2", "");
 
-	// Outputs (Ice -> GCM) are same fields as inputs
-	CouplingContract *gcm_inputs = new_CouplingContract();
-	for (auto ii = ice_output.begin(); ii != ice_output.end(); ++ii) {
-		gcm_inputs->add_field(CoupledField(*ii));
+	// Glint2 requires that all ice models return elev2, so that it can regrid in the vertical.
+	ice_output.add_field("usurf", "m", "ICE", "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
+
+	ice_output.add_field("ice_surface_enth", "J kg-1", "ICE", "");
+	ice_output.add_field("ice_surface_enth_depth", "m", "ICE", "");
+	ice_output.add_field("basal_runoff.mass", "kg m-2 s-1", "ICE", "");		// melt_grounded + melt_floating
+	ice_output.add_field("basal_runoff.enth", "W m-2", "ICE", "")
+	ice_output.add_field("calving.mass", "kg m-2 s-1", "ICE", "");
+	ice_output.add_field("calving.enth", "W m-2", "ICE", "");
+	ice_output.add_field("strain_heating", "W m-2", "ICE", "");
+	ice_output.add_field("epsilon.mass", "kg m-2 s-1", "ICE", "");
+	ice_output.add_field("epsilon.enth", "W m-2", "ICE", "");
+
+	// ------- Variable and unit conversions, Ice -> GCM
+	{VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
+
+	vt.set_names(VarTransformer::INPUTS, &ice_output);
+	vt.set_names(VarTransformer::OUTPUTS, &coupler->gcm_inputs);
+	vt.set_names(VarTransformer::SCALARS, &coupler->ice_output_scalars);
+	vt.allocate();
+
+	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);
+	ok = ok && vt.set("elev1", "usurf", "unit", 1.0);
+
+	// For specific enthalpy: Enth_e = Enth_p - enth_model_to_pism
+	// where X_e is ModelE and X_p is PISM
+	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", 1.0);
+	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", -enth_model_to_pism);
+
+	ok = ok && vt.set("ice_surface_enth_depth", "ice_surface_enth_depth", "unit", 1.0);
+
+	ok = ok && vt.set("basal_runoff.mass", "basal_runoff.mass", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "basal_runoff.enth", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "basal_runoff.enth", "unit", -enth_modele_to_pism);
+
+	ok = ok && vt.set("calving.mass", "calving.mass", "unit", 1.0);
+	ok = ok && vt.set("calving.enth", "calving.enth", "unit", 1.0);
+	ok = ok && vt.set("calving.enth", "calving.enth", "unit", -enth_modele_to_pism);
+
+	ok = ok && vt.set("strain_heating", "strain_heating", "unit", 1.0);
+
+	ok = ok && vt.set("epsilon.mass", "epsilon.mass", "unit", 1.0);
+	ok = ok && vt.set("epsilon.enth", "epsilon.enth", "unit", 1.0);
+	ok = ok && vt.set("epsilon.enth", "epsilon.enth", "unit", -enth_modele_to_pism);
+
 	}
 
-	CouplingContract *ice_output_scalars = new_CouplingContract();
-	ice_output_scalars->add_field("unit", "", "");
-
-	VarTransformer &ice_output_vt(var_transformer[OUTPUT]);
-	ice_output_vt.set_names(VarTransformer::INPUTS, &ice_output);
-	ice_output_vt.set_names(VarTransformer::OUTPUTS, gcm_inputs);
-	ice_output_vt.set_names(VarTransformer::SCALARS, ice_output_scalars);
-	ice_output_vt.allocate();
-
-	// Set up transformations: just copy inputs to outputs
-	for (auto ii = ice_output.begin(); ii != ice_output.end(); ++ii) {
-		ok = ok && ice_output_vt.set(ii->name, ii->name, "unit", 1.0);
-	}
-
-	if (!ok) {
-		printf("modele_pism.cpp quitting due to errors.\n");
-		throw std::exception();
-	}
-
+	// Catch all our errors at once
+	if (!ok) throw std::exception();
 	printf("END IceModel_PISM::setup_contracts_modele\n");
 }
 

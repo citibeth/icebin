@@ -261,18 +261,13 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 			j0s, j1s));
 	api->domain = (ModelEDomain *)mdomain.get();
 
-	// Load the MatrixMaker	(filtering by our domain, of course)
-	// Also load the ice sheets
-	api->maker.reset(new MatrixMaker(true, std::move(mdomain)));
-
 	// ModelE makes symlinks to our real files, which we don't want.
 
 	printf("Opening GLINT2 config file: %s\n", glint2_config_rfname.c_str());
 	NcFile glint2_config_nc(glint2_config_rfname.c_str(), NcFile::ReadOnly);
-	api->maker->read_from_netcdf(glint2_config_nc, maker_vname);
 
 	// Read the coupler, along with ice model proxies
-	api->gcm_coupler->read_from_netcdf(glint2_config_nc, maker_vname, api->maker->get_sheet_names(), api->maker->sheets);
+	api->gcm_coupler->read_from_netcdf(glint2_config_nc, maker_vname, std::move(mdomain));
 	glint2_config_nc.close();
 
 	// Check bounds on the IceSheets, set up any state, etc.

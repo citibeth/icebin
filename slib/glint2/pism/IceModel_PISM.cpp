@@ -352,10 +352,11 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 
 
 	// ============== Set up variables for OUTPUT contract
-	pism_ovars.resize(contract[OUTPUT].size_nounit(), NULL);
-	ix = contract[OUTPUT][];
-		pism_ovars[ix] = ice_model->rate.
+	// -------------- Allocate blitz:Array<double,1> output variables,
+	// which are passed back to Glint2.
 
+	// -------------- Link to PISM-format output variables, used to fill ovars
+	pism_ovars.resize(contract[OUTPUT].size_nounit(), NULL);
 	ix = contract[OUTPUT]["usurf"];		// Elevation of top surface of ice sheet
 		pism_ovars[ix] = ice_model->ice_surface_elevation;	// see PISM's iceModel.hh
 	ix = contract[OUTPUT]["ice_surface_enth"];		// Specific enthalpy of top surface

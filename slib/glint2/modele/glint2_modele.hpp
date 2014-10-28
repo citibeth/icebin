@@ -30,7 +30,9 @@ namespace modele {
 
 // The ModelE interface to GLINT2.  This is called directly by ModelE.
 // ------------------------------------------------------
-/** Make a sparse matrix with a vector of these. */
+
+/** Make a sparse matrix with a vector of these.  This struct is
+specific to ModelE's (i,j,k) indexing scheme. */
 struct hp_to_ice_rec {
 	int row;
 	int col_i, col_j, col_k;
@@ -43,7 +45,7 @@ struct hp_to_ice_rec {
 // ------------------------------------------------------
 
 struct glint2_modele {
-	std::unique_ptr<MatrixMaker> maker;
+//	std::unique_ptr<MatrixMaker> maker;
 	ModelEDomain *domain;	// Points to domain owned by maker
 
 	double dtsrc;			// Size of ModelE timestep

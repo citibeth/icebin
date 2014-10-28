@@ -27,19 +27,19 @@ static double const nan = std::numeric_limits<double>::quiet_NaN();
 // normal arrays (with NaN where no value was given.)
 void IceModel_Decode::run_timestep(double time_s,
 	blitz::Array<int,1> const &indices,
-	std::vector<blitz::Array<double,1>> const &vals2)
+	std::vector<blitz::Array<double,1>> const &ivals2)
 {
 printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, indices.size());
-	std::vector<blitz::Array<double,1>> vals2d;	/// Decoded fields
+	std::vector<blitz::Array<double,1>> ivals2d;	/// Decoded fields
 
 	// Naming convention on array variables:
-	//     vals2 = Vector of Values-arrays on grid2 (ice grid)
-	//     vals2d = Vector of DECODED values-arrays on grid2
-	//     vals = Individual value array from vals2
-	//     valsd = Individual valu array from vals2d
+	//     ivals2 = Vector of Values-arrays on grid2 (ice grid)
+	//     ivals2d = Vector of DECODED values-arrays on grid2
+	//     vals = Individual value array from ivals2
+	//     valsd = Individual valu array from ivals2d
 	// Loop through the fields we require
 	int i=0;
-	for (auto ii = vals2.begin(); ii != vals2.end(); ++ii, ++i) {
+	for (auto ii = ivals2.begin(); ii != ivals2.end(); ++ii, ++i) {
 		blitz::Array<double,1> const &vals(*ii);
 
 		// Decode the field!
@@ -61,12 +61,12 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 		}
 
 		// Store decoded field in our output
-		vals2d.push_back(valsd);
+		ivals2d.push_back(valsd);
 printf("Done decoding required field, %s\n", contract[IceModel::INPUT][i].c_str());
 	}
 
 	// Pass decoded fields on to subclass
-	run_decoded(time_s, vals2d);
+	run_decoded(time_s, ivals2d, ovals2);
 printf("END IceModel_Decode::run_timestep(%f)\n", time_s);
 }
 

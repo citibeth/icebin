@@ -28,6 +28,9 @@ class IceModel_Writer : public IceModel_Decode
 	/** The IceModel we're affiliated with */
 	IceModel const *main_model;
 
+	/** Tells whether we are planning on writing the INPUT or OUTPUT fields */
+	IceModel::IO io;
+
 	// Dimensions to use when writing to netCDF
 	std::vector<std::string> dim_names;
 	std::vector<long> cur;		// Base index to write in netCDF
@@ -38,7 +41,10 @@ class IceModel_Writer : public IceModel_Decode
 
 public:
 
-	IceModel_Writer(std::string const &_name, GCMCoupler const *_coupler) : IceModel_Decode(IceModel::Type::WRITER, _name, _coupler), output_file_initialized(false) {}
+	IceModel_Writer(std::string const &_name, IO _io, GCMCoupler const *_coupler) :
+		IceModel_Decode(IceModel::Type::WRITER, _name, _coupler),
+		io(_io),
+		output_file_initialized(false) {}
 
 
 	/** Specialized init signature for IceModel_Writer */
@@ -58,7 +64,8 @@ public:
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc. */
 	void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &ivals2,
+		std::vector<blitz::Array<double,1>> &ovals2);	// Not used for IceModel_Writer
 
 protected:
 
