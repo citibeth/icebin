@@ -88,6 +88,31 @@ public:
 	/** Placeholder for additional coupling contracts that had to be allocated. */
 	std::vector<std::unique_ptr<giss::CouplingContract>> _extra_contracts;
 
+	// --------------------------------------------
+	// Buffers used to receive ice model output, and regrid it.
+
+	/** Direct output from the ice model (on the ice grid) */
+	std::vector<blitz::Array<double,1>> ovals_I;
+
+	/** Input to the GCM, but on the ice grid */
+	std::vector<blitz::Array<double,1>> ivals_I;
+
+
+	/** Allocate vectors in preparation of calling an ice model. */
+	void allocate0();
+
+	/** Allocate in preparation of var transformations (but not regridding yet) */
+	void allocate1();
+
+	/** Free portions not needed after finished calling ice model and
+	applying variable transform.  This will be variables desired on
+	anything other than the ELEVATION grid. */
+	void free1();
+
+	/** Free all memory used by this.  Called when we're done with a coupling timestep. */
+	void free0();
+
+	// --------------------------------------------
 	/** Allocate a new giss::CouplingContract, with the same lifetime as this IceModel. */
 	giss::CouplingContract *new_CouplingContract();
 

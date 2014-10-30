@@ -124,7 +124,8 @@ void GCMCoupler::set_start_time(
 	gcm_params.set_start_time(time_base, time_start_s);
 
 
-	required_ice_model_output = 0;
+	local_coupling_size = 0;	// Max. # of temporary (per-ice-sheet) doubles needed on any given ice sheet
+	global_coupling_size = 0;	// # of permanent (across-all-ice-sheet) needed for coupling
 	for (auto model = models.begin(); model != models.end(); ++model) {
 		int sheetno = model.key();
 
@@ -150,14 +151,15 @@ void GCMCoupler::set_start_time(
 #endif
 
 		// Update the number of doubles required to hold ice model output
-		long req = 0;
+		long loc = 0;
 		int nfields = model->contract[IceModel::OUTPUT].size_nounit();
 		for (int i=0; i < nfields; ++i) {
 			CoupledField &cf(model->contract[IceModel::OUTPUT].field(i));
-			if (cf.grid != "ELEVATION") req += model->ndata();
+			if (cf.grid == "ELEVATION") global_coupling_size += model->ndata();
+			else if (cf.grid == "ATMOSPHERE") loc + model->ndata();
 		}
 
-		required_ice_model_output = std::max(required_ice_model_output, req);
+		local_coupling_size = std::max(local_coupling_size, req);
 	}
 
 }
@@ -212,7 +214,6 @@ void GCMCoupler::call_ice_model(
 	int sheetno,
 	double time_s,
 	giss::DynArray<SMBMsg> &rbuf,
-	double *obuf,		// Array of doubles large enough to hold all of ice model output.  Should be at least length required_ice_model_output
 	std::vector<blitz::Array<double,1>> &ovalsg,	// Output values, in GCM space
 	SMBMsg *begin, SMBMsg *end)		// Messages have the MAX number of fields for any ice model contract
 {
@@ -239,44 +240,23 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 			&rbegin[i], shape, stride, blitz::neverDeleteData));
 	}
 
-	// -------------- Construct output arrays
-	std::vector<blitz::Array<double,1>> &ovals2;
-	double *ob = obuf;
-	CouplingContract &ocontract(model->contract[IceModel::OUTPUT]);
-	int nfields_output = ocontract.size_nounit();
-	for (int i=0; i < nofields_output; ++i) {
-		CoupledField &cf(model->contract[IceModel::OUTPUT].field(i));
-		std::string const &grid(cf.get_grid());
-		long n2 = model->ndata();
-
-		if (cf.grid == "ELEVATION") {
-			// We must use permanent storage
-			ovals2.push_back(blitz::Array<double,1>(n2));
-		} else {
-			// We can use temporary storage for this
-			ovals2.push_back(blitz::Array<double,1>(ob, blitz::shape(n2), blitz::neverDeleteData));
-		}
-
-		ob += n2;
-	}
-
-	// Check that we haven't overrun our buffer
-	if (ob - obuf > required_ice_model_output) {
-		fprintf(stderr, "Buffer overrun allocating output variables\n");
-		throw std::exception();
-	}
 
 	// -------------- Run the model
+	model->allocate0();	// Allocates ovals_I
+
 	// Record exactly the same inputs that this ice model is seeing.
 	IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
-	if (iwriter) iwriter->run_timestep(time_s, indices, ivals2, ovals2);
+	if (iwriter) iwriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
 
 	// Now call to the ice model
-	model->run_timestep(time_s, indices, ivals2, ovals2);
+	model->run_timestep(time_s, indices, ivals2, model->ovals_I);
 
 	// Record what the ice model produced
 	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
-	if (owriter) owriter->run_timestep(time_s, indices, ivals2, ovals2);
+	if (owriter) owriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
+};
+
+void set_gcm_inputs()
 
 	// -------------- Regrid output arrays as appropriate
 	giss::VarTransformer &vt(models[sheetno]->var_transformer[IceModel::OUTPUT]);
@@ -309,7 +289,7 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 		} else if (cf.grid == "ELEVATION") {
 			// PASS: Elevation stuff from all ice sheets must be regridded at once.
 		} else if (cf.grid == "ATMOSPHERE") {
-			model->maker->
+			auto mat(model->maker->iceinterp_to_projatm(
 
 	}
 
@@ -319,6 +299,12 @@ printf("[%d] END GCMCoupler::call_ice_model(nfields=%ld)\n", gcm_params.gcm_rank
 
 	return ovals2;
 };
+
+
+
+
+
+
 
 
 
