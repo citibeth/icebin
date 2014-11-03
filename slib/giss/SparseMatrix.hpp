@@ -1018,6 +1018,7 @@ SparseMatrixT &mat)
 }
 
 // ===============================================================
+
 // ======== Extra Functions
 
 //extern std::unique_ptr<VectorSparseMatrix> multiply_eigen_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b);
@@ -1039,5 +1040,7 @@ inline std::vector<int> get_row_beginnings(VectorSparseMatrix const &a)
 inline std::vector<int> get_col_beginnings(VectorSparseMatrix const &a)
 	{ return get_rowcol_beginnings(a, 1); }
 
+
+// =============================================================
 
 }	// namespace giss

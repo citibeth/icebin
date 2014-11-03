@@ -43,6 +43,14 @@ public :
 		else ii->second += val;
 	}
 
+	/** Computes the sum of two SparseAccumulator vectors.  Puts rsult in this. */
+	void add(SparseAccumulator<IndexT, AccumT, Hash> const &b) {
+		for (auto ii = begin(); ii != end(); ++ii) {
+			add(ii->first, ii->second);
+		}
+	}
+
+
 	/** Inserts a new <index, value> pair to sparse vector.  If that
 	element was already non-zero, replaces to it. */
 	void set(IndexT const &index, AccumT const &val) {

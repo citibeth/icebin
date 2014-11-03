@@ -105,17 +105,24 @@ public:
 	@param direction Direction to convert vectors (NATIVE_TO_PROJ or PROJ_TO_NATIVE) */
 	std::unique_ptr<giss::VectorSparseMatrix> atm_proj_correct(ProjCorrect direction);
 
-	/** Puts GCM grid correction factors into the area1_m variable often
-	involved in regridding matrices.  Avoides having to create a new sparse
-	matrix just for this purpose.  This subroutine is only really useful when
-	working with one ice sheet at a time. */
+	/** Sets up to correct for projection by adjusting the area1_m
+	vector produced by other subroutines.  Avoids having to create a
+	new sparse matrix just for this purpose.  NOTE: This subroutine is
+	only really useful when working with one ice sheet at a time ---
+	because the projection mapping the GCM grid cells to the ice
+	sheet's cartesian plane is different for each ice sheet. */
 	void atm_proj_correct(
 		giss::SparseAccumulator<int,double> &area1_m,
 		ProjCorrect direction);
 
 	// ------------------------------------------------
 
-	/** Adds up the (ice-covered) area of each GCM grid cell */
+	/** Adds up the (ice-covered) area of each GCM grid cell.
+	@param area1_m IN/OUT: Area of each GCM cell covered by the ice
+		sheet (non-masked).  This variable is not cleared.  Values are
+		added to area1_m, for a cumulative effect across all ice
+		sheets.
+	*/
 	virtual void accum_areas(
 		giss::SparseAccumulator<int,double> &area1_m) = 0;
 
@@ -130,7 +137,9 @@ public:
 	/** Computes matrix to go from elevation point space [nhp * n1]
 	to projected atmosphere grid [n1].  NOTE: Corrections for geometric
 	and projection error when going between Cartesian and Spherical
-	space are not accounted for here.
+	space are not accounted for here.  They can be added to area1_m variable
+	by calling atm_proj_correct().
+
 	@param area1_m IN/OUT: Area of each GCM cell covered by
 		(non-masked-out) ice sheet.  Must divide result by this number. */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_projatm(

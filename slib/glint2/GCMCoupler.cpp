@@ -254,9 +254,12 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 	// Record what the ice model produced
 	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
 	if (owriter) owriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
+
 };
 
+#if 0
 void set_gcm_inputs()
+{
 
 	// -------------- Regrid output arrays as appropriate
 	giss::VarTransformer &vt(models[sheetno]->var_transformer[IceModel::OUTPUT]);
@@ -296,10 +299,8 @@ void set_gcm_inputs()
 
 
 printf("[%d] END GCMCoupler::call_ice_model(nfields=%ld)\n", gcm_params.gcm_rank, nfields);
-
-	return ovals2;
 };
-
+#endif
 
 
 
@@ -313,7 +314,7 @@ void GCMCoupler::couple_to_ice(
 double time_s,
 int nfields,			// Number of fields in sbuf.  Not all will necessarily be filled, in the case of heterogeneous ice models.
 giss::DynArray<SMBMsg> &sbuf,	// Values, already converted to ice model inputs (from gcm outputs)
-std::vector<blitz::Array<double,1>> &ovals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+std::vector<blitz::Array<double,1>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 {
 	// TODO: Convert this to use giss::gather_msg_array() instead!!!
 
@@ -352,7 +353,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 	if (gcm_params.gcm_rank == gcm_params.gcm_root) {
 		// Clear output arrays, which will be filled in additively
 		// on each ice model
-		for (auto ov=ovals.begin(); ov != ovals.end(); ++ov) *ov = 0;
+		for (auto ov=gcm_ivals.begin(); ov != gcm_ivals.end(); ++ov) *ov = 0;
 
 		// Add a sentinel
 		(*rbuf)[rbuf->size-1].sheetno = 999999;
@@ -388,8 +389,56 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			call_ice_model(&*model, sheetno, time_s, *rbuf, obuf.get(),
 				params->second.begin, params->second.next);
 
+			// Convert to variables the GCM wants (but still on the ice grid)
+			model->set_gcm_inputs();
 		}
 
+		// =============== Regrid to the grid requested by the GCM
+
+		// ----------- Create the MutliMatrix used to regrid to atmosphere
+		MultiMatrix ice2atm;
+		for (auto model = models.begin(); model != models.end(); ++model) {
+			// Get matrix for this single ice model.
+			giss::SparseAccumulator<int,double> area1_m;
+			int sheetno = model.key();
+			std::unique_ptr<giss::VectorSparseMatrix> M(
+				model->sheet->iceinterp_to_projatm(
+				area1_m, IceInterp::ICE);
+
+			// Add on correction for projection
+			if (maker->correct_area1)
+				sheet->atm_proj_correct(area1_m, ProjCorrect::PROJ_TO_NATIVE);
+
+			// Store it away...
+			ice2atm.add_matrix(std::move(M), area1_m);
+		}
+
+		// ------------ Regrid each GCM input from ice grid to whatever grid it needs.
+		for (int var_ix=0; var_ix < gcm_inputs.size_nounit(); ++var_ix) {
+			CoupledField &cf(gcm_inputs.field(var_ix));
+
+			if (cf.grid == "ATMOSPHERE") {
+				// --- Assemble all intputs, to multiply by ice_to_hp matrix
+
+				blitz::Array<double, 1> &ival_I(vals(var_ix));
+				for (auto model = models.begin(); model != models.end(); ++model) {
+					// Assemble vector of the same GCM input variable from each ice model.
+					ival_I.push_back(model->ivals_I[var_ix]);
+				}
+
+				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
+			} else if (cf.grid == "ELEVATION") {
+				// --- Assemble all intputs, to send to Glint2 QP regridding
+
+				std::map<int, blitz::Array<double,1>> f4s;
+				for (auto model = models.begin(); model != models.end(); ++model) {
+					int sheetno = model.key();
+					f4s.insert(sheetno, model->ivals_I(var_ix));
+				}
+				maker->iceinterp_to_hp(f4s, gcm_ivals[var_ix],
+					IceInterp::ICE, QPAlgorithm::SINGLE_QP);
+			}
+		}
 	} else {
 		// We're not root --- we have no data to send to ice
 		// models, we just call through anyway because we will

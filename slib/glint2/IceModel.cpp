@@ -78,13 +78,13 @@ void IceModel::set_gcm_inputs()
 {
 	allocate1();		// Allocate ivals_I
 
+	// Compute the variable transformation
 	giss::VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
 	giss::CSRAndUnits trans = vt.apply_scalars({
 //		std::make_pair("by_dt", 1.0 / ((itime - api->itime_last) * api->dtsrc)),
 		std::make_pair("unit", 1.0)});
 
-
-	// Compute the variable transformation
+	// Apply the variable transformation
 	for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {	// xi is index of output variable
 
 		// Consider each output variable separately...
@@ -95,6 +95,15 @@ void IceModel::set_gcm_inputs()
 			
 			ivals_ += ovals2[xj] * io_val;		// blitz++ vector operation
 		}
+	}
+
+}
+
+#if 0
+		// -------- Regrid just the things going to ATMOSPHERE grid.
+		CoupledField &cf(model->contract[IceModel::OUTPUT].field(xi));
+
+
 
 		// Regrid to the request grid for the GCM
 		CoupledField &cf(model->contract[IceModel::OUTPUT].field(xi));
@@ -107,7 +116,7 @@ void IceModel::set_gcm_inputs()
 
 	}
 
-
+#endif
 
 
 

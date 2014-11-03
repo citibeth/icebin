@@ -145,6 +145,66 @@ public:
 
 std::unique_ptr<IceSheet> new_ice_sheet(Grid::Parameterization parameterization);
 
+// --------------------------------------------------------------
+/** Represents a matrix by a series of sub-matrices (almost but not quite block diagonal).
+It then allows computation of y as follows:
+
+[  ]            [M1][x1]
+[y] = diag(1/a) [M2][x2]
+[ ]             [M3][x3]
+
+where:
+   M1..Mn = matrices (1 per ice sheet)
+   x1..xn = vectors (1 field on each ice sheet)
+       y  = result (on eg atmosphere grid)
+       a  = scaling vector (on same grid as y) = sum(a1 ... an)
+
+   a1..an = scalaing vector for each matrix (dimensions same as y)
+
+*/
+class MultiMatrix
+{
+	std::vector<std::unique_ptr<giss::VectorSparseMatrix>> matrices;
+
+	giss::SparseAccumulator<int,double> total_area1_m;
+
+	/** @param area1_m Scaling vector for this matrix */
+	void add_matrix(
+		std::unique_ptr<giss::VectorSparseMatrix> &&mat,
+		giss::SparseAccumulator<int,double> const &area1_m)
+	{
+		matrices.push_back(std::move(mat));
+
+		// --------- Compute: total_area1_m += area1_m
+		total_area1_m.add(area1_m);
+	}
+
+	/** Computes y = diag(1/total_area1_m) * M xs
+	void multiply(std::vector<blitz::Array<double,1>> const &xs,
+		blitz::Array<double,1> &y, bool clear_y = true)
+	{
+		if (clear_y) y = 0;
+
+		if (xs.size() != matrices.size()) {
+			fprintf(stderr, "The number of matrices (%ld) and vectors (%ld) must match!\n", matrices.size(), xs.size());
+			throw std::exception();
+		}
+
+		// y = sum_i M_i x_i
+		for (int i=0; i < matrices.size(); ++i) {
+			matrices[i]->multiply(xs[i], y, false);
+		}
+
+		// y /= area1_m
+		for (auto ii = total_area1_m.begin(); ii != total_area1_m.end(); ++ii) {
+			y[ii->first] /= ii->second;
+		}
+
+	}
+
+
+};
+
 
 }	// namespace glint2
 
