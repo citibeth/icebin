@@ -468,7 +468,7 @@ void IceModel_PISM::run_decoded(double time_s,
 
 PetscErrorCode IceModel_PISM::run_decoded_petsc(double time_s,
 	std::vector<blitz::Array<double,1>> const &ivals2,		// Input values
-	std::vector<blitz::Array<double,1>> &ovals2)			// Output values; we will allocate as needed
+	std::vector<blitz::Array<double,1>> &ovals2)			// Output values (comes allocated)
 {
 printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 	PetscErrorCode ierr;
@@ -580,12 +580,14 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 	// Copy the outputs to the blitz arrays
 	for (unsigned int i=0; i<pism_ovars.size(); ++i) {
 
+		// Reshape 1D blitz variable to 2D for use with PISM
+		blitz::Array<double,2> oval2_xy(
+			giss::reshape<double,2,1>(ovals2[i], blitz::shape(ny(), nx())));
+		
+
 		// Get matching input (val) and output (pism_var) variables
 		IceModelVec2S *pism_var = pism_ovars[i];
-		iceModelVec2S_to_blitz_xy(*pism_ovars[i], glint2_ovars[i]);	// Allocates val2_xy if needed
-		// Reshape to 1D
-		auto v1_shape(blitz::shape(ny()*nx()));
-		ovals2.reference(giss::reshape<double,2,1>(glint2_ovars[i], v1_shape));
+		iceModelVec2S_to_blitz_xy(*pism_ovars[i], oval2_xy);	// Allocates val2_xy if needed
 	}
 
 

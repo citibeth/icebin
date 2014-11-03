@@ -287,7 +287,6 @@ printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_
 /** This is called IMMEDIATELY after ice is gained/lost in
 iMgeometry.cc (massContExplicitStep()).  Here we can record the same
 values that PISM saw when moving ice around. */
-
 PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	int i, int j,
 	double surface_mass_balance,		// [m s-1] ice equivalent

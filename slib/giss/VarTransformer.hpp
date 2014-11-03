@@ -34,7 +34,6 @@ public:
 
 	CSRAndUnits(int nrow) : mat(nrow), units(nrow, 0.0) {}
 
-
 	friend std::ostream &operator<<(std::ostream &out, CSRAndUnits const &matu);
 };
 
@@ -112,31 +111,6 @@ public:
 	matrix derived from the 3d-order tensor, in CSR format. */
 	CSRAndUnits apply_scalars(
 		std::vector<std::pair<std::string, double>> const &nvpairs);
-
-	/** Apply this transformation to a vector (of things).  The vectors
-	must both be pre-allocated. */
-	template<type X>
-	void apply(std::vector<X> const &inn, std::vector<X> &out)
-	{
-
-		giss::CSRAndUnits trans = vt.apply_scalars({
-//			std::make_pair("by_dt", 1.0 / ((itime - api->itime_last) * api->dtsrc)),
-			std::make_pair("unit", 1.0)});
-
-		// Compute the variable transformation
-		for (int xi=0; xi<dimension(OUTPUTS).size_nounit(); ++xi) {	// xi is index of output variable
-			out[xi] = 0;
-
-			// Consider each output variable separately...
-			std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
-			for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
-				int xj = xjj->first;		// Index of input variable
-				double io_val = xjj->second;	// Amount to multiply it by
-				
-				out[xi] += inn[xj] * io_val;		// blitz++ vector operation
-			}
-		}
-	}
 
 	friend std::ostream &operator<<(std::ostream &out, VarTransformer const &vt);
 };

@@ -85,7 +85,7 @@ void GCMCoupler::read_from_netcdf(
 		// to both the GCM and the ice model.  Note that setup_contracts()
 		// is a virtual method.
 		
-		// THis code MUST call GCMCoupler::setup_contracts() somewhere inside.
+		// This code MUST call GCMCoupler::setup_contracts() somewhere inside.
 		ice_model->init(sheet->grid2, nc, vname_sheet);
 		ice_model->update_ice_sheet(nc, vname_sheet, sheet);
 
@@ -102,11 +102,13 @@ void GCMCoupler::read_from_netcdf(
 		}
 
 
-		// Create the affiliated writers
+		// ---- Create the affiliated writers
+		// Writer for ice model input
 		std::unique_ptr<IceModel_Writer> iwriter(new IceModel_Writer(*name, IceModel::INPUT, this));
 		iwriter->init(sheet->grid2, ice_model, *name);
 		writers[IceModel::INPUT].insert(i, std::move(iwriter));
 
+		// Writer for ice model output
 		std::unique_ptr<IceModel_Writer> owriter(new IceModel_Writer(*name, IceModel::OUTPUT, this));
 		owriter->init(sheet->grid2, ice_model, *name);
 		writers[IceModel::OUTPUT].insert(i, std::move(owriter));
@@ -123,9 +125,6 @@ void GCMCoupler::set_start_time(
 {
 	gcm_params.set_start_time(time_base, time_start_s);
 
-
-	local_coupling_size = 0;	// Max. # of temporary (per-ice-sheet) doubles needed on any given ice sheet
-	global_coupling_size = 0;	// # of permanent (across-all-ice-sheet) needed for coupling
 	for (auto model = models.begin(); model != models.end(); ++model) {
 		int sheetno = model.key();
 
@@ -149,17 +148,6 @@ void GCMCoupler::set_start_time(
 		std::cout << model->contract[IceModel::OUTPUT];
 		std::cout << model->var_transformer[IceModel::OUTPUT];
 #endif
-
-		// Update the number of doubles required to hold ice model output
-		long loc = 0;
-		int nfields = model->contract[IceModel::OUTPUT].size_nounit();
-		for (int i=0; i < nfields; ++i) {
-			CoupledField &cf(model->contract[IceModel::OUTPUT].field(i));
-			if (cf.grid == "ELEVATION") global_coupling_size += model->ndata();
-			else if (cf.grid == "ATMOSPHERE") loc + model->ndata();
-		}
-
-		local_coupling_size = std::max(local_coupling_size, req);
 	}
 
 }
@@ -214,7 +202,6 @@ void GCMCoupler::call_ice_model(
 	int sheetno,
 	double time_s,
 	giss::DynArray<SMBMsg> &rbuf,
-	std::vector<blitz::Array<double,1>> &ovalsg,	// Output values, in GCM space
 	SMBMsg *begin, SMBMsg *end)		// Messages have the MAX number of fields for any ice model contract
 {
 	// ----------------- Construct input arrays
@@ -256,58 +243,6 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 	if (owriter) owriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
 
 };
-
-#if 0
-void set_gcm_inputs()
-{
-
-	// -------------- Regrid output arrays as appropriate
-	giss::VarTransformer &vt(models[sheetno]->var_transformer[IceModel::OUTPUT]);
-	giss::CSRAndUnits trans = vt.apply_scalars({
-//		std::make_pair("by_dt", 1.0 / ((itime - api->itime_last) * api->dtsrc)),
-		std::make_pair("unit", 1.0)});
-
-	// Convert from input to output units while regridding
-
-	// Temporary variable to construct output before we regrid to GCM's grid
-	blitz::Array<double,1> oval2_tmp(model->ndata());
-	oval2_tmp = 0;
-
-	// Compute the variable transformation
-	for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {
-
-		// Consider each output variable separately...
-		std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
-		for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
-			int xj = xjj->first;		// Index of input variable
-			double io_val = xjj->second;	// Amount to multiply it by
-			
-			oval2_tmp += ovals2[xj] * io_val;		// blitz++ vector operation
-		}
-
-		// Regrid to the request grid for the GCM
-		CoupledField &cf(model->contract[IceModel::OUTPUT].field(xi));
-		if (cf.grid == "ICE") {
-			// PASS: grid=ICE variables are just for internal Glint2 consumption.
-		} else if (cf.grid == "ELEVATION") {
-			// PASS: Elevation stuff from all ice sheets must be regridded at once.
-		} else if (cf.grid == "ATMOSPHERE") {
-			auto mat(model->maker->iceinterp_to_projatm(
-
-	}
-
-
-
-printf("[%d] END GCMCoupler::call_ice_model(nfields=%ld)\n", gcm_params.gcm_rank, nfields);
-};
-#endif
-
-
-
-
-
-
-
 
 /** @param sbuf the (filled) array of ice grid values for this MPI node. */
 void GCMCoupler::couple_to_ice(
@@ -353,7 +288,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 	if (gcm_params.gcm_rank == gcm_params.gcm_root) {
 		// Clear output arrays, which will be filled in additively
 		// on each ice model
-		for (auto ov=gcm_ivals.begin(); ov != gcm_ivals.end(); ++ov) *ov = 0;
+//		for (auto ov=gcm_ivals.begin(); ov != gcm_ivals.end(); ++ov) *ov = 0;
 
 		// Add a sentinel
 		(*rbuf)[rbuf->size-1].sheetno = 999999;
@@ -361,9 +296,6 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 		// Sort the receive buffer so items in same ice sheet
 		// are found together
 		qsort(rbuf->begin().get(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
-
-		// Allocate memory to receive ice model output
-		std::unique_ptr<double[]> obuf(new double[required_ice_model_output]);
 
 		// Figure out which ice sheets we have data for
 		auto lscan(rbuf->begin());
@@ -386,7 +318,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
 			auto params(im_params.find(sheetno));
-			call_ice_model(&*model, sheetno, time_s, *rbuf, obuf.get(),
+			call_ice_model(&*model, sheetno, time_s, *rbuf,
 				params->second.begin, params->second.next);
 
 			// Convert to variables the GCM wants (but still on the ice grid)
@@ -448,7 +380,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			int sheetno = model.key();
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
-			call_ice_model(&*model, sheetno, time_s, *rbuf, NULL,
+			call_ice_model(&*model, sheetno, time_s, *rbuf,
 				NULL, NULL);
 
 		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)

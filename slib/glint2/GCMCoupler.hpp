@@ -53,13 +53,6 @@ struct SMBMsg {
 
 
 class GCMCoupler {
-protected:
-	/** Number of doubles required to hold the output from the ice models on a
-	coupling timestep.  These arrays are temporary, since the data will be
-	regridded from the ice grid to the atmosphere / elevation grids.
-	It is equal to the max. of the required value for each ice model. */
-	long required_ice_model_output = 0;
-
 public:
 	/** Type tags for subclasses of GCMCoupler */
 	BOOST_ENUM_VALUES( Type, int,
@@ -68,7 +61,7 @@ public:
 	);
 	Type const type;
 
-	/** Main access to the core regridding of GLint2 */
+	/** Main access to the core regridding of Glint2 */
 	std::unique_ptr<MatrixMaker> maker;
 
 	/** Parameters passed from the GCM through to the ice model.
@@ -78,7 +71,7 @@ public:
 
 	/** Associated data structures to write out the exact inputs seen
 	by each ice model. */
-	giss::MapDict<int,IceModel_Writer> writers[2];	// INPUT and OUTPUT
+	giss::MapDict<int,IceModel_Writer> writers[2];	// INPUT and OUTPUT of ice model
 
 	giss::UTSystem ut_system;		//!< Unit system for ConstantSets and CouplingContracts
 	giss::ConstantSet gcm_constants;		//!< Constants provided by the GCM
@@ -93,10 +86,11 @@ public:
 	Used to convert GCM outputs in terms of (eg) coupling timestep (known to the GCM) */
 	giss::CouplingContract ice_input_scalars;
 
-	/** Names of items used in the SCALARS dimension of VarTranslator.
-	Used to convert ice outputs to GCM inputs in terms of (eg)
-	coupling timestep (known to the GCM) */
-	giss::CouplingContract gcm_input_scalars;
+// Not needed, we use ice_input_scalars instead.
+//	/** Names of items used in the SCALARS dimension of VarTranslator.
+//	Used to convert ice outputs to GCM inputs in terms of (eg)
+//	coupling timestep (known to the GCM) */
+//	giss::CouplingContract gcm_input_scalars;
 
 	// Fields we read from the config file...
 

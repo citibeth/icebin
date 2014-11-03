@@ -54,7 +54,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 //	ice_input_scalars.add_field("by_dt", "s-1", "Inverse of coupling timestep");
 
 	ice_input_scalars.add_field("unit", "", "Dimensionless identity");
-	gcm_input_scalars.add_field("unit", "", "Dimensionless identity");
+//	gcm_input_scalars.add_field("unit", "", "Dimensionless identity");
 
 
 #if 0

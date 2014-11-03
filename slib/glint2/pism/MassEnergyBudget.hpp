@@ -65,16 +65,12 @@ struct VecWithFlags {
 	int flags;
 	double sign_sense;		// POSTIVE_UP or POSITIVE_DOWN
 
-	VecWithFlags(pism::IceModelVec2S &_vec, int _flags, double _sign_sense) :
-		vec(_vec), flags(_flags), sign_sense(_sign_sense) {}
+	VecWithFlags(pism::IceModelVec2S &_vec, int _flags) :
+		vec(_vec), flags(_flags) {}
 };
 
 class MassEnergyBudget {
 public:
-	// The sense of PISM flux variables is not consistent.
-	const double POSTIVE_DOWN = 1.0;
-	const double POSITIVE_UP = -1.0;
-
 	// ============================================================
 	// Total State
 

@@ -10,7 +10,7 @@ namespace giss {
 struct CoupledField : public giss::VarMetaData {
 	std::string name;
 	std::string units;			//!< UDUnits-compatible string
-	std::string grid;
+	std::string grid;			//!< Description of the grid this variable should be regridded to
 	std::string description;
 
 	// Implementing giss::VarMetaData

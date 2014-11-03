@@ -63,9 +63,11 @@ class IceModel_PISM : public IceModel_Decode
 	// Corresponding PISM variable for each input field
 	std::vector<pism::IceModelVec2S *> pism_ivars;
 
-	// Corresponding PISM variable for each output field
+	// --- Corresponding PISM variable for each output field
+	// The variable, as it exists in PISM
 	std::vector<pism::IceModelVec2S *> pism_ovars;
-	std::vector<blitz::Array<double,2> glint2_ovars;
+//	// An MPI-collected version of the variable
+//	std::vector<blitz::Array<double,2> glint2_ovars;
 
 
 	double BY_ICE_DENSITY;		// CONSTANT Used to prepare input for PISM

@@ -45,7 +45,7 @@ struct hp_to_ice_rec {
 // ------------------------------------------------------
 
 struct glint2_modele {
-//	std::unique_ptr<MatrixMaker> maker;
+//	std::unique_ptr<MatrixMaker> maker;		Moved to GCMCoupler
 	ModelEDomain *domain;	// Points to domain owned by maker
 
 	double dtsrc;			// Size of ModelE timestep
