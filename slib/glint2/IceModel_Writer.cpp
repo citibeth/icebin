@@ -180,7 +180,7 @@ printf("BEGIN IceModel_Writer::run_decoded\n");
 		NcVar *ncvar = nc.get_var(cf->name.c_str());
 		ncvar->set_cur(&cur[0]);
 
-		double *data = (io == IceModel::INPUT ? ivals2[i].data : ovals2[i].data);
+		double const *data = (io == IceModel::INPUT ? ivals2[i].data() : ovals2[i].data());
 		ncvar->put(data, &counts[0]);
 	}
 

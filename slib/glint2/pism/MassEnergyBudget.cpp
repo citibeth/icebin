@@ -18,14 +18,15 @@ PetscErrorCode MassEnthVec2S::create(pism::IceGrid &my_grid, const std::string &
 PetscErrorCode MassEnthVec2S::set_attrs(
 	const std::string &my_pism_intent,
 	const std::string &my_long_name,
-	const std::string &my_units)
+	const std::string &my_units,
+	const std::string &my_standard_name)
 {
 	PetscErrorCode ierr;
 
 	ierr = mass.set_attrs(my_pism_intent, my_long_name + " (mass portion)",
-		"kg " + my_units, "", 0); CHKERRQ(ierr);
+		"kg " + my_units, my_standard_name + ".mass", 0); CHKERRQ(ierr);
 	ierr = enth.set_attrs(my_pism_intent, my_long_name + " (enthalpy portion)",
-		"J " + my_units, "", 0); CHKERRQ(ierr);
+		"J " + my_units, my_standard_name + ".enth", 0); CHKERRQ(ierr);
 
 	return 0;
 }
@@ -69,7 +70,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = total.set_attrs("diagnostic",
 		"State of the ice sheet (NOT a difference between timetseps)",
-		"m-2"); CHKERRQ(ierr);
+		"m-2", "total"); CHKERRQ(ierr);
 
 	// ----------- Heat generation of flows [vertical]
 	// Postive means heat is flowing INTO the ice sheet.
@@ -99,11 +100,13 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 
 	// ----------- Mass advection, with accompanying enthalpy change
 	// Postive means mass/enthalpy is flowing INTO the ice sheet.
+	std::string name;
+
 	ierr = calving.create(grid, prefix+"calving",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = calving.set_attrs("diagnostic",
 		"Mass/Enthalpy gain from calving.  Should be negative.",
-		"m-2 s-1"); CHKERRQ(ierr);
+		"m-2 s-1", "calving"); CHKERRQ(ierr);
 
 #if 0
 	ierr = basal_runoff.create(grid, prefix+"basal_runoff",
@@ -117,25 +120,25 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = surface_mass_balance.set_attrs("diagnostic",
 		"surface_mass_balance",
-		"m-2 s-1"); CHKERRQ(ierr);
+		"m-2 s-1", "surface_mass_balance"); CHKERRQ(ierr);
 
 	ierr = pism_smb.create(grid, prefix+"pism_smb",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = pism_smb.set_attrs("diagnostic",
 		"pism_smb",
-		"kg m-2 s-1"); CHKERRQ(ierr);
+		"kg m-2 s-1", "pism_smb"); CHKERRQ(ierr);
 
 	ierr = href_to_h.create(grid, prefix+"href_to_h",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = href_to_h.set_attrs("diagnostic",
 		"href_to_h",
-		"kg m-2 s-1"); CHKERRQ(ierr);
+		"kg m-2 s-1", "href_to_h"); CHKERRQ(ierr);
 
 	ierr = nonneg_rule.create(grid, prefix+"nonneg_rule",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = nonneg_rule.set_attrs("diagnostic",
 		"nonneg_rule",
-		"kg m-2 s-1"); CHKERRQ(ierr);
+		"kg m-2 s-1", "nonneg_rule"); CHKERRQ(ierr);
 
 
 
@@ -143,27 +146,27 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = melt_grounded.set_attrs("diagnostic",
 		"Basal melting of grounded ice (negative)",
-		"m-2 s-1"); CHKERRQ(ierr);
+		"m-2 s-1", "melt_grounded"); CHKERRQ(ierr);
 
 	ierr = melt_floating.create(grid, prefix+"melt_floating",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = melt_floating.set_attrs("diagnostic",
 		"Sub-shelf melting (negative)",
-		"m-2 s-1"); CHKERRQ(ierr);
+		"m-2 s-1", "melt_floating"); CHKERRQ(ierr);
 
 	// ----------- Advection WITHIN the ice sheet
 	ierr = internal_advection.create(grid, prefix+"internal_advection",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = internal_advection.set_attrs("diagnostic",
 		"Advection within the ice sheet",
-		"m-2 s-1"); CHKERRQ(ierr);
+		"m-2 s-1", "internal_advection"); CHKERRQ(ierr);
 
 	// ----------- Balance the Budget
 	ierr = epsilon.create(grid, prefix+"epsilon",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = epsilon.set_attrs("diagnostic",
 		"Unaccounted-for changes",
-		"m-2 s-1"); CHKERRQ(ierr);
+		"m-2 s-1", "epsilon"); CHKERRQ(ierr);
 
 	return 0;
 }

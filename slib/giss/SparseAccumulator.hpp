@@ -45,7 +45,7 @@ public :
 
 	/** Computes the sum of two SparseAccumulator vectors.  Puts rsult in this. */
 	void add(SparseAccumulator<IndexT, AccumT, Hash> const &b) {
-		for (auto ii = begin(); ii != end(); ++ii) {
+		for (auto ii = this->begin(); ii != this->end(); ++ii) {
 			add(ii->first, ii->second);
 		}
 	}

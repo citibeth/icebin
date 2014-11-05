@@ -56,11 +56,8 @@ public:
 
 protected:
 
-	/** Main access to the core regridding of Glint2 */
-	std::unique_ptr<MatrixMaker> maker;
-
-//	/** The grid for this IceModel. */
-//	std::shared_ptr<glint2::Grid> grid2;
+	/** The grid for this IceModel. */
+	std::shared_ptr<glint2::Grid> grid2;
 
 	// Parameters provided by the GCM, to inform the coupling
 	std::unique_ptr<GCMPerIceSheetParams> gcm_per_ice_sheet_params;
@@ -112,6 +109,9 @@ public:
 	/** Free all memory used by this.  Called when we're done with a coupling timestep. */
 	void free0();
 
+	/** Allocates and sets ivals_I variable */
+	void set_gcm_inputs();
+
 	// --------------------------------------------
 	/** Allocate a new giss::CouplingContract, with the same lifetime as this IceModel. */
 	giss::CouplingContract *new_CouplingContract();
@@ -120,7 +120,6 @@ public:
 	virtual ~IceModel();
 
 	long ndata() const { return grid2->ndata(); }
-//	long n2() const { return ndata(); }
 
 	// --------------------------------------------------
 	// GCM-specific methods used to set up the contract for

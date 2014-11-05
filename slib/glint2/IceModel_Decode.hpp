@@ -49,8 +49,7 @@ public :
 	yourself. */
 	virtual void run_decoded(double time_s,
 		std::vector<blitz::Array<double,1>> const &ivals2,
-		std::vector<blitz::Array<double,1>> &ovals2) = 0;			// Output values; we will allocate as needed
-
+		std::vector<blitz::Array<double,1>> &ovals2) = 0;			// Output values; must be pre-allocated.
 };
 
 }

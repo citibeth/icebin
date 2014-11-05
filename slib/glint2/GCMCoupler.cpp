@@ -18,17 +18,17 @@
 
 #include <mpi.h>		// Intel MPI wants to be first
 #include <glint2/GCMCoupler.hpp>
+#include <glint2/MatrixMaker.hpp>
 
 namespace glint2 {
 
-/** @param glint2_config_dir Director the GLINT2 config file is found in.  Used to interpret relative paths found in that file.
-@param nc The GLINT2 configuration file */
+/** @param nc The Glint22 configuration file */
 void GCMCoupler::read_from_netcdf(
 	NcFile &nc,
 	std::string const &vname,
 	std::unique_ptr<GridDomain> &&mdomain)
 {
-	printf("BEGIN GCMCoupler::read_from_netcdf()\n");n
+	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 
 
 	// Load the MatrixMaker	(filtering by our domain, of course)
@@ -74,7 +74,7 @@ void GCMCoupler::read_from_netcdf(
 
 		// Create an IceModel corresponding to this IceSheet.
 		IceSheet *sheet = sheets[*name];
-		models.insert(i,
+		models.insert(sheet->index,
 			read_icemodel(*name, this, nc, vname_sheet,
 				read_gcm_per_ice_sheet_params(nc, vname_sheet),
 				sheet));
@@ -90,10 +90,10 @@ void GCMCoupler::read_from_netcdf(
 		ice_model->update_ice_sheet(nc, vname_sheet, sheet);
 
 		// Check the contract for errors
-		CouplingContract &ocontract(ice_model->contract[IceModel::OUTPUT]);
+		giss::CouplingContract const &ocontract(ice_model->contract[IceModel::OUTPUT]);
 		int nfields = ocontract.size_nounit();
 		for (int i=0; i<nfields; ++i) {
-			CoupledField &cf(ocontract.field(i));
+			giss::CoupledField const &cf(ocontract.field(i));
 
 			if (cf.grid != "ICE") {
 				fprintf(stderr, "ERROR: Ice model outputs must be all on the ice grid, field %s is not\n", cf.name.c_str());
@@ -327,15 +327,15 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 
 		// =============== Regrid to the grid requested by the GCM
 
-		// ----------- Create the MutliMatrix used to regrid to atmosphere
+		// ----------- Create the MultiMatrix used to regrid to atmosphere
 		MultiMatrix ice2atm;
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			// Get matrix for this single ice model.
 			giss::SparseAccumulator<int,double> area1_m;
-			int sheetno = model.key();
+			int sheetno = model.key();		// IceSheet::index
+			IceSheet *sheet = (*maker)[sheetno];
 			std::unique_ptr<giss::VectorSparseMatrix> M(
-				model->sheet->iceinterp_to_projatm(
-				area1_m, IceInterp::ICE);
+				sheet->iceinterp_to_projatm(area1_m, IceInterp::ICE));
 
 			// Add on correction for projection
 			if (maker->correct_area1)
@@ -347,12 +347,12 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 
 		// ------------ Regrid each GCM input from ice grid to whatever grid it needs.
 		for (int var_ix=0; var_ix < gcm_inputs.size_nounit(); ++var_ix) {
-			CoupledField &cf(gcm_inputs.field(var_ix));
+			giss::CoupledField const &cf(gcm_inputs.field(var_ix));
 
 			if (cf.grid == "ATMOSPHERE") {
-				// --- Assemble all intputs, to multiply by ice_to_hp matrix
+				// --- Assemble all inputs, to multiply by ice_to_hp matrix
 
-				blitz::Array<double, 1> &ival_I(vals(var_ix));
+				std::vector<blitz::Array<double, 1>> ival_I;
 				for (auto model = models.begin(); model != models.end(); ++model) {
 					// Assemble vector of the same GCM input variable from each ice model.
 					ival_I.push_back(model->ivals_I[var_ix]);
@@ -365,7 +365,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				std::map<int, blitz::Array<double,1>> f4s;
 				for (auto model = models.begin(); model != models.end(); ++model) {
 					int sheetno = model.key();
-					f4s.insert(sheetno, model->ivals_I(var_ix));
+					f4s.insert(std::make_pair(sheetno, model->ivals_I[var_ix]));
 				}
 				maker->iceinterp_to_hp(f4s, gcm_ivals[var_ix],
 					IceInterp::ICE, QPAlgorithm::SINGLE_QP);

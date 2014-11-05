@@ -230,8 +230,8 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	printf("BEGIN PISMIceModel::MassContExplicitStep()\n");
 
 	_ice_density = config.get("ice_density");
-	_meter_per_s_to_kg_per_m2 = dt * ice_density;
-printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, ice_density, _meter_per_s_to_kg_per_m2);
+	_meter_per_s_to_kg_per_m2 = dt * _ice_density;
+printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, _ice_density, _meter_per_s_to_kg_per_m2);
 
 
 	// =========== The Mass Continuity Step Itself
@@ -304,38 +304,24 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	cur.nonneg_rule(i,j) -= nonneg_rule_flux * _ice_density;
 	cur.href_to_h(i,j) += Href_to_H_flux * _ice_density;
 
-	// -------------- meltrate_grounded: Melting at base of ice sheet
+
+	// -------------- Melting
 	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
 	double T = EC->getMeltingTemp(p_basal);
 	double specific_enth;
 	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth); CHKERRQ(ierr);
 	double mass;
 
+	// ------- Melting at base of ice sheet
 	mass = -meltrate_grounded * _meter_per_s_to_kg_per_m2;
 	cur.melt_grounded.mass(i,j) += mass;
 	cur.melt_grounded.enth(i,j) += mass * specific_enth;
 
-	// -------------- meltrate_grounded: Melting at base of ice sheet
-	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
-	double T = EC->getMeltingTemp(p_basal);
-	double specific_enth;
-	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth); CHKERRQ(ierr);
-	double mass;
-
-	mass = -meltrate_grounded * _meter_per_s_to_kg_per_m2;
-	cur.melt_grounded.mass(i,j) += mass;
-	cur.melt_grounded.enth(i,j) += mass * specific_enth;
-
-	// -------------- meltrate_floating: Melting under ice shelf
-	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
-	double T = EC->getMeltingTemp(p_basal);
-	double specific_enth;
-	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth); CHKERRQ(ierr);
-	double mass;
-
+	// ------- Melting under ice shelf
 	mass = -meltrate_floating * _meter_per_s_to_kg_per_m2;
 	cur.melt_floating.mass(i,j) += mass;
 	cur.melt_floating.enth(i,j) += mass * specific_enth;
+
 
 	// -------------- internal_advection
 	const int ks = grid.kBelowHeight(ice_thickness(i,j));
@@ -437,7 +423,8 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	ierr = basal_runoff.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		basal_runoff(i,j) = melt_grounded(i,j) + melt_floating(i,j);
+		basal_runoff.mass(i,j) = rate.melt_grounded.mass(i,j) + rate.melt_floating.mass(i,j);
+		basal_runoff.enth(i,j) = rate.melt_grounded.enth(i,j) + rate.melt_floating.enth(i,j);
 	}}
 	ierr = basal_runoff.end_access(); CHKERRQ(ierr);
 	ierr = rate.melt_floating.end_access(); CHKERRQ(ierr);

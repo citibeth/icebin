@@ -156,7 +156,8 @@ protected:
 
 public:
 	void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &vals2);
+		std::vector<blitz::Array<double,1>> const &vals2,
+		std::vector<blitz::Array<double,1>> &ovals2);			// Output values; must be pre-allocated.
 private:
 	PetscErrorCode run_decoded_petsc(double time_s,
 		std::vector<blitz::Array<double,1>> const &vals2);

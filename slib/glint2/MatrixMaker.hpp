@@ -168,6 +168,7 @@ class MultiMatrix
 
 	giss::SparseAccumulator<int,double> total_area1_m;
 
+public:
 	/** @param area1_m Scaling vector for this matrix */
 	void add_matrix(
 		std::unique_ptr<giss::VectorSparseMatrix> &&mat,
@@ -179,7 +180,7 @@ class MultiMatrix
 		total_area1_m.add(area1_m);
 	}
 
-	/** Computes y = diag(1/total_area1_m) * M xs
+	/** Computes y = diag(1/total_area1_m) * M */
 	void multiply(std::vector<blitz::Array<double,1>> const &xs,
 		blitz::Array<double,1> &y, bool clear_y = true)
 	{

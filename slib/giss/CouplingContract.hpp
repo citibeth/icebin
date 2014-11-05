@@ -32,7 +32,7 @@ struct CoupledField : public giss::VarMetaData {
 };
 
 inline std::ostream &operator<<(std::ostream &out, CoupledField const &cf)
-	{ return out << "(" << cf.name << ": " << cf.units << " [" << grid << "])"; } 
+	{ return out << "(" << cf.name << ": " << cf.units << " [" << cf.grid << "])"; } 
 
 
 
@@ -59,14 +59,10 @@ public:
 		return add_field(std::move(cf));
 	}
 
-	int add_field(giss::CFName const *cf) {
-		return add_field(CoupledField(
-			cf->id, cf->canonical_units, cf->description));
-	}
-
 	int add_field(std::string const &name, std::string const &units,
+		std::string const &grid = "",
 		std::string const &description = "<no description>")
-	{ return add_field(CoupledField(name, units, description)); }
+	{ return add_field(CoupledField(name, units, grid, description)); }
 
 
 	long size_withunit() const { return _ix_to_field.size(); }

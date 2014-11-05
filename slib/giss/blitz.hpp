@@ -30,7 +30,7 @@ arguments, then other array data types can be converted as needed. */
 namespace giss {
 
 template<class T, int len>
-std::vector<T> free_array(blitz::Array<T, len> &array)
+void free_array(blitz::Array<T, len> &array)
 {
 	array.reference(blitz::Array<T,len>(0, blitz::shape(0), blitz::neverDeleteData));
 }

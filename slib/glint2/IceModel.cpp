@@ -26,25 +26,27 @@ giss::CouplingContract *IceModel::new_CouplingContract() {
 void IceModel::allocate0()
 {
 	// Allocate for direct output from ice model
-	int nfields = ocontract->size_nounit();
+	giss::CouplingContract const &ocontract(contract[IceModel::OUTPUT]);
+	int nfields = ocontract.size_nounit();
 	for (int i=0; i < nfields; ++i) {
-		CoupledField &cf(ocontract->field(i));
+		giss::CoupledField const &cf(ocontract.field(i));
 		std::string const &grid(cf.get_grid());
-		long n2 = model->ndata();
+		long n2 = ndata();
 		ovals_I.push_back(blitz::Array<double,1>(n2));
 	}
+}
 
 
 /** Allocate in preparation of var transformations (but not regridding yet) */
 void IceModel::allocate1()
 {
 
-	CouplingContract const *icontract = all->icontract;
-	int nfields = icontract->size_nounit();
+	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
+	int nfields = icontract.size_nounit();
 	for (int i=0; i < nfields; ++i) {
-		CoupledField &cf(icontract->field(i));
+		giss::CoupledField const &cf(icontract.field(i));
 		std::string const &grid(cf.get_grid());
-		long n2 = model->ndata();
+		long n2 = ndata();
 		ivals_I.push_back(blitz::Array<double,1>(n2));
 	}
 }
@@ -56,12 +58,13 @@ void IceModel::free1()
 {
 	ovals_I.clear();
 
-	int nfields = icontract->size_nounit();
+	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
+	int nfields = icontract.size_nounit();
 	for (int i=0; i < nfields; ++i) {
-		CoupledField &cf(icontract->field(i));
+		giss::CoupledField const &cf(icontract.field(i));
 		std::string const &grid(cf.get_grid());
 
-		if (grid != "ELEVATION") giss::free_array(ivals_I(i));
+		if (grid != "ELEVATION") giss::free_array(ivals_I[i]);
 	}
 }
 
@@ -93,34 +96,12 @@ void IceModel::set_gcm_inputs()
 			int xj = xjj->first;		// Index of input variable
 			double io_val = xjj->second;	// Amount to multiply it by
 			
-			ivals_ += ovals2[xj] * io_val;		// blitz++ vector operation
+			ivals_I[xi] += ovals_I[xj] * io_val;		// blitz++ vector operation
 		}
 	}
 
 }
 
-#if 0
-		// -------- Regrid just the things going to ATMOSPHERE grid.
-		CoupledField &cf(model->contract[IceModel::OUTPUT].field(xi));
-
-
-
-		// Regrid to the request grid for the GCM
-		CoupledField &cf(model->contract[IceModel::OUTPUT].field(xi));
-		if (cf.grid == "ICE") {
-			// PASS: grid=ICE variables are just for internal Glint2 consumption.
-		} else if (cf.grid == "ELEVATION") {
-			// PASS: Elevation stuff from all ice sheets must be regridded at once.
-		} else if (cf.grid == "ATMOSPHERE") {
-			auto mat(model->maker->iceinterp_to_projatm(
-
-	}
-
-#endif
-
-
-
-}
 // -----------------------------------------------------------
 
-}
+}	// namespace glint2

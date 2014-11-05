@@ -55,8 +55,8 @@ protected:
 
 	// Output variables prepared for return to GCM
 	MassEnthVec2S basal_runoff;	// = melt_grounded + melt_floating [kg m-2 s-1]
-	IceModelVec2S ice_surface_enth;		// Specific enthalpy of top surface of the ice [J kg-1]
-	IceModelVec2S ice_surface_enth_depth;	// Depth below surface at which ice_surface_enth is recorded [m]
+	pism::IceModelVec2S ice_surface_enth;		// Specific enthalpy of top surface of the ice [J kg-1]
+	pism::IceModelVec2S ice_surface_enth_depth;	// Depth below surface at which ice_surface_enth is recorded [m]
 	
 
 
@@ -127,7 +127,7 @@ public:
 	// Pre and post for energy
 	PetscErrorCode energyStep();
 
-	PetscErrorCode write_post_energy(double time_s);
+	PetscErrorCode prepare_outputs(double time_s);
 
 };
 

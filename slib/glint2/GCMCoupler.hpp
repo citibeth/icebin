@@ -27,6 +27,8 @@
 #include <giss/ConstantSet.hpp>
 #include <glint2/GCMParams.hpp>
 #include <glint2/GCMPerIceSheetParams.hpp>
+#include <glint2/GridDomain.hpp>
+#include <glint2/MatrixMaker.hpp>
 
 namespace glint2 {
 
@@ -121,7 +123,6 @@ public:
 	through to GCM-specific virtual methods on the IceModel. */
 	virtual void setup_contracts(IceModel &ice_model) const = 0;
 
-	/** @param sheets (OPTIONAL): IceSheet data structures w/ grids, etc. */
 	virtual void read_from_netcdf(
 		NcFile &nc, std::string const &vname,
 		std::unique_ptr<GridDomain> &&mdomain);
@@ -159,8 +160,8 @@ public:
 	*/
 	void couple_to_ice(double time_s,
 		int nfields,
-		giss::DynArray<SMBMsg> &sbuf);
-
+		giss::DynArray<SMBMsg> &sbuf,
+		std::vector<blitz::Array<double,1>> &gcm_ivals);
 };
 
 }

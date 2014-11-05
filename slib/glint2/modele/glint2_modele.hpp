@@ -59,7 +59,8 @@ struct glint2_modele {
 	/** Last time the coupler was called (or start of run) */
 	int itime_last;
 
-	// Stuff to store inputs as we received them (modele_out.nc)
+	/** Place to store results from Glint2 calls (allocated by ModelE) */
+	std::vector<blitz::Array<double,1>> &gcm_ivals);
 };
 
 }}	// namespace glint2::modele

@@ -34,7 +34,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 
 	// Mass/Energy outputs the GCM must deal with
 	gcm_inputs.add_field("basal_runoff.mass", "kg m-2 s-1", "ATMOSPHERE", "");		// melt_grounded + melt_floating
-	gcm_inputs.add_field("basal_runoff.enth", "W m-2", "ATMOSPHERE", "")
+	gcm_inputs.add_field("basal_runoff.enth", "W m-2", "ATMOSPHERE", "");
 	gcm_inputs.add_field("calving.mass", "kg m-2 s-1", "ATMOSPHERE", "");
 	gcm_inputs.add_field("calving.enth", "W m-2", "ATMOSPHERE", "");
 	gcm_inputs.add_field("strain_heating", "W m-2", "ATMOSPHERE", "");
