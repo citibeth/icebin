@@ -367,8 +367,9 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 					int sheetno = model.key();
 					f4s.insert(std::make_pair(sheetno, model->ivals_I[var_ix]));
 				}
-				maker->iceinterp_to_hp(f4s, gcm_ivals[var_ix],
-					IceInterp::ICE, QPAlgorithm::SINGLE_QP);
+				giss::CooVector<int, double> iceinterp_to_hp(
+					maker->iceinterp_to_hp(f4s, gcm_ivals[var_ix],
+						IceInterp::ICE, QPAlgorithm::SINGLE_QP));
 			}
 		}
 	} else {

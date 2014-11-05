@@ -203,6 +203,22 @@ public:
 
 	}
 
+	/** Computes y = diag(1/total_area1_m) * M */
+	void multiply(std::vector<blitz::Array<double,1>> const &xs,
+		giss::SparseAccumulator<int,double> &y, bool clear_y = true)
+	{
+		if (clear_y) y.clear();
+
+		// y = sum_i M_i x_i
+		for (int i=0; i < matrices.size(); ++i) {
+			matrices[i]->multiply(xs[i], y, false);
+		}
+
+		// y /= area1_m
+		y.divide_by(area1_m);
+
+	}
+
 
 };
 

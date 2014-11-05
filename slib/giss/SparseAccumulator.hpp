@@ -23,7 +23,7 @@
 
 namespace giss {
 
-/**Implements a "sparse vector", stored as an
+/** Implements a "sparse vector", stored as an
 std::unordered_map<index, value>.  This is analogous to a lookup-style
 sparse matrix representation (MapSparseMatrix).  The CooVecotr class
 does a similar job, but it is analogous to a coordinate-style sparse
@@ -43,7 +43,7 @@ public :
 		else ii->second += val;
 	}
 
-	/** Computes the sum of two SparseAccumulator vectors.  Puts rsult in this. */
+	/** Computes the sum of two SparseAccumulator vectors.  Puts result in this. */
 	void add(SparseAccumulator<IndexT, AccumT, Hash> const &b) {
 		for (auto ii = this->begin(); ii != this->end(); ++ii) {
 			add(ii->first, ii->second);
@@ -52,7 +52,7 @@ public :
 
 
 	/** Inserts a new <index, value> pair to sparse vector.  If that
-	element was already non-zero, replaces to it. */
+	element was already non-zero, replaces it. */
 	void set(IndexT const &index, AccumT const &val) {
 		auto ii(super::find(index));
 		if (ii == super::end()) super::insert(std::make_pair(index, val));
@@ -76,6 +76,36 @@ public :
 		auto ii(super::find(index));
 		if (ii == super::end()) throw std::exception();
 		return ii->second;
+	}
+
+	void divide_by(SparseAccumulator const &b) {
+		for (auto ii=begin(); ii != end(); ++ii) {
+			IndexT ix = ii->first;
+			auto jj(b.find(ix));
+			if (jj == b.end()) {
+				// Not found, so there's a zero value there.
+				// Go ahead, divide by zero!  It will create the appropriate
+				// NaN value as if we were dividing by a dense vector.
+				// This is probably an error, and it will give the user an indication
+				// of where to fix things.
+				ii->second /= 0.;
+			} else {
+				ii->second /= jj->second;
+			}
+		}
+	}
+
+	void multiply_by(SparseAccumulator const &b) {
+		for (auto ii=begin(); ii != end(); ++ii) {
+			IndexT ix = ii->first;
+			auto jj(b.find(ix));
+			if (jj == b.end()) {
+				// Not found, so there's a zero value there.
+				ii->second *= 0.;
+			} else {
+				ii->second *= jj->second;
+			}
+		}
 	}
 
 };

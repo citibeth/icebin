@@ -25,6 +25,7 @@
 #include "ncutil.hpp"
 #include "IndexTranslator.hpp"
 #include <giss/blitz.hpp>
+#include <giss/SparseAccumulator.hpp>
 
 class NcFile;
 
@@ -149,6 +150,10 @@ public:
 		blitz::Array<double,1> const &x,
 		blitz::Array<double,1> &y, bool clear_y) const = 0;
 
+	virtual void multiply(
+		blitz::Array<double,1> const &x,
+		giss::SparseAccumulator<int,double> &y, bool clear_y) const = 0;
+
 	/** Multiply transpose of this matrix A by a vector.
 	Computes y = A^T * x
 	@param x IN: A vector of length nrow
@@ -196,6 +201,9 @@ public:
 	virtual void multiply(
 		blitz::Array<double,1> const &x,
 		blitz::Array<double,1> &y, bool clear_y) const;
+	virtual void multiply(
+		blitz::Array<double,1> const &x,
+		giss::SparseAccumulator<int,double> &y, bool clear_y) const;
 	void multiplyT(double const * x, double *y, bool clear_y = true) const;
 	virtual void multiplyT(
 		blitz::Array<double,1> const &x,
@@ -354,6 +362,22 @@ void SparseMatrix1<SparseMatrix0T>::multiplyT(
 	}
 }
 
+// ------------------------------------------------------------
+/// Computes y = A * x
+template<class SparseMatrix0T>
+void SparseMatrix1<SparseMatrix0T>::multiply(
+	blitz::Array<double,1> const &x,
+	giss::SparseAccumulator<int,double> &y, bool clear_y) const
+{
+	int nx = this->ncol;
+	int ny = this->nrow;
+	if (clear_y) y.clear();
+	for (auto ii = this->begin(); ii != this->end(); ++ii) {
+		int ix = ii.col();
+		int iy = ii.row();
+		y.add(iy, ii.val() * x(ix));
+	}
+}
 // ------------------------------------------------------------
 template<class SparseMatrix0T>
 std::vector<double> SparseMatrix1<SparseMatrix0T>::sum_per_row() const {

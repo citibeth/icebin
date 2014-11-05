@@ -76,6 +76,7 @@ void CooVector<IndexT,ValT>::sum_duplicates()
 	int n = j+1;	// Size of output array
 
 	this->resize(n);
+	this->shrink_to_fit();
 }
 
 
