@@ -249,7 +249,7 @@ void GCMCoupler::couple_to_ice(
 double time_s,
 int nfields,			// Number of fields in sbuf.  Not all will necessarily be filled, in the case of heterogeneous ice models.
 giss::DynArray<SMBMsg> &sbuf,	// Values, already converted to ice model inputs (from gcm outputs)
-std::vector<blitz::Array<double,1>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+std::vector<giss::VectorSparseMatrix<int,double>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 {
 	// TODO: Convert this to use giss::gather_msg_array() instead!!!
 
@@ -359,6 +359,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				}
 
 				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
+				gcm_ivals[var_ix].consolidate();
 			} else if (cf.grid == "ELEVATION") {
 				// --- Assemble all intputs, to send to Glint2 QP regridding
 
@@ -367,9 +368,13 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 					int sheetno = model.key();
 					f4s.insert(std::make_pair(sheetno, model->ivals_I[var_ix]));
 				}
-				giss::VectorSparseVector<int, double> iceinterp_to_hp(
-					maker->iceinterp_to_hp(f4s, gcm_ivals[var_ix],
-						IceInterp::ICE, QPAlgorithm::SINGLE_QP));
+
+				// Use previous return as our initial guess
+				blitz::Array<double,1> initial3(maker->n3());
+				gcm_ivals[var_ix].to_blitz(initial3);
+				gcm_ivals[var_ix] = maker->iceinterp_to_hp(
+					f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP));
+				gcm_ivals[var_ix].consolidate();
 			}
 		}
 	} else {

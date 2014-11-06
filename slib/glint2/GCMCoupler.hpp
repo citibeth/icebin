@@ -161,7 +161,7 @@ public:
 	void couple_to_ice(double time_s,
 		int nfields,
 		giss::DynArray<SMBMsg> &sbuf,
-		std::vector<blitz::VectorSparseVector<int,double>> &gcm_ivals);
+		std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals);
 };
 
 }

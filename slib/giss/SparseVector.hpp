@@ -6,6 +6,7 @@
 
 namespace giss{
 
+template<class IndexT, class ValT>
 class SparseVector {
 public:
 
@@ -27,12 +28,14 @@ public:
 	<dl><dt>dups=DuplicatePolicy::REPLACE</dt><dd> Replace with new value.</dd>
 	<dt>dups=DuplicatePolicy::ADD</dt><dd> Add new value to existing value.</dd></dl>
 	Note that only MapSparseMatrix supports these modes.  VectorSparseMatrix and ZD11SparseMatrix ignore the values of dups. */
-	virtual void set(int index, double const val) = 0;
-	virtual void add(int index, double const val) { set(index, val); }
+	virtual void set(IndexT const &index, ValT const &val) = 0;
+	virtual void add(IndexT const &index, ValT const &val) { set(index, val); }
 
 	/** Sums or otherwise consolidates the sparse representation so
 	there is no more than one entry per index. */
 	virtual void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD);
+
+	virtual void to_blitz(blitz::Array<ValT,1> &out) = 0;
 
 #if 0
 	/** Used to write this data structure to a netCDF file.
@@ -61,6 +64,11 @@ class VectorSparseVector : public SparseVector
 	std::vector<std::pair<IndexT, ValT>> vals;
 
 public:
+	VectorSparseVector(VectorSparseVector &&b) : vals(std::move(b.vals)) {}
+	void operator=(VectorSparseVector &&b) { vals = std::move(b.vals); }
+
+	size_t size() { return vals.size(); }
+	void clear() { vals.clear(); }
 
 	auto begin() -> decltype(vals.begin()) { return vals.begin(); }
 	auto end() -> decltype(vals.end()) { return vals.end(); }
@@ -88,6 +96,13 @@ public:
 	{
 		if (dups == DuplicatePolicy::ADD) sum_duplicates();
 		else remove_duplicates();
+	}
+
+	void to_blitz(blitz::Array<ValT,1> &out)
+	{
+		out = 0;
+		for (auto ii = begin(); ii != end(); ++ii)
+			out[ii->first] = ii->second;
 	}
 
 };
@@ -161,6 +176,9 @@ class MapSparseVector : public SparseVector
 {
 	std::unordered_map<IndexT, ValT> vals;
 public :
+	size_t size() { return vals.size(); }
+	void clear() { vals.clear(); }
+
 	auto begin() -> decltype(vals.begin()) { return vals.begin(); }
 	auto end() -> decltype(vals.end()) { return vals.end(); }
 
@@ -240,6 +258,13 @@ public :
 				ii->second *= jj->second;
 			}
 		}
+	}
+
+	void to_blitz(blitz::Array<ValT,1> &out)
+	{
+		out = 0;
+		for (auto ii = begin(); ii != end(); ++ii)
+			out[ii->first] = ii->second;
 	}
 
 };

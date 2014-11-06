@@ -150,9 +150,10 @@ public:
 		blitz::Array<double,1> const &x,
 		blitz::Array<double,1> &y, bool clear_y) const = 0;
 
+	template<class SparseVectorT>
 	virtual void multiply(
 		blitz::Array<double,1> const &x,
-		giss::MapSparseVector<int,double> &y, bool clear_y) const = 0;
+		SparseVectorT &y, bool clear_y) const = 0;
 
 	/** Multiply transpose of this matrix A by a vector.
 	Computes y = A^T * x
@@ -365,9 +366,10 @@ void SparseMatrix1<SparseMatrix0T>::multiplyT(
 // ------------------------------------------------------------
 /// Computes y = A * x
 template<class SparseMatrix0T>
+template<SparseVectorT>
 void SparseMatrix1<SparseMatrix0T>::multiply(
 	blitz::Array<double,1> const &x,
-	giss::MapSparseVector<int,double> &y, bool clear_y) const
+	SparseVectorT &y, bool clear_y) const
 {
 	int nx = this->ncol;
 	int ny = this->nrow;
