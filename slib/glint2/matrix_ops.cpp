@@ -29,8 +29,8 @@ namespace glint2 {
 @param area (IN) Vector to divide by.  Value is moved out of this.
 @param area_inv (OUT) 1/area */
 void divide_by(giss::VectorSparseMatrix &mat,
-	giss::SparseAccumulator<int,double> &area,
-	giss::SparseAccumulator<int,double> &area_inv)
+	giss::MapSparseVector<int,double> &area,
+	giss::MapSparseVector<int,double> &area_inv)
 {
 	// Compute 1 / area
 	for (auto ii = area.begin(); ii != area.end(); ++ii)

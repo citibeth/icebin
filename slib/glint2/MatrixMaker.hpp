@@ -19,7 +19,7 @@
 #pragma once
 
 #include <memory>
-#include <giss/CooVector.hpp>
+#include <giss/SparseVector.hpp>
 #include <glint2/Grid.hpp>
 #include <glint2/matrix_ops.hpp>
 #include <glint2/IceSheet.hpp>
@@ -38,7 +38,7 @@ C: See get_fhc() below, then multiply by FHC in ModelE code.
 
 namespace glint2 {
 
-typedef giss::SparseAccumulator<std::pair<int,int>, double, giss::HashPair<int,int>> SparseAccumulator1hc;
+typedef giss::MapSparseVector<std::pair<int,int>, double, giss::HashPair<int,int>> MapSparseVector1hc;
 
 BOOST_ENUM_VALUES( QPAlgorithm, int,
 	(SINGLE_QP)		(0)
@@ -113,14 +113,14 @@ public:
 	/** NOTE: Allows for two ice sheets overlapping the same GCM grid cell.
 	Ice sheets cannot overlap each other (although their grids can, if we're
 	guaranteed that ice-filled grid cells will never overlap). */
-	void fgice(giss::CooVector<int,double> &fgice1);
+	void fgice(giss::VectorSparseVector<int,double> &fgice1);
 
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm();
 
 	/** @params f2 Some field on each ice grid (referenced by ID)
 	TODO: This only works on one ice sheet.  Will need to be extended
 	for multiple ice sheets. */
-	giss::CooVector<int, double> iceinterp_to_hp(
+	giss::VectorSparseVector<int, double> iceinterp_to_hp(
 		std::map<int, blitz::Array<double,1>> &f4s,
 		blitz::Array<double,1> initial3,
 		IceInterp src,
@@ -131,7 +131,7 @@ public:
 	/** @params f2 Some field on each ice grid (referenced by ID)
 	TODO: This only works on one ice sheet.  Will need to be extended
 	for multiple ice sheets. */
-	giss::CooVector<int, double> atm_to_hp(
+	giss::VectorSparseVector<int, double> atm_to_hp(
 		blitz::Array<double,1> f1,
 		bool force_lambda = false);
 
@@ -166,13 +166,13 @@ class MultiMatrix
 {
 	std::vector<std::unique_ptr<giss::VectorSparseMatrix>> matrices;
 
-	giss::SparseAccumulator<int,double> total_area1_m;
+	giss::MapSparseVector<int,double> total_area1_m;
 
 public:
 	/** @param area1_m Scaling vector for this matrix */
 	void add_matrix(
 		std::unique_ptr<giss::VectorSparseMatrix> &&mat,
-		giss::SparseAccumulator<int,double> const &area1_m)
+		giss::MapSparseVector<int,double> const &area1_m)
 	{
 		matrices.push_back(std::move(mat));
 
@@ -205,7 +205,7 @@ public:
 
 	/** Computes y = diag(1/total_area1_m) * M */
 	void multiply(std::vector<blitz::Array<double,1>> const &xs,
-		giss::SparseAccumulator<int,double> &y, bool clear_y = true)
+		giss::MapSparseVector<int,double> &y, bool clear_y = true)
 	{
 		if (clear_y) y.clear();
 

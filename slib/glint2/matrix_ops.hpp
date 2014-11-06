@@ -19,7 +19,7 @@
 #pragma once
 
 #include <blitz/array.h>
-#include <giss/SparseAccumulator.hpp>
+#include <giss/SparseVector.hpp>
 #include <giss/SparseMatrix.hpp>
 #include <giss/blitz.hpp>
 #include <glint2/Grid.hpp>
@@ -29,8 +29,8 @@
 namespace glint2 {
 
 void divide_by(giss::VectorSparseMatrix &mat,
-	giss::SparseAccumulator<int,double> &area,
-	giss::SparseAccumulator<int,double> &area_inv);
+	giss::MapSparseVector<int,double> &area,
+	giss::MapSparseVector<int,double> &area_inv);
 
 
 

@@ -17,7 +17,6 @@
  */
 
 #include <cmath>
-#include <giss/CooVector.hpp>
 #include <giss/ncutil.hpp>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/IceSheet_L0.hpp>
@@ -77,16 +76,16 @@ printf("MatrixMaker: %p.sheetno = %d\n", &*sheet, sheet->index);
 
 // --------------------------------------------------------------
 /** NOTE: Allows for multiple ice sheets overlapping the same grid cell (as long as they do not overlap each other, which would make no physical sense). */
-void MatrixMaker::fgice(giss::CooVector<int,double> &fgice1)
+void MatrixMaker::fgice(giss::VectorSparseVector<int,double> &fgice1)
 {
 
 	// Accumulate areas over all ice sheets
-	giss::SparseAccumulator<int,double> area1_m_hc;
+	giss::MapSparseVector<int,double> area1_m_hc;
 	fgice1.clear();
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 
 		// Local area1_m just for this ice sheet
-		giss::SparseAccumulator<int,double> area1_m;
+		giss::MapSparseVector<int,double> area1_m;
 		sheet->accum_areas(area1_m);
 
 		// Use the local area1_m to contribute to fgice1
@@ -270,7 +269,7 @@ static int get_subid(int i1) { return i1; }
 
 
 /** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete. */
-giss::CooVector<int, double>
+giss::VectorSparseVector<int, double>
 MatrixMaker::iceinterp_to_hp(
 std::map<int, blitz::Array<double,1>> &f2_or_4s,		// Actually f2 or f4
 blitz::Array<double,1> initial3,
@@ -338,7 +337,7 @@ printf("BEGIN MatrixMaker::iceinterp_to_hp()\n");
 	std::unique_ptr<giss::VectorSparseMatrix> RM(std::move(RM0));
 #endif
 
-	giss::SparseAccumulator<int,double> area1;
+	giss::MapSparseVector<int,double> area1;
 	giss::MapDict<int, giss::VectorSparseMatrix> Ss;
 	giss::MapDict<int, giss::VectorSparseMatrix> XMs;
 	std::map<int, size_t> size4;	// Size of each ice vector space
@@ -508,7 +507,7 @@ printf("Translating XM: %d\n", index);
 		}
 	}
 
-	giss::CooVector<int, double> ret3;		// Function return value
+	giss::VectorSparseVector<int, double> ret3;		// Function return value
 	for (auto ua = used.begin(); ua != used.end(); ++ua) {
 		int n1p = ua->trans_1_1p.nb();
 		int n4p = ua->trans_4_4p.nb();
@@ -642,7 +641,7 @@ printf("AA1 Done\n");
 /** @param force_lambda If true, then just return $f3 = \Lambda f1$,
            the physicaly most correct answer.
 */
-giss::CooVector<int, double> MatrixMaker::atm_to_hp(blitz::Array<double,1> f1,
+giss::VectorSparseVector<int, double> MatrixMaker::atm_to_hp(blitz::Array<double,1> f1,
 bool force_lambda)
 {
 	// RM = hp --> atm conversion
@@ -683,7 +682,7 @@ bool force_lambda)
 	// (i.e. just repeat each atmosphere value for each elevation point)
 printf("atm_to_hp: rm_local = %d\n", rm_local);
 	if (force_lambda || rm_local) {
-		giss::CooVector<int, double> ret;
+		giss::VectorSparseVector<int, double> ret;
 		for (auto p3 = used3.begin(); p3 != used3.end(); ++p3) {
 			int i3 = *p3;
 			int i1, k;
@@ -766,7 +765,7 @@ printf("CC2\n");
 	eqp_solve_simple(qpt.this_f, infinity);
 
 	// --------- Pick out the answer and convert back to standard vector space
-	giss::CooVector<int, double> ret3;		// Function return value
+	giss::VectorSparseVector<int, double> ret3;		// Function return value
 	for (int i3p=0; i3p<n3p; ++i3p) {
 		int i3 = trans_3_3p.b2a(i3p);
 		ret3.add(i3, qpt.X[i3p]);
@@ -785,7 +784,7 @@ printf("BEGIN hp_to_atm() %d %d\n", n1(), n3());
 
 	// Compute the hp->ice and ice->hc transformations for each ice sheet
 	// and combine into one hp->hc matrix for all ice sheets.
-	giss::SparseAccumulator<int,double> area1_m;
+	giss::MapSparseVector<int,double> area1_m;
 	for (auto sheet = sheets.begin(); sheet != sheets.end(); ++sheet) {
 		auto hp2proj(sheet->hp_to_projatm(area1_m));
 		if (correct_area1) hp2proj = multiply(
@@ -794,7 +793,7 @@ printf("BEGIN hp_to_atm() %d %d\n", n1(), n3());
 		ret->append(*hp2proj);
 	}
 
-	giss::SparseAccumulator<int,double> area1_m_inv;
+	giss::MapSparseVector<int,double> area1_m_inv;
 	divide_by(*ret, area1_m, area1_m_inv);
 	ret->sum_duplicates();
 

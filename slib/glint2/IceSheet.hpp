@@ -24,8 +24,7 @@
 #include <blitz/array.h>
 #include <giss/SparseMatrix.hpp>
 #include <glint2/ExchangeGrid.hpp>
-#include <giss/SparseAccumulator.hpp>
-#include <giss/CooVector.hpp>
+#include <giss/SparseVector.hpp>
 
 namespace glint2 {
 
@@ -112,7 +111,7 @@ public:
 	because the projection mapping the GCM grid cells to the ice
 	sheet's cartesian plane is different for each ice sheet. */
 	void atm_proj_correct(
-		giss::SparseAccumulator<int,double> &area1_m,
+		giss::MapSparseVector<int,double> &area1_m,
 		ProjCorrect direction);
 
 	// ------------------------------------------------
@@ -124,7 +123,7 @@ public:
 		sheets.
 	*/
 	virtual void accum_areas(
-		giss::SparseAccumulator<int,double> &area1_m) = 0;
+		giss::MapSparseVector<int,double> &area1_m) = 0;
 
 	/** Computes matrix to go from elevation point space [nhp * n1] to ice grid [n2] */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceinterp(IceInterp dest) = 0;
@@ -143,10 +142,10 @@ public:
 	@param area1_m IN/OUT: Area of each GCM cell covered by
 		(non-masked-out) ice sheet.  Must divide result by this number. */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_projatm(
-		giss::SparseAccumulator<int,double> &area1_m) = 0;
+		giss::MapSparseVector<int,double> &area1_m) = 0;
 
 	virtual std::unique_ptr<giss::VectorSparseMatrix> iceinterp_to_projatm(
-		giss::SparseAccumulator<int,double> &area1_m,
+		giss::MapSparseVector<int,double> &area1_m,
 		IceInterp src) = 0;
 
 public:

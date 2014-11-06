@@ -331,7 +331,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 		MultiMatrix ice2atm;
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			// Get matrix for this single ice model.
-			giss::SparseAccumulator<int,double> area1_m;
+			giss::MapSparseVector<int,double> area1_m;
 			int sheetno = model.key();		// IceSheet::index
 			IceSheet *sheet = (*maker)[sheetno];
 			std::unique_ptr<giss::VectorSparseMatrix> M(
@@ -367,7 +367,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 					int sheetno = model.key();
 					f4s.insert(std::make_pair(sheetno, model->ivals_I[var_ix]));
 				}
-				giss::CooVector<int, double> iceinterp_to_hp(
+				giss::VectorSparseVector<int, double> iceinterp_to_hp(
 					maker->iceinterp_to_hp(f4s, gcm_ivals[var_ix],
 						IceInterp::ICE, QPAlgorithm::SINGLE_QP));
 			}

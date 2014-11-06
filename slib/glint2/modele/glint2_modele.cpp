@@ -388,8 +388,8 @@ std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
 	// (smallest stride first, whatever-based indexing it came with)
 
 	// Get the sparse vector values
-	giss::CooVector<std::pair<int,int>,double> fhc1h_s;
-	giss::CooVector<int,double> fgice1_s;
+	giss::VectorSparseVector<std::pair<int,int>,double> fhc1h_s;
+	giss::VectorSparseVector<int,double> fgice1_s;
 	api->gcm_coupler->maker->fgice(fgice1_s);
 
 	// Translate the sparse vectors to the ModelE data structures

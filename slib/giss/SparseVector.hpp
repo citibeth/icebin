@@ -55,9 +55,10 @@ a similar job, but it is analogous to a lookup-based sparse matrix
 representation (MapSparseMatrix).  This class is templated in order to
 support multiple <index, value> types.
 @see SparseAccumulator, VectorSparseMatrix, MapSparseMatrix */
+template<class IndexT, class ValT>
 class VectorSparseVector : public SparseVector
 {
-	std::vector<std::pair<int, double>> vals;
+	std::vector<std::pair<IndexT, ValT>> vals;
 
 public:
 
@@ -69,7 +70,7 @@ public:
 
 	/** Insert a new <index, value> pair to the end of the sparse
 	vector list.  Does not detect or eliminate duplicates. */
-	void set(int const &index, double const &val)
+	void set(IndexT const &index, ValT const &val)
 		{ vals.push_back(std::make_pair(index, val)); }
 
 	/** Sort the <index, value> pairs by index. */
@@ -90,6 +91,63 @@ public:
 	}
 
 };
+
+
+template<class IndexT, class ValT>
+void VectorSparseVector<IndexT,ValT>::sum_duplicates()
+{
+	sort_stable();
+
+	// Scan through, overwriting our array
+	// New array will never be bigger than original
+	int j=-1;		// Last-written item in output array
+	double last_index = -1;	// Last index we saw in input array
+	for (int i=0; i<this->size(); ++i) {
+		int index = (*this)[i].first;
+		ValT val = (*this)[i].second;
+
+		if (index == last_index) {
+			(*this)[j].second += val;
+		} else {
+			++j;
+			(*this)[j].second = val;
+			last_index = index;
+		}
+	}
+	int n = j+1;	// Size of output array
+
+	this->resize(n);
+	this->shrink_to_fit();
+}
+// ---------------------------------------------------
+template<class IndexT, class ValT>
+void VectorSparseVector<IndexT,ValT>::remove_duplicates()
+{
+	sort_stable();
+
+	// Scan through, overwriting our array
+	// New array will never be bigger than original
+	int j=-1;		// Last-written item in output array
+	int last_index = -1;	// Last index we saw in input array
+	for (int i=0; i<this->size(); ++i) {
+		int index = (*this)[i].first;
+		ValT val = (*this)[i].second;
+
+		if (index == last_index) {
+			(*this)[j].second == val;
+		} else {
+			++j;
+			(*this)[j].second = val;
+			last_index = index;
+		}
+	}
+	int n = j+1;	// Size of output array
+
+	this->resize(n);
+	this->shrink_to_fit();
+}
+
+
 // ================================================================
 /** Implements a "sparse vector", stored as an
 std::unordered_map<index, value>.  This is analogous to a lookup-style
@@ -98,9 +156,10 @@ does a similar job, but it is analogous to a coordinate-style sparse
 matrix representation (VectorSparseMatrix).  This class is templated
 in order to support multiple <index, value> types.
 @see CooVector, VectorSparseMatrix, MapSparseMatrix */
+template<class IndexT, class ValT>
 class MapSparseVector : public SparseVector
 {
-	std::unordered_map<int, double> vals;
+	std::unordered_map<IndexT, ValT> vals;
 public :
 	auto begin() -> decltype(vals.begin()) { return vals.begin(); }
 	auto end() -> decltype(vals.end()) { return vals.end(); }
@@ -110,7 +169,7 @@ public :
 
 	/** Inserts a new <index, value> pair to sparse vector.  If that
 	element was already non-zero, adds to it. */
-	void add(int index, double val) {
+	void add(IndexT index, ValT val) {
 		auto ii(vals.find(index));
 		if (ii == vals.end()) vals.insert(std::make_pair(index, val));
 		else ii->second += val;
@@ -126,7 +185,7 @@ public :
 
 	/** Inserts a new <index, value> pair to sparse vector.  If that
 	element was already non-zero, replaces it. */
-	void set(int index, double val) {
+	void set(IndexT index, ValT val) {
 		auto ii(vals.find(index));
 		if (ii == vals.end()) vals.insert(std::make_pair(index, val));
 		else ii->second = val;
@@ -135,7 +194,7 @@ public :
 #if 0
 	/** Looks up a value in the sparse index by index.  Throws an
 	exception if the index does not exist. */
-	double &operator[](int index) {
+	ValT &operator[](IndexT index) {
 		auto ii(vals.find(index));
 		if (ii == vals.end()) {
 			std::cout << "SparseAccumulator[" << index << "] doesn't exist" << std::endl;
@@ -146,23 +205,23 @@ public :
 
 	/** Looks up a value in the sparse index by index.  Throws an
 	exception if the index does not exist. */
-	double const &operator[](int const &index) const {
-		auto ii(vals.find(index));
-		if (ii == vals.end()) throw std::exception();
+	ValT const &operator[](IndexT const &index) const {
+ 		auto ii(vals.find(index));
+ 		if (ii == vals.end()) throw std::exception();
 		return ii->second;
 	}
 #endif
 
 	void divide_by(MapSparseVector const &b) {
 		for (auto ii=begin(); ii != end(); ++ii) {
-			int ix = ii->first;
+			IndexT ix = ii->first;
 			auto jj(b.find(ix));
 			if (jj == b.end()) {
 				// Not found, so there's a zero value there.
 				// Go ahead, divide by zero!  It will create the appropriate
 				// NaN value as if we were dividing by a dense vector.
 				// This is probably an error, and it will give the user an indication
-				// of where to fix things.
+ 				// of where to fix things.
 				ii->second /= 0.;
 			} else {
 				ii->second /= jj->second;
@@ -172,7 +231,7 @@ public :
 
 	void multiply_by(MapSparseVector const &b) {
 		for (auto ii=begin(); ii != end(); ++ii) {
-			int ix = ii->first;
+			IndexT ix = ii->first;
 			auto jj(b.find(ix));
 			if (jj == b.end()) {
 				// Not found, so there's a zero value there.
@@ -187,7 +246,7 @@ public :
 
 template<class SparseMatrixT>
 inline void accum_per_row(SparseMatrixT const &mat,
-	MapSparseVector &accum)
+	MapSparseVector<int,double> &accum)
 {
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
 		accum.add(ii.row(), ii.val());
@@ -195,7 +254,7 @@ inline void accum_per_row(SparseMatrixT const &mat,
 
 template<class SparseMatrixT>
 inline void accum_per_col(SparseMatrixT const &mat,
-	MapSparseVector &accum)
+	MapSparseVector<int,double> &accum)
 {
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
 		accum.add(ii.col(), ii.val());

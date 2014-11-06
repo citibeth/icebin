@@ -168,7 +168,7 @@ blitz::Array<double,1> const IceSheet_L0::ice_to_interp(
 }
 // --------------------------------------------------------
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::hp_to_projatm(
-	giss::SparseAccumulator<int,double> &area1_m)
+	giss::MapSparseVector<int,double> &area1_m)
 {
 printf("BEGIN IceSheet_L0::hp_to_projatm %ld %ld\n", n1(), n4());
 
@@ -186,7 +186,7 @@ printf("END IceSheet_L0::hp_to_projatm()\n");
 }
 // --------------------------------------------------------
 std::unique_ptr<giss::VectorSparseMatrix> IceSheet_L0::iceexch_to_projatm(
-	giss::SparseAccumulator<int,double> &area1_m,
+	giss::MapSparseVector<int,double> &area1_m,
 	IceExch src)
 {
 printf("BEGIN IceSheet_L0::ice_to_projatm %ld %ld\n", n1(), n4());
@@ -220,7 +220,7 @@ printf("BEGIN IceSheet_L0::ice_to_projatm %ld %ld\n", n1(), n4());
 @param area1_m IN/OUT: Area of each GCM cell covered by
 	(non-masked-out) ice sheet. */
 void IceSheet_L0::accum_areas(
-giss::SparseAccumulator<int,double> &area1_m)
+giss::MapSparseVector<int,double> &area1_m)
 {
 printf("BEGIN accum_area(%s)\n", name.c_str());
 

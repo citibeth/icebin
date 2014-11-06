@@ -71,7 +71,7 @@ public:
 
 	/** Adds up the (ice-covered) area of each GCM grid cell */
 	virtual void accum_areas(
-		giss::SparseAccumulator<int,double> &area1_m);
+		giss::MapSparseVector<int,double> &area1_m);
 
 	/** Converts vector from ice grid (n2) to exchange grid (n4).
 	The transformation is easy, and no matrix needs to be computed.
@@ -85,16 +85,16 @@ public:
 	@param area1_m IN/OUT: Area of each GCM cell covered by
 		(non-masked-out) ice sheet. */
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_projatm(
-		giss::SparseAccumulator<int,double> &area1_m);
+		giss::MapSparseVector<int,double> &area1_m);
 
 protected :
 	std::unique_ptr<giss::VectorSparseMatrix> iceexch_to_projatm(
-		giss::SparseAccumulator<int,double> &area1_m,
+		giss::MapSparseVector<int,double> &area1_m,
 		IceExch src = IceExch::ICE);
 
 public:
 	virtual std::unique_ptr<giss::VectorSparseMatrix> iceinterp_to_projatm(
-		giss::SparseAccumulator<int,double> &area1_m,
+		giss::MapSparseVector<int,double> &area1_m,
 		IceInterp src)
 	{
 		IceExch iesrc = (src == IceInterp::ICE ? IceExch::ICE : interp_grid);

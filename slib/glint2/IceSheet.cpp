@@ -101,7 +101,7 @@ IceSheet::atm_proj_correct(ProjCorrect direction)
 // -----------------------------------------------------
 /** Corrects the area1_m result */
 void IceSheet::atm_proj_correct(
-	giss::SparseAccumulator<int,double> &area1_m,
+	giss::MapSparseVector<int,double> &area1_m,
 	ProjCorrect direction)
 {
 	int n1 = gcm->n1();
