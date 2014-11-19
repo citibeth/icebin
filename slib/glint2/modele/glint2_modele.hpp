@@ -23,6 +23,7 @@
 #include <giss/SparseMatrix.hpp>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/GCMCoupler.hpp>
+#include <glint2/modele/GCMCoupler_ModelE.hpp>
 #include <glint2/modele/ModelEDomain.hpp>
 
 namespace glint2 {
@@ -49,7 +50,7 @@ struct glint2_modele {
 	ModelEDomain *domain;	// Points to domain owned by maker
 
 	double dtsrc;			// Size of ModelE timestep
-	std::unique_ptr<GCMCoupler> gcm_coupler;
+	GCMCoupler_ModelE gcm_coupler;
 
 	/** The matrix used for each IceModel, used to convert from
 	the elevation grid to ice grid.  Each hp_to_ice_rec is one
@@ -60,7 +61,9 @@ struct glint2_modele {
 	int itime_last;
 
 	/** Place to store results from Glint2 calls (allocated by ModelE) */
-	std::vector<blitz::Array<double,1>> &gcm_ivals);
+	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals;
+
+	glint2_modele() {}
 };
 
 }}	// namespace glint2::modele
@@ -76,6 +79,17 @@ extern "C" void glint2_modele_set_const(
 	double val,
 	char const *units_f, int units_len,
 	char const *description_f, int description_len);
+
+/** Inform Glint2 about a Fortran variable used to hold inputs to the
+GCM (regridded from the ice model output). */
+extern "C"
+int glint2_modele_add_gcm_input(
+glint2::modele::glint2_modele *api,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+char const *grid_f, int grid_len,
+char const *long_name_f, int long_name_len);
+
 
 // First init to be called after new
 extern "C" void glint2_modele_init0(

@@ -46,6 +46,24 @@ INTERFACE
 		integer(c_int), value :: description_len
 	end subroutine
 
+	function glint2_modele_add_gcm_input(api, &
+		field_f, field_len, &
+		units_f, units_len, &
+        grid_f, grid_len, &
+		long_name_f, long_name_len) bind(c)
+	use iso_c_binding
+		type(c_ptr), value :: api
+		character(c_char) :: field_f(*)
+		integer(c_int), value :: field_len
+		character(c_char) :: units_f(*)
+		integer(c_int), value :: units_len
+		character(c_char) :: grid_f(*)
+		integer(c_int), value :: grid_len
+		character(c_char) :: long_name_f(*)
+		integer(c_int), value :: long_name_len
+		integer(c_int) :: glint2_modele_add_gcm_input
+	end function
+
 	subroutine glint2_modele_init0(api, &
 		maker_fname_f, maker_fname_len, &
 		maker_vname_f, maker_vname_len, &
@@ -248,6 +266,16 @@ print *,'END glint2_modele_couple_to_ice()'
 end subroutine
 
 
+! ! Go from a VectorSparseVector<int, double> output from GCMCoupler, to
+! ! a fully scattered array
+! subroutine VectorSparseVector_to_Scattered2(grid, vsv_indices, vsv_vals, nvals, scat) bind(c)
+! type(dist_grid), intent(in) :: grid
+! integer(c_int) :: vsv_indices(*)
+! real(c_double) :: vsv_vals(*)
+! integer(c_int), value :: nvals
+! real*8, dimension(:,:) :: scat
+!
+! end subroutine VectorSparseVector_to_Scattered2
 
 
 end module

@@ -2,7 +2,8 @@
 
 #include <vector>
 #include <algorithm>
-
+#include <unordered_map>
+#include <blitz/array.h>
 
 namespace giss{
 
@@ -35,8 +36,6 @@ public:
 	there is no more than one entry per index. */
 	virtual void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD);
 
-	virtual void to_blitz(blitz::Array<ValT,1> &out) = 0;
-
 #if 0
 	/** Used to write this data structure to a netCDF file.
 	Defines the required variables.  Call the returned boost::function
@@ -59,15 +58,26 @@ representation (MapSparseMatrix).  This class is templated in order to
 support multiple <index, value> types.
 @see SparseAccumulator, VectorSparseMatrix, MapSparseMatrix */
 template<class IndexT, class ValT>
-class VectorSparseVector : public SparseVector
+class VectorSparseVector : public SparseVector<IndexT, ValT>
 {
 	std::vector<std::pair<IndexT, ValT>> vals;
 
 public:
+	VectorSparseVector() {}
 	VectorSparseVector(VectorSparseVector &&b) : vals(std::move(b.vals)) {}
 	void operator=(VectorSparseVector &&b) { vals = std::move(b.vals); }
 
-	size_t size() { return vals.size(); }
+#if 0
+	// These don't make sense for VectorSparseVector!!!
+	auto operator[](IndexT const &ix) -> decltype(vals[ix])
+		{ return vals[ix]; }
+	auto operator[](IndexT const &ix) const -> decltype(vals[ix])
+		{ return vals[ix]; }
+#endif
+
+
+	void sort() { std::sort(vals.begin(), vals.end()); }
+	size_t size() const { return vals.size(); }
 	void clear() { vals.clear(); }
 
 	auto begin() -> decltype(vals.begin()) { return vals.begin(); }
@@ -92,20 +102,32 @@ public:
 	/** Uses only the last-set value for a given index*/
 	void remove_duplicates();
 
-	void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD)
+	void consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups = SparseVector<IndexT,ValT>::DuplicatePolicy::ADD)
 	{
-		if (dups == DuplicatePolicy::ADD) sum_duplicates();
+		if (dups == SparseVector<IndexT,ValT>::DuplicatePolicy::ADD) sum_duplicates();
 		else remove_duplicates();
 	}
 
-	void to_blitz(blitz::Array<ValT,1> &out)
-	{
-		out = 0;
-		for (auto ii = begin(); ii != end(); ++ii)
-			out[ii->first] = ii->second;
-	}
-
 };
+
+template<class SparseVectorT, class ValT>
+void to_blitz(SparseVectorT const &mat, blitz::Array<ValT,1> &out)
+{
+	out = 0;
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
+		out(ii->first) = ii->second;
+}
+
+
+template<class SparseVectorT, class IndexT, class ValT>
+void to_parallel_arrays(SparseVectorT const &mat,
+	std::vector<IndexT> &indices, std::vector<ValT> &vals)
+{
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
+		indices.push_back(ii->first);
+		vals.push_back(ii->second);
+	}
+}
 
 
 template<class IndexT, class ValT>
@@ -117,22 +139,22 @@ void VectorSparseVector<IndexT,ValT>::sum_duplicates()
 	// New array will never be bigger than original
 	int j=-1;		// Last-written item in output array
 	double last_index = -1;	// Last index we saw in input array
-	for (int i=0; i<this->size(); ++i) {
-		int index = (*this)[i].first;
-		ValT val = (*this)[i].second;
+	for (int i=0; i<vals.size(); ++i) {
+		int index = vals[i].first;
+		ValT val = vals[i].second;
 
 		if (index == last_index) {
-			(*this)[j].second += val;
+			vals[j].second += val;
 		} else {
 			++j;
-			(*this)[j].second = val;
+			vals[j].second = val;
 			last_index = index;
 		}
 	}
 	int n = j+1;	// Size of output array
 
-	this->resize(n);
-	this->shrink_to_fit();
+	this->vals.resize(n);
+	this->vals.shrink_to_fit();
 }
 // ---------------------------------------------------
 template<class IndexT, class ValT>
@@ -145,21 +167,21 @@ void VectorSparseVector<IndexT,ValT>::remove_duplicates()
 	int j=-1;		// Last-written item in output array
 	int last_index = -1;	// Last index we saw in input array
 	for (int i=0; i<this->size(); ++i) {
-		int index = (*this)[i].first;
-		ValT val = (*this)[i].second;
+		int index = vals[i].first;
+		ValT val = vals[i].second;
 
 		if (index == last_index) {
-			(*this)[j].second == val;
+			vals[j].second == val;
 		} else {
 			++j;
-			(*this)[j].second = val;
+			vals[j].second = val;
 			last_index = index;
 		}
 	}
 	int n = j+1;	// Size of output array
 
-	this->resize(n);
-	this->shrink_to_fit();
+	this->vals.resize(n);
+	this->vals.shrink_to_fit();
 }
 
 
@@ -172,11 +194,18 @@ matrix representation (VectorSparseMatrix).  This class is templated
 in order to support multiple <index, value> types.
 @see CooVector, VectorSparseMatrix, MapSparseMatrix */
 template<class IndexT, class ValT>
-class MapSparseVector : public SparseVector
+class MapSparseVector : public SparseVector<IndexT, ValT>
 {
 	std::unordered_map<IndexT, ValT> vals;
 public :
-	size_t size() { return vals.size(); }
+	auto find(IndexT const &ix) -> decltype(vals.find(ix))
+		{ return vals.find(ix); }
+	auto find(IndexT const &ix) const -> decltype(vals.find(ix))
+		{ return vals.find(ix); }
+	auto operator[](IndexT const &ix) -> decltype(vals[ix])
+		{ return vals[ix]; }
+
+	size_t size() const { return vals.size(); }
 	void clear() { vals.clear(); }
 
 	auto begin() -> decltype(vals.begin()) { return vals.begin(); }
@@ -187,7 +216,7 @@ public :
 
 	/** Inserts a new <index, value> pair to sparse vector.  If that
 	element was already non-zero, adds to it. */
-	void add(IndexT index, ValT val) {
+	void add(IndexT const &index, ValT const &val) {
 		auto ii(vals.find(index));
 		if (ii == vals.end()) vals.insert(std::make_pair(index, val));
 		else ii->second += val;
@@ -203,7 +232,7 @@ public :
 
 	/** Inserts a new <index, value> pair to sparse vector.  If that
 	element was already non-zero, replaces it. */
-	void set(IndexT index, ValT val) {
+	void set(IndexT const &index, ValT const &val) {
 		auto ii(vals.find(index));
 		if (ii == vals.end()) vals.insert(std::make_pair(index, val));
 		else ii->second = val;
@@ -230,10 +259,13 @@ public :
 	}
 #endif
 
+
+#if 0
+	/** Element-by-element division. */
 	void divide_by(MapSparseVector const &b) {
 		for (auto ii=begin(); ii != end(); ++ii) {
 			IndexT ix = ii->first;
-			auto jj(b.find(ix));
+			auto jj(b.vals.find(ix));
 			if (jj == b.end()) {
 				// Not found, so there's a zero value there.
 				// Go ahead, divide by zero!  It will create the appropriate
@@ -246,6 +278,7 @@ public :
 			}
 		}
 	}
+#endif
 
 	void multiply_by(MapSparseVector const &b) {
 		for (auto ii=begin(); ii != end(); ++ii) {
@@ -260,14 +293,29 @@ public :
 		}
 	}
 
-	void to_blitz(blitz::Array<ValT,1> &out)
-	{
-		out = 0;
-		for (auto ii = begin(); ii != end(); ++ii)
-			out[ii->first] = ii->second;
-	}
-
 };
+
+/** Element-by-element division. */
+template<class SparseVectorT, class IndexT, class ValT>
+void divide_by(SparseVectorT &vec, MapSparseVector<IndexT, ValT> const &b)
+{
+	for (auto ii=vec.begin(); ii != vec.end(); ++ii) {
+		IndexT ix = ii->first;
+		auto jj(b.find(ix));
+		if (jj == b.end()) {
+			// Not found, so there's a zero value there.
+			// Go ahead, divide by zero!  It will create the appropriate
+			// NaN value as if we were dividing by a dense vector.
+			// This is probably an error, and it will give the user an indication
+			// of where to fix things.
+			ii->second /= 0.;
+		} else {
+			ii->second /= jj->second;
+		}
+	}
+}
+
+
 
 template<class SparseMatrixT>
 inline void accum_per_row(SparseMatrixT const &mat,

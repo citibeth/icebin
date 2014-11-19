@@ -22,6 +22,8 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 
 
 	// ------------------------- GCM Inputs
+// ModelE sets this, viar repeated calls to add_gcm_input_ij() and add_gcm_input_ijhc().
+#if 0
 	// The GCM must accept the same set of inputs, no matter what
 	// ice moel is being used
 
@@ -42,7 +44,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	// Unexplained mass/energy outputs, used to close the energy budget.
 	gcm_inputs.add_field("epsilon.mass", "kg m-2 s-1", "ATMOSPHERE", "");
 	gcm_inputs.add_field("epsilon.enth", "W m-2", "ATMOSPHERE", "");
-
+#endif
 
 	// ----------------- Scalars provided by the GCM
 	// Scalars are things that can only be computed at the last minute

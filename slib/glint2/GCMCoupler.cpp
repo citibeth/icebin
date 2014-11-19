@@ -19,6 +19,7 @@
 #include <mpi.h>		// Intel MPI wants to be first
 #include <glint2/GCMCoupler.hpp>
 #include <glint2/MatrixMaker.hpp>
+#include <glint2/MultiMatrix.hpp>
 
 namespace glint2 {
 
@@ -249,7 +250,7 @@ void GCMCoupler::couple_to_ice(
 double time_s,
 int nfields,			// Number of fields in sbuf.  Not all will necessarily be filled, in the case of heterogeneous ice models.
 giss::DynArray<SMBMsg> &sbuf,	// Values, already converted to ice model inputs (from gcm outputs)
-std::vector<giss::VectorSparseMatrix<int,double>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 {
 	// TODO: Convert this to use giss::gather_msg_array() instead!!!
 
@@ -358,10 +359,11 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 					ival_I.push_back(model->ivals_I[var_ix]);
 				}
 
-				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
+				giss::VectorSparseVector<int,double> &gcm_ivals_var_ix(gcm_ivals[var_ix]);
+				ice2atm.multiply(ival_I, gcm_ivals_var_ix, true);
 				gcm_ivals[var_ix].consolidate();
 			} else if (cf.grid == "ELEVATION") {
-				// --- Assemble all intputs, to send to Glint2 QP regridding
+				// --- Assemble all inputs, to send to Glint2 QP regridding
 
 				std::map<int, blitz::Array<double,1>> f4s;
 				for (auto model = models.begin(); model != models.end(); ++model) {
@@ -371,9 +373,9 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 
 				// Use previous return as our initial guess
 				blitz::Array<double,1> initial3(maker->n3());
-				gcm_ivals[var_ix].to_blitz(initial3);
+				giss::to_blitz(gcm_ivals[var_ix], initial3);
 				gcm_ivals[var_ix] = maker->iceinterp_to_hp(
-					f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP));
+					f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP);
 				gcm_ivals[var_ix].consolidate();
 			}
 		}

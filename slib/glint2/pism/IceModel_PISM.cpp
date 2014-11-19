@@ -358,29 +358,29 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// -------------- Link to PISM-format output variables, used to fill ovars
 	pism_ovars.resize(contract[OUTPUT].size_nounit(), NULL);
 	ix = contract[OUTPUT]["usurf"];		// Elevation of top surface of ice sheet
-		pism_ovars[ix] = ice_model->ice_surface_elevation;	// see PISM's iceModel.hh
+		pism_ovars[ix] = &ice_model->ice_surface_elevation;	// see PISM's iceModel.hh
 	ix = contract[OUTPUT]["ice_surface_enth"];		// Specific enthalpy of top surface
-		pism_ovars[ix] = ice_model.ice_surface_enth;
+		pism_ovars[ix] = &ice_model.ice_surface_enth;
 	ix = contract[OUTPUT]["ice_surface_enth_depth"];
-		pism_ovars[ix] = ice_model.ice_surface_enth_depth;
+		pism_ovars[ix] = &ice_model.ice_surface_enth_depth;
 
 	ix = contract[OUTPUT]["basal_runoff.mass"];
-		pism_ovars[ix] = ice_model->rate.basal_runoff.mass;
+		pism_ovars[ix] = &ice_model->rate.basal_runoff.mass;
 	ix = contract[OUTPUT]["basal_runoff.enth"];
-		pism_ovars[ix] = ice_model->rate.basal_runoff.enth;
+		pism_ovars[ix] = &ice_model->rate.basal_runoff.enth;
 
 	ix = contract[OUTPUT]["calving.mass"];
-		pism_ovars[ix] = ice_model->rate.calving.mass;
+		pism_ovars[ix] = &ice_model->rate.calving.mass;
 	ix = contract[OUTPUT]["calving.enth"];
-		pism_ovars[ix] = ice_model->rate.calving.enth;
+		pism_ovars[ix] = &ice_model->rate.calving.enth;
 
 	ix = contract[OUTPUT]["strain_heating"];
-		pism_ovars[ix] = ice_model->rate.strain_heating;
+		pism_ovars[ix] = &ice_model->rate.strain_heating;
 
 	ix = contract[OUTPUT]["epsilon.mass"];
-		pism_ovars[ix] = ice_model->rate.epsilon.mass;
+		pism_ovars[ix] = &ice_model->rate.epsilon.mass;
 	ix = contract[OUTPUT]["epsilon.enth"];
-		pism_ovars[ix] = ice_model->rate.epsilon.enth;
+		pism_ovars[ix] = &ice_model->rate.epsilon.enth;
 
 
 	// ============== Miscellaneous

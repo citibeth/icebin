@@ -76,12 +76,12 @@ std::vector<blitz::Array<double,3>> &inputs)
 {
 
 	// Get dimensions of full domain
-	int nhp = api->gcm_coupler->maker->nhp(-1) + 1;
+	int nhp = api->gcm_coupler.maker->nhp(-1) + 1;
 	ModelEDomain const *domain(&*api->domain);
 
-	int const rank = api->gcm_coupler->rank();	// MPI rank; debugging
+	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
 
-	GCMCoupler &coupler(*api->gcm_coupler);
+	GCMCoupler &coupler(api->gcm_coupler);
 	printf("[%d] BEGIN glint2_modele_save_gcm_outputs(time_s=%f)\n", rank, time_s);
 
 	giss::CouplingContract &gcm_outputs(coupler.gcm_outputs);
@@ -120,7 +120,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 	}
 
 	// Gather it to root
-	GCMParams const &gcm_params(api->gcm_coupler->gcm_params);
+	GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
 	std::unique_ptr<giss::DynArray<ModelEMsg>> rbuf = giss::gather_msg_array(
 		gcm_params.gcm_comm, gcm_params.gcm_root, sbuf, nfields, nmsg, 0);
 
@@ -144,7 +144,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 		}
 
 		// Write the arrays to a file
-		NcFile ncout(api->gcm_coupler->gcm_out_file.c_str(), NcFile::Write);	// Read/Write
+		NcFile ncout(api->gcm_coupler.gcm_out_file.c_str(), NcFile::Write);	// Read/Write
 		NcDim *time_dim = ncout.get_dim("time");
 		NcDim *nhp_dim = ncout.get_dim("nhp");
 		NcDim *jm_dim = ncout.get_dim("jm");
@@ -172,12 +172,11 @@ std::vector<blitz::Array<double,3>> &inputs)
 extern "C" glint2_modele *new_glint2_modele()
 {
 	std::unique_ptr<glint2_modele> api(new glint2_modele());
-	api->gcm_coupler.reset(new GCMCoupler_ModelE());
 
 	// No exception was thrown... we can release our pointer back to Fortran
 	glint2_modele *ret = api.release();
 
-//	int const rank = ret->gcm_coupler->rank();	// MPI rank; debugging
+//	int const rank = ret->gcm_coupler.rank();	// MPI rank; debugging
 //	printf("[%d] Allocated glint2_modele api struct: %p\n", rank, ret);
 	return ret;
 }
@@ -191,8 +190,8 @@ extern "C" void glint2_modele_set_const(
 	char const *units_f, int units_len,
 	char const *description_f, int description_len)
 {
-//	int const rank = api->gcm_coupler->rank();	// MPI rank; debugging
-	giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
+//	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
+	giss::ConstantSet &gcm_constants(api->gcm_coupler.gcm_constants);
 	gcm_constants.set(
 		std::string(name_f, name_len),
 		val,
@@ -237,15 +236,15 @@ printf("glint2_config_rfname = %s\n", glint2_config_rfname.c_str());
 std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 
 	// Set up parmaeters from the GCM to the ice model
-	api->gcm_coupler->gcm_params = GCMParams(
+	api->gcm_coupler.gcm_params = GCMParams(
 		MPI_Comm_f2c(comm_f),
 		root,
 		glint2_config_dir);
 
 	if (write_constants) {
 		// Store constants int NetCDF file, so we can desm without ModelE.
-		giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
-		GCMParams const &gcm_params(api->gcm_coupler->gcm_params);
+		giss::ConstantSet &gcm_constants(api->gcm_coupler.gcm_constants);
+		GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
 	
 		NcFile nc((gcm_params.config_dir / "modele_constants.nc").c_str(), NcFile::Replace);
 		gcm_constants.netcdf_define(nc, "constants");
@@ -267,15 +266,15 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 	NcFile glint2_config_nc(glint2_config_rfname.c_str(), NcFile::ReadOnly);
 
 	// Read the coupler, along with ice model proxies
-	api->gcm_coupler->read_from_netcdf(glint2_config_nc, maker_vname, std::move(mdomain));
+	api->gcm_coupler.read_from_netcdf(glint2_config_nc, maker_vname, std::move(mdomain));
 	glint2_config_nc.close();
 
 	// Check bounds on the IceSheets, set up any state, etc.
-	// This is done AFTER setup of gcm_coupler because gcm_coupler->read_from_netcdf()
+	// This is done AFTER setup of gcm_coupler because gcm_coupler.read_from_netcdf()
 	// might change the IceSheet, in certain cases.
 	// (for example, if PISM is used, elev2 and mask2 will be read from related
 	// PISM input file, and the version in the GLINT2 file will be ignored)
-	api->gcm_coupler->maker->realize();
+	api->gcm_coupler.maker->realize();
 
 	// TODO: Test that im and jm are consistent with the grid read.
 #endif
@@ -290,7 +289,7 @@ extern "C" void glint2_modele_delete(glint2_modele *&api)
 extern "C"
 int glint2_modele_nhp(glint2_modele *api)
 {
-	int ret = api->gcm_coupler->maker->nhp(-1);	// Assume all grid cells have same # EP
+	int ret = api->gcm_coupler.maker->nhp(-1);	// Assume all grid cells have same # EP
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
     // (not part of GLINT2)
 	ret += 1;
@@ -299,15 +298,31 @@ int glint2_modele_nhp(glint2_modele *api)
 }
 // -----------------------------------------------------
 extern "C"
+int glint2_modele_add_gcm_input(
+glint2_modele *api,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+char const *grid_f, int grid_len,
+char const *long_name_f, int long_name_len)
+{
+	std::string field_name(field_name_f, field_name_len);
+	std::string units(units_f, units_len);
+	std::string grid(grid_f, grid_len);
+	std::string long_name(long_name_f, long_name_len);
+	api->gcm_coupler.gcm_inputs.add_field(field_name, units, grid, long_name);
+	return api->gcm_coupler.gcm_inputs.size();
+}
+// -----------------------------------------------------
+extern "C"
 void glint2_modele_set_start_time(glint2_modele *api, int iyear1, int itimei, double dtsrc)
 {
-	GCMParams &gcm_params(api->gcm_coupler->gcm_params);
+	GCMParams &gcm_params(api->gcm_coupler.gcm_params);
 
 	api->dtsrc = dtsrc;
 	double time0_s = itimei * api->dtsrc;
 
 printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f\n", iyear1, itimei, api->dtsrc, time0_s);
-	api->gcm_coupler->set_start_time(
+	api->gcm_coupler.set_start_time(
 		giss::time::tm(iyear1, 1, 1),
 		time0_s);
 
@@ -315,10 +330,10 @@ printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f
 
 	// Finish initialization...
 	// -------------------------------------------------
-	if (api->gcm_coupler->gcm_out_file.length() > 0) {
+	if (api->gcm_coupler.gcm_out_file.length() > 0) {
 		// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
-		int nhp = api->gcm_coupler->maker->nhp(-1) + 1;
-		NcFile ncout(api->gcm_coupler->gcm_out_file.c_str(), NcFile::Replace);
+		int nhp = api->gcm_coupler.maker->nhp(-1) + 1;
+		NcFile ncout(api->gcm_coupler.gcm_out_file.c_str(), NcFile::Replace);
 		NcDim *im_dim = ncout.add_dim("im", api->domain->im);
 		NcDim *jm_dim = ncout.add_dim("jm", api->domain->jm);
 		NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
@@ -339,7 +354,7 @@ printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f
 		time_var->add_att("axis", "T");
 		time_var->add_att("long_name", "Coupling times");
 
-		giss::CouplingContract &gcm_outputs(api->gcm_coupler->gcm_outputs);
+		giss::CouplingContract &gcm_outputs(api->gcm_coupler.gcm_outputs);
 
 		for (unsigned int i=0; i < gcm_outputs.size_nounit(); ++i) {
 			NcVar *nc_var = ncout.add_var(gcm_outputs[i].c_str(),
@@ -390,7 +405,7 @@ std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
 	// Get the sparse vector values
 	giss::VectorSparseVector<std::pair<int,int>,double> fhc1h_s;
 	giss::VectorSparseVector<int,double> fgice1_s;
-	api->gcm_coupler->maker->fgice(fgice1_s);
+	api->gcm_coupler.maker->fgice(fgice1_s);
 
 	// Translate the sparse vectors to the ModelE data structures
 	std::vector<std::tuple<int, int, double>> fgice1_vals;
@@ -512,8 +527,8 @@ printf("init_landice_com_part2 1\n");
 	// on all grid cells.
 
 	auto elev1h(elev1h_f.to_blitz());
-	int nhp_glint2 = api->gcm_coupler->maker->nhp(-1);
-	int nhp = api->gcm_coupler->maker->nhp(-1) + 1;	// Add non-model HP
+	int nhp_glint2 = api->gcm_coupler.maker->nhp(-1);
+	int nhp = api->gcm_coupler.maker->nhp(-1) + 1;	// Add non-model HP
 	if (nhp != elev1h.extent(2)) {
 		fprintf(stderr, "glint2_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp);
 		throw std::exception();
@@ -521,7 +536,7 @@ printf("init_landice_com_part2 1\n");
 
 	// Copy 1-D height point definitions to elev1h
 	for (int k=0; k < nhp_glint2; ++k) {
-		double val = api->gcm_coupler->maker->hpdefs[k];
+		double val = api->gcm_coupler.maker->hpdefs[k];
 		for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
 		for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {
 			// +1 for C-to-Fortran conversion
@@ -558,8 +573,8 @@ printf("init_landice_com_part2 2\n");
 
 printf("init_landice_com_part2 3\n");
 	// ======================= fhc(:,:,hp>1)
-	HCIndex &hc_index(*api->gcm_coupler->maker->hc_index);
-	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->gcm_coupler->maker->hp_to_atm());
+	HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
+	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->gcm_coupler.maker->hp_to_atm());
 	ModelEDomain &domain(*api->domain);
 
 	// Filter this array, and convert to fhc format
@@ -647,11 +662,11 @@ void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api)
 {
 printf("BEGIN glint2_modele_init_hp_to_ices\n");
 	ModelEDomain &domain(*api->domain);
-	HCIndex &hc_index(*api->gcm_coupler->maker->hc_index);
+	HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
 
 	// ====================== hp_to_ices
 	api->hp_to_ices.clear();
-	for (auto sheet=api->gcm_coupler->maker->sheets.begin(); sheet != api->gcm_coupler->maker->sheets.end(); ++sheet) {
+	for (auto sheet=api->gcm_coupler.maker->sheets.begin(); sheet != api->gcm_coupler.maker->sheets.end(); ++sheet) {
 
 		// Get matrix for HP2ICE
 		std::unique_ptr<giss::VectorSparseMatrix> imat(
@@ -695,12 +710,12 @@ giss::F90Array<double,3> &smb1h_f,		// kg/m^2
 giss::F90Array<double,3> &seb1h_f,		// J/m^2: Latent Heat
 giss::F90Array<double,3> &tg21h_f)		// C
 {
-	int rank = api->gcm_coupler->rank();	// MPI rank; debugging
+	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
 	double time_s = itime * api->dtsrc;
 
 	printf("BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f, dtsrc=%f)\n", itime, time_s, api->dtsrc);
 
-	GCMCoupler &coupler(*api->gcm_coupler);
+	GCMCoupler &coupler(api->gcm_coupler);
 	giss::CouplingContract &gcm_outputs_contract(coupler.gcm_outputs);
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
@@ -716,7 +731,7 @@ giss::F90Array<double,3> &tg21h_f)		// C
 
 	// Count total number of elements in the matrices
 	// (_l = local to this MPI node)
-	int nele_l = 0; //api->gcm_coupler->maker->ice_matrices_size();
+	int nele_l = 0; //api->gcm_coupler.maker->ice_matrices_size();
 printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %ld\n", api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
 		nele_l += ii->second.size();
@@ -725,9 +740,9 @@ printf("glint2_modele_couple_to_ice_c(): hp_to_ices.size() %ld\n", api->hp_to_ic
 	// Find the max. number of fields (for input) used for any ice sheet.
 	// This will determine the size of our MPI messages.
 	int nfields_max = 0;
-	for (auto sheet=api->gcm_coupler->maker->sheets.begin(); sheet != api->gcm_coupler->maker->sheets.end(); ++sheet) {
+	for (auto sheet=api->gcm_coupler.maker->sheets.begin(); sheet != api->gcm_coupler.maker->sheets.end(); ++sheet) {
 		int sheetno = sheet->index;
-		giss::VarTransformer &vt(api->gcm_coupler->models[sheetno]->var_transformer[IceModel::INPUT]);
+		giss::VarTransformer &vt(api->gcm_coupler.models[sheetno]->var_transformer[IceModel::INPUT]);
 		nfields_max = std::max(nfields_max, (int)vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit());
 	}
 
@@ -737,12 +752,12 @@ printf("glint2_modele_couple_to_ice_c(): nfields_max=%d, nele_l = %d\n", nfields
 
 	// Fill it in by doing a sparse multiply...
 	// (while translating indices to local coordinates)
-	HCIndex &hc_index(*api->gcm_coupler->maker->hc_index);
+	HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
 	int nmsg = 0;
 printf("[%d] hp_to_ices.size() = %ld\n", rank, api->hp_to_ices.size());
 	for (auto ii = api->hp_to_ices.begin(); ii != api->hp_to_ices.end(); ++ii) {
 		int sheetno = ii->first;
-		giss::VarTransformer &vt(api->gcm_coupler->models[sheetno]->var_transformer[IceModel::INPUT]);
+		giss::VarTransformer &vt(api->gcm_coupler.models[sheetno]->var_transformer[IceModel::INPUT]);
 
 
 		std::vector<hp_to_ice_rec> &mat(ii->second);

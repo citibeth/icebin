@@ -139,32 +139,6 @@ public:
 	@return Function to call later to write the data. */
 	virtual boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const = 0;
 
-	/** Multiply this matrix A by a vector.
-	Computes y = A * x
-	@param x IN: A vector of length ncol
-	@param y OUT: A vector of length nrow
-	@param clear_y If true, y = Ax.  Otherwise, y += Ax. */
-	virtual void multiply(double const * x, double *y, bool clear_y = true) const = 0;
-
-	virtual void multiply(
-		blitz::Array<double,1> const &x,
-		blitz::Array<double,1> &y, bool clear_y) const = 0;
-
-	template<class SparseVectorT>
-	virtual void multiply(
-		blitz::Array<double,1> const &x,
-		SparseVectorT &y, bool clear_y) const = 0;
-
-	/** Multiply transpose of this matrix A by a vector.
-	Computes y = A^T * x
-	@param x IN: A vector of length nrow
-	@param y OUT: A vector of length ncol
-	@param clear_y If true, y = A^T x.  Otherwise, y += A^T x. */
-	virtual void multiplyT(double const * x, double *y, bool clear_y = true) const = 0;
-
-	virtual void multiplyT(
-		blitz::Array<double,1> const &x,
-		blitz::Array<double,1> &y, bool clear_y) const = 0;
 
 	/** Computes the sum of each row of this matrix.
 	@return Vector[nrow], each element containing the sum of the respective row from the matrix. */
@@ -197,18 +171,6 @@ protected:
 public:
 	void set(int row, int col, double const val, SparseMatrix::DuplicatePolicy dups = SparseMatrix::DuplicatePolicy::REPLACE);
 	boost::function<void ()> netcdf_define(NcFile &nc, std::string const &vname) const;
-
-	void multiply(double const * x, double *y, bool clear_y = true) const;
-	virtual void multiply(
-		blitz::Array<double,1> const &x,
-		blitz::Array<double,1> &y, bool clear_y) const;
-	virtual void multiply(
-		blitz::Array<double,1> const &x,
-		giss::MapSparseVector<int,double> &y, bool clear_y) const;
-	void multiplyT(double const * x, double *y, bool clear_y = true) const;
-	virtual void multiplyT(
-		blitz::Array<double,1> const &x,
-		blitz::Array<double,1> &y, bool clear_y) const;
 
 	std::vector<double> sum_per_row() const;
 	std::vector<double> sum_per_col() const;
@@ -302,14 +264,16 @@ boost::function<void ()> SparseMatrix1<SparseMatrix0T>::netcdf_define(
 		this, &nc, vname);
 }
 
+// ------------------------------------------------------------
 /// Computes y = A * x
-template<class SparseMatrix0T>
-void SparseMatrix1<SparseMatrix0T>::multiply(double const * x, double *y, bool clear_y) const
+template<class SparseMatrixT>
+void multiply(SparseMatrixT const &mat,
+double const * x, double *y, bool clear_y)
 {
-	int nx = this->ncol;
-	int ny = this->nrow;
+	int nx = mat.ncol;
+	int ny = mat.nrow;
 	if (clear_y) for (int iy = 0; iy < ny; ++iy) y[iy] = 0;
-	for (auto ii = this->begin(); ii != this->end(); ++ii) {
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
 		int ix = ii.col();
 		int iy = ii.row();
 		y[iy] += ii.val() * x[ix];
@@ -317,13 +281,14 @@ void SparseMatrix1<SparseMatrix0T>::multiply(double const * x, double *y, bool c
 }
 
 /// Computes y = A^T * x
-template<class SparseMatrix0T>
-void SparseMatrix1<SparseMatrix0T>::multiplyT(double const * x, double *y, bool clear_y) const
+template<class SparseMatrixT>
+void multiplyT(SparseMatrixT const &mat,
+double const * x, double *y, bool clear_y)
 {
-	int nx = this->nrow;
-	int ny = this->ncol;
+	int nx = mat.nrow;
+	int ny = mat.ncol;
 	if (clear_y) for (int iy = 0; iy < ny; ++iy) y[iy] = 0;
-	for (auto ii = this->begin(); ii != this->end(); ++ii) {
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
 		int iy = ii.col();
 		int ix = ii.row();
 		y[iy] += ii.val() * x[ix];
@@ -332,15 +297,16 @@ void SparseMatrix1<SparseMatrix0T>::multiplyT(double const * x, double *y, bool 
 
 // ------------------------------------------------------------
 /// Computes y = A * x
-template<class SparseMatrix0T>
-void SparseMatrix1<SparseMatrix0T>::multiply(
+template<class SparseMatrixT>
+void multiply(
+	SparseMatrixT const &mat,
 	blitz::Array<double,1> const &x,
-	blitz::Array<double,1> &y, bool clear_y) const
+	blitz::Array<double,1> &y, bool clear_y)
 {
-	int nx = this->ncol;
-	int ny = this->nrow;
+	int nx = mat.ncol;
+	int ny = mat.nrow;
 	if (clear_y) y = 0;
-	for (auto ii = this->begin(); ii != this->end(); ++ii) {
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
 		int ix = ii.col();
 		int iy = ii.row();
 		y(iy) += ii.val() * x(ix);
@@ -348,15 +314,16 @@ void SparseMatrix1<SparseMatrix0T>::multiply(
 }
 
 /// Computes y = A^T * x
-template<class SparseMatrix0T>
-void SparseMatrix1<SparseMatrix0T>::multiplyT(
+template<class SparseMatrixT>
+void multiplyT(
+	SparseMatrixT const &mat,
 	blitz::Array<double,1> const &x,
-	blitz::Array<double,1> &y, bool clear_y) const
+	blitz::Array<double,1> &y, bool clear_y)
 {
-	int nx = this->nrow;
-	int ny = this->ncol;
+	int nx = mat.nrow;
+	int ny = mat.ncol;
 	if (clear_y) y = 0;
-	for (auto ii = this->begin(); ii != this->end(); ++ii) {
+	for (auto ii = mat.begin(); ii != mat.end(); ++ii) {
 		int iy = ii.col();
 		int ix = ii.row();
 		y(iy) += ii.val() * x(ix);
@@ -365,16 +332,16 @@ void SparseMatrix1<SparseMatrix0T>::multiplyT(
 
 // ------------------------------------------------------------
 /// Computes y = A * x
-template<class SparseMatrix0T>
-template<SparseVectorT>
-void SparseMatrix1<SparseMatrix0T>::multiply(
+template<class SparseMatrixT, class SparseVectorT>
+void multiply(
+	SparseMatrixT const &matrix,
 	blitz::Array<double,1> const &x,
-	SparseVectorT &y, bool clear_y) const
+	SparseVectorT &y, bool clear_y)
 {
-	int nx = this->ncol;
-	int ny = this->nrow;
+	int nx = matrix.ncol;
+	int ny = matrix.nrow;
 	if (clear_y) y.clear();
-	for (auto ii = this->begin(); ii != this->end(); ++ii) {
+	for (auto ii = matrix.begin(); ii != matrix.end(); ++ii) {
 		int ix = ii.col();
 		int iy = ii.row();
 		y.add(iy, ii.val() * x(ix));

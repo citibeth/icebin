@@ -146,7 +146,7 @@ void IceModel_PISM::setup_contracts_modele()
 	ice_output.add_field("ice_surface_enth", "J kg-1", "ICE", "");
 	ice_output.add_field("ice_surface_enth_depth", "m", "ICE", "");
 	ice_output.add_field("basal_runoff.mass", "kg m-2 s-1", "ICE", "");		// melt_grounded + melt_floating
-	ice_output.add_field("basal_runoff.enth", "W m-2", "ICE", "")
+	ice_output.add_field("basal_runoff.enth", "W m-2", "ICE", "");
 	ice_output.add_field("calving.mass", "kg m-2 s-1", "ICE", "");
 	ice_output.add_field("calving.enth", "W m-2", "ICE", "");
 	ice_output.add_field("strain_heating", "W m-2", "ICE", "");
@@ -158,7 +158,7 @@ void IceModel_PISM::setup_contracts_modele()
 
 	vt.set_names(VarTransformer::INPUTS, &ice_output);
 	vt.set_names(VarTransformer::OUTPUTS, &coupler->gcm_inputs);
-	vt.set_names(VarTransformer::SCALARS, &coupler->ice_output_scalars);
+	vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
 	vt.allocate();
 
 	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);

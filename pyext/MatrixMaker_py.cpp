@@ -401,12 +401,15 @@ static PyObject *MatrixMaker_atm_to_hp(PyMatrixMaker *self, PyObject *args, PyOb
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
+		f3.to_blitz(ret);
+#if 0
 		ret = 0;
 		for (auto ii = f3.begin(); ii != f3.end(); ++ii) {
 			int i3 = ii->first;
 			double val = ii->second;
 			ret(i3) = val;
 		}
+#endif
 
 		ret_py = giss::blitz_to_py(ret);
 		return ret_py;
@@ -487,12 +490,15 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
+		f3.to_blitz(ret);
+#if 0
 		ret = 0;
 		for (auto ii = f3.begin(); ii != f3.end(); ++ii) {
 			int i3 = ii->first;
 			double val = ii->second;
 			ret(i3) = val;
 		}
+#endif
 
 		ret_py = giss::blitz_to_py(ret);
 		return ret_py;
