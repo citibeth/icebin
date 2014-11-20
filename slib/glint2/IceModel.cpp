@@ -23,7 +23,7 @@ giss::CouplingContract *IceModel::new_CouplingContract() {
 // ==========================================================
 
 /** Allocate vectors in preparation of calling an ice model. */
-void IceModel::allocate0()
+void IceModel::allocate_ovals_I()
 {
 	// Allocate for direct output from ice model
 	giss::CouplingContract const &ocontract(contract[IceModel::OUTPUT]);
@@ -38,7 +38,7 @@ void IceModel::allocate0()
 
 
 /** Allocate in preparation of var transformations (but not regridding yet) */
-void IceModel::allocate1()
+void IceModel::allocate_ivals_I()
 {
 
 	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
@@ -54,10 +54,10 @@ void IceModel::allocate1()
 /** Free portions not needed after finished calling ice model and
 applying variable transform.  This will be variables desired on
 anything other than the ELEVATION grid. */
-void IceModel::free1()
+void IceModel::free_ovals_I()
 {
 	ovals_I.clear();
-
+#fif 0
 	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
 	int nfields = icontract.size_nounit();
 	for (int i=0; i < nfields; ++i) {
@@ -66,10 +66,11 @@ void IceModel::free1()
 
 		if (grid != "ELEVATION") giss::free_array(ivals_I[i]);
 	}
+#endif
 }
 
 /** Free all memory used by this.  Called when we're done with a coupling timestep. */
-void IceModel::free0()
+void IceModel::free_ovals_ivals_I()
 {
 	ovals_I.clear();
 	ivals_I.clear();

@@ -60,8 +60,8 @@ struct glint2_modele {
 	/** Last time the coupler was called (or start of run) */
 	int itime_last;
 
-	/** Place to store results from Glint2 calls (allocated by ModelE) */
-	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals;
+//	/** Place to store results from Glint2 calls (allocated by ModelE) */
+//	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals;
 
 	glint2_modele() {}
 };

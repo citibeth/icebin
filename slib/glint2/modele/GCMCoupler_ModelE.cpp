@@ -22,29 +22,8 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 
 
 	// ------------------------- GCM Inputs
-// ModelE sets this, viar repeated calls to add_gcm_input_ij() and add_gcm_input_ijhc().
-#if 0
-	// The GCM must accept the same set of inputs, no matter what
-	// ice moel is being used
-
-	gcm_inputs.add_field("elev1", "m", "ATMOSPHERE", "ice upper surface elevation");
-
-	// Enthalpy (T) of top of dynamic ice sheet used to compute heat
-	// fluxes between ice surface model and the dynamic ice model (eg PISM)
-	gcm_inputs.add_field("ice_surface_enth", "J kg-1", "ELEVATION", "");
-	gcm_inputs.add_field("ice_surface_enth_depth", "m", "ELEVATION", "");
-
-	// Mass/Energy outputs the GCM must deal with
-	gcm_inputs.add_field("basal_runoff.mass", "kg m-2 s-1", "ATMOSPHERE", "");		// melt_grounded + melt_floating
-	gcm_inputs.add_field("basal_runoff.enth", "W m-2", "ATMOSPHERE", "");
-	gcm_inputs.add_field("calving.mass", "kg m-2 s-1", "ATMOSPHERE", "");
-	gcm_inputs.add_field("calving.enth", "W m-2", "ATMOSPHERE", "");
-	gcm_inputs.add_field("strain_heating", "W m-2", "ATMOSPHERE", "");
-
-	// Unexplained mass/energy outputs, used to close the energy budget.
-	gcm_inputs.add_field("epsilon.mass", "kg m-2 s-1", "ATMOSPHERE", "");
-	gcm_inputs.add_field("epsilon.enth", "W m-2", "ATMOSPHERE", "");
-#endif
+	// ModelE sets this, via repeated calls to add_gcm_input_ij()
+	// and add_gcm_input_ijhc().  See alloc_landic_com() in LANDICE_COM.f
 
 	// ----------------- Scalars provided by the GCM
 	// Scalars are things that can only be computed at the last minute
@@ -57,12 +36,6 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 
 	ice_input_scalars.add_field("unit", "", "Dimensionless identity");
 //	gcm_input_scalars.add_field("unit", "", "Dimensionless identity");
-
-
-#if 0
-	ice_output_scalars.add_field("dt", "s", "Inverse of coupling timestep");
-	ice_output_scalars.add_field("unit", "", "Dimensionless identity");
-#endif
 
 }
 

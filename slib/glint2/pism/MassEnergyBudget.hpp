@@ -65,8 +65,12 @@ struct VecWithFlags {
 	pism::IceModelVec2S &vec;
 	int flags;
 
-	VecWithFlags(pism::IceModelVec2S &_vec, int _flags) :
-		vec(_vec), flags(_flags) {}
+	/** IF this variable is used directly as a contractual ice model
+	output, the name of that contract entry. */
+	std::string contract_name;
+
+	VecWithFlags(pism::IceModelVec2S &_vec, int _flags, std::string const &_contract_name) :
+		vec(_vec), flags(_flags) contract_name(_contract_name) {}
 };
 
 class MassEnergyBudget {
@@ -110,9 +114,9 @@ public:
 //	MassEnthVec2S basal_runoff;		//!< Enthalpy here is predictable, since runoff is 0C 100% water fraction.
 
 	MassEnthVec2S surface_mass_balance;		//!< accumulation / ablation, as provided by Glint2
-	pism::IceModelVec2S pism_smb;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check surface_mass_balance.mass
-	pism::IceModelVec2S href_to_h;
-	pism::IceModelVec2S nonneg_rule;
+	pism::IceModelVec2S pism_smb;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check surface_mass_balance.mass, but does not figure into contract.
+//	pism::IceModelVec2S href_to_h;
+//	pism::IceModelVec2S nonneg_rule;
 	MassEnthVec2S melt_grounded;		//!< basal melt (grounded) (from summing meltrate_grounded)
 	MassEnthVec2S melt_floating;		//!< sub-shelf melt (from summing meltrate_floating)
 
@@ -142,12 +146,26 @@ public:
 // =====================================================================
 
 protected:
-	void add_enth(pism::IceModelVec2S &vec, int flags)
-		{ all_vecs.push_back(VecWithFlags(vec, ENTH | flags)); }
+	void add_mass(pism::IceModelVec2S &vec, int flags,
+		std::string const &contract_name)
+	{
+		all_vecs.push_back(VecWithFlags(vec, MASS | flags, contract_name));
+	}
 
-	void add_massenth(MassEnthVec2S &massenth, int flags) {
-		all_vecs.push_back(VecWithFlags(massenth.mass, MASS | flags));
-		all_vecs.push_back(VecWithFlags(massenth.enth, ENTH | flags));
+	void add_enth(pism::IceModelVec2S &vec, int flags
+		std::string const &contract_name)
+	{
+		all_vecs.push_back(VecWithFlags(vec, ENTH | flags, contract_name));
+	}
+
+	void add_massenth(MassEnthVec2S &massenth, int flags,
+		std::string const &contract_name_mass,
+		std::string const &contract_name_enth)
+	{
+		all_vecs.push_back(VecWithFlags(massenth.mass, MASS | flags,
+			contract_name_mass));
+		all_vecs.push_back(VecWithFlags(massenth.enth, ENTH | flags,
+			contract_name_enth));
 	}
 
 public:

@@ -96,18 +96,18 @@ public:
 
 
 	/** Allocate vectors in preparation of calling an ice model. */
-	void allocate0();
+	void allocate_ovals_I();
 
 	/** Allocate in preparation of var transformations (but not regridding yet) */
-	void allocate1();
+	void allocate_ivalsI();
 
 	/** Free portions not needed after finished calling ice model and
 	applying variable transform.  This will be variables desired on
 	anything other than the ELEVATION grid. */
-	void free1();
+	void free_ovals_I();
 
 	/** Free all memory used by this.  Called when we're done with a coupling timestep. */
-	void free0();
+	void free_all();
 
 	/** Allocates and sets ivals_I variable */
 	void set_gcm_inputs();

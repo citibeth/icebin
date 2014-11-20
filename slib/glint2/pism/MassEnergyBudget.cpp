@@ -33,29 +33,6 @@ PetscErrorCode MassEnthVec2S::set_attrs(
 
 MassEnergyBudget::MassEnergyBudget()
 {
-	add_massenth(total, TOTAL);
-
-	// Energy deltas
-	add_enth(basal_frictional_heating, DELTA);
-	add_enth(strain_heating, DELTA);	//!< Total amount of strain heating [J/m^2]
-	add_enth(geothermal_flux, DELTA);	//!< Total amount of geothermal energy [J/m^2]
-	add_enth(upward_geothermal_flux, DELTA);	//!< Total amount of geothermal energy [J/m^2]
-
-	// Mass and enthalpy deltas
-	add_massenth(calving, DELTA);
-//	add_massenth(basal_runoff, DELTA);
-	add_massenth(surface_mass_balance, DELTA);
-	all_vecs.push_back(VecWithFlags(pism_smb, MASS));
-	all_vecs.push_back(VecWithFlags(href_to_h, MASS | DELTA));
-	all_vecs.push_back(VecWithFlags(nonneg_rule, MASS | DELTA));
-	add_massenth(melt_grounded, DELTA);
-	add_massenth(melt_floating, DELTA);
-
-	// ----------- Mass advection WITHIN the ice sheet
-	add_massenth(internal_advection, DELTA);
-
-	add_massenth(epsilon, EPSILON);
-
 }
 
 PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &prefix,
@@ -71,6 +48,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = total.set_attrs("diagnostic",
 		"State of the ice sheet (NOT a difference between timetseps)",
 		"m-2", "total"); CHKERRQ(ierr);
+	add_massenth(total, TOTAL, "", "");
 
 	// ----------- Heat generation of flows [vertical]
 	// Postive means heat is flowing INTO the ice sheet.
@@ -79,24 +57,28 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = basal_frictional_heating.set_attrs("internal",
 		"Basal frictional heating",
 		"W m-2", ""); CHKERRQ(ierr);
+	add_enth(basal_frictional_heating, DELTA, "basal_frictional_heating");
 
 	ierr = strain_heating.create(grid, prefix+"strain_heating",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = strain_heating.set_attrs("internal",
 		"Strain heating",
 		"W m-2", ""); CHKERRQ(ierr);
+	add_enth(strain_heating, DELTA, "strain_heating");	//!< Total amount of strain heating [J/m^2]
 
 	ierr = geothermal_flux.create(grid, prefix+"geothermal_flux",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = geothermal_flux.set_attrs("internal",
 		"Geothermal energy through (compare to upward_geothermal_flux?)",
 		"W m-2", ""); CHKERRQ(ierr);
+	add_enth(geothermal_flux, DELTA, "geothermal_flux");	//!< Total amount of geothermal energy [J/m^2]
 
 	ierr = upward_geothermal_flux.create(grid, prefix+"upward_geothermal_flux",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = upward_geothermal_flux.set_attrs("internal",
 		"Geothermal energy through (compare to geothermal_flux?)",
 		"W m-2", ""); CHKERRQ(ierr);
+	add_enth(upward_geothermal_flux, DELTA, "upward_geothermal_flux");	//!< Total amount of geothermal energy [J/m^2]
 
 	// ----------- Mass advection, with accompanying enthalpy change
 	// Postive means mass/enthalpy is flowing INTO the ice sheet.
@@ -107,6 +89,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = calving.set_attrs("diagnostic",
 		"Mass/Enthalpy gain from calving.  Should be negative.",
 		"m-2 s-1", "calving"); CHKERRQ(ierr);
+	add_massenth(calving, DELTA, "calving.mass", "calving.enth");
 
 #if 0
 	ierr = basal_runoff.create(grid, prefix+"basal_runoff",
@@ -114,6 +97,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = basal_runoff.set_attrs("diagnostic",
 		"Runoff from base, should be negative.  Enthalpy portion is predictable, since runoff is 0C 100% water fraction.",
 		"m-2 s-1"); CHKERRQ(ierr);
+	add_massenth(basal_runoff, DELTA, "basal_runoff.mass", "basal_runoff.enth");
 #endif
 
 	ierr = surface_mass_balance.create(grid, prefix+"surface_mass_balance",
@@ -121,24 +105,29 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = surface_mass_balance.set_attrs("diagnostic",
 		"surface_mass_balance",
 		"m-2 s-1", "surface_mass_balance"); CHKERRQ(ierr);
+	add_massenth(surface_mass_balance, DELTA, "surface_mass_balance.mass", "surface_mass_balance.enth");
 
 	ierr = pism_smb.create(grid, prefix+"pism_smb",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = pism_smb.set_attrs("diagnostic",
 		"pism_smb",
 		"kg m-2 s-1", "pism_smb"); CHKERRQ(ierr);
+	// No DELTA< does not participate in epsilon computation
+	add_mass(pism_smb, 0, "", "");
 
 	ierr = href_to_h.create(grid, prefix+"href_to_h",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = href_to_h.set_attrs("diagnostic",
 		"href_to_h",
 		"kg m-2 s-1", "href_to_h"); CHKERRQ(ierr);
+	add_mass(href_to_h, 0, "");
 
 	ierr = nonneg_rule.create(grid, prefix+"nonneg_rule",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = nonneg_rule.set_attrs("diagnostic",
 		"nonneg_rule",
 		"kg m-2 s-1", "nonneg_rule"); CHKERRQ(ierr);
+	add_mass(nonneg_rule, 0, "");
 
 
 
@@ -147,12 +136,14 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = melt_grounded.set_attrs("diagnostic",
 		"Basal melting of grounded ice (negative)",
 		"m-2 s-1", "melt_grounded"); CHKERRQ(ierr);
+	add_massenth(melt_grounded, DELTA, "melt_grounded.mass", "melt_grounded.enth");
 
 	ierr = melt_floating.create(grid, prefix+"melt_floating",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = melt_floating.set_attrs("diagnostic",
 		"Sub-shelf melting (negative)",
 		"m-2 s-1", "melt_floating"); CHKERRQ(ierr);
+	add_massenth(melt_floating, DELTA, "melt_floating.mass", "melt_floating.enth");
 
 	// ----------- Advection WITHIN the ice sheet
 	ierr = internal_advection.create(grid, prefix+"internal_advection",
@@ -160,6 +151,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = internal_advection.set_attrs("diagnostic",
 		"Advection within the ice sheet",
 		"m-2 s-1", "internal_advection"); CHKERRQ(ierr);
+	add_massenth(internal_advection, DELTA, "internal_advection.mass", "internal_advection.enth");
 
 	// ----------- Balance the Budget
 	ierr = epsilon.create(grid, prefix+"epsilon",
@@ -167,6 +159,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	ierr = epsilon.set_attrs("diagnostic",
 		"Unaccounted-for changes",
 		"m-2 s-1", "epsilon"); CHKERRQ(ierr);
+	add_massenth(epsilon, EPSILON, "epsilon.mass", "epsilon.enth");
 
 	return 0;
 }

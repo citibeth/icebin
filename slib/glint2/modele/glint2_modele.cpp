@@ -33,6 +33,14 @@ using namespace glint2::modele;
 
 
 // ================================================================
+// Stuff from LANDICE_DRV.f
+/**
+@param vals1d Base of the ij array to scatter.
+@param n Number of elements in the ij array (== im * jm)
+@param out_ix Specifies which scattered variable to store in, on Fortran side (see gcm_input CouplingContract). */
+extern "C" void store_li_output_ij(double *vals1d, int n, int out_ix);
+
+// ================================================================
 
 struct ModelEMsg {
 	int i, j, k;	// Indices into ModelE
@@ -815,7 +823,35 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 
 printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itime, time_s, api->dtsrc);
 	// sbuf has elements for ALL ice sheets here
-	coupler.couple_to_ice(time_s, nfields_max, sbuf, api->gcm_ivals);
+	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
+	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size());
+	coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
+
+	for (long ix = 0; ix < contract.size(); ++ix) {
+		std::string const &grid(contract[ix].grid);
+		giss::VectorSparseVector<int,double> const &sparse(gcm_ivals_global[ix]);
+
+		if (grid == "ATMOSPHERE") {
+			// Temporary array to hold decoded global array, to then be scattered
+			int n1 = api->gcm_coupler.maker->n1();
+			blitz::Array<double,1> dense1d(n1);
+			dense1d = 0;
+			for (auto ii=sparse.begin(); ii != sparse.end(); ++ii) {
+				int const index = ii->first;
+				double const val = ii->second;
+				dense1d(index) = val;
+			}
+
+			// Now scatter it in ModelE
+            store_li_output_ij(dense1d.base(), n1, ix);
+		} else if (grid == "ELEVATION") {
+			blitz::Array<double,1> dense1d(api->gcm_coupler.maker->n3());
+		} else {
+			fprintf(stderr, "Unsupported grid: %s\n", grid.c_str());
+			throw std::exception();
+		}
+	}
+
 	api->itime_last = itime;
 
 	printf("END glint2_modele_couple_to_ice_c(itime=%d)\n", itime);

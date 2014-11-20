@@ -164,10 +164,10 @@ void IceModel_PISM::setup_contracts_modele()
 	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);
 	ok = ok && vt.set("elev1", "usurf", "unit", 1.0);
 
-	// For specific enthalpy: Enth_e = Enth_p - enth_model_to_pism
+	// For specific enthalpy: Enth_e = Enth_p - enth_modele_to_pism
 	// where X_e is ModelE and X_p is PISM
 	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", 1.0);
-	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", -enth_model_to_pism);
+	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", -enth_modele_to_pism);
 
 	ok = ok && vt.set("ice_surface_enth_depth", "ice_surface_enth_depth", "unit", 1.0);
 

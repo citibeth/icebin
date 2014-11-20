@@ -218,7 +218,7 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 	blitz::Array<int,1> indices(&begin->i2,
 		shape, stride, blitz::neverDeleteData);
 
-	// Construct values vectors: sparse vectors pointing into the SMBMsgs
+	// Construct input values vectors: sparse vectors pointing into the SMBMsgs
 	std::vector<blitz::Array<double,1>> ivals2;
 	stride[0] = rbuf.ele_size / sizeof(double);
 	for (int i=0; i<nfields; ++i) {
@@ -230,7 +230,7 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 
 
 	// -------------- Run the model
-	model->allocate0();	// Allocates ovals_I
+	model->allocate_ovalsI();	// Allocates ovals_I
 
 	// Record exactly the same inputs that this ice model is seeing.
 	IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
@@ -239,7 +239,8 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 	// Now call to the ice model
 	model->run_timestep(time_s, indices, ivals2, model->ovals_I);
 
-	// Record what the ice model produced
+	// Record what the ice model produced.
+	// NOTE: This shouldn't change model->ovals_I
 	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
 	if (owriter) owriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
 
@@ -323,12 +324,15 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				params->second.begin, params->second.next);
 
 			// Convert to variables the GCM wants (but still on the ice grid)
-			model->set_gcm_inputs();
+			model->set_gcm_inputs();	// Fills in ivals_I
+
+			// Free ovals_I
+			model->free_ovals_I();
 		}
 
 		// =============== Regrid to the grid requested by the GCM
 
-		// ----------- Create the MultiMatrix used to regrid to atmosphere
+		// ----------- Create the MultiMatrix used to regrid to atmosphere (I -> A)
 		MultiMatrix ice2atm;
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			// Get matrix for this single ice model.
@@ -359,8 +363,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 					ival_I.push_back(model->ivals_I[var_ix]);
 				}
 
-				giss::VectorSparseVector<int,double> &gcm_ivals_var_ix(gcm_ivals[var_ix]);
-				ice2atm.multiply(ival_I, gcm_ivals_var_ix, true);
+				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
 				gcm_ivals[var_ix].consolidate();
 			} else if (cf.grid == "ELEVATION") {
 				// --- Assemble all inputs, to send to Glint2 QP regridding
@@ -379,6 +382,14 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				gcm_ivals[var_ix].consolidate();
 			}
 		}
+
+		// ----------------- Free Memory
+		for (auto model = models.begin(); model != models.end(); ++model) {
+			// Free ovals_I
+			model->free_all();
+		}
+
+
 	} else {
 		// We're not root --- we have no data to send to ice
 		// models, we just call through anyway because we will
