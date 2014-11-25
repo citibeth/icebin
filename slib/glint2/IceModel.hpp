@@ -99,7 +99,7 @@ public:
 	void allocate_ovals_I();
 
 	/** Allocate in preparation of var transformations (but not regridding yet) */
-	void allocate_ivalsI();
+	void allocate_ivals_I();
 
 	/** Free portions not needed after finished calling ice model and
 	applying variable transform.  This will be variables desired on
@@ -107,7 +107,7 @@ public:
 	void free_ovals_I();
 
 	/** Free all memory used by this.  Called when we're done with a coupling timestep. */
-	void free_all();
+	void free_ovals_ivals_I();
 
 	/** Allocates and sets ivals_I variable */
 	void set_gcm_inputs();

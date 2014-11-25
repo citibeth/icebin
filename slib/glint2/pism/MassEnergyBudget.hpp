@@ -70,7 +70,7 @@ struct VecWithFlags {
 	std::string contract_name;
 
 	VecWithFlags(pism::IceModelVec2S &_vec, int _flags, std::string const &_contract_name) :
-		vec(_vec), flags(_flags) contract_name(_contract_name) {}
+		vec(_vec), flags(_flags), contract_name(_contract_name) {}
 };
 
 class MassEnergyBudget {
@@ -115,8 +115,8 @@ public:
 
 	MassEnthVec2S surface_mass_balance;		//!< accumulation / ablation, as provided by Glint2
 	pism::IceModelVec2S pism_smb;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check surface_mass_balance.mass, but does not figure into contract.
-//	pism::IceModelVec2S href_to_h;
-//	pism::IceModelVec2S nonneg_rule;
+	pism::IceModelVec2S href_to_h;
+	pism::IceModelVec2S nonneg_rule;
 	MassEnthVec2S melt_grounded;		//!< basal melt (grounded) (from summing meltrate_grounded)
 	MassEnthVec2S melt_floating;		//!< sub-shelf melt (from summing meltrate_floating)
 
@@ -152,7 +152,7 @@ protected:
 		all_vecs.push_back(VecWithFlags(vec, MASS | flags, contract_name));
 	}
 
-	void add_enth(pism::IceModelVec2S &vec, int flags
+	void add_enth(pism::IceModelVec2S &vec, int flags,
 		std::string const &contract_name)
 	{
 		all_vecs.push_back(VecWithFlags(vec, ENTH | flags, contract_name));

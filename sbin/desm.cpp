@@ -31,9 +31,104 @@ const double SHI  = 2060.;
 //@param lhm   latent heat of melt at 0 C (334590 J/kg)
 const double LHM = 3.34e5;
 
+#if 0
+struct GCMInput {
+	int ix;			// Index into the gcm_inputs array where this starts
+	int nhp;		// Number of elevation classes for this variable (1 for atmosphere variables, or the nhp for elevation-classified variables)
+	std::string field;
+	std::string units;
+	std::string long_name;
+
+	GCMInput(int _ix, int _nhp, std::string const &_field, std::string const &_units, std::string const &_long_name) :
+		ix(_ix), nhp(_nhp), field(_field), units(_units), long_name(_long_name)
+		{}
+};
+#endif
+
+class Desm {
+	int nhp;		// Number of elevation points for this grid.
+
+
+	// Array to receive Glint2 outputs
+	blitz::Array<double,3> gcm_inputs;
+	int gcm_inputs_nhp;		// Total size in the elevation points direction
+
+	glint2_modele *api
+
+
+	Desm::Desm() : nhp(0), gcm_inputs_nhp(0) {}
+
+	int main(int argc, char **argv);
+
+	void allocate_gcm_input();
+
+	void add_gcm_input_ij(std::string const &field, std::string const &units, std::string const &long_name);
+	void add_gcm_input_ijhc(std::string const &field, std::string const &units, std::string const &long_name);
+
+};
 
 // --------------------------------------------------------
-int main(int argc, char **argv)
+// --------------------------------------------------------
+void Desm::add_gcm_input_ij(std::string const &field, std::string const &units, std::string const &long_name)
+{
+	glint2_modele_add_gcm_input(api,
+		field.c_str(), field.size(),
+		units.c_str(), units.size(),
+		"ATMOSPHERE", 10,
+		long_name.c_str(), long_name.size());
+}
+void Desm::add_gcm_input_ijhc(std::string const &field, std::string const &units, std::string const &long_name)
+{
+	glint2_modele_add_gcm_input(api,
+		field.c_str(), field.size(),
+		units.c_str(), units.size(),
+		"ELEVATION", 9,
+		long_name.c_str(), long_name.size());
+}
+// --------------------------------------------------------
+void Desm::allocate_gcm_input()
+{
+	// Allocate arrays to receive Glint2 output
+
+	! --------- State Outputs
+	add_gcm_input_ij(elev1, "elev1", "m", "ice upper surface elevation");
+
+	add_gcm_input_ijhc(ice_surface_enth, "ice_surface_enth", "J kg-1", "Enthalpy state (temperature) at surface of ice sheet.");
+
+	add_gcm_input_ijhc(ice_surface_enth_depth, "ice_surface_enth_depth", "m", "Depth below surface at which ice_surface_enth is given.");
+
+	! ---------- Heat Flux Outputs
+	add_gcm_input_ij(basal_frictional_heating, "basal_frictional_heating", "W m-2", "Frictional heating at base of ice sheet");
+
+	add_gcm_input_ij(strain_heating, "strain_heating", "W m-2", "Heating from internal friciton");
+
+	add_gcm_input_ij(geothermal_flux, "geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
+
+	add_gcm_input_ij(upward_geothermal_flux, "upward_geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
+
+
+	! ----------- Mass Transfer Flux Outputs
+	add_gcm_input_ij(calving_mass, "calving.mass", "kg m-2 s-1", "Calving rate for grid cells containing a calving front.");
+	add_gcm_input_ij(calving_enth, "calving.enth", "W m-2", "Calving rate for grid cells containing a calving front.");
+
+	add_gcm_input_ij(surface_mass_balance_mass, "surface_mass_balance.mass", "kg m-2 s-1", "Mass transfer from snow/firn model above (as seen by GCM).");
+	add_gcm_input_ij(surface_mass_balance_enth, "surface_mass_balance.enth", "W m-2", "Mass transfer from snow/firn model above (as seen by GCM).");
+
+	add_gcm_input_ij(melt_grounded_mass, "melt_grounded.mass", "kg m-2 s-1", "Basal melting of grounded ice");
+	add_gcm_input_ij(melt_grounded_enth, "melt_grounded.enth", "W m-2", "Basal melting of grounded ice");
+
+	add_gcm_input_ij(melt_floating_mass, "melt_floating_mass", "kg m-2 s-1", "Basal melting of floating ice shelf");
+	add_gcm_input_ij(melt_floating_enth, "melt_floating_enth", "W m-2", "Basal melting of floating ice shelf");
+
+	add_gcm_input_ij(internal_advection_mass, "internal-advection_mass", "kg m-2 s-1", "Horizontal advection due to ice dynamics");
+	add_gcm_input_ij(internal_advection_enth, "internal-advection_enth", "W m-2", "Horizontal advection due to ice dynamics");
+
+
+	add_gcm_input_ij(grid, epsilon_mass, "epsilon.mass", "kg m-2 s-1", "Changes not otherwise accounted for");
+	add_gcm_input_ij(grid, epsilon_enth, "epsilon.enth", "W m-2", "Changes not otherwise accounted for");
+}
+// --------------------------------------------------------
+int Desm::main(int argc, char **argv)
 {
 	if (argc < 2) {
 		fprintf(stderr, "Usage: desm <modele-input-dir>\n"
@@ -138,13 +233,13 @@ int main(int argc, char **argv)
 	time0_nc->get(&time0_s, &counts1);	// Just get one item
 	int time0_i = (time0_s / dtsrc + .5);	// Also called itime in ModelE
 
-	glint2_modele *api = new_glint2_modele();
+	*api = new_glint2_modele();
 
 	// Read constants from ModelE into Glint2 data structures.
 	// This is in lieu of the "set_all_constants()" code in the standard ModelE coupler.
 	printf("Reading constants file %s\n", constants_fname.c_str());
 	NcFile cnc(constants_fname.c_str());
-	giss::ConstantSet &gcm_constants(api->gcm_coupler->gcm_constants);
+	giss::ConstantSet &gcm_constants(api->gcm_coupler.gcm_constants);
 	gcm_constants.read_from_netcdf(cnc, "constants");
 	cnc.close();
 
@@ -174,10 +269,14 @@ int main(int argc, char **argv)
 
 	glint2_modele_set_start_time(api, iyear1, time0_i, dtsrc);
 
-	int nhp = api->maker->nhp(-1);
+	int nhp = api->gcm_coupler.maker->nhp(-1);
 	printf("desm.cpp: Number Elevation Points (nhp)== %d\n", nhp);
 
 	glint2_modele_init_hp_to_ices(api);
+
+	// ----------------------------------------------------------
+	allocate_gcm_input();
+
 
 	// ----------------------------------------------------------
 	// -------- Test regridding to the ice model
@@ -220,6 +319,7 @@ int main(int argc, char **argv)
 	blitz::Array<double,3> &imph_c(vars_c[1]);
 	blitz::Array<double,3> &tice_c(vars_c[2]);
 
+	giss::F90Array<double,3> gcm_inputs_f(gcm_inputs);
 
 	// The main loop
 	double begin_time_s;
@@ -298,7 +398,12 @@ var_kji = -3. + (double)time_index*1.;
 		}
 
 		// Run the coupling step
-		glint2_modele_couple_to_ice_c(api, end_time_i, impm_ff, imph_ff, tice_ff);
+		glint2_modele_couple_to_ice_c(api, end_time_i, impm_ff, imph_ff, tice_ff, gcm_inputs_f);
+
+		// (No need to scatter back to GCM.  But if we did scatter,
+		// we would be doing (in Fortran):
+		// call unpack_3d(grid, gcm_inputs_d, gcm_inputs, .false.)
+
 	}
 
 	// Finish up

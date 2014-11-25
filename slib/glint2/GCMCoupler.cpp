@@ -57,6 +57,24 @@ void GCMCoupler::read_from_netcdf(
 		}
 	}
 
+
+	// Read gcm_in_file, an optional variable telling the GCM-specific
+	// part of GLINT2 to write out exactly what it sees coming from the GCM
+	// (so it can be replayed later with desm)
+	NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
+	auto attr(giss::get_att(info_var, "gcm_in_file"));
+	if (!attr.get()) {
+		gcm_in_file = "";
+	} else {
+		gcm_in_file = attr->as_string(0);
+		if (gcm_in_file.length() > 0) {
+		    gcm_in_file = boost::filesystem::absolute(
+				boost::filesystem::path(gcm_in_file),
+				gcm_params.config_dir).string();
+		}
+	}
+
+
 #if 1
 	std::cout << "========= GCM Constants" << std::endl;
 
@@ -230,7 +248,7 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 
 
 	// -------------- Run the model
-	model->allocate_ovalsI();	// Allocates ovals_I
+	model->allocate_ovals_I();	// Allocates ovals_I
 
 	// Record exactly the same inputs that this ice model is seeing.
 	IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
@@ -386,7 +404,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 		// ----------------- Free Memory
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			// Free ovals_I
-			model->free_all();
+			model->free_ovals_ivals_I();
 		}
 
 

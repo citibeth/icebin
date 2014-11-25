@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 	glint2_modele_set_start_time(api,
 		1950, 0, 1800.);	// iyear, itimei
 
-	int nhp = api->maker->nhp(-1);
+	int nhp = api->gcm_coupler.maker->nhp(-1);
 
 	auto used1h = blitz::Array<int,3>(
 		blitz::Range(1,im),

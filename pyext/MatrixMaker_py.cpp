@@ -329,7 +329,7 @@ static PyObject *MatrixMaker_iceinterp_to_atm(PyMatrixMaker *self, PyObject *arg
 		}
 
 		// Get the ice_to_atm matrix from it
-		giss::SparseAccumulator<int,double> area1_m, area1_m_inv;
+		giss::MapSparseVector<int,double> area1_m, area1_m_inv;
 		auto ret_c(sheet->iceinterp_to_projatm(area1_m, src));
 		if (maker->correct_area1)
 			sheet->atm_proj_correct(area1_m, ProjCorrect::PROJ_TO_NATIVE);
@@ -397,11 +397,11 @@ static PyObject *MatrixMaker_atm_to_hp(PyMatrixMaker *self, PyObject *args, PyOb
 		auto f1(giss::py_to_blitz<double,1>(f1_py, "f1", 1, dims));
 
 		// Call!
-		giss::CooVector<int, double> f3(self->maker->atm_to_hp(f1, force_lambda));
+		giss::VectorSparseVector<int, double> f3(self->maker->atm_to_hp(f1, force_lambda));
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
-		f3.to_blitz(ret);
+		to_blitz(f3, ret);
 #if 0
 		ret = 0;
 		for (auto ii = f3.begin(); ii != f3.end(); ++ii) {
@@ -485,12 +485,12 @@ printf("MatrixMaker_ice_to_hp(): Adding %s\n", sheetname_py);
 		}
 
 		// Call!
-		giss::CooVector<int, double> f3(
+		giss::VectorSparseVector<int, double> f3(
 			self->maker->iceinterp_to_hp(f2s, initial, src, qp_algorithm));
 
 		// Copy output for return
 		blitz::Array<double,1> ret(self->maker->n3());
-		f3.to_blitz(ret);
+		giss::to_blitz(f3, ret);
 #if 0
 		ret = 0;
 		for (auto ii = f3.begin(); ii != f3.end(); ++ii) {
@@ -575,7 +575,7 @@ printf("BEGIN MatrixMaker_area1()\n");
 		std::string const ice_sheet_name(ice_sheet_name_py);
 		IceSheet *sheet = (*maker)[ice_sheet_name];
 
-		giss::SparseAccumulator<int,double> area1_m;
+		giss::MapSparseVector<int,double> area1_m;
 		sheet->accum_areas(area1_m);
 
 		blitz::Array<double,1> ret(maker->n1());

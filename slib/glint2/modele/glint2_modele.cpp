@@ -70,11 +70,110 @@ MPI_Datatype ModelEMsg::new_MPI_struct(int nfields)
 	MPI_Type_commit(&ret);
 	return ret;
 }
+// -----------------------------------------------------
+extern "C"
+void glint2_modele_init_ncfile(glint2_modele *api,
+giss::CouplingContract const &contract,
+std::string const &fname)
+{
+	// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
+	int nhp = glint2_modele_nhp(api);
+	NcFile ncout(fname.c_str(), NcFile::Replace);
+	NcDim *im_dim = ncout.add_dim("im", api->domain->im);
+	NcDim *jm_dim = ncout.add_dim("jm", api->domain->jm);
+	NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
+	NcDim *one_dim = ncout.add_dim("one", 1);
+	NcDim *time_dim = ncout.add_dim("time");		// No dimsize --> unlimited
+	const NcDim *dims[4]{time_dim, nhp_dim, jm_dim, im_dim};
 
+	const NcDim *dims_b[1]{one_dim};
+	NcVar *time0_var = ncout.add_var("time0", giss::get_nc_type<double>(), 1, dims_b);
+	time0_var->add_att("units", gcm_params.time_units.c_str());
+	time0_var->add_att("calendar", "365_day");
+	time0_var->add_att("axis", "T");
+	time0_var->add_att("long_name", "Simulation start time");
 
+	NcVar *time_var = ncout.add_var("time", giss::get_nc_type<double>(), 1, dims);
+	time_var->add_att("units", gcm_params.time_units.c_str());
+	time_var->add_att("calendar", "365_day");
+	time_var->add_att("axis", "T");
+	time_var->add_att("long_name", "Coupling times");
 
+	//giss::CouplingContract &gcm_outputs(api->gcm_coupler.gcm_outputs);
 
+	for (unsigned int i=0; i < contract.size_nounit(); ++i) {
+		NcVar *nc_var = ncout.add_var(contract[i].c_str(),
+			giss::get_nc_type<double>(), 4, dims);
 
+		auto comment(boost::format(
+			"%s[t,...] holds the mean from time[t-1] to time[t].  See time0[0] if t=0.")
+			% contract[i]);
+		nc_var->add_att("comment", comment.str().c_str());
+
+		std::string const &description(contract.field(i).get_description());
+		if (description != "") nc_var->add_att("long_name", description.c_str());
+
+		std::string const &units(contract.field(i).get_units());
+		if (units != "") nc_var->add_att("units", units.c_str());
+	}
+
+	// Put initial time in it...
+	long cur[1]{0};
+	long counts[1]{1};
+	time0_var->set_cur(cur);
+	time0_var->put(&gcm_params.time_start_s, counts);
+
+	ncout.close();
+}
+// -----------------------------------------------------
+void glint2_modele_save_gcm_inputs(
+glint2_modele *api,
+double time_s,
+blitz::Array<double,3> gcm_inputs)
+{
+	// Get dimensions of full domain
+	int nhp = glint2_modele_nhp();
+	GCMCoupler &coupler(api->gcm_coupler);
+	CouplingContract const &contract(coupler.gcm_inputs);
+
+	// Open output netCDF file
+	NcFile ncout(api->gcm_coupler.gcm_in_file.c_str(), NcFile::Write);	// Read/Write
+	NcDim *time_dim = ncout.get_dim("time");
+	NcDim *nhp_dim = ncout.get_dim("nhp");
+	NcDim *jm_dim = ncout.get_dim("jm");
+	NcDim *im_dim = ncout.get_dim("im");
+
+	long cur_ijhc[4]{time_dim->size(),0,0,0};		// time, nhp, jm, im
+	long counts_ijhc[4]{1, nhp_dim->size(), jm_dim->size(), im_dim->size()};
+
+	long cur_ij[4]{time_dim->size(),0,0};		// time, nhp, jm, im
+	long counts_ij[4]{1, jm_dim->size(), im_dim->size()};
+
+	NcVar *time_var = ncout.get_var("time");
+	time_var->set_cur(cur_ijhc);	// Could be cur_ij, either way is fine
+	time_var->put(&time_s, counts_ijhc);
+
+	// Write arrays to it
+	int base_index = 0;
+	for (unsigned int i=0; i < contract.size_nounit(); ++i) {
+		double const *array_base = &gcm_inputs(base_index,0,0);
+
+		NcVar *nc_var = ncout.get_var(contract[i].c_str());
+
+		if (contract.field[i].grid == "ATMOSPHERE") {
+			nc_var->set_cur(cur_ij);
+			nc_var->put(array_base, counts_ij);
+			base_index += 1;
+		} else if (contract.field[i].grid == "ELEVATION") {
+			nc_var->set_cur(cur_ijhc);
+			nc_var->put(array_base, counts_ijhc);
+			base_index += nhp;
+		}
+	}
+
+	ncout.close();
+}
+// -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide. */
 void  glint2_modele_save_gcm_outputs(
@@ -84,7 +183,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 {
 
 	// Get dimensions of full domain
-	int nhp = api->gcm_coupler.maker->nhp(-1) + 1;
+	int nhp = glint2_modele_nhp();
 	ModelEDomain const *domain(&*api->domain);
 
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
@@ -295,7 +394,7 @@ extern "C" void glint2_modele_delete(glint2_modele *&api)
 }
 // -----------------------------------------------------
 extern "C"
-int glint2_modele_nhp(glint2_modele *api)
+int glint2_modele_nhp(glint2_modele const *api)
 {
 	int ret = api->gcm_coupler.maker->nhp(-1);	// Assume all grid cells have same # EP
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
@@ -318,6 +417,10 @@ char const *long_name_f, int long_name_len)
 	std::string grid(grid_f, grid_len);
 	std::string long_name(long_name_f, long_name_len);
 	api->gcm_coupler.gcm_inputs.add_field(field_name, units, grid, long_name);
+
+	WhichGrid which_grid = giss::parse_enum<WhichGrid>(grid);
+	++api->gcm_input_grid_count[which_grid];
+
 	return api->gcm_coupler.gcm_inputs.size();
 }
 // -----------------------------------------------------
@@ -339,54 +442,14 @@ printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f
 	// Finish initialization...
 	// -------------------------------------------------
 	if (api->gcm_coupler.gcm_out_file.length() > 0) {
-		// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
-		int nhp = api->gcm_coupler.maker->nhp(-1) + 1;
-		NcFile ncout(api->gcm_coupler.gcm_out_file.c_str(), NcFile::Replace);
-		NcDim *im_dim = ncout.add_dim("im", api->domain->im);
-		NcDim *jm_dim = ncout.add_dim("jm", api->domain->jm);
-		NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
-		NcDim *one_dim = ncout.add_dim("one", 1);
-		NcDim *time_dim = ncout.add_dim("time");		// No dimsize --> unlimited
-		const NcDim *dims[4]{time_dim, nhp_dim, jm_dim, im_dim};
-
-		const NcDim *dims_b[1]{one_dim};
-		NcVar *time0_var = ncout.add_var("time0", giss::get_nc_type<double>(), 1, dims_b);
-		time0_var->add_att("units", gcm_params.time_units.c_str());
-		time0_var->add_att("calendar", "365_day");
-		time0_var->add_att("axis", "T");
-		time0_var->add_att("long_name", "Simulation start time");
-
-		NcVar *time_var = ncout.add_var("time", giss::get_nc_type<double>(), 1, dims);
-		time_var->add_att("units", gcm_params.time_units.c_str());
-		time_var->add_att("calendar", "365_day");
-		time_var->add_att("axis", "T");
-		time_var->add_att("long_name", "Coupling times");
-
-		giss::CouplingContract &gcm_outputs(api->gcm_coupler.gcm_outputs);
-
-		for (unsigned int i=0; i < gcm_outputs.size_nounit(); ++i) {
-			NcVar *nc_var = ncout.add_var(gcm_outputs[i].c_str(),
-				giss::get_nc_type<double>(), 4, dims);
-
-			auto comment(boost::format(
-				"%s[t,...] holds the mean from time[t-1] to time[t].  See time0[0] if t=0.")
-				% gcm_outputs[i]);
-			nc_var->add_att("comment", comment.str().c_str());
-
-			std::string const &description(gcm_outputs.field(i).get_description());
-			if (description != "") nc_var->add_att("long_name", description.c_str());
-
-			std::string const &units(gcm_outputs.field(i).get_units());
-			if (units != "") nc_var->add_att("units", units.c_str());
-		}
-
-		// Put initial time in it...
-		long cur[1]{0};
-		long counts[1]{1};
-		time0_var->set_cur(cur);
-		time0_var->put(&gcm_params.time_start_s, counts);
-
-		ncout.close();
+		glint2_modele_init_ncfile(api,
+			api->gcm_coupler.gcm_outputs,
+			api->gcm_coupler.gcm_out_file);
+	}
+	if (api->gcm_coupler.gcm_in_file.length() > 0) {
+		glint2_modele_init_ncfile(api,
+			api->gcm_coupler.gcm_inputs,
+			api->gcm_coupler.gcm_in_file);
 	}
 }
 // -----------------------------------------------------
@@ -481,6 +544,9 @@ nc.close();
 printf("END glint2_modele_compute_fgice_c()\n");
 }
 // -----------------------------------------------------
+#if 0
+// NOT USED
+
 static void global_to_local_hp(
 	glint2_modele *api,	
 	HCIndex const &hc_index,
@@ -507,6 +573,7 @@ printf("BEGIN global_to_local_hp %p %p %p %p\n", &grows[0], rows_i.data(), rows_
 	}
 printf("END global_to_local_hp\n");
 }
+#endif
 // -----------------------------------------------------
 /**
 @param zatmo1_f ZATMO from ModelE (Elevation of bottom of atmosphere * GRAV)
@@ -716,7 +783,9 @@ glint2_modele *api,
 int itime,
 giss::F90Array<double,3> &smb1h_f,		// kg/m^2
 giss::F90Array<double,3> &seb1h_f,		// J/m^2: Latent Heat
-giss::F90Array<double,3> &tg21h_f)		// C
+giss::F90Array<double,3> &tg21h_f,		// C
+giss::F90Array<double,3> &gcm_inputs_d_f)
+
 {
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
 	double time_s = itime * api->dtsrc;
@@ -827,28 +896,63 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size());
 	coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
 
-	for (long ix = 0; ix < contract.size(); ++ix) {
-		std::string const &grid(contract[ix].grid);
-		giss::VectorSparseVector<int,double> const &sparse(gcm_ivals_global[ix]);
+	// Decode the outputs to a dense array for ModelE
+	int natm = api->gcm_input_grid_count[WhichGrid::ATMOSPHERE];
+	int nelev = api->gcm_input_grid_count[WhichGrid::ELEVATION];
+	int nhp = glint2_modele_nhp(api);	// == Glint2's nhp + 1, for legacy ice in ModelE
+	int n1 = api->gcm_coupler.maker->n1();
 
-		if (grid == "ATMOSPHERE") {
-			// Temporary array to hold decoded global array, to then be scattered
-			int n1 = api->gcm_coupler.maker->n1();
-			blitz::Array<double,1> dense1d(n1);
-			dense1d = 0;
-			for (auto ii=sparse.begin(); ii != sparse.end(); ++ii) {
-				int const index = ii->first;
-				double const val = ii->second;
-				dense1d(index) = val;
+
+	blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+	if (api->gcm_coupler.am_i_root()) {
+		// We ARE the root note --- densify the data
+		gcm_inputs_d.reference(blitz::Array<double,2>(natm + nelev*nhp, n1));
+
+		int ihp = 0;
+		for (long ix = 0; ix < contract.size(); ++ix) {
+			// Check bounds
+			if (ihp > gcm_inputs_d.size(0)) {
+				fprintf(stderr, "gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", gcm_inputs_d.size(0), ihp);
+				throw std::exception();
 			}
 
-			// Now scatter it in ModelE
-            store_li_output_ij(dense1d.base(), n1, ix);
-		} else if (grid == "ELEVATION") {
-			blitz::Array<double,1> dense1d(api->gcm_coupler.maker->n3());
-		} else {
-			fprintf(stderr, "Unsupported grid: %s\n", grid.c_str());
-			throw std::exception();
+			if (grid == "ATMOSPHERE") {
+				// Index into our big array-of-array of all gcm_inputs
+				blitz::Array<double,1> dense1d(
+					blitz::Array(&gcm_inputs_d(ihp, 0),
+					blitz::shape(n1), blitz::neverDeleteData));
+		
+				// Convert this sparse vector...
+				for (auto ii=sparse.begin(); ii != sparse.end(); ++ii) {
+					int const i1 = ii->first;
+					double const val = ii->second;
+					dense1d(i1) = val;
+				}
+
+				ihp += 1
+			} else if (grid == "ELEVATION") {
+				// Index into our big array-of-array of all gcm_inputs
+				// (ihp+1 here because the first elevation point is
+				// reserved for legacy ice in ModelE, it is not part
+				// of Glint2).
+				blitz::Array<double,1> dense1d(
+					blitz::Array(&gcm_inputs_d(ihp+1, 0),
+					blitz::shape(n1*nhc), blitz::neverDeleteData));
+		
+				// Convert this sparse vector...
+				for (auto ii=sparse.begin(); ii != sparse.end(); ++ii) {
+					int const i3 = ii->first;
+					double const val = ii->second;
+					dense1d(i3) = val;
+				}
+				ihp += nhp;
+			}
+
+		}
+
+		if (coupler.gcm_in_file.length() > 0) {
+			// Write out to DESM file
+			glint2_modele_save_gcm_inputs(api, time_s, gcm_inputs_d);
 		}
 	}
 

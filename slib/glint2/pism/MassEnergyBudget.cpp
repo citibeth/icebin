@@ -113,7 +113,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		"pism_smb",
 		"kg m-2 s-1", "pism_smb"); CHKERRQ(ierr);
 	// No DELTA< does not participate in epsilon computation
-	add_mass(pism_smb, 0, "", "");
+	add_mass(pism_smb, 0, "");
 
 	ierr = href_to_h.create(grid, prefix+"href_to_h",
 		ghostedp, width); CHKERRQ(ierr);

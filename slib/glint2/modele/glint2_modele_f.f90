@@ -249,7 +249,7 @@ integer, value :: itime
 	integer :: n
 
 	! ------------------- local vars
-	type(arr_spec_3) :: smb1h_f, seb1h_f, tg21h_f
+	type(arr_spec_3) :: smb1h_f, seb1h_f, tg21h_f, gcm_inputs_d_f
 
 	! ------------------- subroutine body
 print *,'BEGIN glint2_modele_couple_to_ice()'
@@ -258,9 +258,10 @@ print *,'BEGIN glint2_modele_couple_to_ice()'
 	call get_spec_double_3(smb1h, i0h, j0h, 1, smb1h_f)		! kg/m^2
 	call get_spec_double_3(seb1h, i0h, j0h, 1, seb1h_f)		! J/m^2: Latent Heat
 	call get_spec_double_3(tg21h, i0h, j0h, 1, tg21h_f)		! C
+	call get_spec_double_3(gcm_inputs_d, 1,1,1, gcm_inputs_d_f)
 
 	! Call the C-side of the interface
-	call glint2_modele_couple_to_ice_c(api, itime, smb1h_f, seb1h_f, tg21h_f)
+	call glint2_modele_couple_to_ice_c(api, itime, smb1h_f, seb1h_f, tg21h_f, gcm_inputs_d_f)
 
 print *,'END glint2_modele_couple_to_ice()'
 end subroutine

@@ -573,7 +573,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 
 		// Reshape 1D blitz variable to 2D for use with PISM
 		blitz::Array<double,2> oval2_xy(
-			giss::reshape<double,2,1>(ovals2[i], blitz::shape(ny(), nx())));
+			giss::reshape<double,1,2>(ovals2[i], blitz::shape(ny(), nx())));
 		
 
 		// Get matching input (val) and output (pism_var) variables

@@ -52,6 +52,10 @@ struct glint2_modele {
 	double dtsrc;			// Size of ModelE timestep
 	GCMCoupler_ModelE gcm_coupler;
 
+	/** Count of # of gcm input variables (in gcm_coupler.gcm_params)
+	existing on each grid (ATMOSPHERE, ELEVATION, ICE) */
+	int gcm_input_grid_count[GridType::size];
+
 	/** The matrix used for each IceModel, used to convert from
 	the elevation grid to ice grid.  Each hp_to_ice_rec is one
 	non-zero element of the matrix. */

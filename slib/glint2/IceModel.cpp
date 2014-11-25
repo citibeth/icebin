@@ -57,7 +57,7 @@ anything other than the ELEVATION grid. */
 void IceModel::free_ovals_I()
 {
 	ovals_I.clear();
-#fif 0
+#if 0
 	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
 	int nfields = icontract.size_nounit();
 	for (int i=0; i < nfields; ++i) {
@@ -80,7 +80,7 @@ void IceModel::free_ovals_ivals_I()
 /** Allocates and sets ivals_I variable */
 void IceModel::set_gcm_inputs()
 {
-	allocate1();		// Allocate ivals_I
+	allocate_ivals_I();		// Allocate ivals_I
 
 	// Compute the variable transformation
 	giss::VarTransformer &vt(var_transformer[IceModel::OUTPUT]);

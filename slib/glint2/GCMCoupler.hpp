@@ -54,6 +54,15 @@ struct SMBMsg {
 };
 
 
+/** Type tags for subclasses of GCMCoupler */
+BOOST_ENUM_VALUES( WhichGrid, int,
+	(ATMOSPHERE) (0)
+	(ICE) (1)
+	(ELEVATION) (2)
+	(size) (3)
+);
+
+
 class GCMCoupler {
 public:
 	/** Type tags for subclasses of GCMCoupler */
@@ -99,6 +108,10 @@ public:
 	/** File to which to write gcm_output.  If "", then don't write. */
 	std::string gcm_out_file;
 
+	/** File to which to write gcm_input.  (That is, stuff coming from
+	Glint2 back to the GCM.  If "", then don't write. */
+	std::string gcm_out_file;
+
 	GCMCoupler(Type _type) :
 		type(_type), ut_system(""),
 		gcm_constants(&ut_system)
@@ -111,6 +124,8 @@ public:
 	}
 
 	virtual ~GCMCoupler() {}
+
+	bool am_i_root() { return gcm_params.gcm_rank == gcm_params.gcm_root); }
 
 	/** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
 	virtual std::unique_ptr<GCMPerIceSheetParams>
