@@ -95,18 +95,7 @@ public:
 	void sort_stable()
 		{ std::stable_sort(vals.begin(), vals.end()); }
 
-	/** Sums duplicate indices, resulting in a vector with no
-	duplicates.  Also sorts in order to do this. */
-	void sum_duplicates();
-
-	/** Uses only the last-set value for a given index*/
-	void remove_duplicates();
-
-	void consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups = SparseVector<IndexT,ValT>::DuplicatePolicy::ADD)
-	{
-		if (dups == SparseVector<IndexT,ValT>::DuplicatePolicy::ADD) sum_duplicates();
-		else remove_duplicates();
-	}
+	void consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups = SparseVector<IndexT,ValT>::DuplicatePolicy::ADD);
 
 };
 
@@ -130,48 +119,28 @@ void to_parallel_arrays(SparseVectorT const &mat,
 }
 
 
-template<class IndexT, class ValT>
-void VectorSparseVector<IndexT,ValT>::sum_duplicates()
-{
-	sort_stable();
-
-	// Scan through, overwriting our array
-	// New array will never be bigger than original
-	int j=-1;		// Last-written item in output array
-	double last_index = -1;	// Last index we saw in input array
-	for (int i=0; i<vals.size(); ++i) {
-		int index = vals[i].first;
-		ValT val = vals[i].second;
-
-		if (index == last_index) {
-			vals[j].second += val;
-		} else {
-			++j;
-			vals[j].second = val;
-			last_index = index;
-		}
-	}
-	int n = j+1;	// Size of output array
-
-	this->vals.resize(n);
-	this->vals.shrink_to_fit();
-}
 // ---------------------------------------------------
 template<class IndexT, class ValT>
-void VectorSparseVector<IndexT,ValT>::remove_duplicates()
+void VectorSparseVector<IndexT,ValT>::consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups)
 {
+	if (size() == 0) return;
+
 	sort_stable();
 
 	// Scan through, overwriting our array
 	// New array will never be bigger than original
-	int j=-1;		// Last-written item in output array
-	int last_index = -1;	// Last index we saw in input array
-	for (int i=0; i<this->size(); ++i) {
-		int index = vals[i].first;
+	int j=0;		// Last-written item in output array
+	IndexT last_index = vals[0].first;	// Last index we saw in input array
+	for (int i=1; i<this->size(); ++i) {
+		IndexT index = vals[i].first;
 		ValT val = vals[i].second;
 
 		if (index == last_index) {
-			vals[j].second == val;
+			if (dups == SparseVector<IndexT,ValT>::DuplicatePolicy::ADD) {
+				vals[j].second += val;
+			} else {
+				vals[j].second == val;
+			}
 		} else {
 			++j;
 			vals[j].second = val;
@@ -182,6 +151,7 @@ void VectorSparseVector<IndexT,ValT>::remove_duplicates()
 
 	this->vals.resize(n);
 	this->vals.shrink_to_fit();
+
 }
 
 
