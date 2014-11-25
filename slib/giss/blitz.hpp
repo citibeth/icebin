@@ -151,7 +151,7 @@ blitz::Array<T, rank> f_to_c(blitz::Array<T, rank> &arr)
 #define RESHAPE_BODY \
 	/* Check dimensions */ \
 	long src_n = 1; \
-	for (int i=0; i<src_ndim; ++i) src_n *= src.extent[i]; \
+	for (int i=0; i<src_ndim; ++i) src_n *= src.extent(i); \
 	long dest_n = 1; \
 	for (int i=0; i<dest_ndim; ++i) dest_n *= dest_shape[i]; \
 	if (src_n != dest_n) { \
