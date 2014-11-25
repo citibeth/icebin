@@ -12,6 +12,15 @@ int root,		// The root rank
 DynArray<MPIMsgT> &sbuf,		// Source buffer (msg on this MPI node)
 int nfields,		// # of fields in MPIMsgT
 int nele_l,					// # slots in source buffer
+int nele_r_extra = 0);		// # extra slots to allocate in receive buffer
+
+template<class MPIMsgT>
+static std::unique_ptr<DynArray<MPIMsgT>> gather_msg_array(
+MPI_Comm comm,
+int root,		// The root rank
+DynArray<MPIMsgT> &sbuf,		// Source buffer (msg on this MPI node)
+int nfields,		// # of fields in MPIMsgT
+int nele_l,					// # slots in source buffer
 int nele_r_extra = 0)		// # extra slots to allocate in receive buffer
 {
 	int rank;
