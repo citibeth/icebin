@@ -59,7 +59,7 @@ BOOST_ENUM_VALUES( WhichGrid, int,
 	(ATMOSPHERE) (0)
 	(ICE) (1)
 	(ELEVATION) (2)
-	(size) (3)
+	(SIZE) (3)
 );
 
 
@@ -110,7 +110,7 @@ public:
 
 	/** File to which to write gcm_input.  (That is, stuff coming from
 	Glint2 back to the GCM.  If "", then don't write. */
-	std::string gcm_out_file;
+	std::string gcm_in_file;
 
 	GCMCoupler(Type _type) :
 		type(_type), ut_system(""),
@@ -125,7 +125,7 @@ public:
 
 	virtual ~GCMCoupler() {}
 
-	bool am_i_root() { return gcm_params.gcm_rank == gcm_params.gcm_root); }
+	bool am_i_root() { return (gcm_params.gcm_rank == gcm_params.gcm_root); }
 
 	/** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
 	virtual std::unique_ptr<GCMPerIceSheetParams>

@@ -145,12 +145,12 @@ INTERFACE
 		type(c_ptr), value :: api
 	end subroutine
 
-	subroutine glint2_modele_couple_to_ice_c(api, itime, smb1hp_f, seb1hp_f, tg21hp_f) bind(c)
+	subroutine glint2_modele_couple_to_ice_c(api, itime, smb1hp_f, seb1hp_f, tg21hp_f, gcm_inputs_d_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
 		integer(c_int), value :: itime
-		type(arr_spec_3) :: smb1hp_f, seb1hp_f, tg21hp_f
+		type(arr_spec_3) :: smb1hp_f, seb1hp_f, tg21hp_f, gcm_inputs_d_f
 	end subroutine
 
 END INTERFACE
@@ -240,10 +240,11 @@ end subroutine
 
 subroutine glint2_modele_couple_to_ice(api, &
 	itime, smb1h, seb1h, tg21h, &
+	gcm_inputs_d, &
 	i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
-real*8, dimension(i0h:,j0h:,:) :: smb1h, seb1h, tg21h
+real*8, dimension(i0h:,j0h:,:) :: smb1h, seb1h, tg21h, gcm_inputs_d
 integer, value :: itime
 
 	integer :: n

@@ -52,9 +52,11 @@ struct glint2_modele {
 	double dtsrc;			// Size of ModelE timestep
 	GCMCoupler_ModelE gcm_coupler;
 
-	/** Count of # of gcm input variables (in gcm_coupler.gcm_params)
-	existing on each grid (ATMOSPHERE, ELEVATION, ICE) */
-	int gcm_input_grid_count[GridType::size];
+	/** Position with the gcm_inputs array (passed from GCM)
+	where each variable in the gcm_inputs contract starts.
+	This has a sentinel on the end, thus indicating the extent of
+	each variable as well. */
+	std::vector<int> gcm_inputs_ihp;
 
 	/** The matrix used for each IceModel, used to convert from
 	the elevation grid to ice grid.  Each hp_to_ice_rec is one
@@ -67,7 +69,11 @@ struct glint2_modele {
 //	/** Place to store results from Glint2 calls (allocated by ModelE) */
 //	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals;
 
-	glint2_modele() {}
+	glint2_modele()
+	{
+		/** Sentinel */
+		gcm_inputs_ihp.push_back(0);
+	}
 };
 
 }}	// namespace glint2::modele
@@ -83,6 +89,9 @@ extern "C" void glint2_modele_set_const(
 	double val,
 	char const *units_f, int units_len,
 	char const *description_f, int description_len);
+
+extern "C"
+int glint2_modele_nhp(glint2::modele::glint2_modele const *api);
 
 /** Inform Glint2 about a Fortran variable used to hold inputs to the
 GCM (regridded from the ice model output). */
@@ -151,4 +160,5 @@ glint2::modele::glint2_modele *api,
 int itime,			// ModelE itime counter
 giss::F90Array<double,3> &smb1hp_f,
 giss::F90Array<double,3> &seb1hp_,
-giss::F90Array<double,3> &tg21hp_f);
+giss::F90Array<double,3> &tg21hp_f,
+giss::F90Array<double,3> &gcm_inputs_d_f);

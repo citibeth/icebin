@@ -76,6 +76,8 @@ void glint2_modele_init_ncfile(glint2_modele *api,
 giss::CouplingContract const &contract,
 std::string const &fname)
 {
+	GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
+
 	// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
 	int nhp = glint2_modele_nhp(api);
 	NcFile ncout(fname.c_str(), NcFile::Replace);
@@ -132,9 +134,9 @@ double time_s,
 blitz::Array<double,3> gcm_inputs)
 {
 	// Get dimensions of full domain
-	int nhp = glint2_modele_nhp();
+	int nhp = glint2_modele_nhp(api);
 	GCMCoupler &coupler(api->gcm_coupler);
-	CouplingContract const &contract(coupler.gcm_inputs);
+	giss::CouplingContract const &contract(coupler.gcm_inputs);
 
 	// Open output netCDF file
 	NcFile ncout(api->gcm_coupler.gcm_in_file.c_str(), NcFile::Write);	// Read/Write
@@ -160,11 +162,11 @@ blitz::Array<double,3> gcm_inputs)
 
 		NcVar *nc_var = ncout.get_var(contract[i].c_str());
 
-		if (contract.field[i].grid == "ATMOSPHERE") {
+		if (contract.field(i).grid == "ATMOSPHERE") {
 			nc_var->set_cur(cur_ij);
 			nc_var->put(array_base, counts_ij);
 			base_index += 1;
-		} else if (contract.field[i].grid == "ELEVATION") {
+		} else if (contract.field(i).grid == "ELEVATION") {
 			nc_var->set_cur(cur_ijhc);
 			nc_var->put(array_base, counts_ijhc);
 			base_index += nhp;
@@ -183,7 +185,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 {
 
 	// Get dimensions of full domain
-	int nhp = glint2_modele_nhp();
+	int nhp = glint2_modele_nhp(api);
 	ModelEDomain const *domain(&*api->domain);
 
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
@@ -404,6 +406,9 @@ int glint2_modele_nhp(glint2_modele const *api)
 	return ret;
 }
 // -----------------------------------------------------
+/** @para var_nhc Number of elevation points for this variable.
+ (equal to 1 for atmosphere variables, or nhp for elevation-grid variables)
+@param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
 extern "C"
 int glint2_modele_add_gcm_input(
 glint2_modele *api,
@@ -416,12 +421,23 @@ char const *long_name_f, int long_name_len)
 	std::string units(units_f, units_len);
 	std::string grid(grid_f, grid_len);
 	std::string long_name(long_name_f, long_name_len);
+
+
+	int ihp = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
+	int var_nhp;
+	if (grid == "ATMOSPHERE") var_nhp = 1;
+	else if (grid == "ELEVATION") var_nhp = glint2_modele_nhp(api);
+	else {
+		fprintf(stderr, "Unrecognized grid: %s\n", grid.c_str());
+		throw std::exception();
+	}
+
+
 	api->gcm_coupler.gcm_inputs.add_field(field_name, units, grid, long_name);
 
-	WhichGrid which_grid = giss::parse_enum<WhichGrid>(grid);
-	++api->gcm_input_grid_count[which_grid];
+	api->gcm_inputs_ihp.push_back(ihp + var_nhp);
 
-	return api->gcm_coupler.gcm_inputs.size();
+	return ihp+1;
 }
 // -----------------------------------------------------
 extern "C"
@@ -776,7 +792,10 @@ printf("END glint2_modele_init_hp_to_ices\n");
 }
 // -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields
-	the GCM has decided to provide. */
+	the GCM has decided to provide.
+	@param gcm_inputs_d_f Global (gathered) array of the Glint2
+	outputs to be fed into the GCM. */
+
 extern "C"
 void  glint2_modele_couple_to_ice_c(
 glint2_modele *api,
@@ -785,7 +804,6 @@ giss::F90Array<double,3> &smb1h_f,		// kg/m^2
 giss::F90Array<double,3> &seb1h_f,		// J/m^2: Latent Heat
 giss::F90Array<double,3> &tg21h_f,		// C
 giss::F90Array<double,3> &gcm_inputs_d_f)
-
 {
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
 	double time_s = itime * api->dtsrc;
@@ -897,57 +915,35 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 	coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
 
 	// Decode the outputs to a dense array for ModelE
-	int natm = api->gcm_input_grid_count[WhichGrid::ATMOSPHERE];
-	int nelev = api->gcm_input_grid_count[WhichGrid::ELEVATION];
 	int nhp = glint2_modele_nhp(api);	// == Glint2's nhp + 1, for legacy ice in ModelE
 	int n1 = api->gcm_coupler.maker->n1();
 
 
-	blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 	if (api->gcm_coupler.am_i_root()) {
-		// We ARE the root note --- densify the data
-		gcm_inputs_d.reference(blitz::Array<double,2>(natm + nelev*nhp, n1));
+		blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
-		int ihp = 0;
+		// We ARE the root note --- densify the data into the global gcm_inputs array
 		for (long ix = 0; ix < contract.size(); ++ix) {
+			int ihp = api->gcm_inputs_ihp[ix];
+			int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;
+
 			// Check bounds
-			if (ihp > gcm_inputs_d.size(0)) {
-				fprintf(stderr, "gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", gcm_inputs_d.size(0), ihp);
+			if (ihp+var_nhp >= gcm_inputs_d.extent(0)) {
+				fprintf(stderr, "gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", gcm_inputs_d.extent(0), ihp+var_nhp);
 				throw std::exception();
 			}
 
-			if (grid == "ATMOSPHERE") {
-				// Index into our big array-of-array of all gcm_inputs
-				blitz::Array<double,1> dense1d(
-					blitz::Array(&gcm_inputs_d(ihp, 0),
-					blitz::shape(n1), blitz::neverDeleteData));
-		
-				// Convert this sparse vector...
-				for (auto ii=sparse.begin(); ii != sparse.end(); ++ii) {
-					int const i1 = ii->first;
-					double const val = ii->second;
-					dense1d(i1) = val;
-				}
-
-				ihp += 1
-			} else if (grid == "ELEVATION") {
-				// Index into our big array-of-array of all gcm_inputs
-				// (ihp+1 here because the first elevation point is
-				// reserved for legacy ice in ModelE, it is not part
-				// of Glint2).
-				blitz::Array<double,1> dense1d(
-					blitz::Array(&gcm_inputs_d(ihp+1, 0),
-					blitz::shape(n1*nhc), blitz::neverDeleteData));
-		
-				// Convert this sparse vector...
-				for (auto ii=sparse.begin(); ii != sparse.end(); ++ii) {
-					int const i3 = ii->first;
-					double const val = ii->second;
-					dense1d(i3) = val;
-				}
-				ihp += nhp;
+			// Index into our big array-of-array of all gcm_inputs
+			blitz::Array<double,1> dense1d(
+				&gcm_inputs_d(ihp, 0, 0),
+				blitz::shape(n1*var_nhp), blitz::neverDeleteData);
+	
+			// Convert this sparse vector...
+			for (auto ii=gcm_ivals_global[ix].begin(); ii != gcm_ivals_global[ix].end(); ++ii) {
+				int const i1 = ii->first;
+				double const val = ii->second;
+				dense1d(i1) = val;
 			}
-
 		}
 
 		if (coupler.gcm_in_file.length() > 0) {

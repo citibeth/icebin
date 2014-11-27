@@ -53,10 +53,10 @@ class Desm {
 	blitz::Array<double,3> gcm_inputs;
 	int gcm_inputs_nhp;		// Total size in the elevation points direction
 
-	glint2_modele *api
+	glint2_modele *api;
 
-
-	Desm::Desm() : nhp(0), gcm_inputs_nhp(0) {}
+public:
+	Desm() : nhp(0), gcm_inputs_nhp(0) {}
 
 	int main(int argc, char **argv);
 
@@ -90,42 +90,42 @@ void Desm::allocate_gcm_input()
 {
 	// Allocate arrays to receive Glint2 output
 
-	! --------- State Outputs
-	add_gcm_input_ij(elev1, "elev1", "m", "ice upper surface elevation");
+	// --------- State Outputs
+	add_gcm_input_ij("elev1", "m", "ice upper surface elevation");
 
-	add_gcm_input_ijhc(ice_surface_enth, "ice_surface_enth", "J kg-1", "Enthalpy state (temperature) at surface of ice sheet.");
+	add_gcm_input_ijhc("ice_surface_enth", "J kg-1", "Enthalpy state (temperature) at surface of ice sheet.");
 
-	add_gcm_input_ijhc(ice_surface_enth_depth, "ice_surface_enth_depth", "m", "Depth below surface at which ice_surface_enth is given.");
+	add_gcm_input_ijhc("ice_surface_enth_depth", "m", "Depth below surface at which ice_surface_enth is given.");
 
-	! ---------- Heat Flux Outputs
-	add_gcm_input_ij(basal_frictional_heating, "basal_frictional_heating", "W m-2", "Frictional heating at base of ice sheet");
+	// ---------- Heat Flux Outputs
+	add_gcm_input_ij("basal_frictional_heating", "W m-2", "Frictional heating at base of ice sheet");
 
-	add_gcm_input_ij(strain_heating, "strain_heating", "W m-2", "Heating from internal friciton");
+	add_gcm_input_ij("strain_heating", "W m-2", "Heating from internal friciton");
 
-	add_gcm_input_ij(geothermal_flux, "geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
+	add_gcm_input_ij("geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
 
-	add_gcm_input_ij(upward_geothermal_flux, "upward_geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
-
-
-	! ----------- Mass Transfer Flux Outputs
-	add_gcm_input_ij(calving_mass, "calving.mass", "kg m-2 s-1", "Calving rate for grid cells containing a calving front.");
-	add_gcm_input_ij(calving_enth, "calving.enth", "W m-2", "Calving rate for grid cells containing a calving front.");
-
-	add_gcm_input_ij(surface_mass_balance_mass, "surface_mass_balance.mass", "kg m-2 s-1", "Mass transfer from snow/firn model above (as seen by GCM).");
-	add_gcm_input_ij(surface_mass_balance_enth, "surface_mass_balance.enth", "W m-2", "Mass transfer from snow/firn model above (as seen by GCM).");
-
-	add_gcm_input_ij(melt_grounded_mass, "melt_grounded.mass", "kg m-2 s-1", "Basal melting of grounded ice");
-	add_gcm_input_ij(melt_grounded_enth, "melt_grounded.enth", "W m-2", "Basal melting of grounded ice");
-
-	add_gcm_input_ij(melt_floating_mass, "melt_floating_mass", "kg m-2 s-1", "Basal melting of floating ice shelf");
-	add_gcm_input_ij(melt_floating_enth, "melt_floating_enth", "W m-2", "Basal melting of floating ice shelf");
-
-	add_gcm_input_ij(internal_advection_mass, "internal-advection_mass", "kg m-2 s-1", "Horizontal advection due to ice dynamics");
-	add_gcm_input_ij(internal_advection_enth, "internal-advection_enth", "W m-2", "Horizontal advection due to ice dynamics");
+	add_gcm_input_ij("upward_geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
 
 
-	add_gcm_input_ij(grid, epsilon_mass, "epsilon.mass", "kg m-2 s-1", "Changes not otherwise accounted for");
-	add_gcm_input_ij(grid, epsilon_enth, "epsilon.enth", "W m-2", "Changes not otherwise accounted for");
+	// ----------- Mass Transfer Flux Outputs
+	add_gcm_input_ij("calving.mass", "kg m-2 s-1", "Calving rate for grid cells containing a calving front.");
+	add_gcm_input_ij("calving.enth", "W m-2", "Calving rate for grid cells containing a calving front.");
+
+	add_gcm_input_ij("surface_mass_balance.mass", "kg m-2 s-1", "Mass transfer from snow/firn model above (as seen by GCM).");
+	add_gcm_input_ij("surface_mass_balance.enth", "W m-2", "Mass transfer from snow/firn model above (as seen by GCM).");
+
+	add_gcm_input_ij("melt_grounded.mass", "kg m-2 s-1", "Basal melting of grounded ice");
+	add_gcm_input_ij("melt_grounded.enth", "W m-2", "Basal melting of grounded ice");
+
+	add_gcm_input_ij("melt_floating_mass", "kg m-2 s-1", "Basal melting of floating ice shelf");
+	add_gcm_input_ij("melt_floating_enth", "W m-2", "Basal melting of floating ice shelf");
+
+	add_gcm_input_ij("internal-advection_mass", "kg m-2 s-1", "Horizontal advection due to ice dynamics");
+	add_gcm_input_ij("internal-advection_enth", "W m-2", "Horizontal advection due to ice dynamics");
+
+
+	add_gcm_input_ij("epsilon.mass", "kg m-2 s-1", "Changes not otherwise accounted for");
+	add_gcm_input_ij("epsilon.enth", "W m-2", "Changes not otherwise accounted for");
 }
 // --------------------------------------------------------
 int Desm::main(int argc, char **argv)
@@ -233,7 +233,7 @@ int Desm::main(int argc, char **argv)
 	time0_nc->get(&time0_s, &counts1);	// Just get one item
 	int time0_i = (time0_s / dtsrc + .5);	// Also called itime in ModelE
 
-	*api = new_glint2_modele();
+	api = new_glint2_modele();
 
 	// Read constants from ModelE into Glint2 data structures.
 	// This is in lieu of the "set_all_constants()" code in the standard ModelE coupler.
@@ -419,4 +419,10 @@ var_kji = -3. + (double)time_index*1.;
 	MPI_Finalize();
 
 	return 0;
+}
+
+main(int argc, char **argv)
+{
+	Desm desm;
+	desm.main(argc, argv);
 }

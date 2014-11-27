@@ -44,36 +44,38 @@ void GCMCoupler::read_from_netcdf(
 	// Read gcm_out_file, an optional variable telling the GCM-specific
 	// part of GLINT2 to write out exactly what it sees coming from the GCM
 	// (so it can be replayed later with desm)
-	NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
-	auto attr(giss::get_att(info_var, "gcm_out_file"));
-	if (!attr.get()) {
-		gcm_out_file = "";
-	} else {
-		gcm_out_file = attr->as_string(0);
-		if (gcm_out_file.length() > 0) {
-		    gcm_out_file = boost::filesystem::absolute(
-				boost::filesystem::path(gcm_out_file),
-				gcm_params.config_dir).string();
+	{
+		NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
+		auto attr(giss::get_att(info_var, "gcm_out_file"));
+		if (!attr.get()) {
+			gcm_out_file = "";
+		} else {
+			gcm_out_file = attr->as_string(0);
+			if (gcm_out_file.length() > 0) {
+			    gcm_out_file = boost::filesystem::absolute(
+					boost::filesystem::path(gcm_out_file),
+					gcm_params.config_dir).string();
+			}
 		}
 	}
-
 
 	// Read gcm_in_file, an optional variable telling the GCM-specific
 	// part of GLINT2 to write out exactly what it sees coming from the GCM
 	// (so it can be replayed later with desm)
-	NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
-	auto attr(giss::get_att(info_var, "gcm_in_file"));
-	if (!attr.get()) {
-		gcm_in_file = "";
-	} else {
-		gcm_in_file = attr->as_string(0);
-		if (gcm_in_file.length() > 0) {
-		    gcm_in_file = boost::filesystem::absolute(
-				boost::filesystem::path(gcm_in_file),
-				gcm_params.config_dir).string();
+	{
+		NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
+		auto attr(giss::get_att(info_var, "gcm_in_file"));
+		if (!attr.get()) {
+			gcm_in_file = "";
+		} else {
+			gcm_in_file = attr->as_string(0);
+			if (gcm_in_file.length() > 0) {
+			    gcm_in_file = boost::filesystem::absolute(
+					boost::filesystem::path(gcm_in_file),
+					gcm_params.config_dir).string();
+			}
 		}
 	}
-
 
 #if 1
 	std::cout << "========= GCM Constants" << std::endl;
