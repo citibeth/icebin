@@ -20,8 +20,10 @@ bin_PROGRAMS = \
 	greenland_4x5 greenland_2x2_5 \
 	ga_2x2_5 \
 	overlap \
-	apitest blitztest smulttest \
+	blitztest smulttest \
 	desm
+
+#	apitest 
 
 hires_SOURCES = hires.cpp
 
