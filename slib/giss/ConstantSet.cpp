@@ -33,7 +33,7 @@ int ConstantSet::copy(std::string const &dst_name,
 	std::string const &src_name,
 	std::string const &description)
 {
-	int src_ix = fields[src_name];
+	int src_ix = fields.index(src_name);
 	CoupledField const &src_field(fields.field(src_ix));
 	
 	int dst_ix = add_field(dst_name, src_field.units, description);
@@ -46,7 +46,7 @@ int ConstantSet::copy(std::string const &dst_name,
 double ConstantSet::get_as(std::string const &name,
 	UTUnit const &units) const
 {
-	int src_ix = fields[name];
+	int src_ix = fields.index(name);
 	std::string const &susrc(fields.field(src_ix).units);
 	UTUnit usrc(ut_system->parse(susrc));
 

@@ -329,10 +329,10 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// in the PISM data structures.
 	int ix;
 	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
-	ix = contract[INPUT]["surface_downward_mass_flux"];
+	ix = contract[INPUT].index("surface_downward_mass_flux");
 		pism_ivars[ix] = &pism_surface_model->climatic_mass_balance;
 //printf("PV1: pism_ivars[%d] = %p (climatic_mass_balance)\n", ix, pism_ivars[ix]);
-	ix = contract[INPUT]["surface_temperature"];
+	ix = contract[INPUT].index("surface_temperature");
 		pism_ivars[ix] = &pism_surface_model->ice_surface_temp;
 //printf("PV1: pism_ivars[%d] = %p (ice_surface_temp)\n", ix, pism_ivars[ix]);
 
@@ -357,11 +357,11 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 
 	// -------------- Link to PISM-format output variables, used to fill ovars
 	pism_ovars.resize(contract[OUTPUT].size_nounit(), NULL);
-	ix = contract[OUTPUT]["usurf"];		// Elevation of top surface of ice sheet
+	ix = contract[OUTPUT].index("usurf");		// Elevation of top surface of ice sheet
 		pism_ovars[ix] = &ice_model->ice_surface_elevation;	// see PISM's iceModel.hh
-	ix = contract[OUTPUT]["ice_surface_enth"];		// Specific enthalpy of top surface
+	ix = contract[OUTPUT].index("ice_surface_enth");		// Specific enthalpy of top surface
 		pism_ovars[ix] = &ice_model->ice_surface_enth;
-	ix = contract[OUTPUT]["ice_surface_enth_depth"];
+	ix = contract[OUTPUT].index("ice_surface_enth_depth");
 		pism_ovars[ix] = &ice_model->ice_surface_enth_depth;
 
 
@@ -370,7 +370,7 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	for (auto ii = ice_model->rate.all_vecs.begin(); ii != ice_model->rate.all_vecs.end(); ++ii) {
 		if (ii->contract_name == "") continue;
 
-		int ix = contract[OUTPUT][ii->contract_name];
+		int ix = contract[OUTPUT].index(ii->contract_name);
 		pism_ovars[ix] = &ii->vec;
 	}
 
@@ -476,7 +476,7 @@ printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 		throw std::exception();
 	}
 
-int surface_temperature_ix = contract[INPUT]["surface_temperature"];
+int surface_temperature_ix = contract[INPUT].index("surface_temperature");
 
 	// Transfer input to PISM variables (and scatter w/ PETSc as well)
 	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
@@ -539,7 +539,7 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 			// ================ BEGIN Write PISM Inputs
 			long time_day = (int)(time_s / 86400. + .5);
 			std::stringstream fname;
-			std::string const &fnpart = contract[INPUT][i];
+			std::string const &fnpart = contract[INPUT].name(i);
 
 			fname << time_day << "-" << fnpart << ".nc";
 			boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());

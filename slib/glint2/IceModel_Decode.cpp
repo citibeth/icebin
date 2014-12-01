@@ -63,7 +63,7 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 
 		// Store decoded field in our output
 		ivals2d.push_back(valsd);
-printf("Done decoding required field, %s\n", contract[IceModel::INPUT][i].c_str());
+printf("Done decoding required field, %s\n", contract[IceModel::INPUT].name(i).c_str());
 	}
 
 	// Pass decoded fields on to subclass

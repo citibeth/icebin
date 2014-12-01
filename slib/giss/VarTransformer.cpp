@@ -13,9 +13,9 @@ void VarTransformer::allocate()
 
 bool VarTransformer::set(std::string output, std::string input, std::string scalar, double val)
 {
-	int ioutput = dimension(OUTPUTS)[output];
-	int iinput = dimension(INPUTS)[input];
-	int iscalar = dimension(SCALARS)[scalar];
+	int ioutput = dimension(OUTPUTS).index(output);
+	int iinput = dimension(INPUTS).index(input);
+	int iscalar = dimension(SCALARS).index(scalar);
 
 	bool ret = true;
 	if (ioutput < 0) {
@@ -62,7 +62,7 @@ CSRAndUnits VarTransformer::apply_scalars(
 	for (auto ii = nvpairs.begin(); ii != nvpairs.end(); ++ii) {
 		std::string const &nv_name = ii->first;
 		double const val = ii->second;
-		scalars(dimension(SCALARS)[nv_name]) = val;
+		scalars(dimension(SCALARS).index(nv_name)) = val;
 	}
 
 //std::cout << "Input vector = " << scalars << std::endl;
@@ -131,7 +131,7 @@ std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)
 
 
 	for (int i=0; i<n_outputs_nu; ++i) {
-		out << "    " << vt.dimension(VarTransformer::OUTPUTS)[i] << " = ";
+		out << "    " << vt.dimension(VarTransformer::OUTPUTS).name(i) << " = ";
 
 		// Count number of INPUTs used for this OUTPUT
 		int nj = 0;
@@ -161,7 +161,7 @@ std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)
 				double val = vt._tensor(i,j,k);
 				if (val == 0.0) continue;
 				if (val != 1.0) out << val;
-				if (k != unit_scalars) out << " " << vt.dimension(VarTransformer::SCALARS)[k];
+				if (k != unit_scalars) out << " " << vt.dimension(VarTransformer::SCALARS).name(k);
 
 				if (kk != nkj-1) out << " + ";
 
@@ -169,7 +169,7 @@ std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)
 				++kk;
 			}
 			if (nkj > 1) out << ")";
-			if (j != unit_inputs) out << " " << vt.dimension(VarTransformer::INPUTS)[j];
+			if (j != unit_inputs) out << " " << vt.dimension(VarTransformer::INPUTS).name(j);
 
 			if (jj != nj-1) out << " + ";
 

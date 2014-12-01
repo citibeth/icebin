@@ -71,7 +71,7 @@ public:
 
 	int unit_ix() const { return _unit_ix; }
 
-	int operator[](std::string const &name) const {
+	int index(std::string const &name) const {
 		auto ii = _name_to_ix.find(name);
 		if (ii == _name_to_ix.end()) {
 			fprintf(stderr, "CouplingContract::operator[]: name '%s' not found\n", name.c_str());
@@ -80,14 +80,14 @@ public:
 		return ii->second;
 	}
 
-	std::string const &operator[](int ix) const
+	std::string const &name(int ix) const
 		{ return _ix_to_field[ix].name; }
 
 	CoupledField const &field(int ix) const
 		{ return _ix_to_field[ix]; }
 
 	CoupledField const &field(std::string const &name) const
-		{ return field((*this)[name]); }
+		{ return field((*this).index(name)); }
 
 	std::ostream &operator<<(std::ostream &out) const;
  

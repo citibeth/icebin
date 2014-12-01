@@ -52,13 +52,13 @@ public:
 
 
 	double const &operator[](std::string const &name) const
-		{ return vals[fields[name]]; }
+		{ return vals[fields.index(name)]; }
 
 	double const &operator[](int ix) const
 		{ return vals[ix]; }
 
 	double &operator[](std::string const &name)
-		{ return vals[fields[name]]; }
+		{ return vals[fields.index(name)]; }
 
 	double &operator[](int ix)
 		{ return vals[ix]; }

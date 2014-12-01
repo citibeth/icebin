@@ -104,12 +104,12 @@ std::string const &fname)
 	//giss::CouplingContract &gcm_outputs(api->gcm_coupler.gcm_outputs);
 
 	for (unsigned int i=0; i < contract.size_nounit(); ++i) {
-		NcVar *nc_var = ncout.add_var(contract[i].c_str(),
+		NcVar *nc_var = ncout.add_var(contract.name(i).c_str(),
 			giss::get_nc_type<double>(), 4, dims);
 
 		auto comment(boost::format(
 			"%s[t,...] holds the mean from time[t-1] to time[t].  See time0[0] if t=0.")
-			% contract[i]);
+			% contract.name(i));
 		nc_var->add_att("comment", comment.str().c_str());
 
 		std::string const &description(contract.field(i).get_description());
@@ -160,7 +160,7 @@ blitz::Array<double,3> gcm_inputs)
 	for (unsigned int i=0; i < contract.size_nounit(); ++i) {
 		double const *array_base = &gcm_inputs(base_index,0,0);
 
-		NcVar *nc_var = ncout.get_var(contract[i].c_str());
+		NcVar *nc_var = ncout.get_var(contract.name(i).c_str());
 
 		if (contract.field(i).grid == "ATMOSPHERE") {
 			nc_var->set_cur(cur_ij);
@@ -267,7 +267,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 		time_var->put(&time_s, counts);
 
 		for (int i=0; i<nfields; ++i) {
-			NcVar *nc_var = ncout.get_var(gcm_outputs[i].c_str());
+			NcVar *nc_var = ncout.get_var(gcm_outputs.name(i).c_str());
 			nc_var->set_cur(cur);
 			nc_var->put(outputs[i].data(), counts);
 		}
@@ -823,9 +823,9 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
 	std::vector<blitz::Array<double,3>> inputs(gcm_outputs_contract.size_nounit());
-	inputs[gcm_outputs_contract["lismb"]].reference(smb1h_f.to_blitz());
-	inputs[gcm_outputs_contract["liseb"]].reference(seb1h_f.to_blitz());
-	inputs[gcm_outputs_contract["litg2"]].reference(tg21h_f.to_blitz());
+	inputs[gcm_outputs_contract.index("lismb")].reference(smb1h_f.to_blitz());
+	inputs[gcm_outputs_contract.index("liseb")].reference(seb1h_f.to_blitz());
+	inputs[gcm_outputs_contract.index("litg2")].reference(tg21h_f.to_blitz());
 
 	if (coupler.gcm_out_file.length() > 0) {
 		// Write out to DESM file

@@ -17,9 +17,9 @@ public:
 	virtual ~DynamicEnum() {}
 
 	/** Look up the int corresponding to a string. */
-	virtual int operator[](std::string const &name) const = 0;
+	virtual int index(std::string const &name) const = 0;
 	/** Look up the string corresponding to an int. */
-	virtual std::string const &operator[](int ix) const = 0;
+	virtual std::string const &name(int ix) const = 0;
 
 	/** Number of strings in the enum, NOT COUNTING "unit" (if it exists) */
 	virtual long size_withunit() const = 0;
