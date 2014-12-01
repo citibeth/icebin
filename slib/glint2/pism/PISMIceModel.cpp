@@ -416,19 +416,19 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	double t1 = enthalpy_t();	// Current time of the enthalpy portion of ice model.
 	set_rate(t1 - t0);
 
-	// ====================== Compute "custom" variables in output
-	// --------- basal_runoff = melt_grounded + melt_floating
-	ierr = rate.melt_grounded.begin_access(); CHKERRQ(ierr);
-	ierr = rate.melt_floating.begin_access(); CHKERRQ(ierr);
-	ierr = basal_runoff.begin_access(); CHKERRQ(ierr);
-	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		basal_runoff.mass(i,j) = rate.melt_grounded.mass(i,j) + rate.melt_floating.mass(i,j);
-		basal_runoff.enth(i,j) = rate.melt_grounded.enth(i,j) + rate.melt_floating.enth(i,j);
-	}}
-	ierr = basal_runoff.end_access(); CHKERRQ(ierr);
-	ierr = rate.melt_floating.end_access(); CHKERRQ(ierr);
-	ierr = rate.melt_grounded.end_access(); CHKERRQ(ierr);
+//	// ====================== Compute "custom" variables in output
+//	// --------- basal_runoff = melt_grounded + melt_floating
+//	ierr = rate.melt_grounded.begin_access(); CHKERRQ(ierr);
+//	ierr = rate.melt_floating.begin_access(); CHKERRQ(ierr);
+//	ierr = basal_runoff.begin_access(); CHKERRQ(ierr);
+//	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+//	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+//		basal_runoff.mass(i,j) = rate.melt_grounded.mass(i,j) + rate.melt_floating.mass(i,j);
+//		basal_runoff.enth(i,j) = rate.melt_grounded.enth(i,j) + rate.melt_floating.enth(i,j);
+//	}}
+//	ierr = basal_runoff.end_access(); CHKERRQ(ierr);
+//	ierr = rate.melt_floating.end_access(); CHKERRQ(ierr);
+//	ierr = rate.melt_grounded.end_access(); CHKERRQ(ierr);
 
 	// --------- ice_surface_enth from Enth3
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);

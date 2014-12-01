@@ -387,6 +387,7 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 
 	// TODO: Test that im and jm are consistent with the grid read.
 #endif
+	printf("***** END glint2_modele_init0()\n");
 }
 // -----------------------------------------------------
 extern "C" void glint2_modele_delete(glint2_modele *&api)
@@ -402,7 +403,7 @@ int glint2_modele_nhp(glint2_modele const *api)
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
     // (not part of GLINT2)
 	ret += 1;
-	printf("glint2_modele_nhp() returning %d\n", ret);
+//	printf("glint2_modele_nhp() returning %d\n", ret);
 	return ret;
 }
 // -----------------------------------------------------
@@ -422,7 +423,6 @@ char const *long_name_f, int long_name_len)
 	std::string grid(grid_f, grid_len);
 	std::string long_name(long_name_f, long_name_len);
 
-
 	int ihp = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
 	int var_nhp;
 	if (grid == "ATMOSPHERE") var_nhp = 1;
@@ -436,19 +436,25 @@ char const *long_name_f, int long_name_len)
 	api->gcm_coupler.gcm_inputs.add_field(field_name, units, grid, long_name);
 
 	api->gcm_inputs_ihp.push_back(ihp + var_nhp);
+	int ret = ihp+1;
 
-	return ihp+1;
+	printf("glint2_modele_add_gcm_input(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
+
+	return ret;
 }
 // -----------------------------------------------------
 extern "C"
 void glint2_modele_set_start_time(glint2_modele *api, int iyear1, int itimei, double dtsrc)
 {
+	std::cout << "========= GCM Inputs (second time: must be set by now)" << std::endl;
+	std::cout << api->gcm_coupler.gcm_inputs << std::endl;
+
 	GCMParams &gcm_params(api->gcm_coupler.gcm_params);
 
 	api->dtsrc = dtsrc;
 	double time0_s = itimei * api->dtsrc;
 
-printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f\n", iyear1, itimei, api->dtsrc, time0_s);
+printf("BEGIN glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f\n", iyear1, itimei, api->dtsrc, time0_s);
 	api->gcm_coupler.set_start_time(
 		giss::time::tm(iyear1, 1, 1),
 		time0_s);
@@ -467,6 +473,8 @@ printf("glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f
 			api->gcm_coupler.gcm_inputs,
 			api->gcm_coupler.gcm_in_file);
 	}
+
+printf("END glint2_modele_set_start_time\n");
 }
 // -----------------------------------------------------
 extern "C"

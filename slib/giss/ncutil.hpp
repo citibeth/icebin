@@ -57,6 +57,8 @@ template<> inline NcType get_nc_type<int>()
 template<class KeyT>
 inline std::unique_ptr<NcAtt> get_att(NcVar *var, KeyT key)
 {
+	NcError err(NcError::silent_nonfatal);
+
 	NcAtt *att = var->get_att(key);
 	if (!att) return std::unique_ptr<NcAtt>();
 	return std::unique_ptr<NcAtt>(att);

@@ -74,7 +74,7 @@ public:
 	int operator[](std::string const &name) const {
 		auto ii = _name_to_ix.find(name);
 		if (ii == _name_to_ix.end()) {
-			fprintf(stderr, "CouplingContract::operator[]: name '%s' not found", name.c_str());
+			fprintf(stderr, "CouplingContract::operator[]: name '%s' not found\n", name.c_str());
 			throw std::exception();
 		}
 		return ii->second;

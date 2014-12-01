@@ -91,14 +91,12 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		"m-2 s-1", "calving"); CHKERRQ(ierr);
 	add_massenth(calving, DELTA, "calving.mass", "calving.enth");
 
-#if 0
-	ierr = basal_runoff.create(grid, prefix+"basal_runoff",
-		ghostedp, width); CHKERRQ(ierr);
-	ierr = basal_runoff.set_attrs("diagnostic",
-		"Runoff from base, should be negative.  Enthalpy portion is predictable, since runoff is 0C 100% water fraction.",
-		"m-2 s-1"); CHKERRQ(ierr);
-	add_massenth(basal_runoff, DELTA, "basal_runoff.mass", "basal_runoff.enth");
-#endif
+//	ierr = basal_runoff.create(grid, prefix+"basal_runoff",
+//		ghostedp, width); CHKERRQ(ierr);
+//	ierr = basal_runoff.set_attrs("diagnostic",
+//		"Runoff from base, should be negative.  Enthalpy portion is predictable, since runoff is 0C 100% water fraction.",
+//		"m-2 s-1"); CHKERRQ(ierr);
+//	add_massenth(basal_runoff, DELTA, "basal_runoff.mass", "basal_runoff.enth");
 
 	ierr = surface_mass_balance.create(grid, prefix+"surface_mass_balance",
 		ghostedp, width); CHKERRQ(ierr);

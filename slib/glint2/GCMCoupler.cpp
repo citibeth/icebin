@@ -46,7 +46,9 @@ void GCMCoupler::read_from_netcdf(
 	// (so it can be replayed later with desm)
 	{
 		NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
+printf("AA\n");
 		auto attr(giss::get_att(info_var, "gcm_out_file"));
+printf("AA\n");
 		if (!attr.get()) {
 			gcm_out_file = "";
 		} else {
@@ -64,7 +66,9 @@ void GCMCoupler::read_from_netcdf(
 	// (so it can be replayed later with desm)
 	{
 		NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
+printf("BB\n");
 		auto attr(giss::get_att(info_var, "gcm_in_file"));
+printf("BB\n");
 		if (!attr.get()) {
 			gcm_in_file = "";
 		} else {
@@ -86,6 +90,9 @@ void GCMCoupler::read_from_netcdf(
 	}
 	std::cout << "========= GCM Outputs" << std::endl;
 	std::cout << gcm_outputs << std::endl;
+
+	std::cout << "========= GCM Inputs (first time around)" << std::endl;
+	std::cout << gcm_inputs << std::endl;
 
 #endif
 
@@ -164,9 +171,11 @@ void GCMCoupler::set_start_time(
 		std::cout << "========= Contract for " << model->name << std::endl;
 		std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
 		std::cout << model->contract[IceModel::INPUT];
+		std::cout << "TRANSFORMATIONS:" << std::endl;
 		std::cout << model->var_transformer[IceModel::INPUT];
 		std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
 		std::cout << model->contract[IceModel::OUTPUT];
+		std::cout << "TRANSFORMATIONS:" << std::endl;
 		std::cout << model->var_transformer[IceModel::OUTPUT];
 #endif
 	}

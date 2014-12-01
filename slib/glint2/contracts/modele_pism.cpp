@@ -95,6 +95,10 @@ void IceModel_PISM::setup_contracts_modele()
 		break;
 	}
 
+	std::cout << "========= Ice Model Inputs (" << model.name << ") modele_pism.cpp:" << std::endl;
+	std::cout << ice_input << std::endl;
+
+
 	// Figure out the conversion between GCM and PISM enthalpy
 	// ModelE's reference state is 1atm, 0C, 100% liquid water.
 	// The enthalpy for that reference state would be the top end
@@ -141,17 +145,37 @@ void IceModel_PISM::setup_contracts_modele()
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
 
 	// Glint2 requires that all ice models return elev2, so that it can regrid in the vertical.
+
 	ice_output.add_field("usurf", "m", "ICE", "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
 
 	ice_output.add_field("ice_surface_enth", "J kg-1", "ICE", "");
 	ice_output.add_field("ice_surface_enth_depth", "m", "ICE", "");
-	ice_output.add_field("basal_runoff.mass", "kg m-2 s-1", "ICE", "");		// melt_grounded + melt_floating
-	ice_output.add_field("basal_runoff.enth", "W m-2", "ICE", "");
+
+	ice_output.add_field("basal_frictional_heating", "W m-2", "ICE", "");
+	ice_output.add_field("strain_heating", "W m-2", "ICE", "");
+	ice_output.add_field("geothermal_flux", "W m-2", "ICE", "");
+	ice_output.add_field("upward_geothermal_flux", "W m-2", "ICE", "");
+
 	ice_output.add_field("calving.mass", "kg m-2 s-1", "ICE", "");
 	ice_output.add_field("calving.enth", "W m-2", "ICE", "");
-	ice_output.add_field("strain_heating", "W m-2", "ICE", "");
+	ice_output.add_field("surface_mass_balance.mass", "kg m-2 s-1", "ICE", "");
+	ice_output.add_field("surface_mass_balance.enth", "W m-2", "ICE", "");
+
+	// basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
+	ice_output.add_field("melt_grounded.mass", "kg m-2 s-1", "ICE", "");
+	ice_output.add_field("melt_grounded.enth", "W m-2", "ICE", "");
+	ice_output.add_field("melt_floating.mass", "kg m-2 s-1", "ICE", "");
+	ice_output.add_field("melt_floating.enth", "W m-2", "ICE", "");
+
+	ice_output.add_field("internal_advection.mass", "kg m-2 s-1", "ICE", "");
+	ice_output.add_field("internal_advection.enth", "W m-2", "ICE", "");
 	ice_output.add_field("epsilon.mass", "kg m-2 s-1", "ICE", "");
 	ice_output.add_field("epsilon.enth", "W m-2", "ICE", "");
+
+	ice_output.add_field("unit", "", "Dimensionless identity");
+
+	std::cout << "========= Ice Model Outputs (" << model.name << ") modele_pism.cpp:" << std::endl;
+	std::cout << ice_output << std::endl;
 
 	// ------- Variable and unit conversions, Ice -> GCM
 	{VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
@@ -167,23 +191,42 @@ void IceModel_PISM::setup_contracts_modele()
 	// For specific enthalpy: Enth_e = Enth_p - enth_modele_to_pism
 	// where X_e is ModelE and X_p is PISM
 	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", 1.0);
-	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", -enth_modele_to_pism);
-
+	ok = ok && vt.set("ice_surface_enth", "unit", "unit", -enth_modele_to_pism);
 	ok = ok && vt.set("ice_surface_enth_depth", "ice_surface_enth_depth", "unit", 1.0);
 
-	ok = ok && vt.set("basal_runoff.mass", "basal_runoff.mass", "unit", 1.0);
-	ok = ok && vt.set("basal_runoff.enth", "basal_runoff.enth", "unit", 1.0);
-	ok = ok && vt.set("basal_runoff.enth", "basal_runoff.enth", "unit", -enth_modele_to_pism);
+
+
+	ok = ok && vt.set("basal_frictional_heating", "basal_frictional_heating", "unit", 1.0);
+	ok = ok && vt.set("strain_heating", "strain_heating", "unit", 1.0);
+
+	ok = ok && vt.set("geothermal_flux", "geothermal_flux", "unit", 1.0);
+	ok = ok && vt.set("upward_geothermal_flux", "upward_geothermal_flux", "unit", 1.0);
+
+	ok = ok && vt.set("surface_mass_balance.mass", "surface_mass_balance.mass", "unit", 1.0);
+	ok = ok && vt.set("surface_mass_balance.enth", "surface_mass_balance.enth", "unit", 1.0);
+	ok = ok && vt.set("surface_mass_balance.enth", "surface_mass_balance.mass", "unit", -enth_modele_to_pism);
+
+	ok = ok && vt.set("basal_runoff.mass", "melt_grounded.mass", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "melt_grounded.enth", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "melt_grounded.mass", "unit", -enth_modele_to_pism);
+
+	ok = ok && vt.set("basal_runoff.mass", "melt_floating.mass", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "melt_floating.enth", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "melt_floating.mass", "unit", -enth_modele_to_pism);
 
 	ok = ok && vt.set("calving.mass", "calving.mass", "unit", 1.0);
 	ok = ok && vt.set("calving.enth", "calving.enth", "unit", 1.0);
-	ok = ok && vt.set("calving.enth", "calving.enth", "unit", -enth_modele_to_pism);
+	ok = ok && vt.set("calving.enth", "calving.mass", "unit", -enth_modele_to_pism);
 
-	ok = ok && vt.set("strain_heating", "strain_heating", "unit", 1.0);
+
+	ok = ok && vt.set("internal_advection.mass", "internal_advection.mass", "unit", 1.0);
+	ok = ok && vt.set("internal_advection.enth", "internal_advection.enth", "unit", 1.0);
+	ok = ok && vt.set("internal_advection.enth", "internal_advection.mass", "unit", -enth_modele_to_pism);
+
 
 	ok = ok && vt.set("epsilon.mass", "epsilon.mass", "unit", 1.0);
 	ok = ok && vt.set("epsilon.enth", "epsilon.enth", "unit", 1.0);
-	ok = ok && vt.set("epsilon.enth", "epsilon.enth", "unit", -enth_modele_to_pism);
+	ok = ok && vt.set("epsilon.enth", "epsilon.mass", "unit", -enth_modele_to_pism);
 
 	}
 

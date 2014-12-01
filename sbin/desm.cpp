@@ -114,14 +114,11 @@ void Desm::allocate_gcm_input()
 	add_gcm_input_ij("surface_mass_balance.mass", "kg m-2 s-1", "Mass transfer from snow/firn model above (as seen by GCM).");
 	add_gcm_input_ij("surface_mass_balance.enth", "W m-2", "Mass transfer from snow/firn model above (as seen by GCM).");
 
-	add_gcm_input_ij("melt_grounded.mass", "kg m-2 s-1", "Basal melting of grounded ice");
-	add_gcm_input_ij("melt_grounded.enth", "W m-2", "Basal melting of grounded ice");
+	add_gcm_input_ij("basal_runoff.mass", "kg m-2 s-1", "Basal melting of grounded ice");
+	add_gcm_input_ij("basal_runoff.enth", "W m-2", "Basal melting of grounded ice");
 
-	add_gcm_input_ij("melt_floating_mass", "kg m-2 s-1", "Basal melting of floating ice shelf");
-	add_gcm_input_ij("melt_floating_enth", "W m-2", "Basal melting of floating ice shelf");
-
-	add_gcm_input_ij("internal-advection_mass", "kg m-2 s-1", "Horizontal advection due to ice dynamics");
-	add_gcm_input_ij("internal-advection_enth", "W m-2", "Horizontal advection due to ice dynamics");
+	add_gcm_input_ij("internal_advection.mass", "kg m-2 s-1", "Horizontal advection due to ice dynamics");
+	add_gcm_input_ij("internal_advection.enth", "W m-2", "Horizontal advection due to ice dynamics");
 
 
 	add_gcm_input_ij("epsilon.mass", "kg m-2 s-1", "Changes not otherwise accounted for");
@@ -267,6 +264,8 @@ int Desm::main(int argc, char **argv)
 		// API Control: write_constants = false
 		0);
 
+	allocate_gcm_input();
+
 	glint2_modele_set_start_time(api, iyear1, time0_i, dtsrc);
 
 	int nhp = api->gcm_coupler.maker->nhp(-1);
@@ -275,7 +274,6 @@ int Desm::main(int argc, char **argv)
 	glint2_modele_init_hp_to_ices(api);
 
 	// ----------------------------------------------------------
-	allocate_gcm_input();
 
 
 	// ----------------------------------------------------------

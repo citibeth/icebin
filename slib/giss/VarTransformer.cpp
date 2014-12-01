@@ -131,7 +131,7 @@ std::ostream &operator<<(std::ostream &out, VarTransformer const &vt)
 
 
 	for (int i=0; i<n_outputs_nu; ++i) {
-		out << vt.dimension(VarTransformer::OUTPUTS)[i] << " = ";
+		out << "    " << vt.dimension(VarTransformer::OUTPUTS)[i] << " = ";
 
 		// Count number of INPUTs used for this OUTPUT
 		int nj = 0;

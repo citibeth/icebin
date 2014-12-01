@@ -887,7 +887,7 @@ void MatrixMaker::read_from_netcdf(NcFile &nc, std::string const &vname)
 {
 	clear();
 
-	printf("MatrixMaker::read_from_netcdf(%s) 1\n", vname.c_str());
+	printf("BEGIN MatrixMaker::read_from_netcdf(%s) 1\n", vname.c_str());
 	grid1.reset(read_grid(nc, vname + ".grid1").release());
 	if (giss::get_var_safe(nc, vname + ".mask1", false)) {
 		mask1.reset(new blitz::Array<int,1>(
@@ -928,6 +928,7 @@ printf("2 Set mask1 = %p\n", mask1.get());
 		sheet->filter_cells1(include_cell1);
 	}
 
+	printf("END MatrixMaker::read_from_netcdf(%s) 1\n", vname.c_str());
 }
 
 std::unique_ptr<IceSheet> new_ice_sheet(Grid::Parameterization parameterization)

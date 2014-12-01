@@ -34,7 +34,7 @@ public:
 
 	/** Sums or otherwise consolidates the sparse representation so
 	there is no more than one entry per index. */
-	virtual void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD);
+	virtual void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD) = 0;
 
 #if 0
 	/** Used to write this data structure to a netCDF file.
@@ -199,6 +199,8 @@ public :
 		}
 	}
 
+	/** Nothing to do for consolidate with MapSparseVector. */
+	void consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups = SparseVector<IndexT,ValT>::DuplicatePolicy::ADD) {}
 
 	/** Inserts a new <index, value> pair to sparse vector.  If that
 	element was already non-zero, replaces it. */
