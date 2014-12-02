@@ -268,8 +268,8 @@ int Desm::main(int argc, char **argv)
 
 	glint2_modele_set_start_time(api, iyear1, time0_i, dtsrc);
 
-	int nhp = api->gcm_coupler.maker->nhp(-1);
-	printf("desm.cpp: Number Elevation Points (nhp)== %d\n", nhp);
+//	int nhp = api->gcm_coupler.maker->nhp(-1);
+//	printf("desm.cpp: Number Elevation Points (nhp)== %d\n", nhp);
 
 	glint2_modele_init_hp_to_ices(api);
 

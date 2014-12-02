@@ -133,6 +133,8 @@ glint2_modele *api,
 double time_s,
 blitz::Array<double,3> gcm_inputs)
 {
+	printf("BEGIN glint2_modele_save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
+
 	// Get dimensions of full domain
 	int nhp = glint2_modele_nhp(api);
 	GCMCoupler &coupler(api->gcm_coupler);
@@ -174,6 +176,7 @@ blitz::Array<double,3> gcm_inputs)
 	}
 
 	ncout.close();
+	printf("END glint2_modele_save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
 }
 // -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields
@@ -954,7 +957,9 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 			}
 		}
 
+printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n");
 		if (coupler.gcm_in_file.length() > 0) {
+printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCDDDDDDDDDDDDDDDDDDD\n");
 			// Write out to DESM file
 			glint2_modele_save_gcm_inputs(api, time_s, gcm_inputs_d);
 		}

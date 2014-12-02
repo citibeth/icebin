@@ -271,8 +271,13 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 	// Record what the ice model produced.
 	// NOTE: This shouldn't change model->ovals_I
 	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
-	if (owriter) owriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
+	if (owriter) {
+		printf("BEGIN owriter->run_timestep()\n");
+		owriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
+		printf("END owriter->run_timestep()\n");
+	}
 
+printf("END GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 };
 
 /** @param sbuf the (filled) array of ice grid values for this MPI node. */
@@ -349,14 +354,18 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
 			auto params(im_params.find(sheetno));
+printf("AXAAA1\n");
 			call_ice_model(&*model, sheetno, time_s, *rbuf,
 				params->second.begin, params->second.next);
+printf("AXAAA2\n");
 
 			// Convert to variables the GCM wants (but still on the ice grid)
 			model->set_gcm_inputs();	// Fills in ivals_I
+printf("AXAAA3\n");
 
 			// Free ovals_I
 			model->free_ovals_I();
+printf("AXAAA4\n");
 		}
 
 		// =============== Regrid to the grid requested by the GCM

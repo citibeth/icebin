@@ -71,12 +71,14 @@ public:
 
 	int unit_ix() const { return _unit_ix; }
 
-	int index(std::string const &name) const {
+	int index(std::string const &name, bool throw_exception=true) const {
 		auto ii = _name_to_ix.find(name);
-		if (ii == _name_to_ix.end()) {
-			fprintf(stderr, "CouplingContract::operator[]: name '%s' not found\n", name.c_str());
-			throw std::exception();
-		}
+		if (throw_exception) {
+			if (ii == _name_to_ix.end()) {
+				fprintf(stderr, "CouplingContract::operator[]: name '%s' not found\n", name.c_str());
+				throw std::exception();
+			}
+		} else return -1;
 		return ii->second;
 	}
 

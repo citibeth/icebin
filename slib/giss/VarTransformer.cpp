@@ -62,7 +62,10 @@ CSRAndUnits VarTransformer::apply_scalars(
 	for (auto ii = nvpairs.begin(); ii != nvpairs.end(); ++ii) {
 		std::string const &nv_name = ii->first;
 		double const val = ii->second;
-		scalars(dimension(SCALARS).index(nv_name)) = val;
+
+		// If a provided scalar is not used for this VarTransformer, just ignore it.
+		int ix = dimension(SCALARS).index(nv_name, false);
+		if (ix >= 0) scalars(ix) = val;
 	}
 
 //std::cout << "Input vector = " << scalars << std::endl;

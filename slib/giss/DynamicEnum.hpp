@@ -17,7 +17,8 @@ public:
 	virtual ~DynamicEnum() {}
 
 	/** Look up the int corresponding to a string. */
-	virtual int index(std::string const &name) const = 0;
+	virtual int index(std::string const &name, bool throw_exception=true) const = 0;
+
 	/** Look up the string corresponding to an int. */
 	virtual std::string const &name(int ix) const = 0;
 

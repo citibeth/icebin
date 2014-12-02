@@ -240,6 +240,7 @@ printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, _ice_density, _meter_per
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
 	ierr = cur.pism_smb.begin_access(); CHKERRQ(ierr);
 	ierr = cur.melt_grounded.begin_access(); CHKERRQ(ierr);
+	ierr = cur.melt_floating.begin_access(); CHKERRQ(ierr);
 	ierr = cur.internal_advection.begin_access(); CHKERRQ(ierr);
 	ierr = cur.href_to_h.begin_access(); CHKERRQ(ierr);
 	ierr = cur.nonneg_rule.begin_access(); CHKERRQ(ierr);
@@ -249,6 +250,7 @@ printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, _ice_density, _meter_per
 	ierr = cur.nonneg_rule.end_access(); CHKERRQ(ierr);
 	ierr = cur.href_to_h.end_access(); CHKERRQ(ierr);
 	ierr = cur.internal_advection.end_access(); CHKERRQ(ierr);
+	ierr = cur.melt_floating.end_access(); CHKERRQ(ierr);
 	ierr = cur.melt_grounded.end_access(); CHKERRQ(ierr);
 	ierr = cur.pism_smb.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
@@ -298,6 +300,8 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	double nonneg_rule_flux)			// [m] ice equivalent
 {
 	PetscErrorCode ierr;
+
+//	printf("BEGIN PISMIceModel::accumulateFluxes_MassContExplicitStep()\n");
 
 	// -------------- Get the easy veriables out of the way...
 	cur.pism_smb(i,j) += surface_mass_balance * _meter_per_s_to_kg_per_m2;
@@ -366,6 +370,8 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 {
 	PetscErrorCode ierr;
 
+	printf("BEGIN PISMIceModel::set_rate()\n");
+
 	double by_dt = 1.0 / dt;
 
 	ierr = compute_enth2(cur.total.enth, cur.total.mass); CHKERRQ(ierr);
@@ -401,6 +407,7 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 		ierr = vbase.end_access(); CHKERRQ(ierr);
 	}
 
+	printf("END PISMIceModel::set_rate()\n");
 	return 0;
 }
 
@@ -429,6 +436,7 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 //	ierr = basal_runoff.end_access(); CHKERRQ(ierr);
 //	ierr = rate.melt_floating.end_access(); CHKERRQ(ierr);
 //	ierr = rate.melt_grounded.end_access(); CHKERRQ(ierr);
+
 
 	// --------- ice_surface_enth from Enth3
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
@@ -492,6 +500,10 @@ PetscErrorCode PISMIceModel::allocate_internal_objects()
 	ierr = base.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = cur.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = rate.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+
+	ierr = ice_surface_enth.create(grid, "surface_enth", pism::WITHOUT_GHOSTS);
+	ierr = ice_surface_enth_depth.create(grid, "surface_enth_depth", pism::WITHOUT_GHOSTS);
+
 
 	return 0;
 }

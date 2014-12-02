@@ -60,7 +60,7 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 			if (std::isnan(oval)) oval = vals(i);
 			else oval += vals(i);
 		}
-
+printf("CX4\n");
 		// Store decoded field in our output
 		ivals2d.push_back(valsd);
 printf("Done decoding required field, %s\n", contract[IceModel::INPUT].name(i).c_str());
