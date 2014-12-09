@@ -409,9 +409,9 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 	PetscErrorCode ierr;
 //	Vec g;
 
-printf("iceModelVec2S_to_blitz_xy:\n");
-printf("nx() ny() = %d, %d\n", nx(), ny());
-printf("Mx My = %d, %d\n", pism_grid->Mx, pism_grid->My);
+//printf("iceModelVec2S_to_blitz_xy:\n");
+//printf("nx() ny() = %d, %d\n", nx(), ny());
+//printf("Mx My = %d, %d\n", pism_grid->Mx, pism_grid->My);
 
 	auto xy_shape(blitz::shape(ny(), nx()));
 	if (ret.size() == 0) {
@@ -544,7 +544,7 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 			fname << time_day << "-" << fnpart << ".nc";
 			boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());
 
-			printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
+//			printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
 			pism_var->dump(pfname.c_str());
 			// ================ END Write PISM Inputs
 		}

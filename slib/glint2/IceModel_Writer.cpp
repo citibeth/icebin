@@ -30,7 +30,7 @@ namespace glint2 {
 
 std::vector<NcDim const *> IceModel_Writer::add_dims(NcFile &nc)
 {
-	printf("BEGIN add_dims()\n");
+//	printf("BEGIN add_dims()\n");
 
 	std::vector<NcDim const *> ret;
 	unsigned int ndim = dim_names.size();
@@ -40,7 +40,7 @@ std::vector<NcDim const *> IceModel_Writer::add_dims(NcFile &nc)
 		ret.push_back(nc.add_dim(dim_names[i].c_str(), counts[i]));
 	}
 
-	printf("END add_dims()\n");
+//	printf("END add_dims()\n");
 	return ret;
 }
 
@@ -58,10 +58,10 @@ std::vector<NcDim const *> IceModel_Writer::get_dims(NcFile &nc)
 /** Specialized init signature for IceModel_Writer */
 void IceModel_Writer::init(
 	std::shared_ptr<glint2::Grid> const &grid2,
-	IceModel const *model, std::string const &sheet_name)
+	IceModel const *model)
 
 {
-	printf("BEGIN IceModel_Writer::init(%s)\n", sheet_name.c_str());
+	printf("BEGIN IceModel_Writer::init(%s)\n", name.c_str());
 
 	IceModel::init(grid2);
 
@@ -91,16 +91,17 @@ void IceModel_Writer::init(
 
 	// Put our output files in this directory, one named per ice sheet.
 	auto output_dir = boost::filesystem::absolute(
-		boost::filesystem::path("ice_model_inputs"),
+		boost::filesystem::path(
+			(io == IceModel::INPUT ? "ice_model_inputs" : "ice_model_outputs")),
 		coupler->gcm_params.config_dir);
 	boost::filesystem::create_directory(output_dir);	// Make sure it exists
 
 	// Set up the output file
 	// Create netCDF variables based on details of the coupling contract.xs
-	output_fname = (output_dir / (sheet_name + ".nc")).string();
+	output_fname = (output_dir / (name + ".nc")).string();
 	printf("IceModel_Writer opening file %s\n", output_fname.c_str());
 
-	printf("END IceModel_Writer::init_from_ice_model(%s)\n", sheet_name.c_str());
+	printf("END IceModel_Writer::init_from_ice_model(%s)\n", name.c_str());
 }
 
 void IceModel_Writer::start_time_set()
@@ -113,6 +114,8 @@ void IceModel_Writer::start_time_set()
 void IceModel_Writer::init_output_file()
 {
 	GCMParams const &gcm_params(coupler->gcm_params);
+
+	printf("BEGIN IceModelWriter::init_output_file(%s)\n", output_fname.c_str());
 
 	NcFile nc(output_fname.c_str(), NcFile::Replace);
 	std::vector<const NcDim *> dims = add_dims(nc);
@@ -147,6 +150,8 @@ void IceModel_Writer::init_output_file()
 	nc.close();
 
 	output_file_initialized = true;
+
+	printf("END IceModelWriter::init_output_file(%s)\n", output_fname.c_str());
 }
 
 /** @param index Index of each grid value.
@@ -177,10 +182,14 @@ printf("BEGIN IceModel_Writer::run_decoded\n");
 	// Write the other variables
 	int i = 0;
 	for (auto cf = contract[io].begin(); cf != contract[io].end(); ++cf, ++i) {
+		if (cf->name == "unit") continue;
+
 		NcVar *ncvar = nc.get_var(cf->name.c_str());
 		ncvar->set_cur(&cur[0]);
 
-		double const *data = (io == IceModel::INPUT ? ivals2[i].data() : ovals2[i].data());
+//		double const *data = (io == IceModel::INPUT ? ivals2[i].data() : ovals2[i].data());
+		double const *data = ivals2[i].data();
+printf("data = %p\n", data);
 		ncvar->put(data, &counts[0]);
 	}
 

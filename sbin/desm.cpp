@@ -322,7 +322,8 @@ int Desm::main(int argc, char **argv)
 	// The main loop
 	double begin_time_s;
 	double end_time_s = time0_s;
-	for (long time_index=0; time_index<ntime; ++time_index) {
+	for (long time_index=1; time_index<ntime; ++time_index) {
+//	for (long time_index=0; time_index<ntime; ++time_index) {
 		// Roll forward the time interval
 		begin_time_s = end_time_s;
 

@@ -50,7 +50,7 @@ public:
 	/** Specialized init signature for IceModel_Writer */
 	void init(
 		std::shared_ptr<glint2::Grid> const &grid2,
-		IceModel const *model, std::string const &sheet_name);
+		IceModel const *model);
 
 	void start_time_set();
 

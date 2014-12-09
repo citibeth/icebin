@@ -203,6 +203,13 @@ PetscErrorCode PISMIceModel::energyStep()
 	// ----------- Geothermal Flux
 	ierr = cur.geothermal_flux.add(my_dt, geothermal_flux); CHKERRQ(ierr);
 
+ierr = geothermal_flux.begin_access(); CHKERRQ(ierr);
+ierr = cur.geothermal_flux.begin_access(); CHKERRQ(ierr);
+printf("geothermal_flux(%d,%d) = %f\n", grid.xs, grid.ys, geothermal_flux(grid.xs, grid.ys));
+printf("cur.geothermal_flux(%d,%d) = %f\n", grid.xs, grid.ys, cur.geothermal_flux(grid.xs, grid.ys));
+ierr = cur.geothermal_flux.end_access(); CHKERRQ(ierr);
+ierr = geothermal_flux.end_access(); CHKERRQ(ierr);
+
 	// ---------- Basal Frictional Heating (see iMenthalpy.cc l. 220)
 	IceModelVec2S *Rb = NULL;
 	ierr = stress_balance->get_basal_frictional_heating(Rb); CHKERRQ(ierr);
@@ -370,7 +377,7 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 {
 	PetscErrorCode ierr;
 
-	printf("BEGIN PISMIceModel::set_rate()\n");
+	printf("BEGIN PISMIceModel::set_rate(dt=%f)\n", dt);
 
 	double by_dt = 1.0 / dt;
 
@@ -400,7 +407,7 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 			}
 
 			// base = cur: For ALL vectors
-			vbase(i,j) = vcur(i,j);
+//			vbase(i,j) = vcur(i,j);
 		}}
 		ierr = vrate.end_access(); CHKERRQ(ierr);
 		ierr = vcur.end_access(); CHKERRQ(ierr);
@@ -408,6 +415,21 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 	}
 
 	printf("END PISMIceModel::set_rate()\n");
+
+#if 0
+ierr = rate.geothermal_flux.begin_access(); CHKERRQ(ierr);
+printf("rate.geothermal_flux(%d, %d) = %f\n", grid.xs, grid.xs, rate.geothermal_flux(grid.xs, grid.xs));
+ierr = rate.geothermal_flux.end_access(); CHKERRQ(ierr);
+
+ierr = cur.geothermal_flux.begin_access(); CHKERRQ(ierr);
+printf("cur.geothermal_flux(%d, %d) = %f\n", grid.xs, grid.xs, cur.geothermal_flux(grid.xs, grid.xs));
+ierr = cur.geothermal_flux.end_access(); CHKERRQ(ierr);
+
+ierr = base.geothermal_flux.begin_access(); CHKERRQ(ierr);
+printf("base.geothermal_flux(%d, %d) = %f\n", grid.xs, grid.xs, base.geothermal_flux(grid.xs, grid.xs));
+ierr = base.geothermal_flux.end_access(); CHKERRQ(ierr);
+#endif
+
 	return 0;
 }
 

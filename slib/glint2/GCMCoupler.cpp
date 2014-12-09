@@ -133,12 +133,12 @@ printf("BB\n");
 		// ---- Create the affiliated writers
 		// Writer for ice model input
 		std::unique_ptr<IceModel_Writer> iwriter(new IceModel_Writer(*name, IceModel::INPUT, this));
-		iwriter->init(sheet->grid2, ice_model, *name);
+		iwriter->init(sheet->grid2, ice_model);
 		writers[IceModel::INPUT].insert(i, std::move(iwriter));
 
 		// Writer for ice model output
 		std::unique_ptr<IceModel_Writer> owriter(new IceModel_Writer(*name, IceModel::OUTPUT, this));
-		owriter->init(sheet->grid2, ice_model, *name);
+		owriter->init(sheet->grid2, ice_model);
 		writers[IceModel::OUTPUT].insert(i, std::move(owriter));
 
 		++i;
@@ -259,7 +259,7 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 
 
 	// -------------- Run the model
-	model->allocate_ovals_I();	// Allocates ovals_I
+	model->allocate_ovals_I();	// Allocate ice model output variables (ICE grid)
 
 	// Record exactly the same inputs that this ice model is seeing.
 	IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
@@ -273,7 +273,8 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
 	if (owriter) {
 		printf("BEGIN owriter->run_timestep()\n");
-		owriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
+		std::vector<blitz::Array<double,1>> dummy;
+		owriter->run_decoded(time_s, model->ovals_I, dummy);
 		printf("END owriter->run_timestep()\n");
 	}
 
