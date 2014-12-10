@@ -89,27 +89,27 @@ public:
 	// Buffers used to receive ice model output, and regrid it.
 
 	/** Direct output from the ice model (on the ice grid) */
-	std::vector<blitz::Array<double,1>> ovals_I;
+	std::vector<blitz::Array<double,1>> ice_ovals_I;
 
 	/** Input to the GCM, but on the ice grid */
-	std::vector<blitz::Array<double,1>> ivals_I;
+	std::vector<blitz::Array<double,1>> gcm_ivals_I;
 
 
 	/** Allocate vectors in preparation of calling an ice model. */
-	void allocate_ovals_I();
+	void allocate_ice_ovals_I();
 
 	/** Allocate in preparation of var transformations (but not regridding yet) */
-	void allocate_ivals_I();
+	void allocate_gcm_ivals_I();
 
 	/** Free portions not needed after finished calling ice model and
 	applying variable transform.  This will be variables desired on
 	anything other than the ELEVATION grid. */
-	void free_ovals_I();
+	void free_ice_ovals_I();
 
 	/** Free all memory used by this.  Called when we're done with a coupling timestep. */
 	void free_ovals_ivals_I();
 
-	/** Allocates and sets ivals_I variable */
+	/** Allocates and sets gcm_ivals_I variable */
 	void set_gcm_inputs();
 
 	// --------------------------------------------

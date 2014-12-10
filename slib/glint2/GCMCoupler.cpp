@@ -259,22 +259,22 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 
 
 	// -------------- Run the model
-	model->allocate_ovals_I();	// Allocate ice model output variables (ICE grid)
+	model->allocate_ice_ovals_I();	// Allocate ice model output variables (ICE grid)
 
 	// Record exactly the same inputs that this ice model is seeing.
 	IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
-	if (iwriter) iwriter->run_timestep(time_s, indices, ivals2, model->ovals_I);
+	if (iwriter) iwriter->run_timestep(time_s, indices, ivals2, model->ice_ovals_I);
 
 	// Now call to the ice model
-	model->run_timestep(time_s, indices, ivals2, model->ovals_I);
+	model->run_timestep(time_s, indices, ivals2, model->ice_ovals_I);
 
 	// Record what the ice model produced.
-	// NOTE: This shouldn't change model->ovals_I
+	// NOTE: This shouldn't change model->ice_ovals_I
 	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
 	if (owriter) {
 		printf("BEGIN owriter->run_timestep()\n");
 		std::vector<blitz::Array<double,1>> dummy;
-		owriter->run_decoded(time_s, model->ovals_I, dummy);
+		owriter->run_decoded(time_s, model->ice_ovals_I, dummy);
 		printf("END owriter->run_timestep()\n");
 	}
 
@@ -355,18 +355,13 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
 			auto params(im_params.find(sheetno));
-printf("AXAAA1\n");
 			call_ice_model(&*model, sheetno, time_s, *rbuf,
 				params->second.begin, params->second.next);
-printf("AXAAA2\n");
-
 			// Convert to variables the GCM wants (but still on the ice grid)
 			model->set_gcm_inputs();	// Fills in ivals_I
-printf("AXAAA3\n");
 
-			// Free ovals_I
-			model->free_ovals_I();
-printf("AXAAA4\n");
+			// Free ice_ovals_I
+			model->free_ice_ovals_I();
 		}
 
 		// =============== Regrid to the grid requested by the GCM
@@ -399,7 +394,7 @@ printf("AXAAA4\n");
 				std::vector<blitz::Array<double, 1>> ival_I;
 				for (auto model = models.begin(); model != models.end(); ++model) {
 					// Assemble vector of the same GCM input variable from each ice model.
-					ival_I.push_back(model->ivals_I[var_ix]);
+					ival_I.push_back(model->gcm_ivals_I[var_ix]);
 				}
 
 				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
@@ -410,7 +405,7 @@ printf("AXAAA4\n");
 				std::map<int, blitz::Array<double,1>> f4s;
 				for (auto model = models.begin(); model != models.end(); ++model) {
 					int sheetno = model.key();
-					f4s.insert(std::make_pair(sheetno, model->ivals_I[var_ix]));
+					f4s.insert(std::make_pair(sheetno, model->gcm_ivals_I[var_ix]));
 				}
 
 				// Use previous return as our initial guess
@@ -424,7 +419,6 @@ printf("AXAAA4\n");
 
 		// ----------------- Free Memory
 		for (auto model = models.begin(); model != models.end(); ++model) {
-			// Free ovals_I
 			model->free_ovals_ivals_I();
 		}
 

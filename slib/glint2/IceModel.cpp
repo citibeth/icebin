@@ -23,7 +23,7 @@ giss::CouplingContract *IceModel::new_CouplingContract() {
 // ==========================================================
 
 /** Allocate vectors in preparation of calling an ice model. */
-void IceModel::allocate_ovals_I()
+void IceModel::allocate_ice_ovals_I()
 {
 	// Allocate for direct output from ice model
 	giss::CouplingContract const &ocontract(contract[IceModel::OUTPUT]);
@@ -32,55 +32,45 @@ void IceModel::allocate_ovals_I()
 		giss::CoupledField const &cf(ocontract.field(i));
 		std::string const &grid(cf.get_grid());
 		long n2 = ndata();
-		ovals_I.push_back(blitz::Array<double,1>(n2));
+		ice_ovals_I.push_back(blitz::Array<double,1>(n2));
 	}
 }
 
 
 /** Allocate in preparation of var transformations (but not regridding yet) */
-void IceModel::allocate_ivals_I()
+void IceModel::allocate_gcm_ivals_I()
 {
-
-	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
-	int nfields = icontract.size_nounit();
+	giss::CouplingContract const &gcm_inputs(coupler->gcm_inputs);
+	int nfields = gcm_inputs.size_nounit();
 	for (int i=0; i < nfields; ++i) {
-		giss::CoupledField const &cf(icontract.field(i));
+		giss::CoupledField const &cf(gcm_inputs.field(i));
 		std::string const &grid(cf.get_grid());
 		long n2 = ndata();
-		ivals_I.push_back(blitz::Array<double,1>(n2));
+		gcm_ivals_I.push_back(blitz::Array<double,1>(n2));
 	}
 }
 
 /** Free portions not needed after finished calling ice model and
 applying variable transform.  This will be variables desired on
 anything other than the ELEVATION grid. */
-void IceModel::free_ovals_I()
+void IceModel::free_ice_ovals_I()
 {
-	ovals_I.clear();
-#if 0
-	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
-	int nfields = icontract.size_nounit();
-	for (int i=0; i < nfields; ++i) {
-		giss::CoupledField const &cf(icontract.field(i));
-		std::string const &grid(cf.get_grid());
-
-		if (grid != "ELEVATION") giss::free_array(ivals_I[i]);
-	}
-#endif
+	ice_ovals_I.clear();
 }
 
 /** Free all memory used by this.  Called when we're done with a coupling timestep. */
 void IceModel::free_ovals_ivals_I()
 {
-	ovals_I.clear();
-	ivals_I.clear();
+	ice_ovals_I.clear();
+	gcm_ivals_I.clear();
 }
 
 // -----------------------------------------------------------
-/** Allocates and sets ivals_I variable */
+/** Allocates and sets gcm_ivals_I variable */
 void IceModel::set_gcm_inputs()
 {
-	allocate_ivals_I();		// Allocate ivals_I
+	printf("BEGIN IceModel::set_gcm_inputs()\n");
+	allocate_gcm_ivals_I();
 
 	// Compute the variable transformation
 	giss::VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
@@ -90,17 +80,16 @@ void IceModel::set_gcm_inputs()
 
 	// Apply the variable transformation
 	for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {	// xi is index of output variable
-
 		// Consider each output variable separately...
 		std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
 		for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
 			int xj = xjj->first;		// Index of input variable
 			double io_val = xjj->second;	// Amount to multiply it by
-			
-			ivals_I[xi] += ovals_I[xj] * io_val;		// blitz++ vector operation
+			gcm_ivals_I[xi] += ice_ovals_I[xj] * io_val;		// blitz++ vector operation
 		}
 	}
 
+	printf("END IceModel::set_gcm_inputs()\n");
 }
 
 // -----------------------------------------------------------

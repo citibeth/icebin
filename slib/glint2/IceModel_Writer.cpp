@@ -189,7 +189,6 @@ printf("BEGIN IceModel_Writer::run_decoded\n");
 
 //		double const *data = (io == IceModel::INPUT ? ivals2[i].data() : ovals2[i].data());
 		double const *data = ivals2[i].data();
-printf("data = %p\n", data);
 		ncvar->put(data, &counts[0]);
 	}
 

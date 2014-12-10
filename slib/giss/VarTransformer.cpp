@@ -39,6 +39,17 @@ bool VarTransformer::set(std::string output, std::string input, std::string scal
 }
 
 
+std::string dims_str(DynamicEnum const &de)
+{
+	std::string ret;
+	int sz = de.size_withunit();
+	for (int i=0; i<sz; ++i) {
+		ret += de.name(i);
+		ret += ", ";
+	}
+	return ret;
+}
+
 /** Instantiates the scalars with specific values, and returns a 2nd-order
 matrix derived from the 3d-order tensor, in CSR format. */
 CSRAndUnits VarTransformer::apply_scalars(
@@ -48,6 +59,10 @@ CSRAndUnits VarTransformer::apply_scalars(
 	for (auto ele : nvpairs) {
 		printf("    %s = %g\n", ele.first.c_str(), ele.second);
 	}
+
+std::cout << "OUTPUTS = " << dims_str(dimension(OUTPUTS)) << std::endl;
+std::cout << "INPUTS = " << dims_str(dimension(INPUTS)) << std::endl;
+std::cout << "SCALARS = " << dims_str(dimension(SCALARS)) << std::endl;
 
 
 	int n_outputs_nu = dimension(OUTPUTS).size_nounit();		// # OUTPUTS no unit
@@ -67,8 +82,6 @@ CSRAndUnits VarTransformer::apply_scalars(
 		int ix = dimension(SCALARS).index(nv_name, false);
 		if (ix >= 0) scalars(ix) = val;
 	}
-
-//std::cout << "Input vector = " << scalars << std::endl;
 
 	// Take inner product of tensor with our scalars.
 	CSRAndUnits ret(n_outputs_nu);
