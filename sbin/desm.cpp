@@ -50,7 +50,7 @@ class Desm {
 
 
 	// Array to receive Glint2 outputs
-	blitz::Array<double,3> gcm_inputs;
+	blitz::Array<double,3> gcm_inputs;		// Global array on root
 	int gcm_inputs_nhp;		// Total size in the elevation points direction
 
 	glint2_modele *api;
@@ -71,19 +71,21 @@ public:
 // --------------------------------------------------------
 void Desm::add_gcm_input_ij(std::string const &field, std::string const &units, std::string const &long_name)
 {
-	glint2_modele_add_gcm_input(api,
+	int ret = glint2_modele_add_gcm_input(api,
 		field.c_str(), field.size(),
 		units.c_str(), units.size(),
 		"ATMOSPHERE", 10,
 		long_name.c_str(), long_name.size());
+//printf("add_gcm_input_ij(%s) = %d\n", field.c_str(), ret);
 }
 void Desm::add_gcm_input_ijhc(std::string const &field, std::string const &units, std::string const &long_name)
 {
-	glint2_modele_add_gcm_input(api,
+	int ret = glint2_modele_add_gcm_input(api,
 		field.c_str(), field.size(),
 		units.c_str(), units.size(),
 		"ELEVATION", 9,
 		long_name.c_str(), long_name.size());
+//printf("add_gcm_input_ijhc(%s) = %d\n", field.c_str(), ret);
 }
 // --------------------------------------------------------
 void Desm::allocate_gcm_input()
@@ -123,6 +125,13 @@ void Desm::allocate_gcm_input()
 
 	add_gcm_input_ij("epsilon.mass", "kg m-2 s-1", "Changes not otherwise accounted for");
 	add_gcm_input_ij("epsilon.enth", "W m-2", "Changes not otherwise accounted for");
+
+	if (api->gcm_coupler.am_i_root()) {
+		int nhp_total = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
+printf("Allocating gcm_inputs with nhp = %d\n", nhp_total);
+		gcm_inputs.reference(blitz::Array<double,3>(nhp_total,
+			api->domain->jm, api->domain->im));
+	}
 }
 // --------------------------------------------------------
 int Desm::main(int argc, char **argv)
@@ -204,7 +213,7 @@ int Desm::main(int argc, char **argv)
 
 	// -------------------------------------------------
 	// Open desm input file and read dtsrc (and other parameters)
-	printf("desm_fname = %s\n", desm_fname.c_str());
+	printf("Opening for reading, desm_fname = %s\n", desm_fname.c_str());
 	NcFile dnc(desm_fname.c_str());
 
 	// Get parameters

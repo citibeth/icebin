@@ -120,7 +120,11 @@ public:
 		// Glint2 requires orography on the ice grid, in order to
 		// regrid in elevation space when things change.  Therefore, this
 		// is added to the contract for all GCMs
-		gcm_inputs.add_field("elev2", "m", "ICE", "ice upper surface elevation");
+		// gcm_inputs.add_field("elev2", "m", "ICE", "ice upper surface elevation");
+		// No... this messes up what the GCM expects, and it's not used by the GCM.
+		// Therefore, it should not be listed as a GCM input, it's a Glint2 input.
+		// Glint2 will require it, somehow, as an IceModel output, and get it
+		// directly from there.
 	}
 
 	virtual ~GCMCoupler() {}

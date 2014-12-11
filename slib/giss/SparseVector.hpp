@@ -127,19 +127,25 @@ void VectorSparseVector<IndexT,ValT>::consolidate(typename SparseVector<IndexT,V
 
 	sort_stable();
 
+printf("-------------- AFTER SORT\n");
+for (auto ii=begin(); ii != end(); ++ii) {
+	printf("     %d = %f\n", ii->first, ii->second);
+}
+
+
 	// Scan through, overwriting our array
 	// New array will never be bigger than original
 	int j=0;		// Last-written item in output array
 	IndexT last_index = vals[0].first;	// Last index we saw in input array
 	for (int i=1; i<this->size(); ++i) {
-		IndexT index = vals[i].first;
-		ValT val = vals[i].second;
+		IndexT &index = vals[i].first;
+		ValT &val = vals[i].second;
 
 		if (index == last_index) {
 			if (dups == SparseVector<IndexT,ValT>::DuplicatePolicy::ADD) {
 				vals[j].second += val;
 			} else {
-				vals[j].second == val;
+				vals[j].second = val;
 			}
 		} else {
 			++j;
@@ -151,6 +157,11 @@ void VectorSparseVector<IndexT,ValT>::consolidate(typename SparseVector<IndexT,V
 
 	this->vals.resize(n);
 	this->vals.shrink_to_fit();
+
+printf("-------------- AFTER CONSOLIDATE\n");
+for (auto ii=begin(); ii != end(); ++ii) {
+	printf("     %d = %f\n", ii->first, ii->second);
+}
 
 }
 

@@ -59,6 +59,7 @@ printf("AA\n");
 					gcm_params.config_dir).string();
 			}
 		}
+		printf("gcm_out_file = %s\n", gcm_out_file.c_str());
 	}
 
 	// Read gcm_in_file, an optional variable telling the GCM-specific
@@ -66,9 +67,7 @@ printf("AA\n");
 	// (so it can be replayed later with desm)
 	{
 		NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
-printf("BB\n");
 		auto attr(giss::get_att(info_var, "gcm_in_file"));
-printf("BB\n");
 		if (!attr.get()) {
 			gcm_in_file = "";
 		} else {
@@ -79,6 +78,7 @@ printf("BB\n");
 					gcm_params.config_dir).string();
 			}
 		}
+		printf("gcm_in_file = %s\n", gcm_in_file.c_str());
 	}
 
 #if 1
@@ -398,8 +398,17 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				}
 
 				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
+#if 0
+printf("-------------- Produced GCM Input %s\n", cf.name.c_str());
+for (auto ii=gcm_ivals[var_ix].begin(); ii != gcm_ivals[var_ix].end(); ++ii) {
+	printf("     %d = %f\n", ii->first, ii->second);
+}
+#endif
 				gcm_ivals[var_ix].consolidate();
+
 			} else if (cf.grid == "ELEVATION") {
+// Temporarily comment out, there might be problems inside QP regridding.
+#if 0
 				// --- Assemble all inputs, to send to Glint2 QP regridding
 
 				std::map<int, blitz::Array<double,1>> f4s;
@@ -414,6 +423,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				gcm_ivals[var_ix] = maker->iceinterp_to_hp(
 					f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP);
 				gcm_ivals[var_ix].consolidate();
+#endif
 			}
 		}
 

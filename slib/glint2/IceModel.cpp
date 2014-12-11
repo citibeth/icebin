@@ -87,6 +87,7 @@ void IceModel::set_gcm_inputs()
 			double io_val = xjj->second;	// Amount to multiply it by
 			gcm_ivals_I[xi] += ice_ovals_I[xj] * io_val;		// blitz++ vector operation
 		}
+gcm_ivals_I[xi] = 17.17;
 	}
 
 	printf("END IceModel::set_gcm_inputs()\n");

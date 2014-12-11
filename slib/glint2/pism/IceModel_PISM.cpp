@@ -476,14 +476,10 @@ printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 		throw std::exception();
 	}
 
-int surface_temperature_ix = contract[INPUT].index("surface_temperature");
-
 	// Transfer input to PISM variables (and scatter w/ PETSc as well)
 	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
 	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[ndata()]);
 	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
-
-printf("Doing pism_ivars[%d]\n", i);
 
 		// Get matching input (val) and output (pism_var) variables
 		blitz::Array<double,1> const &val(ivals2[i]);
@@ -577,7 +573,6 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 		
 
 		// Get matching input (val) and output (pism_var) variables
-		IceModelVec2S *pism_var = pism_ovars[i];
 		iceModelVec2S_to_blitz_xy(*pism_ovars[i], oval2_xy);	// Allocates val2_xy if needed
 	}
 

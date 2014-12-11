@@ -37,7 +37,6 @@ std::unique_ptr<IceModel> read_icemodel(
 {
 	printf("BEGIN read_icemodel(%s)\n", vname.c_str());
 	auto info_var = nc.get_var((vname + ".info").c_str());
-	auto const_var = nc.get_var("const");	// Physical constants
 
 	IceModel::Type type = giss::parse_enum<IceModel::Type>(
 		giss::get_att(info_var, "ice_model")->as_string(0));
@@ -56,7 +55,7 @@ std::unique_ptr<IceModel> read_icemodel(
 
 	// After this, the caller must run the following to finish IceModel setup:
 	// 1. Configure the contracts
-	// 2. ice_model->init(coupler, sheet->grid2, nc, vname, const_var);
+	// 2. ice_model->init(coupler, sheet->grid2, nc, vname);
 	// 3. ice_model->update_ice_sheet(nc, vname, sheet);
 
 	ice_model->gcm_per_ice_sheet_params = std::move(gcm_per_ice_sheet_params);

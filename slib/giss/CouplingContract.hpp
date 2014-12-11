@@ -66,7 +66,7 @@ public:
 
 
 	long size_withunit() const { return _ix_to_field.size(); }
-	long size() const { return size_withunit(); }
+//	long size() const { return size_withunit(); }
 	long size_nounit() const { return _size_nounit; }
 
 	int unit_ix() const { return _unit_ix; }

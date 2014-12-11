@@ -185,7 +185,7 @@ void IceModel_PISM::setup_contracts_modele()
 	vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
 	vt.allocate();
 
-	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);
+//	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);
 	ok = ok && vt.set("elev1", "usurf", "unit", 1.0);
 
 	// For specific enthalpy: Enth_e = Enth_p - enth_modele_to_pism

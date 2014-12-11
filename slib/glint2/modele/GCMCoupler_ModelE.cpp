@@ -13,12 +13,12 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	// ------------ GCM Outputs
 	// The GCM must produce the same set of outputs, no matter what
 	// ice model is being used
-	gcm_outputs.add_field("lismb", "kg m-2 s-1", "Surface mass balance");
-	gcm_outputs.add_field("liseb", "J m-2 s-1", "Ethalpy of SMB");
+	gcm_outputs.add_field("lismb", "kg m-2 s-1", "ELEVATION", "Surface mass balance");
+	gcm_outputs.add_field("liseb", "J m-2 s-1", "ELEVATION", "Ethalpy of SMB");
 	// Specific enthalpy of the SMB computed as liseb / lismb (J kg-1)
 
-	gcm_outputs.add_field("litg2", "degC", "T of bottom layer of snow/firn");
-	gcm_outputs.add_field("unit", "", "Dimensionless identity");
+	gcm_outputs.add_field("litg2", "degC", "ELEVATION", "T of bottom layer of snow/firn");
+	gcm_outputs.add_field("unit", "", "", "Dimensionless identity");
 
 
 	// ------------------------- GCM Inputs

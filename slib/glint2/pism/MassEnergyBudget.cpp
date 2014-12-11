@@ -40,7 +40,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 {
 	PetscErrorCode ierr;
 
-	printf("BEGIN MassEnergyBudget::create()\n");
+//	printf("BEGIN MassEnergyBudget::create()\n");
 
 	// ----------- Mass and Enthalpy State of the Ice Sheet
 	ierr = total.create(grid, prefix+"total",

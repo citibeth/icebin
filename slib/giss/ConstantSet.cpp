@@ -109,7 +109,7 @@ void ConstantSet::netcdf_define(NcFile &nc, std::string const &vname)
 	}
 
 	// Store the constants as attributes
-	for (int i=0; i<fields.size(); ++i) {
+	for (int i=0; i<fields.size_withunit(); ++i) {
 		CoupledField const &field(fields.field(i));
 		ncvar->add_att(field.name.c_str(), vals[i]);
 		ncvar->add_att((field.name + "_units").c_str(), field.units.c_str());

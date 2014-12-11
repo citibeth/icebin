@@ -76,6 +76,7 @@ void glint2_modele_init_ncfile(glint2_modele *api,
 giss::CouplingContract const &contract,
 std::string const &fname)
 {
+	printf("BEGIN glint2_modele_init_ncfile(%s)\n", fname.c_str());
 	GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
 
 	// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
@@ -86,7 +87,9 @@ std::string const &fname)
 	NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
 	NcDim *one_dim = ncout.add_dim("one", 1);
 	NcDim *time_dim = ncout.add_dim("time");		// No dimsize --> unlimited
-	const NcDim *dims[4]{time_dim, nhp_dim, jm_dim, im_dim};
+
+	const NcDim *dims_elevation[4]{time_dim, nhp_dim, jm_dim, im_dim};
+	const NcDim *dims_atmosphere[3]{time_dim, jm_dim, im_dim};
 
 	const NcDim *dims_b[1]{one_dim};
 	NcVar *time0_var = ncout.add_var("time0", giss::get_nc_type<double>(), 1, dims_b);
@@ -95,7 +98,7 @@ std::string const &fname)
 	time0_var->add_att("axis", "T");
 	time0_var->add_att("long_name", "Simulation start time");
 
-	NcVar *time_var = ncout.add_var("time", giss::get_nc_type<double>(), 1, dims);
+	NcVar *time_var = ncout.add_var("time", giss::get_nc_type<double>(), 1, dims_atmosphere);
 	time_var->add_att("units", gcm_params.time_units.c_str());
 	time_var->add_att("calendar", "365_day");
 	time_var->add_att("axis", "T");
@@ -104,8 +107,20 @@ std::string const &fname)
 	//giss::CouplingContract &gcm_outputs(api->gcm_coupler.gcm_outputs);
 
 	for (unsigned int i=0; i < contract.size_nounit(); ++i) {
-		NcVar *nc_var = ncout.add_var(contract.name(i).c_str(),
-			giss::get_nc_type<double>(), 4, dims);
+
+		NcVar *nc_var = 0;
+		giss::CoupledField const &cf(contract.field(i));
+printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), cf.grid.c_str());
+		if (cf.grid == "ATMOSPHERE") {
+			nc_var = ncout.add_var(cf.name.c_str(),
+				giss::get_nc_type<double>(), 3, dims_atmosphere);
+		} else if (cf.grid == "ELEVATION") {
+			nc_var = ncout.add_var(cf.name.c_str(),
+				giss::get_nc_type<double>(), 4, dims_elevation);
+		} else {
+			fprintf(stderr, "glint2_modele_init_ncfile() unable to handle grid type %s for field %s\n", cf.grid.c_str(), cf.name.c_str());
+			throw std::exception();
+		}
 
 		auto comment(boost::format(
 			"%s[t,...] holds the mean from time[t-1] to time[t].  See time0[0] if t=0.")
@@ -126,6 +141,8 @@ std::string const &fname)
 	time0_var->put(&gcm_params.time_start_s, counts);
 
 	ncout.close();
+	printf("END glint2_modele_init_ncfile(%s)\n", fname.c_str());
+
 }
 // -----------------------------------------------------
 void glint2_modele_save_gcm_inputs(
@@ -439,7 +456,7 @@ char const *long_name_f, int long_name_len)
 	api->gcm_coupler.gcm_inputs.add_field(field_name, units, grid, long_name);
 
 	api->gcm_inputs_ihp.push_back(ihp + var_nhp);
-	int ret = ihp+1;
+	int ret = ihp+1;		// Convert to Fortran (1-based) indexing
 
 	printf("glint2_modele_add_gcm_input(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
 
@@ -804,8 +821,10 @@ printf("END glint2_modele_init_hp_to_ices\n");
 // -----------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide.
+
 	@param gcm_inputs_d_f Global (gathered) array of the Glint2
-	outputs to be fed into the GCM. */
+	outputs to be fed into the GCM.  This only needs to be allocated
+	if api->gcm_coupler.am_i_root(). */
 
 extern "C"
 void  glint2_modele_couple_to_ice_c(
@@ -922,7 +941,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itime, time_s, api->dtsrc);
 	// sbuf has elements for ALL ice sheets here
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
-	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size());
+	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size_nounit());
 	coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
 
 	// Decode the outputs to a dense array for ModelE
@@ -932,15 +951,25 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 
 	if (api->gcm_coupler.am_i_root()) {
 		blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+printf("gcm_inputs_d.extent(0) = %d\n", gcm_inputs_d.extent(0));
 
 		// We ARE the root note --- densify the data into the global gcm_inputs array
-		for (long ix = 0; ix < contract.size(); ++ix) {
-			int ihp = api->gcm_inputs_ihp[ix];
-			int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;
+		for (long ix = 0; ix < contract.size_nounit(); ++ix) {
+			int ihp = api->gcm_inputs_ihp[ix];				// First elevation point for this variable
+			int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;	// # elevation points for this variable.
 
 			// Check bounds
-			if (ihp+var_nhp >= gcm_inputs_d.extent(0)) {
-				fprintf(stderr, "gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", gcm_inputs_d.extent(0), ihp+var_nhp);
+			if (ihp+var_nhp > gcm_inputs_d.extent(0)) {
+printf("gcm_inputs_ihp = [");
+for (int i : api->gcm_inputs_ihp) printf(" %d", i);
+printf("]\n");
+printf("gcm_inputs_ihp.size() = %d\n", api->gcm_inputs_ihp.size());
+printf("contract.size_nounit() = %d\n", contract.size_nounit());
+printf("ihp var_hp = %d %d\n", ihp, var_nhp);
+printf("ix = %d\n", ix);
+std::cout << "Contract = " << contract << std::endl;
+
+				fprintf(stderr, "gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", gcm_inputs_d.extent(0), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
 				throw std::exception();
 			}
 
@@ -957,9 +986,7 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 			}
 		}
 
-printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n");
 		if (coupler.gcm_in_file.length() > 0) {
-printf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCDDDDDDDDDDDDDDDDDDD\n");
 			// Write out to DESM file
 			glint2_modele_save_gcm_inputs(api, time_s, gcm_inputs_d);
 		}
