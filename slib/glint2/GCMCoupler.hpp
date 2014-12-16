@@ -72,6 +72,11 @@ public:
 	);
 	Type const type;
 
+	/** Filename this coupler (including grid) was read from. */
+	std::string fname;
+	/** Variable inside fname this coupler (including grid) was read from. */
+	std::string vname;
+
 	/** Main access to the core regridding of Glint2 */
 	std::unique_ptr<MatrixMaker> maker;
 
@@ -143,7 +148,8 @@ public:
 	virtual void setup_contracts(IceModel &ice_model) const = 0;
 
 	virtual void read_from_netcdf(
-		NcFile &nc, std::string const &vname,
+		std::string const &fname,
+		std::string const &vname,
 		std::unique_ptr<GridDomain> &&mdomain);
 
 	void set_start_time(

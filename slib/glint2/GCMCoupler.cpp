@@ -25,18 +25,21 @@ namespace glint2 {
 
 /** @param nc The Glint22 configuration file */
 void GCMCoupler::read_from_netcdf(
-	NcFile &nc,
+	std::string const &fname,
 	std::string const &vname,
 	std::unique_ptr<GridDomain> &&mdomain)
 {
 	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
 
+	NcFile nc(fname.c_str(), NcFile::ReadOnly);
+
+	this->fname = fname;
+	this->vname = vname;
 
 	// Load the MatrixMaker	(filtering by our domain, of course)
 	// Also load the ice sheets
 	maker.reset(new MatrixMaker(true, std::move(mdomain)));
 	maker->read_from_netcdf(nc, vname);
-
 
 	std::vector<std::string> const &sheet_names(maker->get_sheet_names());
     giss::MapDict<std::string, IceSheet> &sheets(maker->sheets);
@@ -46,10 +49,8 @@ void GCMCoupler::read_from_netcdf(
 	// (so it can be replayed later with desm)
 	{
 		NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
-printf("AA\n");
 		auto attr(giss::get_att(info_var, "gcm_out_file"));
-printf("AA\n");
-		if (!attr.get()) {
+s		if (!attr.get()) {
 			gcm_out_file = "";
 		} else {
 			gcm_out_file = attr->as_string(0);
@@ -143,6 +144,8 @@ printf("AA\n");
 
 		++i;
 	}
+
+	nc.close();
 	printf("END GCMCoupler::read_from_netcdf()\n");
 }
 
@@ -398,17 +401,9 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				}
 
 				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
-#if 0
-printf("-------------- Produced GCM Input %s\n", cf.name.c_str());
-for (auto ii=gcm_ivals[var_ix].begin(); ii != gcm_ivals[var_ix].end(); ++ii) {
-	printf("     %d = %f\n", ii->first, ii->second);
-}
-#endif
 				gcm_ivals[var_ix].consolidate();
 
 			} else if (cf.grid == "ELEVATION") {
-// Temporarily comment out, there might be problems inside QP regridding.
-#if 0
 				// --- Assemble all inputs, to send to Glint2 QP regridding
 
 				std::map<int, blitz::Array<double,1>> f4s;
@@ -423,7 +418,6 @@ for (auto ii=gcm_ivals[var_ix].begin(); ii != gcm_ivals[var_ix].end(); ++ii) {
 				gcm_ivals[var_ix] = maker->iceinterp_to_hp(
 					f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP);
 				gcm_ivals[var_ix].consolidate();
-#endif
 			}
 		}
 

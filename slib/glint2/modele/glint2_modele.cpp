@@ -92,6 +92,10 @@ std::string const &fname)
 	const NcDim *dims_atmosphere[3]{time_dim, jm_dim, im_dim};
 
 	const NcDim *dims_b[1]{one_dim};
+	NcVar *grid_var = ncout.add_var("grid", giss::get_nc_type<double>(), 1, dims_b);
+	grid_var->add_att("file", api->gcm_coupler.fname.c_str());
+	grid_var->add_att("variable", api->gcm_coupler.vname.c_str());
+
 	NcVar *time0_var = ncout.add_var("time0", giss::get_nc_type<double>(), 1, dims_b);
 	time0_var->add_att("units", gcm_params.time_units.c_str());
 	time0_var->add_att("calendar", "365_day");
@@ -392,11 +396,9 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 	// ModelE makes symlinks to our real files, which we don't want.
 
 	printf("Opening GLINT2 config file: %s\n", glint2_config_rfname.c_str());
-	NcFile glint2_config_nc(glint2_config_rfname.c_str(), NcFile::ReadOnly);
 
 	// Read the coupler, along with ice model proxies
-	api->gcm_coupler.read_from_netcdf(glint2_config_nc, maker_vname, std::move(mdomain));
-	glint2_config_nc.close();
+	api->gcm_coupler.read_from_netcdf(glint2_config_rfname.string(), maker_vname, std::move(mdomain));
 
 	// Check bounds on the IceSheets, set up any state, etc.
 	// This is done AFTER setup of gcm_coupler because gcm_coupler.read_from_netcdf()
@@ -973,10 +975,20 @@ std::cout << "Contract = " << contract << std::endl;
 				throw std::exception();
 			}
 
+			// Ignore elevation point = 0 (for ELEVATION grid only),
+			// which is reserved for ModelE's "legacy" elevation point.
+			int modele_ihp = ihp;
+			int modele_var_nhp = var_nhp;
+			if (modele_var_nhp > 1) {
+				// We have an ELEVATION grid destination (not ATMOSPHERE)
+				modele_ihp += 1;
+				modele_var_nhp -= 1;
+			}
+
 			// Index into our big array-of-array of all gcm_inputs
 			blitz::Array<double,1> dense1d(
-				&gcm_inputs_d(ihp, 0, 0),
-				blitz::shape(n1*var_nhp), blitz::neverDeleteData);
+				&gcm_inputs_d(modele_ihp, 0, 0),
+				blitz::shape(n1*modele_var_nhp), blitz::neverDeleteData);
 	
 			// Convert this sparse vector...
 			for (auto ii=gcm_ivals_global[ix].begin(); ii != gcm_ivals_global[ix].end(); ++ii) {

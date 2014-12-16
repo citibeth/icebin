@@ -121,6 +121,16 @@ void IceModel_Writer::init_output_file()
 	std::vector<const NcDim *> dims = add_dims(nc);
 	NcDim *one_dim = nc.add_dim("one", 1);
 
+	NcVar *info_var = nc.add_var("grid", giss::get_nc_type<double>(), one_dim);
+
+
+//	std::string fname(boost::filesystem::absolute(
+//		boost::filesystem::path(coupler->fname)).string());
+//	info_var->add_att("file", fname.c_str());
+	info_var->add_att("file", coupler->fname.c_str());
+	info_var->add_att("variable", coupler->vname.c_str());
+	info_var->add_att("ice_sheet", this->name.c_str());
+
 	NcVar *time0_var = nc.add_var("time0", giss::get_nc_type<double>(), one_dim);
 	time0_var->add_att("units", gcm_params.time_units.c_str());
 	time0_var->add_att("calendar", "365_day");

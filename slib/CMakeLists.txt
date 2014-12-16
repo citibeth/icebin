@@ -63,6 +63,7 @@ set(glint2_SOURCES
 	glint2/IceSheet.cpp
 	glint2/IceSheet_L0.cpp
 	glint2/MatrixMaker.cpp
+	glint2/MultiMatrix.cpp
 	glint2/clippers.cpp
 	glint2/gridutil.cpp
 	glint2/matrix_ops.cpp
