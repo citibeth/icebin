@@ -78,6 +78,7 @@ export CPPFLAGS="-frounding-math"
 
 PETSC_HOME=$HOME/opt/petsc-3.4.4
 PETSC_ARCH=$PETSC_HOME/arch-darwin-c-opt
+#PETSC_ARCH=$PETSC_HOME/arch-darwin-c-debug
 export PETSC_CFLAGS="-I$PETSC_ARCH/include -I$PETSC_HOME/include"
 export PETSC_LIBS="-L$PETSC_ARCH/lib -lpetsc"
 

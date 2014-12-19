@@ -77,8 +77,12 @@ public:
 	/** Variable inside fname this coupler (including grid) was read from. */
 	std::string vname;
 
-	/** Main access to the core regridding of Glint2 */
+	/** Main access to the core regridding of Glint2
+	(for just this MPI node's part of the GCM domain) */
 	std::unique_ptr<MatrixMaker> maker;
+
+	/** Access to entire regridding matrices, for all MPI nodes. */
+	std::unique_ptr<MatrixMaker> maker_full;
 
 	/** Parameters passed from the GCM through to the ice model.
 	These parameters cannot be specific to either the ice model or the GCM. */
@@ -134,7 +138,7 @@ public:
 
 	virtual ~GCMCoupler() {}
 
-	bool am_i_root() { return (gcm_params.gcm_rank == gcm_params.gcm_root); }
+	bool am_i_root() const { return (gcm_params.gcm_rank == gcm_params.gcm_root); }
 
 	/** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
 	virtual std::unique_ptr<GCMPerIceSheetParams>
@@ -151,6 +155,8 @@ public:
 		std::string const &fname,
 		std::string const &vname,
 		std::unique_ptr<GridDomain> &&mdomain);
+
+	virtual void realize();
 
 	void set_start_time(
 		giss::time::tm const &time_base,

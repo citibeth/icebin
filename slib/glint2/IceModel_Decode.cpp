@@ -27,8 +27,7 @@ static double const nan = std::numeric_limits<double>::quiet_NaN();
 // normal arrays (with NaN where no value was given.)
 void IceModel_Decode::run_timestep(double time_s,
 	blitz::Array<int,1> const &indices,
-	std::vector<blitz::Array<double,1>> const &ivals2,
-	std::vector<blitz::Array<double,1>> &ovals2)			// Output variables; should be allocated by caller
+	std::vector<blitz::Array<double,1>> const &ivals2)
 {
 printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, indices.size());
 	std::vector<blitz::Array<double,1>> ivals2d;	/// Decoded fields
@@ -67,7 +66,7 @@ printf("Done decoding required field, %s\n", contract[IceModel::INPUT].name(i).c
 	}
 
 	// Pass decoded fields on to subclass
-	run_decoded(time_s, ivals2d, ovals2);
+	run_decoded(time_s, ivals2d);
 printf("END IceModel_Decode::run_timestep(%f)\n", time_s);
 }
 

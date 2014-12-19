@@ -923,7 +923,8 @@ printf("2 Set mask1 = %p\n", mask1.get());
 	boost::function<bool (int)> include_cell1(domain->get_in_halo2());
 	grid1->filter_cells(include_cell1);
 
-	// Now remove cells from the exgrids and grid2s that interacted with grid1
+	// Now remove cells from the exgrids and grid2s that
+	// do not interact with the cells we've kept in grid1.
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
 		sheet->filter_cells1(include_cell1);
 	}

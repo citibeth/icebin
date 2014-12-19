@@ -41,15 +41,13 @@ public :
 	@param time_s Time since start of simulation, in seconds */
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
-		std::vector<blitz::Array<double,1>> const &ivals2,
-		std::vector<blitz::Array<double,1>> &ovals2);			// Output values; we will allocate as needed
+		std::vector<blitz::Array<double,1>> const &ivals2);
 
 	/** Runs a timestep after fields have been decoded.  This is what
 	one will normally want to override, unless you wish to decode
 	yourself. */
 	virtual void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &ivals2,
-		std::vector<blitz::Array<double,1>> &ovals2) = 0;			// Output values; must be pre-allocated.
+		std::vector<blitz::Array<double,1>> const &ivals2) = 0;
 };
 
 }

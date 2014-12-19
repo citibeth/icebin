@@ -34,6 +34,9 @@ class IceModel_PISM : public IceModel_Decode
 	std::shared_ptr<glint2::Grid_XY const> glint2_grid;
 	MPI_Comm pism_comm;			// Commnicator used by ice model
 	PetscMPIInt pism_rank, pism_size;
+	const int pism_root = 0;
+
+	bool am_i_root() const { return pism_rank == 0; }
 
 	/** Arguments to be passed to PISM at PISM initialization */
 	std::vector<std::string> pism_args;
@@ -156,12 +159,10 @@ protected:
 
 public:
 	void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &vals2,
-		std::vector<blitz::Array<double,1>> &ovals2);			// Output values; must be pre-allocated.
+		std::vector<blitz::Array<double,1>> const &vals2);
 private:
 	PetscErrorCode run_decoded_petsc(double time_s,
-		std::vector<blitz::Array<double,1>> const &vals2,
-		std::vector<blitz::Array<double,1>> &ovals2);			// Output values; must be pre-allocated.
+		std::vector<blitz::Array<double,1>> const &vals2);
 
 };
 

@@ -41,6 +41,14 @@ void GCMCoupler::read_from_netcdf(
 	maker.reset(new MatrixMaker(true, std::move(mdomain)));
 	maker->read_from_netcdf(nc, vname);
 
+	// The root node needs to make the full regridding matrices, not just those
+	// for its own domain.  Therefore, create a second MatrixMaker for it.
+	if (am_i_root()) {
+		maker_full.reset(new MatrixMaker(true,
+			std::unique_ptr<GridDomain>(new GridDomain_Identity())));
+		maker_full->read_from_netcdf(nc, vname);
+	}
+
 	std::vector<std::string> const &sheet_names(maker->get_sheet_names());
     giss::MapDict<std::string, IceSheet> &sheets(maker->sheets);
 
@@ -50,7 +58,7 @@ void GCMCoupler::read_from_netcdf(
 	{
 		NcVar *info_var = giss::get_var_safe(nc, vname + ".info");
 		auto attr(giss::get_att(info_var, "gcm_out_file"));
-s		if (!attr.get()) {
+		if (!attr.get()) {
 			gcm_out_file = "";
 		} else {
 			gcm_out_file = attr->as_string(0);
@@ -150,6 +158,12 @@ s		if (!attr.get()) {
 }
 
 
+void GCMCoupler::realize()
+{
+	maker->realize();
+	if (maker_full.get()) maker_full->realize();
+}
+
 void GCMCoupler::set_start_time(
 	giss::time::tm const &time_base,
 	double time_start_s)
@@ -229,7 +243,7 @@ public:
 		sheetno(_sheetno), begin(_begin), next(_next) {}
 };
 
-/** PROTECTED method */
+/** PROTECTED method.  Called by all MPI nodes. */
 void GCMCoupler::call_ice_model(
 	IceModel *model,
 	int sheetno,
@@ -242,7 +256,7 @@ void GCMCoupler::call_ice_model(
 	// of fields in SMBMsg
 	int nfields = model->contract[IceModel::INPUT].size_nounit();
 
-printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
+printf("[%d] BEGIN GCMCoupler::call_ice_model(%s, nfields=%ld)\n", gcm_params.gcm_rank, model->name.c_str(), nfields);
 
 	// Construct indices vector
 	blitz::TinyVector<int,1> shape(rbuf.diff(end, begin));
@@ -262,22 +276,21 @@ printf("BEGIN GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
 
 
 	// -------------- Run the model
-	model->allocate_ice_ovals_I();	// Allocate ice model output variables (ICE grid)
-
 	// Record exactly the same inputs that this ice model is seeing.
 	IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
-	if (iwriter) iwriter->run_timestep(time_s, indices, ivals2, model->ice_ovals_I);
+	if (iwriter) iwriter->run_timestep(time_s, indices, ivals2);
 
 	// Now call to the ice model
-	model->run_timestep(time_s, indices, ivals2, model->ice_ovals_I);
+//	printf("[%d] BEGIN GCMCoupler::call_ice_model() calling model->run_timestep()\n", rank);
+	model->run_timestep(time_s, indices, ivals2);
+//	printf("[%d]END GCMCoupler::call_ice_model() calling model->run_timestep()\n", rank);
 
 	// Record what the ice model produced.
 	// NOTE: This shouldn't change model->ice_ovals_I
 	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
 	if (owriter) {
 		printf("BEGIN owriter->run_timestep()\n");
-		std::vector<blitz::Array<double,1>> dummy;
-		owriter->run_decoded(time_s, model->ice_ovals_I, dummy);
+		owriter->run_decoded(time_s, model->ice_ovals_I);
 		printf("END owriter->run_timestep()\n");
 	}
 
@@ -297,12 +310,16 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 	int num_mpi_nodes;
 	MPI_Comm_size(gcm_params.gcm_comm, &num_mpi_nodes); 
 
+	int const rank = gcm_params.gcm_rank;
+
 printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size=%d\n", gcm_params.gcm_rank, time_s, sbuf.size, sbuf.ele_size);
 
 	// MPI_Gather the count
 	std::unique_ptr<int[]> rcounts;
 	rcounts.reset(new int[num_mpi_nodes]);
 	for (int i=0; i<num_mpi_nodes; ++i) rcounts[i] = 0;
+
+printf("[%d] EE1\n", rank);
 
 	int nele_l = sbuf.size;
 	MPI_Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, gcm_params.gcm_root, gcm_params.gcm_comm);
@@ -311,6 +328,7 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 	std::unique_ptr<int[]> displs;
 	std::unique_ptr<giss::DynArray<SMBMsg>> rbuf;
 
+printf("[%d] EE2\n", rank);
 	displs.reset(new int[num_mpi_nodes+1]);
 	displs[0] = 0;
 	for (int i=0; i<num_mpi_nodes; ++i) displs[i+1] = displs[i] + rcounts[i];
@@ -320,12 +338,17 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 	// (There's an extra item in the array for a sentinel)
 	rbuf.reset(new giss::DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
 
+printf("[%d] EE3\n", rank);
 	MPI_Datatype mpi_type(SMBMsg::new_MPI_struct(nfields));
 	MPI_Gatherv(sbuf.begin().get(), sbuf.size, mpi_type,
 		rbuf->begin().get(), &rcounts[0], &displs[0], mpi_type,
 		gcm_params.gcm_root, gcm_params.gcm_comm);
 	MPI_Type_free(&mpi_type);
-	if (gcm_params.gcm_rank == gcm_params.gcm_root) {
+printf("[%d] EE4\n", rank);
+
+	if (am_i_root()) {
+printf("[%d] EE5\n", rank);
+		// (ONLY ON GCM ROOT)
 		// Clear output arrays, which will be filled in additively
 		// on each ice model
 //		for (auto ov=gcm_ivals.begin(); ov != gcm_ivals.end(); ++ov) *ov = 0;
@@ -337,6 +360,8 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 		// are found together
 		qsort(rbuf->begin().get(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
 
+printf("[%d] EE6\n", rank);
+		// (ONLY ON GCM ROOT)
 		// Figure out which ice sheets we have data for
 		auto lscan(rbuf->begin());
 		auto rscan(lscan);
@@ -352,6 +377,8 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			++rscan;
 		}
 
+		// (ONLY ON GCM ROOT)
+		// NOTE: call_ice_model() is called (below) even on NON-ROOT
 		// Call all our ice models
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			int sheetno = model.key();
@@ -361,32 +388,36 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 			call_ice_model(&*model, sheetno, time_s, *rbuf,
 				params->second.begin, params->second.next);
 			// Convert to variables the GCM wants (but still on the ice grid)
-			model->set_gcm_inputs();	// Fills in ivals_I
+			model->set_gcm_inputs();	// Fills in gcm_ivals_I
 
 			// Free ice_ovals_I
 			model->free_ice_ovals_I();
 		}
 
+		// (ONLY ON GCM ROOT)
 		// =============== Regrid to the grid requested by the GCM
 
+		// (ONLY ON GCM ROOT)
 		// ----------- Create the MultiMatrix used to regrid to atmosphere (I -> A)
 		MultiMatrix ice2atm;
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			// Get matrix for this single ice model.
 			giss::MapSparseVector<int,double> area1_m;
 			int sheetno = model.key();		// IceSheet::index
-			IceSheet *sheet = (*maker)[sheetno];
+			IceSheet *sheet = (*maker_full)[sheetno];
 			std::unique_ptr<giss::VectorSparseMatrix> M(
 				sheet->iceinterp_to_projatm(area1_m, IceInterp::ICE));
 
 			// Add on correction for projection
-			if (maker->correct_area1)
+			if (maker_full->correct_area1) {
 				sheet->atm_proj_correct(area1_m, ProjCorrect::PROJ_TO_NATIVE);
+			}
 
 			// Store it away...
 			ice2atm.add_matrix(std::move(M), area1_m);
 		}
 
+		// (ONLY ON GCM ROOT)
 		// ------------ Regrid each GCM input from ice grid to whatever grid it needs.
 		for (int var_ix=0; var_ix < gcm_inputs.size_nounit(); ++var_ix) {
 			giss::CoupledField const &cf(gcm_inputs.field(var_ix));
@@ -413,21 +444,23 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 				}
 
 				// Use previous return as our initial guess
-				blitz::Array<double,1> initial3(maker->n3());
+				blitz::Array<double,1> initial3(maker_full->n3());
 				giss::to_blitz(gcm_ivals[var_ix], initial3);
-				gcm_ivals[var_ix] = maker->iceinterp_to_hp(
+				gcm_ivals[var_ix] = maker_full->iceinterp_to_hp(
 					f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP);
 				gcm_ivals[var_ix].consolidate();
 			}
 		}
 
 		// ----------------- Free Memory
+		// (ONLY ON GCM ROOT)
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			model->free_ovals_ivals_I();
 		}
 
 
 	} else {
+		// (ONLY ON NOT GCM ROOT)
 		// We're not root --- we have no data to send to ice
 		// models, we just call through anyway because we will
 		// receive data in an upcomming MPI_Scatter
@@ -442,6 +475,8 @@ printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele
 		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
 
 	}
+
+	printf("[%d] END GCMCoupler::couple_to_ice()\n", gcm_params.gcm_rank);
 }
 
 int GCMCoupler::rank() const

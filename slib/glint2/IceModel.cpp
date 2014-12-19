@@ -21,13 +21,26 @@ giss::CouplingContract *IceModel::new_CouplingContract() {
 }
 
 // ==========================================================
+bool IceModel::am_i_root() const
+	{ return coupler->am_i_root(); }
 
 /** Allocate vectors in preparation of calling an ice model. */
 void IceModel::allocate_ice_ovals_I()
 {
+	// Check for program errors
+	if (!coupler->am_i_root()) {
+		fprintf(stderr, "IceModel::allocate_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
+		throw std::exception();
+	}
+	if (ice_ovals_I.size() != 0) {
+		fprintf(stderr, "[%d] IceModel::allocate_ice_ovals_I(): called twice without a free() inbetween.  Fix the code. (old size is %ld)\n", coupler->gcm_params.gcm_rank, ice_ovals_I.size());
+		throw std::exception();
+	}
+
 	// Allocate for direct output from ice model
 	giss::CouplingContract const &ocontract(contract[IceModel::OUTPUT]);
 	int nfields = ocontract.size_nounit();
+printf("[%d] IceModel::allocate_ice_ovals_I() ice_ovals_I.size() = %ld, nfields = %d\n", coupler->gcm_params.gcm_rank, ice_ovals_I.size(), nfields);
 	for (int i=0; i < nfields; ++i) {
 		giss::CoupledField const &cf(ocontract.field(i));
 		std::string const &grid(cf.get_grid());
@@ -40,6 +53,16 @@ void IceModel::allocate_ice_ovals_I()
 /** Allocate in preparation of var transformations (but not regridding yet) */
 void IceModel::allocate_gcm_ivals_I()
 {
+	// Check for program errors
+	if (!coupler->am_i_root()) {
+		fprintf(stderr, "IceModel::allocate_ice_ivals_I() should only be called from GCM root MPI node.  Fix the code.\n");
+		throw std::exception();
+	}
+	if (gcm_ivals_I.size() != 0) {
+		fprintf(stderr, "IceModel::allocate_gcm_ivals_I(): called twice without a free() inbetween.  Fix the code.\n");
+		throw std::exception();
+	}
+
 	giss::CouplingContract const &gcm_inputs(coupler->gcm_inputs);
 	int nfields = gcm_inputs.size_nounit();
 	for (int i=0; i < nfields; ++i) {
@@ -55,12 +78,24 @@ applying variable transform.  This will be variables desired on
 anything other than the ELEVATION grid. */
 void IceModel::free_ice_ovals_I()
 {
+	// Check for program errors
+	if (!coupler->am_i_root()) {
+		fprintf(stderr, "IceModel::free_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
+		throw std::exception();
+	}
+
 	ice_ovals_I.clear();
 }
 
 /** Free all memory used by this.  Called when we're done with a coupling timestep. */
 void IceModel::free_ovals_ivals_I()
 {
+	// Check for program errors
+	if (!coupler->am_i_root()) {
+		fprintf(stderr, "IceModel::free_ovals_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
+		throw std::exception();
+	}
+
 	ice_ovals_I.clear();
 	gcm_ivals_I.clear();
 }

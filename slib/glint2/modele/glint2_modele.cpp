@@ -214,8 +214,9 @@ std::vector<blitz::Array<double,3>> &inputs)
 
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
 
-	GCMCoupler &coupler(api->gcm_coupler);
 	printf("[%d] BEGIN glint2_modele_save_gcm_outputs(time_s=%f)\n", rank, time_s);
+
+	GCMCoupler &coupler(api->gcm_coupler);
 
 	giss::CouplingContract &gcm_outputs(coupler.gcm_outputs);
 
@@ -405,7 +406,7 @@ std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 	// might change the IceSheet, in certain cases.
 	// (for example, if PISM is used, elev2 and mask2 will be read from related
 	// PISM input file, and the version in the GLINT2 file will be ignored)
-	api->gcm_coupler.maker->realize();
+	api->gcm_coupler.realize();
 
 	// TODO: Test that im and jm are consistent with the grid read.
 #endif
@@ -840,7 +841,7 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
 	double time_s = itime * api->dtsrc;
 
-	printf("BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f, dtsrc=%f)\n", itime, time_s, api->dtsrc);
+	printf("[%d] BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f, dtsrc=%f)\n", rank, itime, time_s, api->dtsrc);
 
 	GCMCoupler &coupler(api->gcm_coupler);
 	giss::CouplingContract &gcm_outputs_contract(coupler.gcm_outputs);
@@ -940,7 +941,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		throw std::exception();
 	}
 
-printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itime, time_s, api->dtsrc);
+//printf("[%d] glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", rank, itime, time_s, api->dtsrc);
 	// sbuf has elements for ALL ice sheets here
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
 	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size_nounit());
@@ -953,7 +954,6 @@ printf("glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", itim
 
 	if (api->gcm_coupler.am_i_root()) {
 		blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
-printf("gcm_inputs_d.extent(0) = %d\n", gcm_inputs_d.extent(0));
 
 		// We ARE the root note --- densify the data into the global gcm_inputs array
 		for (long ix = 0; ix < contract.size_nounit(); ++ix) {
@@ -962,16 +962,16 @@ printf("gcm_inputs_d.extent(0) = %d\n", gcm_inputs_d.extent(0));
 
 			// Check bounds
 			if (ihp+var_nhp > gcm_inputs_d.extent(0)) {
-printf("gcm_inputs_ihp = [");
-for (int i : api->gcm_inputs_ihp) printf(" %d", i);
-printf("]\n");
-printf("gcm_inputs_ihp.size() = %d\n", api->gcm_inputs_ihp.size());
-printf("contract.size_nounit() = %d\n", contract.size_nounit());
-printf("ihp var_hp = %d %d\n", ihp, var_nhp);
-printf("ix = %d\n", ix);
-std::cout << "Contract = " << contract << std::endl;
+//printf("[%d] gcm_inputs_ihp = [", rank);
+//for (int i : api->gcm_inputs_ihp) printf(" %d", i);
+//printf("]\n");
+//printf("[%d] gcm_inputs_ihp.size() = %d\n", rank, api->gcm_inputs_ihp.size());
+//printf("[%d] contract.size_nounit() = %d\n", rank, contract.size_nounit());
+//printf("[%d] ihp var_hp = %d %d\n", rank, ihp, var_nhp);
+//printf("[%d] ix = %d\n", rank, ix);
+//std::cout << "Contract = " << contract << std::endl;
 
-				fprintf(stderr, "gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", gcm_inputs_d.extent(0), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
+				fprintf(stderr, "[%d] gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", rank, gcm_inputs_d.extent(0), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
 				throw std::exception();
 			}
 
@@ -1006,7 +1006,7 @@ std::cout << "Contract = " << contract << std::endl;
 
 	api->itime_last = itime;
 
-	printf("END glint2_modele_couple_to_ice_c(itime=%d)\n", itime);
+	printf("[%d] END glint2_modele_couple_to_ice_c(itime=%d)\n", rank, itime);
 }
 
 // ===============================================================

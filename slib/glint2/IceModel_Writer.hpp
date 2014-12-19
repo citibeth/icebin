@@ -64,8 +64,7 @@ public:
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc. */
 	void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &ivals2,
-		std::vector<blitz::Array<double,1>> &ovals2);	// Not used for IceModel_Writer
+		std::vector<blitz::Array<double,1>> const &ivals2);
 
 protected:
 

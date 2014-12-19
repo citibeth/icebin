@@ -88,25 +88,30 @@ public:
 	// --------------------------------------------
 	// Buffers used to receive ice model output, and regrid it.
 
-	/** Direct output from the ice model (on the ice grid) */
+	/** Direct output from the ice model (on the ice grid).
+	This is allocated (for the ice model ROOT node only) inside
+	run_timestep() */
 	std::vector<blitz::Array<double,1>> ice_ovals_I;
 
 	/** Input to the GCM, but on the ice grid */
 	std::vector<blitz::Array<double,1>> gcm_ivals_I;
 
 
-	/** Allocate vectors in preparation of calling an ice model. */
+	/** Tells whether we are running on the root node of the ice model. */
+	virtual bool am_i_root() const;
+
+	/** Allocate vectors in preparation of calling an ice model (ROOT only). */
 	void allocate_ice_ovals_I();
 
-	/** Allocate in preparation of var transformations (but not regridding yet) */
+	/** Allocate in preparation of var transformations (but not regridding yet) (ROOT only) */
 	void allocate_gcm_ivals_I();
 
 	/** Free portions not needed after finished calling ice model and
 	applying variable transform.  This will be variables desired on
-	anything other than the ELEVATION grid. */
+	anything other than the ELEVATION grid. (ROOT only) */
 	void free_ice_ovals_I();
 
-	/** Free all memory used by this.  Called when we're done with a coupling timestep. */
+	/** Free all memory used by this.  Called when we're done with a coupling timestep. (ROOT only) */
 	void free_ovals_ivals_I();
 
 	/** Allocates and sets gcm_ivals_I variable */
@@ -167,8 +172,7 @@ public:
 	*/
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
-		std::vector<blitz::Array<double,1>> const &ivals2,
-		std::vector<blitz::Array<double,1>> &ovals2) = 0;			// Output variables; should be allocated by caller
+		std::vector<blitz::Array<double,1>> const &ivals2) = 0;
 
 	/** Allows the IceModel to change the inputs used to create the
 	regridding transformations.  This is used, for example, to make

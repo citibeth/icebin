@@ -51,8 +51,7 @@ void IceModel_DISMAL::IceModel_DISMAL::init(
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
 void IceModel_DISMAL::run_decoded(double time_s,
-	std::vector<blitz::Array<double,1>> const &vals2,
-	std::vector<blitz::Array<double,1>> &ovals2)			// Output values; must be pre-allocated.
+	std::vector<blitz::Array<double,1>> const &vals2)
 {
 }
 

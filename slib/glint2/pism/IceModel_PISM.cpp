@@ -402,24 +402,21 @@ PetscErrorCode IceModel_PISM::deallocate()
 
 // --------------------------------------------------
 /** glint2_var Variable, already allocated, to receive data
-@param glint2_var_xy The array to write into.  If this array is not yet allocated,
-it will be allocated.*/
+@param glint2_var_xy The array to write into (on the root node).
+If this array is not yet allocated (ROOT NODE ONLY), it will be allocated.*/
 PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var, blitz::Array<double,2> &ret)
 {
 	PetscErrorCode ierr;
-//	Vec g;
 
-//printf("iceModelVec2S_to_blitz_xy:\n");
-//printf("nx() ny() = %d, %d\n", nx(), ny());
-//printf("Mx My = %d, %d\n", pism_grid->Mx, pism_grid->My);
-
-	auto xy_shape(blitz::shape(ny(), nx()));
-	if (ret.size() == 0) {
-		ret.reference(blitz::Array<double,2>(ny(), nx()));
-	} else {
-		if (ret.extent(0) != xy_shape[0] || ret.extent(1) != xy_shape[1]) {
-			fprintf(stderr, "IceModel_PISM::iceModelVec2S_to_blitz_xy(): ret(%d, %d) should be (%d, %d)\n", ret.extent(0), ret.extent(1), xy_shape[0], xy_shape[1]);
-			throw std::exception();
+	if (am_i_root()) {
+		auto xy_shape(blitz::shape(ny(), nx()));
+		if (ret.size() == 0) {
+			ret.reference(blitz::Array<double,2>(ny(), nx()));
+		} else {
+			if (ret.extent(0) != xy_shape[0] || ret.extent(1) != xy_shape[1]) {
+				fprintf(stderr, "IceModel_PISM::iceModelVec2S_to_blitz_xy(): ret(%d, %d) should be (%d, %d)\n", ret.extent(0), ret.extent(1), xy_shape[0], xy_shape[1]);
+				throw std::exception();
+			}
 		}
 	}
 
@@ -430,25 +427,27 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 	PetscScalar **bHp0;
 	ierr = pism_var.put_on_proc0(Hp0, scatter, g2, g2natural); CHKERRQ(ierr);
 
-	// Copy it to blitz array
-	ierr = VecGetArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
-	for (PetscInt i=0; i < pism_grid->Mx; i++) {
-		for (PetscInt j=0; j < pism_grid->My; j++) {
-			ret(j, i) = bHp0[i][j];
+	if (am_i_root()) {
+		// Copy it to blitz array (on the root node only)
+		ierr = VecGetArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
+		for (PetscInt i=0; i < pism_grid->Mx; i++) {
+			for (PetscInt j=0; j < pism_grid->My; j++) {
+				ret(j, i) = bHp0[i][j];
+			}
 		}
+		ierr = VecRestoreArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0); CHKERRQ(ierr);
 	}
-	ierr = VecRestoreArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0); CHKERRQ(ierr);
+
 
 	return 0;
 }
 // --------------------------------------------------
 void IceModel_PISM::run_decoded(double time_s,
-	std::vector<blitz::Array<double,1>> const &ivals2,
-	std::vector<blitz::Array<double,1>> &ovals2)			// Output values; we will allocate as needed
+	std::vector<blitz::Array<double,1>> const &ivals2)
 {
 	printf("BEGIN IceModel_PISM::run_decoded(%f)\n", time_s);
 
-	if (run_decoded_petsc(time_s, ivals2, ovals2) != 0) {
+	if (run_decoded_petsc(time_s, ivals2) != 0) {
 		PetscPrintf(pism_comm, "IceModel_PISM::runtimestep() failed\n");
 		PISMEnd();
 	}
@@ -458,21 +457,14 @@ void IceModel_PISM::run_decoded(double time_s,
 // --------------------------------------------------
 
 PetscErrorCode IceModel_PISM::run_decoded_petsc(double time_s,
-	std::vector<blitz::Array<double,1>> const &ivals2,		// Input values
-	std::vector<blitz::Array<double,1>> &ovals2)			// Output values (comes allocated)
+	std::vector<blitz::Array<double,1>> const &ivals2)		// Input values
 {
 printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
 	PetscErrorCode ierr;
 
 	// Check number of variables matches for input
 	if (ivals2.size() != pism_ivars.size()) {
-		fprintf(stderr, "IceModel_PISM::run_decoded_petsc: ivals2.size()=%ld does not match pism_ivars.size()=%ld\n", ivals2.size(), pism_ivars.size());
-		throw std::exception();
-	}
-
-	// Check number of variables matches for output
-	if (ovals2.size() != pism_ovars.size()) {
-		fprintf(stderr, "IceModel_PISM::run_decoded_petsc: ovals2.size()=%ld does not match pism_ovars.size()=%ld\n", ovals2.size(), pism_ovars.size());
+		fprintf(stderr, "[%d] IceModel_PISM::run_decoded_petsc: ivals2.size()=%ld does not match pism_ivars.size()=%ld\n", pism_rank, ivals2.size(), pism_ivars.size());
 		throw std::exception();
 	}
 
@@ -565,17 +557,37 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 	ice_model->prepare_outputs(old_pism_time);
 
 	// Copy the outputs to the blitz arrays
+	if (am_i_root()) allocate_ice_ovals_I();		// ROOT in PISM communicator
 	for (unsigned int i=0; i<pism_ovars.size(); ++i) {
 
-		// Reshape 1D blitz variable to 2D for use with PISM
-		blitz::Array<double,2> oval2_xy(
-			giss::reshape<double,1,2>(ovals2[i], blitz::shape(ny(), nx())));
+		if (am_i_root()) {		// ROOT in PISM communicator
+
+			// Check number of variables matches for output
+			if (ice_ovals_I.size() != pism_ovars.size()) {
+				fprintf(stderr, "[%d] IceModel_PISM::run_decoded_petsc: ice_ovals_I.size()=%ld does not match pism_ovars.size()=%ld\n", pism_rank, ice_ovals_I.size(), pism_ovars.size());
+				throw std::exception();
+			}
+
+			// Reshape 1D blitz variable to 2D for use with PISM
+			blitz::Array<double,2> oval2_xy(
+				giss::reshape<double,1,2>(ice_ovals_I[i], blitz::shape(ny(), nx())));
 		
+	
+			// Get matching input (val) and output (pism_var) variables
+			iceModelVec2S_to_blitz_xy(*pism_ovars[i], oval2_xy);	// Allocates oval2_xy if needed
 
-		// Get matching input (val) and output (pism_var) variables
-		iceModelVec2S_to_blitz_xy(*pism_ovars[i], oval2_xy);	// Allocates val2_xy if needed
+		} else {
+			blitz::Array<double,2> oval2_xy;	// dummy
+			iceModelVec2S_to_blitz_xy(*pism_ovars[i], oval2_xy);
+		}
+
+		// Now send those data from the PISM root to the GCM root
+		// (DUMMY for now, just make sure PISM and GCM have the same root)
+		if (pism_root != coupler->gcm_params.gcm_root) {
+			fprintf(stderr, "PISM and the GCM must share the same root!\n");
+			throw std::exception();
+		}
 	}
-
 
 printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
 printf("[%d] END ice_model->run_to()\n", pism_rank);
