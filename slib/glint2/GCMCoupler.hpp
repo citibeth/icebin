@@ -54,15 +54,6 @@ struct SMBMsg {
 };
 
 
-/** Type tags for subclasses of GCMCoupler */
-BOOST_ENUM_VALUES( WhichGrid, int,
-	(ATMOSPHERE) (0)
-	(ICE) (1)
-	(ELEVATION) (2)
-	(SIZE) (3)
-);
-
-
 class GCMCoupler {
 public:
 	/** Type tags for subclasses of GCMCoupler */

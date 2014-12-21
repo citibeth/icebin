@@ -46,7 +46,6 @@ struct hp_to_ice_rec {
 // ------------------------------------------------------
 
 struct glint2_modele {
-//	std::unique_ptr<MatrixMaker> maker;		Moved to GCMCoupler
 	ModelEDomain *domain;	// Points to domain owned by maker
 
 	double dtsrc;			// Size of ModelE timestep
@@ -65,9 +64,6 @@ struct glint2_modele {
 
 	/** Last time the coupler was called (or start of run) */
 	int itime_last;
-
-//	/** Place to store results from Glint2 calls (allocated by ModelE) */
-//	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals;
 
 	glint2_modele()
 	{
@@ -90,11 +86,17 @@ extern "C" void glint2_modele_set_const(
 	char const *units_f, int units_len,
 	char const *description_f, int description_len);
 
+/** Tell the GCM how many elevation points are involved in this
+configuration, INCLUDING the "legacy" elevation point, which is
+used by ModelE but not Glint2. */
 extern "C"
 int glint2_modele_nhp(glint2::modele::glint2_modele const *api);
 
 /** Inform Glint2 about a Fortran variable used to hold inputs to the
-GCM (regridded from the ice model output). */
+GCM (regridded from the ice model output).  This is called from
+ModelE, as a way to ensure that ModelE and Glint2 are working from
+the same set of variables.
+*/
 extern "C"
 int glint2_modele_add_gcm_input(
 glint2::modele::glint2_modele *api,

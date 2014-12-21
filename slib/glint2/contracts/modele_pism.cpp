@@ -95,10 +95,6 @@ void IceModel_PISM::setup_contracts_modele()
 		break;
 	}
 
-	std::cout << "========= Ice Model Inputs (" << model.name << ") modele_pism.cpp:" << std::endl;
-	std::cout << ice_input << std::endl;
-
-
 	// Figure out the conversion between GCM and PISM enthalpy
 	// ModelE's reference state is 1atm, 0C, 100% liquid water.
 	// The enthalpy for that reference state would be the top end

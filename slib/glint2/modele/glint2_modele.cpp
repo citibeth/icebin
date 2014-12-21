@@ -33,14 +33,6 @@ using namespace glint2::modele;
 
 
 // ================================================================
-// Stuff from LANDICE_DRV.f
-/**
-@param vals1d Base of the ij array to scatter.
-@param n Number of elements in the ij array (== im * jm)
-@param out_ix Specifies which scattered variable to store in, on Fortran side (see gcm_input CouplingContract). */
-extern "C" void store_li_output_ij(double *vals1d, int n, int out_ix);
-
-// ================================================================
 
 struct ModelEMsg {
 	int i, j, k;	// Indices into ModelE
@@ -71,12 +63,16 @@ MPI_Datatype ModelEMsg::new_MPI_struct(int nfields)
 	return ret;
 }
 // -----------------------------------------------------
+
+/** LOCAL FUNCTION: Set up a netCDF file, ready to store timeseries
+variables in by Glint2.  This is used for both gcm_input and gcm_ouput
+files. */
 extern "C"
-void glint2_modele_init_ncfile(glint2_modele *api,
+void init_ncfile(glint2_modele *api,
 giss::CouplingContract const &contract,
 std::string const &fname)
 {
-	printf("BEGIN glint2_modele_init_ncfile(%s)\n", fname.c_str());
+	printf("BEGIN init_ncfile(%s)\n", fname.c_str());
 	GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
 
 	// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
@@ -122,7 +118,7 @@ printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), cf.grid.c_str());
 			nc_var = ncout.add_var(cf.name.c_str(),
 				giss::get_nc_type<double>(), 4, dims_elevation);
 		} else {
-			fprintf(stderr, "glint2_modele_init_ncfile() unable to handle grid type %s for field %s\n", cf.grid.c_str(), cf.name.c_str());
+			fprintf(stderr, "init_ncfile() unable to handle grid type %s for field %s\n", cf.grid.c_str(), cf.name.c_str());
 			throw std::exception();
 		}
 
@@ -145,16 +141,19 @@ printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), cf.grid.c_str());
 	time0_var->put(&gcm_params.time_start_s, counts);
 
 	ncout.close();
-	printf("END glint2_modele_init_ncfile(%s)\n", fname.c_str());
+	printf("END init_ncfile(%s)\n", fname.c_str());
 
 }
 // -----------------------------------------------------
-void glint2_modele_save_gcm_inputs(
+
+/** LOCAL FUNCTION: Save the ice model output, after it's been
+transformed by Glint2 (now it's GCM input). */
+void save_gcm_inputs(
 glint2_modele *api,
 double time_s,
 blitz::Array<double,3> gcm_inputs)
 {
-	printf("BEGIN glint2_modele_save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
+	printf("BEGIN save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
 
 	// Get dimensions of full domain
 	int nhp = glint2_modele_nhp(api);
@@ -197,12 +196,15 @@ blitz::Array<double,3> gcm_inputs)
 	}
 
 	ncout.close();
-	printf("END glint2_modele_save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
+	printf("END save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
 }
 // -----------------------------------------------------
-/** @param hpvals Values on height-points GCM grid for various fields
+
+/** LOCAL function: Log the GCM output, which is to be passed to the
+ice model.
+@param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide. */
-void  glint2_modele_save_gcm_outputs(
+void save_gcm_outputs(
 glint2_modele *api,
 double time_s,
 std::vector<blitz::Array<double,3>> &inputs)
@@ -214,7 +216,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
 
-	printf("[%d] BEGIN glint2_modele_save_gcm_outputs(time_s=%f)\n", rank, time_s);
+	printf("[%d] BEGIN save_gcm_outputs(time_s=%f)\n", rank, time_s);
 
 	GCMCoupler &coupler(api->gcm_coupler);
 
@@ -299,7 +301,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 
 		ncout.close();
 	}
-	printf("[%d] END glint2_modele_save_gcm_outputs(time_s=%f)\n", rank, time_s);
+	printf("[%d] END save_gcm_outputs(time_s=%f)\n", rank, time_s);
 }
 
 // ================================================================
@@ -426,7 +428,6 @@ int glint2_modele_nhp(glint2_modele const *api)
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
     // (not part of GLINT2)
 	ret += 1;
-//	printf("glint2_modele_nhp() returning %d\n", ret);
 	return ret;
 }
 // -----------------------------------------------------
@@ -477,7 +478,6 @@ void glint2_modele_set_start_time(glint2_modele *api, int iyear1, int itimei, do
 	api->dtsrc = dtsrc;
 	double time0_s = itimei * api->dtsrc;
 
-printf("BEGIN glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time0_s=%f\n", iyear1, itimei, api->dtsrc, time0_s);
 	api->gcm_coupler.set_start_time(
 		giss::time::tm(iyear1, 1, 1),
 		time0_s);
@@ -486,18 +486,19 @@ printf("BEGIN glint2_modele_set_start_time: iyear1=%d, itimei=%d, dtsrc=%f, time
 
 	// Finish initialization...
 	// -------------------------------------------------
+	// Open file to record GCM outputs to Glint2
 	if (api->gcm_coupler.gcm_out_file.length() > 0) {
-		glint2_modele_init_ncfile(api,
+		init_ncfile(api,
 			api->gcm_coupler.gcm_outputs,
 			api->gcm_coupler.gcm_out_file);
 	}
+
+	// Open file to record GCM inputs from Glint2
 	if (api->gcm_coupler.gcm_in_file.length() > 0) {
-		glint2_modele_init_ncfile(api,
+		init_ncfile(api,
 			api->gcm_coupler.gcm_inputs,
 			api->gcm_coupler.gcm_in_file);
 	}
-
-printf("END glint2_modele_set_start_time\n");
 }
 // -----------------------------------------------------
 extern "C"
@@ -590,37 +591,6 @@ nc.close();
 	// -----------------------------------------------------
 printf("END glint2_modele_compute_fgice_c()\n");
 }
-// -----------------------------------------------------
-#if 0
-// NOT USED
-
-static void global_to_local_hp(
-	glint2_modele *api,	
-	HCIndex const &hc_index,
-	std::vector<int> const &grows,
-	std::string const &name,	// For debugging
-	blitz::Array<int,1> &rows_i,		// Fortran-style array, base=1
-	blitz::Array<int,1> &rows_j,
-	blitz::Array<int,1> &rows_k)		// height point index
-{
-printf("BEGIN global_to_local_hp %p %p %p %p\n", &grows[0], rows_i.data(), rows_j.data(), rows_k.data());
-	// Copy the rows while translating
-	// auto rows_k(rows_k_f.to_blitz());
-	//std::vector<double> &grows = *api->hp_to_hc.rows();
-	int lindex[api->domain->num_local_indices];
-	for (int i=0; i<grows.size(); ++i) {		
-		int ihc, i1;
-		hc_index.index_to_ik(grows[i], i1, ihc);
-		api->domain->global_to_local(i1, lindex);
-		rows_i(i+1) = lindex[0];
-		rows_j(i+1) = lindex[1];
-		// +1 for C-to-Fortran conversion
-		// +1 because lowest HP/HC is reserved
-		rows_k(i+1) = ihc+2;
-	}
-printf("END global_to_local_hp\n");
-}
-#endif
 // -----------------------------------------------------
 /**
 @param zatmo1_f ZATMO from ModelE (Elevation of bottom of atmosphere * GRAV)
@@ -854,7 +824,7 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 
 	if (coupler.gcm_out_file.length() > 0) {
 		// Write out to DESM file
-		glint2_modele_save_gcm_outputs(api, time_s, inputs);
+		save_gcm_outputs(api, time_s, inputs);
 	}
 
 	// Count total number of elements in the matrices
@@ -941,7 +911,6 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		throw std::exception();
 	}
 
-//printf("[%d] glint2_modele_couple_to_ice_c(): itime=%d, time_s=%f (dtsrc=%f)\n", rank, itime, time_s, api->dtsrc);
 	// sbuf has elements for ALL ice sheets here
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
 	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size_nounit());
@@ -1000,7 +969,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 
 		if (coupler.gcm_in_file.length() > 0) {
 			// Write out to DESM file
-			glint2_modele_save_gcm_inputs(api, time_s, gcm_inputs_d);
+			save_gcm_inputs(api, time_s, gcm_inputs_d);
 		}
 	}
 

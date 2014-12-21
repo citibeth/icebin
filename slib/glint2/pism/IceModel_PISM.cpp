@@ -331,10 +331,8 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
 	ix = contract[INPUT].index("surface_downward_mass_flux");
 		pism_ivars[ix] = &pism_surface_model->climatic_mass_balance;
-//printf("PV1: pism_ivars[%d] = %p (climatic_mass_balance)\n", ix, pism_ivars[ix]);
 	ix = contract[INPUT].index("surface_temperature");
 		pism_ivars[ix] = &pism_surface_model->ice_surface_temp;
-//printf("PV1: pism_ivars[%d] = %p (ice_surface_temp)\n", ix, pism_ivars[ix]);
 
 	// Initialize scatter/gather stuff
 	ierr = pism_grid->get_dm(1, pism_grid->max_stencil_width, da2); CHKERRQ(ierr);
@@ -554,7 +552,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 	}
 
 	// ice_model->enthalpy_t() == time_s here
-	ice_model->prepare_outputs(old_pism_time);
+	ierr = ice_model->prepare_outputs(old_pism_time); CHKERRQ(ierr);
 
 	// Copy the outputs to the blitz arrays
 	if (am_i_root()) allocate_ice_ovals_I();		// ROOT in PISM communicator
@@ -588,6 +586,8 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 			throw std::exception();
 		}
 	}
+
+	ierr = ice_model->reset_rate(); CHKERRQ(ierr);
 
 printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
 printf("[%d] END ice_model->run_to()\n", pism_rank);

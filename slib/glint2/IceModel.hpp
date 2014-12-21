@@ -165,10 +165,6 @@ public:
            Their meaning (SMB, T, etc) is determined
            by the place in the array, as specified by the appropriate
            INPUT contract for this ice model.
-
-	@param ovals2 Place for the ice model to put its outputs that it
-           will communicate back to the GCM.  These are allocated
-           by the caller.
 	*/
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,

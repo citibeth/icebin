@@ -203,29 +203,19 @@ PetscErrorCode PISMIceModel::energyStep()
 	// ----------- Geothermal Flux
 	ierr = cur.geothermal_flux.add(my_dt, geothermal_flux); CHKERRQ(ierr);
 
-ierr = geothermal_flux.begin_access(); CHKERRQ(ierr);
-ierr = cur.geothermal_flux.begin_access(); CHKERRQ(ierr);
-printf("geothermal_flux(%d,%d) = %f\n", grid.xs, grid.ys, geothermal_flux(grid.xs, grid.ys));
-printf("cur.geothermal_flux(%d,%d) = %f\n", grid.xs, grid.ys, cur.geothermal_flux(grid.xs, grid.ys));
-ierr = cur.geothermal_flux.end_access(); CHKERRQ(ierr);
-ierr = geothermal_flux.end_access(); CHKERRQ(ierr);
-
 	// ---------- Basal Frictional Heating (see iMenthalpy.cc l. 220)
 	IceModelVec2S *Rb = NULL;
 	ierr = stress_balance->get_basal_frictional_heating(Rb); CHKERRQ(ierr);
 	cur.basal_frictional_heating.add(my_dt, *Rb);
 
-#if 1
-//Temporarily comment out.  For now, this creates problems in ncView.
-//strain_heating is inf at the coastlines.
-// See: https://github.com/pism/pism/issues/292
+	// NOTE: strain_heating is inf at the coastlines.
+	// See: https://github.com/pism/pism/issues/292
 	// ------------ Volumetric Strain Heating
 	// strain_heating_sum += my_dt * sum_columns(strainheating3p)
 	IceModelVec3 *strain_heating3p;
 	stress_balance->get_volumetric_strain_heating(strain_heating3p);
 	// cur.strain_heating = cur.strain_heating * 1.0 + my_dt * sum_columns(strain_heating3p)
 	ierr = strain_heating3p->sumColumns(cur.strain_heating, 1.0, my_dt); CHKERRQ(ierr);
-#endif
 
 	printf("END PISMIceModel::energyStep(time=%f)\n", t_TempAge);
 	return 0;
@@ -238,7 +228,6 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 
 	_ice_density = config.get("ice_density");
 	_meter_per_s_to_kg_per_m2 = dt * _ice_density;
-printf("_meter_per_s_to_kg_per_m2: %g * %g = %g\n", dt, _ice_density, _meter_per_s_to_kg_per_m2);
 
 
 	// =========== The Mass Continuity Step Itself
@@ -308,8 +297,6 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 {
 	PetscErrorCode ierr;
 
-//	printf("BEGIN PISMIceModel::accumulateFluxes_MassContExplicitStep()\n");
-
 	// -------------- Get the easy veriables out of the way...
 	cur.pism_smb(i,j) += surface_mass_balance * _meter_per_s_to_kg_per_m2;
 	cur.nonneg_rule(i,j) -= nonneg_rule_flux * _ice_density;
@@ -371,7 +358,6 @@ PetscErrorCode PISMIceModel::prepare_nc(std::string const &fname, std::unique_pt
 	return 0;
 }
 
-
 /** @param t0 Time of last time we coupled. */
 PetscErrorCode PISMIceModel::set_rate(double dt)
 {
@@ -405,34 +391,60 @@ PetscErrorCode PISMIceModel::set_rate(double dt)
 				// Or else just copy the to rate
 				vrate(i,j) = vcur(i,j);
 			}
-
-			// base = cur: For ALL vectors
-//			vbase(i,j) = vcur(i,j);
 		}}
 		ierr = vrate.end_access(); CHKERRQ(ierr);
 		ierr = vcur.end_access(); CHKERRQ(ierr);
 		ierr = vbase.end_access(); CHKERRQ(ierr);
+
 	}
 
 	printf("END PISMIceModel::set_rate()\n");
+	return 0;
+
+}
+
+PetscErrorCode PISMIceModel::reset_rate()
+{
+	PetscErrorCode ierr;
+
+
+	// Compute differences, and set base = cur
+	auto base_ii(base.all_vecs.begin());
+	auto cur_ii(cur.all_vecs.begin());
+	for (; base_ii != base.all_vecs.end(); ++base_ii, ++cur_ii) {
+		IceModelVec2S &vbase(base_ii->vec);
+		IceModelVec2S &vcur(cur_ii->vec);
+
+		// This cannot go in the loop above with PETSc because
+		// vbase is needed on the RHS of the equations above.
+		ierr = vbase.begin_access(); CHKERRQ(ierr);
+		ierr = vcur.begin_access(); CHKERRQ(ierr);
+		for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+		for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+			// base = cur: For ALL vectors
+			vbase(i,j) = vcur(i,j);
+		}}
+		ierr = vcur.end_access(); CHKERRQ(ierr);
+		ierr = vbase.end_access(); CHKERRQ(ierr);
+	}
+
 
 #if 0
 ierr = rate.geothermal_flux.begin_access(); CHKERRQ(ierr);
-printf("rate.geothermal_flux(%d, %d) = %f\n", grid.xs, grid.xs, rate.geothermal_flux(grid.xs, grid.xs));
+printf("GG rate.geothermal_flux(%d, %d) = %f (%p)\n", grid.xs, grid.xs, rate.geothermal_flux(grid.xs, grid.xs), &rate.geothermal_flux(grid.xs, grid.xs));
 ierr = rate.geothermal_flux.end_access(); CHKERRQ(ierr);
 
 ierr = cur.geothermal_flux.begin_access(); CHKERRQ(ierr);
-printf("cur.geothermal_flux(%d, %d) = %f\n", grid.xs, grid.xs, cur.geothermal_flux(grid.xs, grid.xs));
+printf("GG cur.geothermal_flux(%d, %d) = %f (%p)\n", grid.xs, grid.xs, cur.geothermal_flux(grid.xs, grid.xs), &cur.geothermal_flux(grid.xs, grid.xs));
 ierr = cur.geothermal_flux.end_access(); CHKERRQ(ierr);
 
 ierr = base.geothermal_flux.begin_access(); CHKERRQ(ierr);
-printf("base.geothermal_flux(%d, %d) = %f\n", grid.xs, grid.xs, base.geothermal_flux(grid.xs, grid.xs));
+printf("GG base.geothermal_flux(%d, %d) = %f (%p)\n", grid.xs, grid.xs, base.geothermal_flux(grid.xs, grid.xs), &base.geothermal_flux(grid.xs, grid.xs));
 ierr = base.geothermal_flux.end_access(); CHKERRQ(ierr);
 #endif
 
 	return 0;
 }
-
 
 /** @param t0 Time of last time we coupled. */
 PetscErrorCode PISMIceModel::prepare_outputs(double t0)
@@ -443,22 +455,7 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 
 	// ------ Difference between now and the last time we were called
 	double t1 = enthalpy_t();	// Current time of the enthalpy portion of ice model.
-	set_rate(t1 - t0);
-
-//	// ====================== Compute "custom" variables in output
-//	// --------- basal_runoff = melt_grounded + melt_floating
-//	ierr = rate.melt_grounded.begin_access(); CHKERRQ(ierr);
-//	ierr = rate.melt_floating.begin_access(); CHKERRQ(ierr);
-//	ierr = basal_runoff.begin_access(); CHKERRQ(ierr);
-//	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-//	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-//		basal_runoff.mass(i,j) = rate.melt_grounded.mass(i,j) + rate.melt_floating.mass(i,j);
-//		basal_runoff.enth(i,j) = rate.melt_grounded.enth(i,j) + rate.melt_floating.enth(i,j);
-//	}}
-//	ierr = basal_runoff.end_access(); CHKERRQ(ierr);
-//	ierr = rate.melt_floating.end_access(); CHKERRQ(ierr);
-//	ierr = rate.melt_grounded.end_access(); CHKERRQ(ierr);
-
+	ierr = set_rate(t1 - t0); CHKERRQ(ierr);
 
 	// --------- ice_surface_enth from Enth3
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
@@ -483,6 +480,9 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	// ====================== Write to the post_energy.nc file (OPTIONAL)
 
 	// ------ Write it out
+#if 0
+	// This is not really needed, since Glint2 also writes out
+	// the same fields.
 	PIO nc(grid, grid.config.get_string("output_format"));
 	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
 	nc.append_time(config.get_string("time_dimension_name"), t1);
@@ -495,6 +495,7 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 		ierr = ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
 	nc.close();
+#endif
 
 	printf("END PISMIceModel::prepare_outputs()\n");
 	return 0;
@@ -545,10 +546,10 @@ PetscErrorCode PISMIceModel::misc_setup()
 	ierr = cur.set_epsilon(grid); CHKERRQ(ierr);
 
 	// base = cur
-	auto bii(base.all_vecs.begin());
-	auto cii(cur.all_vecs.begin());
-	for (; bii != base.all_vecs.end(); ++bii, ++cii) {
-		cii->vec.copy_to(bii->vec);
+	auto base_ii(base.all_vecs.begin());
+	auto cur_ii(cur.all_vecs.begin());
+	for (; base_ii != base.all_vecs.end(); ++base_ii, ++cur_ii) {
+		cur_ii->vec.copy_to(base_ii->vec);
 	}
 
 	// ---------- Create the netCDF output file

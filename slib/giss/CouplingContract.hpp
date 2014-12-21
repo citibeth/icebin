@@ -75,7 +75,7 @@ public:
 		auto ii = _name_to_ix.find(name);
 		if (ii == _name_to_ix.end()) {
 			if (throw_exception) {
-				fprintf(stderr, "CouplingContract::operator[]: name '%s' not found\n", name.c_str());
+				fprintf(stderr, "CouplingContract::index(): name '%s' not found\n", name.c_str());
 				throw std::exception();
 			} else return -1;
 		}

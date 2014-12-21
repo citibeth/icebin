@@ -115,7 +115,7 @@ void IceModel_Writer::init_output_file()
 {
 	GCMParams const &gcm_params(coupler->gcm_params);
 
-	printf("BEGIN IceModelWriter::init_output_file(%s)\n", output_fname.c_str());
+	printf("BEGIN IceModel_Writer::init_output_file(%s)\n", output_fname.c_str());
 
 	NcFile nc(output_fname.c_str(), NcFile::Replace);
 	std::vector<const NcDim *> dims = add_dims(nc);
@@ -123,10 +123,6 @@ void IceModel_Writer::init_output_file()
 
 	NcVar *info_var = nc.add_var("grid", giss::get_nc_type<double>(), one_dim);
 
-
-//	std::string fname(boost::filesystem::absolute(
-//		boost::filesystem::path(coupler->fname)).string());
-//	info_var->add_att("file", fname.c_str());
 	info_var->add_att("file", coupler->fname.c_str());
 	info_var->add_att("variable", coupler->vname.c_str());
 	info_var->add_att("ice_sheet", this->name.c_str());
@@ -196,7 +192,6 @@ printf("BEGIN IceModel_Writer::run_decoded\n");
 		NcVar *ncvar = nc.get_var(cf->name.c_str());
 		ncvar->set_cur(&cur[0]);
 
-//		double const *data = (io == IceModel::INPUT ? ivals2[i].data() : ovals2[i].data());
 		double const *data = ivals2[i].data();
 		ncvar->put(data, &counts[0]);
 	}

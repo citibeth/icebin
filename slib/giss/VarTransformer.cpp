@@ -38,7 +38,7 @@ bool VarTransformer::set(std::string output, std::string input, std::string scal
 	return ret;
 }
 
-
+/** Local function for debugging output, not for re-use. */
 std::string dims_str(DynamicEnum const &de)
 {
 	std::string ret;
@@ -60,9 +60,9 @@ CSRAndUnits VarTransformer::apply_scalars(
 		printf("    %s = %g\n", ele.first.c_str(), ele.second);
 	}
 
-std::cout << "OUTPUTS = " << dims_str(dimension(OUTPUTS)) << std::endl;
-std::cout << "INPUTS = " << dims_str(dimension(INPUTS)) << std::endl;
-std::cout << "SCALARS = " << dims_str(dimension(SCALARS)) << std::endl;
+//std::cout << "OUTPUTS = " << dims_str(dimension(OUTPUTS)) << std::endl;
+//std::cout << "INPUTS = " << dims_str(dimension(INPUTS)) << std::endl;
+//std::cout << "SCALARS = " << dims_str(dimension(SCALARS)) << std::endl;
 
 
 	int n_outputs_nu = dimension(OUTPUTS).size_nounit();		// # OUTPUTS no unit

@@ -29,6 +29,7 @@ arguments, then other array data types can be converted as needed. */
 
 namespace giss {
 
+/** Frees memory associated with a blitz::Array */
 template<class T, int len>
 void free_array(blitz::Array<T, len> &array)
 {

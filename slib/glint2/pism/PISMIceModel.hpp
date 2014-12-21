@@ -54,7 +54,6 @@ protected:
 	MassEnergyBudget rate;		// At end of coupling timestep, set to (cur - base) / dt
 
 	// Output variables prepared for return to GCM
-//	MassEnthVec2S basal_runoff;	// = melt_grounded + melt_floating [kg m-2 s-1]
 	pism::IceModelVec2S ice_surface_enth;		// Specific enthalpy of top surface of the ice [J kg-1]
 	pism::IceModelVec2S ice_surface_enth_depth;	// Depth below surface at which ice_surface_enth is recorded [m]
 	
@@ -79,7 +78,7 @@ public:
 private:
 	// Temporary variables inside massContExplicitStep()
 	double _ice_density;		// From config
-	double _meter_per_s_to_kg_per_m2;
+	double _meter_per_s_to_kg_per_m2;		// Conversion factor computed from _ice_density
 
 
 private:
@@ -90,6 +89,8 @@ public:
 
 	/** @param t0 Time of last time we coupled. */
 	PetscErrorCode set_rate(double dt);
+
+	PetscErrorCode reset_rate();
 
 
 	std::unique_ptr<pism::PIO> pre_mass_nc;	//!< Write variables every time massContPostHook() is called.

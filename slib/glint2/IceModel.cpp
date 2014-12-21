@@ -40,7 +40,6 @@ void IceModel::allocate_ice_ovals_I()
 	// Allocate for direct output from ice model
 	giss::CouplingContract const &ocontract(contract[IceModel::OUTPUT]);
 	int nfields = ocontract.size_nounit();
-printf("[%d] IceModel::allocate_ice_ovals_I() ice_ovals_I.size() = %ld, nfields = %d\n", coupler->gcm_params.gcm_rank, ice_ovals_I.size(), nfields);
 	for (int i=0; i < nfields; ++i) {
 		giss::CoupledField const &cf(ocontract.field(i));
 		std::string const &grid(cf.get_grid());
@@ -110,7 +109,6 @@ void IceModel::set_gcm_inputs()
 	// Compute the variable transformation
 	giss::VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
 	giss::CSRAndUnits trans = vt.apply_scalars({
-//		std::make_pair("by_dt", 1.0 / ((itime - api->itime_last) * api->dtsrc)),
 		std::make_pair("unit", 1.0)});
 
 	// Apply the variable transformation
