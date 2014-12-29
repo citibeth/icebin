@@ -4,6 +4,7 @@
 
 #include <glint2/pism/IceModel_PISM.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
+#include <glint2/contracts/contracts.hpp>
 
 using namespace giss;
 using namespace glint2::modele;
@@ -67,16 +68,16 @@ void IceModel_PISM::setup_contracts_modele()
 	std::string const HEAT_FLUX = "surface_downward_conductive_heat_flux";
 
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field(MASS_FLUX, "kg m-2 s-1", "ICE",
+	ice_input.add_field(MASS_FLUX, "kg m-2 s-1", contracts::ICE,
 		"'Surface Mass Balance' over the coupling interval.\n"
 		"Convention: Down is positive");
-	ice_input.add_field(ENTHALPY_FLUX, "W m-2", "ICE",
+	ice_input.add_field(ENTHALPY_FLUX, "W m-2", contracts::ICE,
 		"Advective enthalpy associated with land_ice_surface_downward_mass_flux."
 		"Convention: Down is positive");
 
 	switch(params->coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
-			ice_input.add_field(T, "K", "ICE",
+			ice_input.add_field(T, "K", contracts::ICE,
 				"The surface called \"surface\" means the lower boundary of the "
 				"atmosphere. The surface temperature is the temperature at the "
 				"interface, not the bulk temperature of the medium above or "
@@ -89,7 +90,7 @@ void IceModel_PISM::setup_contracts_modele()
 				"horizontal area to which the quantity applies.");
 		break;
 		case ModelE_CouplingType::NEUMANN_BC :
-			ice_input.add_field(HEAT_FLUX, "W m-2", "ICE",
+			ice_input.add_field(HEAT_FLUX, "W m-2", contracts::ICE,
 				"Conductive heat between ice sheet and snow/firn model on top of it.\n"
 				"Convention: Down is positive");
 		break;
@@ -142,33 +143,33 @@ void IceModel_PISM::setup_contracts_modele()
 
 	// Glint2 requires that all ice models return elev2, so that it can regrid in the vertical.
 
-	ice_output.add_field("usurf", "m", "ICE", "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
+	ice_output.add_field("usurf", "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
 
-	ice_output.add_field("ice_surface_enth", "J kg-1", "ICE", "");
-	ice_output.add_field("ice_surface_enth_depth", "m", "ICE", "");
+	ice_output.add_field("ice_surface_enth", "J kg-1", contracts::ICE|contracts::INITIAL, "");
+	ice_output.add_field("ice_surface_enth_depth", "m", contracts::ICE|contracts::INITIAL, "");
 
-	ice_output.add_field("basal_frictional_heating", "W m-2", "ICE", "");
-	ice_output.add_field("strain_heating", "W m-2", "ICE", "");
-	ice_output.add_field("geothermal_flux", "W m-2", "ICE", "");
-	ice_output.add_field("upward_geothermal_flux", "W m-2", "ICE", "");
+	ice_output.add_field("basal_frictional_heating", "W m-2", contracts::ICE, "");
+	ice_output.add_field("strain_heating", "W m-2", contracts::ICE, "");
+	ice_output.add_field("geothermal_flux", "W m-2", contracts::ICE, "");
+	ice_output.add_field("upward_geothermal_flux", "W m-2", contracts::ICE, "");
 
-	ice_output.add_field("calving.mass", "kg m-2 s-1", "ICE", "");
-	ice_output.add_field("calving.enth", "W m-2", "ICE", "");
-	ice_output.add_field("surface_mass_balance.mass", "kg m-2 s-1", "ICE", "");
-	ice_output.add_field("surface_mass_balance.enth", "W m-2", "ICE", "");
+	ice_output.add_field("calving.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("calving.enth", "W m-2", contracts::ICE, "");
+	ice_output.add_field("surface_mass_balance.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("surface_mass_balance.enth", "W m-2", contracts::ICE, "");
 
 	// basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
-	ice_output.add_field("melt_grounded.mass", "kg m-2 s-1", "ICE", "");
-	ice_output.add_field("melt_grounded.enth", "W m-2", "ICE", "");
-	ice_output.add_field("melt_floating.mass", "kg m-2 s-1", "ICE", "");
-	ice_output.add_field("melt_floating.enth", "W m-2", "ICE", "");
+	ice_output.add_field("melt_grounded.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("melt_grounded.enth", "W m-2", contracts::ICE, "");
+	ice_output.add_field("melt_floating.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("melt_floating.enth", "W m-2", contracts::ICE, "");
 
-	ice_output.add_field("internal_advection.mass", "kg m-2 s-1", "ICE", "");
-	ice_output.add_field("internal_advection.enth", "W m-2", "ICE", "");
-	ice_output.add_field("epsilon.mass", "kg m-2 s-1", "ICE", "");
-	ice_output.add_field("epsilon.enth", "W m-2", "ICE", "");
+	ice_output.add_field("internal_advection.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("internal_advection.enth", "W m-2", contracts::ICE, "");
+	ice_output.add_field("epsilon.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("epsilon.enth", "W m-2", contracts::ICE, "");
 
-	ice_output.add_field("unit", "", "Dimensionless identity");
+	ice_output.add_field("unit", "", 0, "Dimensionless identity");
 
 	std::cout << "========= Ice Model Outputs (" << model.name << ") modele_pism.cpp:" << std::endl;
 	std::cout << ice_output << std::endl;

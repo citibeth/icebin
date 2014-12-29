@@ -1,10 +1,12 @@
 #include <mpi.h>		// Intel MPI wants to be first
 #include <giss/memory.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
+#include <contracts/contracts.hpp>
 
 namespace glint2 {
 namespace modele {
 
+using namespace glint2::contracts;
 
 GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	GCMCoupler(GCMCoupler::Type::MODELE)
@@ -13,12 +15,12 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	// ------------ GCM Outputs
 	// The GCM must produce the same set of outputs, no matter what
 	// ice model is being used
-	gcm_outputs.add_field("lismb", "kg m-2 s-1", "ELEVATION", "Surface mass balance");
-	gcm_outputs.add_field("liseb", "J m-2 s-1", "ELEVATION", "Ethalpy of SMB");
+	gcm_outputs.add_field("lismb", "kg m-2 s-1", ELEVATION, "Surface mass balance");
+	gcm_outputs.add_field("liseb", "J m-2 s-1", ELEVATION, "Ethalpy of SMB");
 	// Specific enthalpy of the SMB computed as liseb / lismb (J kg-1)
 
-	gcm_outputs.add_field("litg2", "degC", "ELEVATION", "T of bottom layer of snow/firn");
-	gcm_outputs.add_field("unit", "", "", "Dimensionless identity");
+	gcm_outputs.add_field("litg2", "degC", ELEVATION, "T of bottom layer of snow/firn");
+	gcm_outputs.add_field("unit", "", 0, "Dimensionless identity");
 
 
 	// ------------------------- GCM Inputs
@@ -34,8 +36,8 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 // We don't need this, GCM is converting to s-1 on its own.
 //	ice_input_scalars.add_field("by_dt", "s-1", "Inverse of coupling timestep");
 
-	ice_input_scalars.add_field("unit", "", "Dimensionless identity");
-//	gcm_input_scalars.add_field("unit", "", "Dimensionless identity");
+	ice_input_scalars.add_field("unit", "", 0, "Dimensionless identity");
+//	gcm_input_scalars.add_field("unit", "", 0, "Dimensionless identity");
 
 }
 

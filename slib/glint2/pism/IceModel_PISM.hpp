@@ -69,6 +69,7 @@ class IceModel_PISM : public IceModel_Decode
 	// --- Corresponding PISM variable for each output field
 	// The variable, as it exists in PISM
 	std::vector<pism::IceModelVec2S *> pism_ovars;
+
 //	// An MPI-collected version of the variable
 //	std::vector<blitz::Array<double,2> glint2_ovars;
 
@@ -160,9 +161,21 @@ protected:
 public:
 	void run_decoded(double time_s,
 		std::vector<blitz::Array<double,1>> const &vals2);
+
+	void get_initial_state();
+
 private:
 	PetscErrorCode run_decoded_petsc(double time_s,
 		std::vector<blitz::Array<double,1>> const &vals2);
+
+	/** Copies PISM->Glint2 output variables from PISM variables to
+	the Glint2-supplied variables (on the root node).
+	@param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
+	PetscErrorCode get_state_petsc(unsigned int mask = 0);
+
+	PetscErrorCode get_initial_state_petsc();
+
+
 
 };
 

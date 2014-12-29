@@ -50,6 +50,7 @@ INTERFACE
 		field_f, field_len, &
 		units_f, units_len, &
         grid_f, grid_len, &
+        initial, &
 		long_name_f, long_name_len) bind(c)
 	use iso_c_binding
 		type(c_ptr), value :: api
@@ -60,6 +61,7 @@ INTERFACE
 		character(c_char) :: grid_f(*)
 		integer(c_int), value :: grid_len
 		character(c_char) :: long_name_f(*)
+        integer(c_int), value :: initial
 		integer(c_int), value :: long_name_len
 		integer(c_int) :: glint2_modele_add_gcm_input
 	end function
@@ -153,6 +155,13 @@ INTERFACE
 		type(arr_spec_3) :: smb1hp_f, seb1hp_f, tg21hp_f, gcm_inputs_d_f
 	end subroutine
 
+	subroutine glint2_modele_get_initial_state_c(api, gcm_inputs_d_f) bind(c)
+	use iso_c_binding
+	use f90blitz
+		type(c_ptr), value :: api
+		type(arr_spec_3) :: gcm_inputs_d_f
+	end subroutine
+
 END INTERFACE
 
 !include 'mpif.h'
@@ -237,14 +246,15 @@ real*8, dimension(i0h:,j0h:,:) :: elev1h
 
 print *,'END glint2_modele_init_landice_com()'
 end subroutine
-
+! ---------------------------------------------------
 subroutine glint2_modele_couple_to_ice(api, &
 	itime, smb1h, seb1h, tg21h, &
 	gcm_inputs_d, &
 	i0h, j0h)
 type(c_ptr), value :: api
 integer :: i0h, j0h
-real*8, dimension(i0h:,j0h:,:) :: smb1h, seb1h, tg21h, gcm_inputs_d
+real*8, dimension(i0h:,j0h:,:) :: smb1h, seb1h, tg21h
+real*8, dimension(:,:,:) :: gcm_inputs_d
 integer, value :: itime
 
 	integer :: n
@@ -265,6 +275,27 @@ print *,'BEGIN glint2_modele_couple_to_ice()'
 	call glint2_modele_couple_to_ice_c(api, itime, smb1h_f, seb1h_f, tg21h_f, gcm_inputs_d_f)
 
 print *,'END glint2_modele_couple_to_ice()'
+end subroutine
+! ---------------------------------------------------
+subroutine glint2_modele_get_initial_state(api, gcm_inputs_d)
+type(c_ptr), value :: api
+real*8, dimension(:,:,:) :: gcm_inputs_d
+
+	integer :: n
+
+	! ------------------- local vars
+	type(arr_spec_3) :: gcm_inputs_d_f
+
+	! ------------------- subroutine body
+print *,'BEGIN glint2_modele_get_initial_state()'
+
+	! Grab array descriptors
+	call get_spec_double_3(gcm_inputs_d, 1,1,1, gcm_inputs_d_f)
+
+	! Call the C-side of the interface
+	call glint2_modele_get_initial_state_c(api, gcm_inputs_d_f)
+
+print *,'END glint2_modele_get_initial_state()'
 end subroutine
 
 

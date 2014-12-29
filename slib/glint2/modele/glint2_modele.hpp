@@ -103,6 +103,7 @@ glint2::modele::glint2_modele *api,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 char const *grid_f, int grid_len,
+int initial,	// bool
 char const *long_name_f, int long_name_len);
 
 
@@ -163,4 +164,9 @@ int itime,			// ModelE itime counter
 giss::F90Array<double,3> &smb1hp_f,
 giss::F90Array<double,3> &seb1hp_,
 giss::F90Array<double,3> &tg21hp_f,
+giss::F90Array<double,3> &gcm_inputs_d_f);
+
+extern "C"
+void  glint2_modele_get_initial_state_c(
+glint2::modele::glint2_modele *api,
 giss::F90Array<double,3> &gcm_inputs_d_f);

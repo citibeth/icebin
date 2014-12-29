@@ -20,6 +20,7 @@
 #include <glint2/GCMCoupler.hpp>
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/MultiMatrix.hpp>
+#include <glint2/contracts/contracts.hpp>
 
 namespace glint2 {
 
@@ -132,7 +133,7 @@ void GCMCoupler::read_from_netcdf(
 		for (int i=0; i<nfields; ++i) {
 			giss::CoupledField const &cf(ocontract.field(i));
 
-			if (cf.grid != "ICE") {
+			if ((cf.flags & contracts::GRID_BITS) == contracts::ICE) {
 				fprintf(stderr, "ERROR: Ice model outputs must be all on the ice grid, field %s is not\n", cf.name.c_str());
 				throw std::exception();
 			}
@@ -388,77 +389,13 @@ printf("[%d] EE6\n", rank);
 			call_ice_model(&*model, sheetno, time_s, *rbuf,
 				params->second.begin, params->second.next);
 			// Convert to variables the GCM wants (but still on the ice grid)
-			model->set_gcm_inputs();	// Fills in gcm_ivals_I
+			model->set_gcm_inputs(0);	// Fills in gcm_ivals_I
 
 			// Free ice_ovals_I
 			model->free_ice_ovals_I();
 		}
 
-		// (ONLY ON GCM ROOT)
-		// =============== Regrid to the grid requested by the GCM
-
-		// (ONLY ON GCM ROOT)
-		// ----------- Create the MultiMatrix used to regrid to atmosphere (I -> A)
-		MultiMatrix ice2atm;
-		for (auto model = models.begin(); model != models.end(); ++model) {
-			// Get matrix for this single ice model.
-			giss::MapSparseVector<int,double> area1_m;
-			int sheetno = model.key();		// IceSheet::index
-			IceSheet *sheet = (*maker_full)[sheetno];
-			std::unique_ptr<giss::VectorSparseMatrix> M(
-				sheet->iceinterp_to_projatm(area1_m, IceInterp::ICE));
-
-			// Add on correction for projection
-			if (maker_full->correct_area1) {
-				sheet->atm_proj_correct(area1_m, ProjCorrect::PROJ_TO_NATIVE);
-			}
-
-			// Store it away...
-			ice2atm.add_matrix(std::move(M), area1_m);
-		}
-
-		// (ONLY ON GCM ROOT)
-		// ------------ Regrid each GCM input from ice grid to whatever grid it needs.
-		for (int var_ix=0; var_ix < gcm_inputs.size_nounit(); ++var_ix) {
-			giss::CoupledField const &cf(gcm_inputs.field(var_ix));
-
-			if (cf.grid == "ATMOSPHERE") {
-				// --- Assemble all inputs, to multiply by ice_to_hp matrix
-
-				std::vector<blitz::Array<double, 1>> ival_I;
-				for (auto model = models.begin(); model != models.end(); ++model) {
-					// Assemble vector of the same GCM input variable from each ice model.
-					ival_I.push_back(model->gcm_ivals_I[var_ix]);
-				}
-
-				ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
-				gcm_ivals[var_ix].consolidate();
-
-			} else if (cf.grid == "ELEVATION") {
-				// --- Assemble all inputs, to send to Glint2 QP regridding
-
-				std::map<int, blitz::Array<double,1>> f4s;
-				for (auto model = models.begin(); model != models.end(); ++model) {
-					int sheetno = model.key();
-					f4s.insert(std::make_pair(sheetno, model->gcm_ivals_I[var_ix]));
-				}
-
-				// Use previous return as our initial guess
-				blitz::Array<double,1> initial3(maker_full->n3());
-				giss::to_blitz(gcm_ivals[var_ix], initial3);
-				gcm_ivals[var_ix] = maker_full->iceinterp_to_hp(
-					f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP);
-				gcm_ivals[var_ix].consolidate();
-			}
-		}
-
-		// ----------------- Free Memory
-		// (ONLY ON GCM ROOT)
-		for (auto model = models.begin(); model != models.end(); ++model) {
-			model->free_ovals_ivals_I();
-		}
-
-
+		regrid_gcm_inputs_onroot(gcm_ivals, 0);
 	} else {
 		// (ONLY ON NOT GCM ROOT)
 		// We're not root --- we have no data to send to ice
@@ -478,6 +415,157 @@ printf("[%d] EE6\n", rank);
 
 	printf("[%d] END GCMCoupler::couple_to_ice()\n", gcm_params.gcm_rank);
 }
+
+
+void GCMCoupler:: regrid_gcm_inputs_onroot(
+std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals,	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+unsigned int mask)
+{
+	// This method is meant to be run only on the GCM root.
+	if (!am_i_root()) return;
+
+	// (ONLY ON GCM ROOT)
+	// =============== Regrid to the grid requested by the GCM
+
+	// (ONLY ON GCM ROOT)
+	// ----------- Create the MultiMatrix used to regrid to atmosphere (I -> A)
+	MultiMatrix ice2atm;
+	for (auto model = models.begin(); model != models.end(); ++model) {
+		// Get matrix for this single ice model.
+		giss::MapSparseVector<int,double> area1_m;
+		int sheetno = model.key();		// IceSheet::index
+		IceSheet *sheet = (*maker_full)[sheetno];
+		std::unique_ptr<giss::VectorSparseMatrix> M(
+			sheet->iceinterp_to_projatm(area1_m, IceInterp::ICE));
+
+		// Add on correction for projection
+		if (maker_full->correct_area1) {
+			sheet->atm_proj_correct(area1_m, ProjCorrect::PROJ_TO_NATIVE);
+		}
+
+		// Store it away...
+		ice2atm.add_matrix(std::move(M), area1_m);
+	}
+
+	// (ONLY ON GCM ROOT)
+	// ------------ Regrid each GCM input from ice grid to whatever grid it needs.
+	for (int var_ix=0; var_ix < gcm_inputs.size_nounit(); ++var_ix) {
+		giss::CoupledField const &cf(gcm_inputs.field(var_ix));
+
+		if ((cf.flags & mask) != mask) continue;
+
+		if ((cf.flags & contracts::GRID_BITS) == contracts::ATMOSPHERE) {
+			// --- Assemble all inputs, to multiply by ice_to_hp matrix
+
+			std::vector<blitz::Array<double, 1>> ival_I;
+			for (auto model = models.begin(); model != models.end(); ++model) {
+				// Assemble vector of the same GCM input variable from each ice model.
+				ival_I.push_back(model->gcm_ivals_I[var_ix]);
+			}
+
+			ice2atm.multiply(ival_I, gcm_ivals[var_ix], true);
+			gcm_ivals[var_ix].consolidate();
+
+		} else if ((cf.flags & contracts::GRID_BITS) == contracts::ELEVATION) {
+			// --- Assemble all inputs, to send to Glint2 QP regridding
+
+			std::map<int, blitz::Array<double,1>> f4s;
+			for (auto model = models.begin(); model != models.end(); ++model) {
+				int sheetno = model.key();
+				f4s.insert(std::make_pair(sheetno, model->gcm_ivals_I[var_ix]));
+			}
+
+			// Use previous return as our initial guess
+			blitz::Array<double,1> initial3(maker_full->n3());
+			giss::to_blitz(gcm_ivals[var_ix], initial3);
+			gcm_ivals[var_ix] = maker_full->iceinterp_to_hp(
+				f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP);
+			gcm_ivals[var_ix].consolidate();
+		}
+	}
+
+	// ----------------- Free Memory
+	// (ONLY ON GCM ROOT)
+	for (auto model = models.begin(); model != models.end(); ++model) {
+		model->free_ovals_ivals_I();
+	}
+
+}
+
+
+
+
+
+
+
+
+
+/** Follows the pattern of couple_to_ice()
+@param sbuf the (filled) array of ice grid values for this MPI node. */
+void GCMCoupler::get_initial_state(
+std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+{
+
+	if (am_i_root()) {
+
+		// (ONLY ON GCM ROOT)
+		// NOTE: call_ice_model() is called (below) even on NON-ROOT
+		// Call all our ice models
+		for (auto model = models.begin(); model != models.end(); ++model) {
+			int sheetno = model.key();
+			model->get_initial_state();
+
+#if 0
+			// Record what the ice model produced.
+			// NOTE: This shouldn't change model->ice_ovals_I
+			IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
+			if (owriter) {
+				printf("BEGIN owriter->run_timestep()\n");
+				owriter->run_decoded(time_s, model->ice_ovals_I);
+				printf("END owriter->run_timestep()\n");
+			}
+#endif
+
+			// Convert to variables the GCM wants (but still on the ice grid)
+			model->set_gcm_inputs(contracts::INITIAL);	// Fills in gcm_ivals_I
+
+			// Free ice_ovals_I
+			model->free_ice_ovals_I();
+		}
+
+		// Fill in gcm_ivals
+		regrid_gcm_inputs_onroot(gcm_ivals, contracts::INITIAL);
+
+	} else {
+		// (NOT GCM ROOT)
+		// We're not root --- we have no data to send to ice
+		// models, we just call through anyway because we will
+		// receive data in an upcomming MPI_Scatter
+		// Call all our ice models
+		for (auto model = models.begin(); model != models.end(); ++model) {
+			int sheetno = model.key();
+			// Assume we have data for all ice models
+			// (So we can easily maintain MPI SIMD operation)
+			model->set_gcm_inputs(contracts::INITIAL);	// Fills in gcm_ivals_I
+
+		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
+
+	}
+
+	printf("[%d] END GCMCoupler::couple_to_ice()\n", gcm_params.gcm_rank);
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 int GCMCoupler::rank() const
 	{ return gcm_params.gcm_rank; }

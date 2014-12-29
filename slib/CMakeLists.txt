@@ -42,6 +42,7 @@ set(glint2_SOURCES
 	giss/sparsemult.cpp
 	giss/udunits2.cpp
 	giss/VarTransformer.cpp
+	glint2/contracts/contracts.cpp
 	glint2/contracts/modele_pism.cpp
 	glint2/contracts/modele_dismal.cpp
 	giss/ConstantSet.cpp

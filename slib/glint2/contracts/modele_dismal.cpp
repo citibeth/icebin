@@ -79,7 +79,7 @@ void IceModel_DISMAL::setup_contracts_modele()
 	}
 
 	CouplingContract *ice_output_scalars = new_CouplingContract();
-	ice_output_scalars->add_field("unit", "", "");
+	ice_output_scalars->add_field("unit", "", 0, "");
 
 	VarTransformer &ice_output_vt(var_transformer[OUTPUT]);
 	ice_output_vt.set_names(VarTransformer::INPUTS, &ice_output);

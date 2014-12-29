@@ -18,8 +18,8 @@ public:
 	/** The units of the variable, in UDUNITS format. */
 	virtual std::string const &get_units() const { return ""; }
 
-	/** The grid the variable resides on. */
-	virtual std::string const &get_grid() const { return ""; }
+	/** The flags the variable resides on. */
+	virtual unsigned get_flags() const { return 0; }
 
 	/** A textual description of the variable, also called the "long name" */
 	virtual std::string const &get_description() const { return ""; }

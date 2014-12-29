@@ -27,6 +27,7 @@
 //#include <glint2/IceModel_TConv.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <contracts/contracts.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
@@ -110,16 +111,19 @@ std::string const &fname)
 
 		NcVar *nc_var = 0;
 		giss::CoupledField const &cf(contract.field(i));
-printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), cf.grid.c_str());
-		if (cf.grid == "ATMOSPHERE") {
-			nc_var = ncout.add_var(cf.name.c_str(),
-				giss::get_nc_type<double>(), 3, dims_atmosphere);
-		} else if (cf.grid == "ELEVATION") {
-			nc_var = ncout.add_var(cf.name.c_str(),
+printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), contracts::to_str(cf.flags).c_str());
+		switch(cf.flags & contracts::GRID_BITS) {
+			case contracts::ATMOSPHERE :
+				nc_var = ncout.add_var(cf.name.c_str(),
+					giss::get_nc_type<double>(), 3, dims_atmosphere);
+			break;
+			case contracts::ELEVATION :
+				nc_var = ncout.add_var(cf.name.c_str(),
 				giss::get_nc_type<double>(), 4, dims_elevation);
-		} else {
-			fprintf(stderr, "init_ncfile() unable to handle grid type %s for field %s\n", cf.grid.c_str(), cf.name.c_str());
-			throw std::exception();
+			break;
+			default:
+				fprintf(stderr, "init_ncfile() unable to handle grid type %s for field %s\n", contracts::to_str(cf.flags).c_str(), cf.name.c_str());
+				throw std::exception();
 		}
 
 		auto comment(boost::format(
@@ -184,14 +188,18 @@ blitz::Array<double,3> gcm_inputs)
 
 		NcVar *nc_var = ncout.get_var(contract.name(i).c_str());
 
-		if (contract.field(i).grid == "ATMOSPHERE") {
-			nc_var->set_cur(cur_ij);
-			nc_var->put(array_base, counts_ij);
-			base_index += 1;
-		} else if (contract.field(i).grid == "ELEVATION") {
-			nc_var->set_cur(cur_ijhc);
-			nc_var->put(array_base, counts_ijhc);
-			base_index += nhp;
+		switch(contract.field(i).flags & contracts::GRID_BITS) {
+			case contracts::ATMOSPHERE :
+				nc_var->set_cur(cur_ij);
+				nc_var->put(array_base, counts_ij);
+				base_index += 1;
+			break;
+			case contracts::ELEVATION :
+				nc_var->set_cur(cur_ijhc);
+				nc_var->put(array_base, counts_ijhc);
+				base_index += nhp;
+			break;
+			default: ;
 		}
 	}
 
@@ -440,6 +448,7 @@ glint2_modele *api,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 char const *grid_f, int grid_len,
+int initial,	// bool
 char const *long_name_f, int long_name_len)
 {
 	std::string field_name(field_name_f, field_name_len);
@@ -449,15 +458,21 @@ char const *long_name_f, int long_name_len)
 
 	int ihp = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
 	int var_nhp;
-	if (grid == "ATMOSPHERE") var_nhp = 1;
-	else if (grid == "ELEVATION") var_nhp = glint2_modele_nhp(api);
-	else {
+	unsigned int flags = 0;
+	if (grid == "ATMOSPHERE") {
+		var_nhp = 1;
+		flags = contracts::ATMOSPHERE;
+	} else if (grid == "ELEVATION") {
+		var_nhp = glint2_modele_nhp(api);
+		flags = contracts::ELEVATION;
+	} else {
 		fprintf(stderr, "Unrecognized grid: %s\n", grid.c_str());
 		throw std::exception();
 	}
 
+	if (initial) flags |= contracts::INITIAL;
 
-	api->gcm_coupler.gcm_inputs.add_field(field_name, units, grid, long_name);
+	api->gcm_coupler.gcm_inputs.add_field(field_name, units, flags, long_name);
 
 	api->gcm_inputs_ihp.push_back(ihp + var_nhp);
 	int ret = ihp+1;		// Convert to Fortran (1-based) indexing
@@ -593,6 +608,10 @@ printf("END glint2_modele_compute_fgice_c()\n");
 }
 // -----------------------------------------------------
 /**
+Called from LANDICE_COM.f: read_landice_ic().  This needs to happen AFTER
+ModelE alloc() stuff (which calls glint2_modele_add_gcm_input_*().
+I believe that is the order.
+
 @param zatmo1_f ZATMO from ModelE (Elevation of bottom of atmosphere * GRAV)
 @param BYGRAV 1/GRAV = 1/(9.8 m/s^2)
 @param fgice1_glint2_f Amount of GLINT2-related ground ice in each GCM grid cell
@@ -744,9 +763,6 @@ printf("init_landice_com_part2 4\n");
 	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
 		if (used1h(i,j,k) && (fhc1h(i,j,k) == 0)) fhc1h(i,j,k) = 1e-30;
 	}}}
-
-
-printf("END glint2_modele_init_landice_com_part2\n");
 }
 
 extern "C"
@@ -792,6 +808,63 @@ printf("BEGIN glint2_modele_init_hp_to_ices\n");
 printf("END glint2_modele_init_hp_to_ices\n");
 }
 // -----------------------------------------------------
+void densify_gcm_inputs_onroot(glint2_modele *api,
+	std::vector<giss::VectorSparseVector<int,double>> const &gcm_ivals_global,
+	blitz::Array<double,3> &gcm_inputs_d)
+{
+	// This should only be run on the MPI root node
+	if (!api->gcm_coupler.am_i_root()) return;
+
+	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
+	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
+	int n1 = api->gcm_coupler.maker->n1();
+//	blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+
+	// We ARE the root note --- densify the data into the global gcm_inputs array
+	for (long ix = 0; ix < contract.size_nounit(); ++ix) {
+		int ihp = api->gcm_inputs_ihp[ix];				// First elevation point for this variable
+		int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;	// # elevation points for this variable.
+
+		// Check bounds
+		if (ihp+var_nhp > gcm_inputs_d.extent(0)) {
+//printf("[%d] gcm_inputs_ihp = [", rank);
+//for (int i : api->gcm_inputs_ihp) printf(" %d", i);
+//printf("]\n");
+//printf("[%d] gcm_inputs_ihp.size() = %d\n", rank, api->gcm_inputs_ihp.size());
+//printf("[%d] contract.size_nounit() = %d\n", rank, contract.size_nounit());
+//printf("[%d] ihp var_hp = %d %d\n", rank, ihp, var_nhp);
+//printf("[%d] ix = %d\n", rank, ix);
+//std::cout << "Contract = " << contract << std::endl;
+
+			fprintf(stderr, "[%d] gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", rank, gcm_inputs_d.extent(0), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
+			throw std::exception();
+		}
+
+		// Ignore elevation point = 0 (for ELEVATION grid only),
+		// which is reserved for ModelE's "legacy" elevation point.
+		int modele_ihp = ihp;
+		int modele_var_nhp = var_nhp;
+		if (modele_var_nhp > 1) {
+			// We have an ELEVATION grid destination (not ATMOSPHERE)
+			modele_ihp += 1;
+			modele_var_nhp -= 1;
+		}
+
+		// Index into our big array-of-array of all gcm_inputs
+		blitz::Array<double,1> dense1d(
+			&gcm_inputs_d(modele_ihp, 0, 0),
+			blitz::shape(n1*modele_var_nhp), blitz::neverDeleteData);
+
+		// Convert this sparse vector...
+		for (auto ii=gcm_ivals_global[ix].begin(); ii != gcm_ivals_global[ix].end(); ++ii) {
+			int const i1 = ii->first;
+			double const val = ii->second;
+			dense1d(i1) = val;
+		}
+	}
+
+}
+// -------------------------------------------------------------
 /** @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide.
 
@@ -922,50 +995,9 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 
 
 	if (api->gcm_coupler.am_i_root()) {
-		blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+		auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
-		// We ARE the root note --- densify the data into the global gcm_inputs array
-		for (long ix = 0; ix < contract.size_nounit(); ++ix) {
-			int ihp = api->gcm_inputs_ihp[ix];				// First elevation point for this variable
-			int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;	// # elevation points for this variable.
-
-			// Check bounds
-			if (ihp+var_nhp > gcm_inputs_d.extent(0)) {
-//printf("[%d] gcm_inputs_ihp = [", rank);
-//for (int i : api->gcm_inputs_ihp) printf(" %d", i);
-//printf("]\n");
-//printf("[%d] gcm_inputs_ihp.size() = %d\n", rank, api->gcm_inputs_ihp.size());
-//printf("[%d] contract.size_nounit() = %d\n", rank, contract.size_nounit());
-//printf("[%d] ihp var_hp = %d %d\n", rank, ihp, var_nhp);
-//printf("[%d] ix = %d\n", rank, ix);
-//std::cout << "Contract = " << contract << std::endl;
-
-				fprintf(stderr, "[%d] gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", rank, gcm_inputs_d.extent(0), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
-				throw std::exception();
-			}
-
-			// Ignore elevation point = 0 (for ELEVATION grid only),
-			// which is reserved for ModelE's "legacy" elevation point.
-			int modele_ihp = ihp;
-			int modele_var_nhp = var_nhp;
-			if (modele_var_nhp > 1) {
-				// We have an ELEVATION grid destination (not ATMOSPHERE)
-				modele_ihp += 1;
-				modele_var_nhp -= 1;
-			}
-
-			// Index into our big array-of-array of all gcm_inputs
-			blitz::Array<double,1> dense1d(
-				&gcm_inputs_d(modele_ihp, 0, 0),
-				blitz::shape(n1*modele_var_nhp), blitz::neverDeleteData);
-	
-			// Convert this sparse vector...
-			for (auto ii=gcm_ivals_global[ix].begin(); ii != gcm_ivals_global[ix].end(); ++ii) {
-				int const i1 = ii->first;
-				double const val = ii->second;
-				dense1d(i1) = val;
-			}
-		}
+		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d);
 
 		if (coupler.gcm_in_file.length() > 0) {
 			// Write out to DESM file
@@ -977,5 +1009,39 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 
 	printf("[%d] END glint2_modele_couple_to_ice_c(itime=%d)\n", rank, itime);
 }
+// -------------------------------------------------------------
+extern "C"
+void  glint2_modele_get_initial_state_c(
+glint2_modele *api,
+giss::F90Array<double,3> &gcm_inputs_d_f)
+{
+	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
+
+	auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+
+	printf("[%d] BEGIN glint2_modele_get_initial_state_c()\n", rank);
+
+	GCMCoupler &coupler(api->gcm_coupler);
+
+	// sbuf has elements for ALL ice sheets here
+	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
+	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size_nounit());
+	coupler.get_initial_state(gcm_ivals_global);
+
+	// Decode the outputs to a dense array for ModelE
+	if (api->gcm_coupler.am_i_root()) {
+
+		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d);
+#if 0
+		if (coupler.gcm_in_file.length() > 0) {
+			// Write out to DESM file
+			save_gcm_inputs(api, time_s, gcm_inputs_d);
+		}
+#endif
+	}
+
+	printf("[%d] END glint2_modele_get_initial_state_c()\n", rank);
+}
+
 
 // ===============================================================

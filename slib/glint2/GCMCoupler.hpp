@@ -184,6 +184,17 @@ public:
 		int nfields,
 		giss::DynArray<SMBMsg> &sbuf,
 		std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals);
+
+	/** Follows the pattern of couple_to_ice()
+	@param sbuf the (filled) array of ice grid values for this MPI node. */
+	void get_initial_state(
+	std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals);	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+
+protected:
+	void regrid_gcm_inputs_onroot(
+		std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals,	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+		unsigned int mask);
+
 };
 
 }

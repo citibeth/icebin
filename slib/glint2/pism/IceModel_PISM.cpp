@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <glint2/GCMCoupler.hpp>
+#include <glint2/contracts/contracts.hpp>
 
 using namespace giss;
 using namespace pism;
@@ -553,10 +554,29 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 
 	// ice_model->enthalpy_t() == time_s here
 	ierr = ice_model->prepare_outputs(old_pism_time); CHKERRQ(ierr);
+	ierr = get_state_petsc(); CHKERRQ(ierr);
+	ierr = ice_model->reset_rate(); CHKERRQ(ierr);
+
+printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
+printf("[%d] END ice_model->run_to()\n", pism_rank);
+
+	return 0;
+}
+
+
+/** Copies PISM->Glint2 output variables from PISM variables to
+the Glint2-supplied variables (on the root node).
+@param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
+PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
+{
+	giss::CouplingContract const &ocontract(contract[IceModel::OUTPUT]);
 
 	// Copy the outputs to the blitz arrays
 	if (am_i_root()) allocate_ice_ovals_I();		// ROOT in PISM communicator
 	for (unsigned int i=0; i<pism_ovars.size(); ++i) {
+
+		giss::CoupledField const &cf(ocontract.field(i));
+		if ((cf.flags & mask) != mask) continue;
 
 		if (am_i_root()) {		// ROOT in PISM communicator
 
@@ -587,12 +607,43 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 		}
 	}
 
-	ierr = ice_model->reset_rate(); CHKERRQ(ierr);
+	return 0;
+}
 
-printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
-printf("[%d] END ice_model->run_to()\n", pism_rank);
+
+PetscErrorCode IceModel_PISM::get_initial_state_petsc()
+{
+	PetscErrorCode ierr;
+
+	// Only prepare PISMIceModel outputs for things we need at init time.
+	ierr = ice_model->prepare_initial_outputs(); CHKERRQ(ierr);
+
+	// Copy outputs to Glint2-supplied variables, only for INITIAL variables
+	ierr = get_state_petsc(contracts::INITIAL); CHKERRQ(ierr);
+
 
 	return 0;
 }
+
+void IceModel_PISM::get_initial_state()
+{
+	printf("BEGIN IceModel_PISM::get_initial_state()\n");
+
+	if (get_state_petsc() != 0) {
+		PetscPrintf(pism_comm, "IceModel_PISM::get_initial_state() failed\n");
+		PISMEnd();
+	}
+	printf("END IceModel_PISM::get_initial_state()\n");
+}
+
+
+
+
+
+
+
+
+
+
 
 }}

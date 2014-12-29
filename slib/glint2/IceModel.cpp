@@ -42,7 +42,6 @@ void IceModel::allocate_ice_ovals_I()
 	int nfields = ocontract.size_nounit();
 	for (int i=0; i < nfields; ++i) {
 		giss::CoupledField const &cf(ocontract.field(i));
-		std::string const &grid(cf.get_grid());
 		long n2 = ndata();
 		ice_ovals_I.push_back(blitz::Array<double,1>(n2));
 	}
@@ -66,7 +65,6 @@ void IceModel::allocate_gcm_ivals_I()
 	int nfields = gcm_inputs.size_nounit();
 	for (int i=0; i < nfields; ++i) {
 		giss::CoupledField const &cf(gcm_inputs.field(i));
-		std::string const &grid(cf.get_grid());
 		long n2 = ndata();
 		gcm_ivals_I.push_back(blitz::Array<double,1>(n2));
 	}
@@ -100,8 +98,9 @@ void IceModel::free_ovals_ivals_I()
 }
 
 // -----------------------------------------------------------
-/** Allocates and sets gcm_ivals_I variable */
-void IceModel::set_gcm_inputs()
+/** Allocates and sets gcm_ivals_I variable
+@param mask Control which GCM input variables to set (according to, etc, INITIAL flag in contract) */
+void IceModel::set_gcm_inputs(unsigned int mask)
 {
 	printf("BEGIN IceModel::set_gcm_inputs()\n");
 	allocate_gcm_ivals_I();
@@ -111,8 +110,14 @@ void IceModel::set_gcm_inputs()
 	giss::CSRAndUnits trans = vt.apply_scalars({
 		std::make_pair("unit", 1.0)});
 
+	giss::CouplingContract const &gcm_inputs(coupler->gcm_inputs);
+
 	// Apply the variable transformation
 	for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {	// xi is index of output variable
+		giss::CoupledField const &cf(gcm_inputs.field(xi));
+
+		if ((cf.flags & mask) != mask) continue;
+
 		// Consider each output variable separately...
 		std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
 		for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {

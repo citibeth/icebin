@@ -115,7 +115,7 @@ public:
 	void free_ovals_ivals_I();
 
 	/** Allocates and sets gcm_ivals_I variable */
-	void set_gcm_inputs();
+	void set_gcm_inputs(unsigned int mask);
 
 	// --------------------------------------------
 	/** Allocate a new giss::CouplingContract, with the same lifetime as this IceModel. */
@@ -169,6 +169,14 @@ public:
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
 		std::vector<blitz::Array<double,1>> const &ivals2) = 0;
+
+	/** Called at the beginning.  Returns variables in same place as run_timestep(),
+	but doesn't actually run the timestep. */
+	virtual void get_initial_state() {
+		fprintf(stderr, "get_initial_state() not implemented.\n");
+		throw std::exception();
+	}
+
 
 	/** Allows the IceModel to change the inputs used to create the
 	regridding transformations.  This is used, for example, to make

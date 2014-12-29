@@ -62,28 +62,30 @@ public:
 
 	void allocate_gcm_input();
 
-	void add_gcm_input_ij(std::string const &field, std::string const &units, std::string const &long_name);
-	void add_gcm_input_ijhc(std::string const &field, std::string const &units, std::string const &long_name);
+	void add_gcm_input_ij(std::string const &field, std::string const &units, int initial, std::string const &long_name);
+	void add_gcm_input_ijhc(std::string const &field, std::string const &units, int initial, std::string const &long_name);
 
 };
 
 // --------------------------------------------------------
 // --------------------------------------------------------
-void Desm::add_gcm_input_ij(std::string const &field, std::string const &units, std::string const &long_name)
+void Desm::add_gcm_input_ij(std::string const &field, std::string const &units, int initial, std::string const &long_name)
 {
 	int ret = glint2_modele_add_gcm_input(api,
 		field.c_str(), field.size(),
 		units.c_str(), units.size(),
 		"ATMOSPHERE", 10,
+		initial,
 		long_name.c_str(), long_name.size());
 //printf("add_gcm_input_ij(%s) = %d\n", field.c_str(), ret);
 }
-void Desm::add_gcm_input_ijhc(std::string const &field, std::string const &units, std::string const &long_name)
+void Desm::add_gcm_input_ijhc(std::string const &field, std::string const &units, int initial, std::string const &long_name)
 {
 	int ret = glint2_modele_add_gcm_input(api,
 		field.c_str(), field.size(),
 		units.c_str(), units.size(),
 		"ELEVATION", 9,
+		initial,
 		long_name.c_str(), long_name.size());
 //printf("add_gcm_input_ijhc(%s) = %d\n", field.c_str(), ret);
 }
@@ -93,38 +95,38 @@ void Desm::allocate_gcm_input()
 	// Allocate arrays to receive Glint2 output
 
 	// --------- State Outputs
-	add_gcm_input_ij("elev1", "m", "ice upper surface elevation");
+	add_gcm_input_ij("elev1", "m", 1, "ice upper surface elevation");
 
-	add_gcm_input_ijhc("ice_surface_enth", "J kg-1", "Enthalpy state (temperature) at surface of ice sheet.");
+	add_gcm_input_ijhc("ice_surface_enth", "J kg-1", 1, "Enthalpy state (temperature) at surface of ice sheet.");
 
-	add_gcm_input_ijhc("ice_surface_enth_depth", "m", "Depth below surface at which ice_surface_enth is given.");
+	add_gcm_input_ijhc("ice_surface_enth_depth", "m", 1, "Depth below surface at which ice_surface_enth is given.");
 
 	// ---------- Heat Flux Outputs
-	add_gcm_input_ij("basal_frictional_heating", "W m-2", "Frictional heating at base of ice sheet");
+	add_gcm_input_ij("basal_frictional_heating", "W m-2", 0, "Frictional heating at base of ice sheet");
 
-	add_gcm_input_ij("strain_heating", "W m-2", "Heating from internal friciton");
+	add_gcm_input_ij("strain_heating", "W m-2", 0, "Heating from internal friciton");
 
-	add_gcm_input_ij("geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
+	add_gcm_input_ij("geothermal_flux", "W m-2", 0, "Heat flow between ice sheet and solid earth. ???");
 
-	add_gcm_input_ij("upward_geothermal_flux", "W m-2", "Heat flow between ice sheet and solid earth. ???");
+	add_gcm_input_ij("upward_geothermal_flux", "W m-2", 0, "Heat flow between ice sheet and solid earth. ???");
 
 
 	// ----------- Mass Transfer Flux Outputs
-	add_gcm_input_ij("calving.mass", "kg m-2 s-1", "Calving rate for grid cells containing a calving front.");
-	add_gcm_input_ij("calving.enth", "W m-2", "Calving rate for grid cells containing a calving front.");
+	add_gcm_input_ij("calving.mass", "kg m-2 s-1", 0, "Calving rate for grid cells containing a calving front.");
+	add_gcm_input_ij("calving.enth", "W m-2", 0, "Calving rate for grid cells containing a calving front.");
 
-	add_gcm_input_ij("surface_mass_balance.mass", "kg m-2 s-1", "Mass transfer from snow/firn model above (as seen by GCM).");
-	add_gcm_input_ij("surface_mass_balance.enth", "W m-2", "Mass transfer from snow/firn model above (as seen by GCM).");
+	add_gcm_input_ij("surface_mass_balance.mass", "kg m-2 s-1", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
+	add_gcm_input_ij("surface_mass_balance.enth", "W m-2", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
 
-	add_gcm_input_ij("basal_runoff.mass", "kg m-2 s-1", "Basal melting of grounded ice");
-	add_gcm_input_ij("basal_runoff.enth", "W m-2", "Basal melting of grounded ice");
+	add_gcm_input_ij("basal_runoff.mass", "kg m-2 s-1", 0, "Basal melting of grounded ice");
+	add_gcm_input_ij("basal_runoff.enth", "W m-2", 0, "Basal melting of grounded ice");
 
-	add_gcm_input_ij("internal_advection.mass", "kg m-2 s-1", "Horizontal advection due to ice dynamics");
-	add_gcm_input_ij("internal_advection.enth", "W m-2", "Horizontal advection due to ice dynamics");
+	add_gcm_input_ij("internal_advection.mass", "kg m-2 s-1", 0, "Horizontal advection due to ice dynamics");
+	add_gcm_input_ij("internal_advection.enth", "W m-2", 0, "Horizontal advection due to ice dynamics");
 
 
-	add_gcm_input_ij("epsilon.mass", "kg m-2 s-1", "Changes not otherwise accounted for");
-	add_gcm_input_ij("epsilon.enth", "W m-2", "Changes not otherwise accounted for");
+	add_gcm_input_ij("epsilon.mass", "kg m-2 s-1", 0, "Changes not otherwise accounted for");
+	add_gcm_input_ij("epsilon.enth", "W m-2", 0, "Changes not otherwise accounted for");
 
 	if (api->gcm_coupler.am_i_root()) {
 		int nhp_total = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];

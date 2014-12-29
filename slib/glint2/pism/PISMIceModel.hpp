@@ -130,6 +130,10 @@ public:
 
 	PetscErrorCode prepare_outputs(double time_s);
 
+	/** Read things out of the ice model that will be sent back BEFORE
+	the first coupling timestep (eg, ice surface enthalpy) */
+	PetscErrorCode prepare_initial_outputs();
+
 };
 
 }}

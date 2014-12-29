@@ -457,6 +457,35 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	double t1 = enthalpy_t();	// Current time of the enthalpy portion of ice model.
 	ierr = set_rate(t1 - t0); CHKERRQ(ierr);
 
+	// ice_surface_enth & ice_surfac_enth_depth
+	ierr = prepare_initial_outputs(); CHKERRQ(ierr);
+
+	// ------ Write it out
+#if 0
+	// This is not really needed, since Glint2 also writes out
+	// the same fields.
+	PIO nc(grid, grid.config.get_string("output_format"));
+	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
+	nc.append_time(config.get_string("time_dimension_name"), t1);
+	Enth3.write(nc, PISM_DOUBLE);
+	ice_thickness.write(nc, PISM_DOUBLE);
+	ice_surface_temp.write(nc, PISM_DOUBLE);
+	PSConstantGLINT2 *surface = ps_constant_glint2();
+	surface->ice_surface_temp.write(nc, PISM_DOUBLE);
+	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
+		ierr = ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+	}
+	nc.close();
+#endif
+
+	printf("END PISMIceModel::prepare_outputs()\n");
+	return 0;
+}
+
+PetscErrorCode PISMIceModel::prepare_initial_outputs()
+{
+	PetscErrorCode ierr;
+
 	// --------- ice_surface_enth from Enth3
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
 	ierr = ice_surface_enth.begin_access(); CHKERRQ(ierr);
@@ -478,26 +507,6 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 
 	// ====================== Write to the post_energy.nc file (OPTIONAL)
-
-	// ------ Write it out
-#if 0
-	// This is not really needed, since Glint2 also writes out
-	// the same fields.
-	PIO nc(grid, grid.config.get_string("output_format"));
-	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
-	nc.append_time(config.get_string("time_dimension_name"), t1);
-	Enth3.write(nc, PISM_DOUBLE);
-	ice_thickness.write(nc, PISM_DOUBLE);
-	ice_surface_temp.write(nc, PISM_DOUBLE);
-	PSConstantGLINT2 *surface = ps_constant_glint2();
-	surface->ice_surface_temp.write(nc, PISM_DOUBLE);
-	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
-		ierr = ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	}
-	nc.close();
-#endif
-
-	printf("END PISMIceModel::prepare_outputs()\n");
 	return 0;
 }
 

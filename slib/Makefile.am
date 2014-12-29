@@ -54,6 +54,7 @@ libglint2_la_SOURCES = \
 	glint2/read_grid.cpp \
 	glint2/read_icemodel.cpp \
 	glint2/read_matrixmaker.cpp \
+	glint2/contracts/contracts.cpp \
 	glint2/contracts/modele_dismal.cpp \
 	$(FORTRAN_SOURCES)
 

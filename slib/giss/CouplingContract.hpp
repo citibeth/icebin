@@ -10,29 +10,29 @@ namespace giss {
 struct CoupledField : public giss::VarMetaData {
 	std::string name;
 	std::string units;			//!< UDUnits-compatible string
-	std::string grid;			//!< Description of the grid this variable should be regridded to
+	unsigned flags;			//!< Allows arbitrary subsets
 	std::string description;
 
 	// Implementing giss::VarMetaData
 	std::string const &get_name() const { return name; }
 	std::string const &get_units() const { return units; }
-	std::string const &get_grid() const { return grid; }
+	unsigned get_flags() const { return flags; }
 	std::string const &get_description() const { return description; }
 
 	CoupledField(std::string const &_name,
 		std::string const &_units,
-		std::string const &_grid,
+		unsigned _flags,
 		std::string const &_description)
 	: name(_name),
 	units(_units),
-	grid(_grid),
+	flags(_flags),
 	description(_description)
 	{}
 
 };
 
 inline std::ostream &operator<<(std::ostream &out, CoupledField const &cf)
-	{ return out << "(" << cf.name << ": " << cf.units << " [" << cf.grid << "])"; } 
+	{ return out << "(" << cf.name << ": " << cf.units << " [" << cf.flags << "])"; } 
 
 
 
@@ -60,9 +60,9 @@ public:
 	}
 
 	int add_field(std::string const &name, std::string const &units,
-		std::string const &grid = "",
+		unsigned flags = 0,
 		std::string const &description = "<no description>")
-	{ return add_field(CoupledField(name, units, grid, description)); }
+	{ return add_field(CoupledField(name, units, flags, description)); }
 
 
 	long size_withunit() const { return _ix_to_field.size(); }

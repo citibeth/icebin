@@ -11,7 +11,7 @@ int ConstantSet::add_field(
 	std::string const &name, std::string const &units,
 	std::string const &description)
 {
-	int ix = fields.add_field(name, units, description);
+	int ix = fields.add_field(name, units, 0, description);
 	if (ix >= vals.size()) vals.resize(ix+1);
 	return ix;
 }
