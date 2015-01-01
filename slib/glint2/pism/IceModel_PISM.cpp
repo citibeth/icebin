@@ -578,6 +578,8 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 		giss::CoupledField const &cf(ocontract.field(i));
 		if ((cf.flags & mask) != mask) continue;
 
+		printf("[%d] IceModel_PISM::get_state_petsc(mask=%d) copying field %s\n", pism_rank, mask, cf.name.c_str());
+
 		if (am_i_root()) {		// ROOT in PISM communicator
 
 			// Check number of variables matches for output
@@ -619,6 +621,7 @@ PetscErrorCode IceModel_PISM::get_initial_state_petsc()
 	ierr = ice_model->prepare_initial_outputs(); CHKERRQ(ierr);
 
 	// Copy outputs to Glint2-supplied variables, only for INITIAL variables
+printf("[%d] Calling get_state_petsc(%d)\n", pism_rank, contracts::INITIAL);
 	ierr = get_state_petsc(contracts::INITIAL); CHKERRQ(ierr);
 
 
@@ -627,13 +630,13 @@ PetscErrorCode IceModel_PISM::get_initial_state_petsc()
 
 void IceModel_PISM::get_initial_state()
 {
-	printf("BEGIN IceModel_PISM::get_initial_state()\n");
+	printf("[%d] BEGIN IceModel_PISM::get_initial_state()\n", pism_rank);
 
-	if (get_state_petsc() != 0) {
+	if (get_initial_state_petsc() != 0) {
 		PetscPrintf(pism_comm, "IceModel_PISM::get_initial_state() failed\n");
 		PISMEnd();
 	}
-	printf("END IceModel_PISM::get_initial_state()\n");
+	printf("[%d] END IceModel_PISM::get_initial_state()\n", pism_rank);
 }
 
 

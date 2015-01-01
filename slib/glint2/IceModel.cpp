@@ -102,7 +102,7 @@ void IceModel::free_ovals_ivals_I()
 @param mask Control which GCM input variables to set (according to, etc, INITIAL flag in contract) */
 void IceModel::set_gcm_inputs(unsigned int mask)
 {
-	printf("BEGIN IceModel::set_gcm_inputs()\n");
+	printf("[%d] BEGIN IceModel::set_gcm_inputs()\n", coupler->gcm_params.gcm_rank);
 	allocate_gcm_ivals_I();
 
 	// Compute the variable transformation
@@ -125,6 +125,7 @@ void IceModel::set_gcm_inputs(unsigned int mask)
 			double io_val = xjj->second;	// Amount to multiply it by
 			gcm_ivals_I[xi] += ice_ovals_I[xj] * io_val;		// blitz++ vector operation
 		}
+		gcm_ivals_I[xi] += trans.units[xi];
 	}
 
 	printf("END IceModel::set_gcm_inputs()\n");

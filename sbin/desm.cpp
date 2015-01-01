@@ -330,6 +330,11 @@ int Desm::main(int argc, char **argv)
 
 	giss::F90Array<double,3> gcm_inputs_f(gcm_inputs);
 
+
+	// Initial query of ice sheet initial state
+	// (so the GCM can compute conductive heat flows)
+	glint2_modele_get_initial_state_c(api, gcm_inputs_f);
+
 	// The main loop
 	double begin_time_s;
 	double end_time_s = time0_s;

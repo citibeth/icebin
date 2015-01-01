@@ -5,7 +5,12 @@
 namespace glint2 {
 
 GCMParams::GCMParams() :
-	gcm_rank(-1), gcm_root(-1) {}
+	gcm_rank(-1), gcm_root(-1)
+{
+	// Set a reasonable default initial value for start time.
+	giss::time::tm const time_base(1900,1,1);
+	set_start_time(time_base, -1);
+}
 
 void GCMParams::set_start_time(
 	giss::time::tm const &_time_base,

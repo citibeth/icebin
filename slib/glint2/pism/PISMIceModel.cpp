@@ -500,6 +500,7 @@ PetscErrorCode PISMIceModel::prepare_initial_outputs()
 		ice_surface_enth(i,j) = Enth[ks];
 		// Depth at which enthalpy is as above (could be zero)
 		ice_surface_enth_depth(i,j) = ice_thickness(i,j) - grid.zlevels[ks];
+
 	}}
 	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
 	ierr = ice_surface_enth_depth.end_access(); CHKERRQ(ierr);

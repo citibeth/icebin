@@ -164,6 +164,7 @@ int itime,			// ModelE itime counter
 giss::F90Array<double,3> &smb1hp_f,
 giss::F90Array<double,3> &seb1hp_,
 giss::F90Array<double,3> &tg21hp_f,
+giss::F90Array<double,3> &f21hp_f,
 giss::F90Array<double,3> &gcm_inputs_d_f);
 
 extern "C"

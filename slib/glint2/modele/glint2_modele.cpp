@@ -768,7 +768,9 @@ printf("init_landice_com_part2 4\n");
 extern "C"
 void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api)
 {
-printf("BEGIN glint2_modele_init_hp_to_ices\n");
+	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
+printf("[%d] BEGIN glint2_modele_init_hp_to_ices\n", rank);
+
 	ModelEDomain &domain(*api->domain);
 	HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
 
@@ -805,7 +807,7 @@ printf("BEGIN glint2_modele_init_hp_to_ices\n");
 		api->hp_to_ices[sheet->index] = std::move(omat);
 	}
 
-printf("END glint2_modele_init_hp_to_ices\n");
+printf("[%d] END glint2_modele_init_hp_to_ices\n", rank);
 }
 // -----------------------------------------------------
 void densify_gcm_inputs_onroot(glint2_modele *api,
@@ -876,9 +878,10 @@ extern "C"
 void  glint2_modele_couple_to_ice_c(
 glint2_modele *api,
 int itime,
-giss::F90Array<double,3> &smb1h_f,		// kg/m^2
-giss::F90Array<double,3> &seb1h_f,		// J/m^2: Latent Heat
+giss::F90Array<double,3> &smb1h_f,		// kg m-2 s-1
+giss::F90Array<double,3> &seb1h_f,		// W m-2: Latent Heat
 giss::F90Array<double,3> &tg21h_f,		// C
+giss::F90Array<double,3> &f21h_f,		// W m2: Conductive heat flow
 giss::F90Array<double,3> &gcm_inputs_d_f)
 {
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
@@ -894,6 +897,7 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 	inputs[gcm_outputs_contract.index("lismb")].reference(smb1h_f.to_blitz());
 	inputs[gcm_outputs_contract.index("liseb")].reference(seb1h_f.to_blitz());
 	inputs[gcm_outputs_contract.index("litg2")].reference(tg21h_f.to_blitz());
+	inputs[gcm_outputs_contract.index("lif2")].reference(f21h_f.to_blitz());
 
 	if (coupler.gcm_out_file.length() > 0) {
 		// Write out to DESM file
@@ -1032,12 +1036,11 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 	if (api->gcm_coupler.am_i_root()) {
 
 		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d);
-#if 0
+		const double time_s = coupler.gcm_params.time_start_s;
 		if (coupler.gcm_in_file.length() > 0) {
 			// Write out to DESM file
 			save_gcm_inputs(api, time_s, gcm_inputs_d);
 		}
-#endif
 	}
 
 	printf("[%d] END glint2_modele_get_initial_state_c()\n", rank);

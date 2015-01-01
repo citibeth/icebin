@@ -388,6 +388,7 @@ printf("[%d] EE6\n", rank);
 			auto params(im_params.find(sheetno));
 			call_ice_model(&*model, sheetno, time_s, *rbuf,
 				params->second.begin, params->second.next);
+
 			// Convert to variables the GCM wants (but still on the ice grid)
 			model->set_gcm_inputs(0);	// Fills in gcm_ivals_I
 
@@ -506,6 +507,10 @@ void GCMCoupler::get_initial_state(
 std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 {
 
+	int const rank = gcm_params.gcm_rank;
+
+	printf("[%d] BEGIN GCMCoupler::get_initial_state()\n", gcm_params.gcm_rank);
+
 	if (am_i_root()) {
 
 		// (ONLY ON GCM ROOT)
@@ -515,16 +520,15 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 			int sheetno = model.key();
 			model->get_initial_state();
 
-#if 0
 			// Record what the ice model produced.
 			// NOTE: This shouldn't change model->ice_ovals_I
 			IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
+			const double time_s = gcm_params.time_start_s;
 			if (owriter) {
 				printf("BEGIN owriter->run_timestep()\n");
 				owriter->run_decoded(time_s, model->ice_ovals_I);
 				printf("END owriter->run_timestep()\n");
 			}
-#endif
 
 			// Convert to variables the GCM wants (but still on the ice grid)
 			model->set_gcm_inputs(contracts::INITIAL);	// Fills in gcm_ivals_I
@@ -543,16 +547,20 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 		// receive data in an upcomming MPI_Scatter
 		// Call all our ice models
 		for (auto model = models.begin(); model != models.end(); ++model) {
+			model->get_initial_state();
+
 			int sheetno = model.key();
 			// Assume we have data for all ice models
 			// (So we can easily maintain MPI SIMD operation)
-			model->set_gcm_inputs(contracts::INITIAL);	// Fills in gcm_ivals_I
+
+			// Fills in gcm_ivals_I.  This is done 
+//			model->set_gcm_inputs(contracts::INITIAL);
 
 		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
 
 	}
 
-	printf("[%d] END GCMCoupler::couple_to_ice()\n", gcm_params.gcm_rank);
+	printf("[%d] END GCMCoupler::get_initial_state()\n", gcm_params.gcm_rank);
 }
 
 
