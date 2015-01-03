@@ -48,10 +48,10 @@ struct GCMInput {
 class Desm {
 	int nhp;		// Number of elevation points for this grid.
 
-
 	// Array to receive Glint2 outputs
 	blitz::Array<double,3> gcm_inputs;		// Global array on root
 	int gcm_inputs_nhp;		// Total size in the elevation points direction
+	blitz::Array<double,3> ice_surface_enth;
 
 	glint2_modele *api;
 
@@ -62,14 +62,14 @@ public:
 
 	void allocate_gcm_input();
 
-	void add_gcm_input_ij(std::string const &field, std::string const &units, int initial, std::string const &long_name);
-	void add_gcm_input_ijhc(std::string const &field, std::string const &units, int initial, std::string const &long_name);
+	int add_gcm_input_ij(std::string const &field, std::string const &units, int initial, std::string const &long_name);
+	int add_gcm_input_ijhc(std::string const &field, std::string const &units, int initial, std::string const &long_name);
 
 };
 
 // --------------------------------------------------------
 // --------------------------------------------------------
-void Desm::add_gcm_input_ij(std::string const &field, std::string const &units, int initial, std::string const &long_name)
+int Desm::add_gcm_input_ij(std::string const &field, std::string const &units, int initial, std::string const &long_name)
 {
 	int ret = glint2_modele_add_gcm_input(api,
 		field.c_str(), field.size(),
@@ -78,8 +78,9 @@ void Desm::add_gcm_input_ij(std::string const &field, std::string const &units, 
 		initial,
 		long_name.c_str(), long_name.size());
 //printf("add_gcm_input_ij(%s) = %d\n", field.c_str(), ret);
+	return ret-1;		// Convert to C (0-based) indexing
 }
-void Desm::add_gcm_input_ijhc(std::string const &field, std::string const &units, int initial, std::string const &long_name)
+int Desm::add_gcm_input_ijhc(std::string const &field, std::string const &units, int initial, std::string const &long_name)
 {
 	int ret = glint2_modele_add_gcm_input(api,
 		field.c_str(), field.size(),
@@ -88,6 +89,7 @@ void Desm::add_gcm_input_ijhc(std::string const &field, std::string const &units
 		initial,
 		long_name.c_str(), long_name.size());
 //printf("add_gcm_input_ijhc(%s) = %d\n", field.c_str(), ret);
+	return ret-1;		// Convert to C (0-based) indexing
 }
 // --------------------------------------------------------
 void Desm::allocate_gcm_input()
@@ -97,7 +99,8 @@ void Desm::allocate_gcm_input()
 	// --------- State Outputs
 	add_gcm_input_ij("elev1", "m", 1, "ice upper surface elevation");
 
-	add_gcm_input_ijhc("ice_surface_enth", "J kg-1", 1, "Enthalpy state (temperature) at surface of ice sheet.");
+	int ix = add_gcm_input_ijhc("ice_surface_enth", "J kg-1", 1, "Enthalpy state (temperature) at surface of ice sheet.");
+	ice_surface_enth.reference(gcm_inputs(blitz::Range(ix, ix+nhp-1), blitz::Range::all(), blitz::Range::all()));
 
 	add_gcm_input_ijhc("ice_surface_enth_depth", "m", 1, "Depth below surface at which ice_surface_enth is given.");
 
@@ -115,8 +118,10 @@ void Desm::allocate_gcm_input()
 	add_gcm_input_ij("calving.mass", "kg m-2 s-1", 0, "Calving rate for grid cells containing a calving front.");
 	add_gcm_input_ij("calving.enth", "W m-2", 0, "Calving rate for grid cells containing a calving front.");
 
+#if 0
 	add_gcm_input_ij("surface_mass_balance.mass", "kg m-2 s-1", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
 	add_gcm_input_ij("surface_mass_balance.enth", "W m-2", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
+#endif
 
 	add_gcm_input_ij("basal_runoff.mass", "kg m-2 s-1", 0, "Basal melting of grounded ice");
 	add_gcm_input_ij("basal_runoff.enth", "W m-2", 0, "Basal melting of grounded ice");
@@ -293,13 +298,12 @@ int Desm::main(int argc, char **argv)
 	// Get Time...
 //	NcVar *date_nc = dnc.get_var("date");
 	// Get Data
-	const int nvar = 3;
+	const int nvar = 3;		// # variables to read from file
+	const int nfree = 1;	// # additional variables we make ourselves
 	NcVar *vars_nc[nvar] = {
 		dnc.get_var("lismb"),
 		dnc.get_var("liseb"),
 		dnc.get_var("litg2")};
-
-//const int LITG2 = 2;
 
 	// Get dimensions by querying one variable
 	NcVar *var_nc = vars_nc[0];
@@ -308,25 +312,29 @@ int Desm::main(int argc, char **argv)
 		var_nc->get_dim(1)->size(),		// nhc
 		var_nc->get_dim(2)->size(),		// jm
 		var_nc->get_dim(3)->size()};		// im
+	int nhp = counts[1];
 
 	// Allocate arrays (buffers) for one timestep
+	// These are gcm_outputs (lismb, liseb, litg2, lif2)
 	blitz::Array<double, 3> vars_c[nvar];		// C ordering of dimensions, 0-based
 	blitz::Array<double, 3> vars_f[nvar];		// Fortran ordering of dimensions, 1-based
 	giss::F90Array<double,3> vars_ff[nvar];		// Dope vector
-	for (int i=0; i<nvar; ++i) {
+	for (int i=0; i<nvar+nfree; ++i) {
 		vars_c[i].reference(
 			blitz::Array<double, 3>(counts[1], counts[2], counts[3]));
-		vars_f[i].reference(giss::c_to_f(vars_c[i]));
+		vars_f[i].reference(giss::c_to_f(vars_c[i]));	// Creates exact image of how array will look in Fortran
 		vars_ff[i] = giss::F90Array<double,3>(vars_f[i]);
 	}
 
-	giss::F90Array<double,3> &impm_ff(vars_ff[0]);
-	giss::F90Array<double,3> &imph_ff(vars_ff[1]);
-	giss::F90Array<double,3> &tice_ff(vars_ff[2]);
+	giss::F90Array<double,3> &lismb_ff(vars_ff[0]);
+	giss::F90Array<double,3> &liseb_ff(vars_ff[1]);
+	giss::F90Array<double,3> &litg2_ff(vars_ff[2]);
+	giss::F90Array<double,3> &lif2_ff(vars_ff[3]);
 
-	blitz::Array<double,3> &impm_c(vars_c[0]);
-	blitz::Array<double,3> &imph_c(vars_c[1]);
-	blitz::Array<double,3> &tice_c(vars_c[2]);
+	blitz::Array<double,3> &lismb_c(vars_c[0]);
+	blitz::Array<double,3> &liseb_c(vars_c[1]);
+	blitz::Array<double,3> &litg2_c(vars_c[2]);
+	blitz::Array<double,3> &lif2_c(vars_c[3]);
 
 	giss::F90Array<double,3> gcm_inputs_f(gcm_inputs);
 
@@ -380,30 +388,67 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 			for (int i=0; i<var_c.extent(2); ++i) {
 				double &var_kji = var_c(k,j,i);
 				if (fabs(var_kji) >= 1e10) var_kji = 0;
-
-#if 0
-if (vi != LITG2) var_kji = 0;
-//if (i < 20) var_kji = -90.;		// Really should be k
-//if (i < 20) var_kji = 239. - 273.15;		// Really should be k
-//else var_kji = 10. * (j + k) - 1600. + 200. -40.;
-
-//var_kji = -90.;
-//var_kji = -100.;
-
-if (k > 30) {
-if ((i + j) % 2 == 0) {
-	var_kji = 245.482732342 - 273.15; - k + 30.;
-} else {
-	var_kji = 250.7892746 - 273.15; - k + 30.;
-}
-var_kji += 7. + time_index;
-}
-//var_kji = -100. + (double)time_index*1.;
-var_kji = -3. + (double)time_index*1.;
-#endif
-
 			}}}
-				
+		}
+
+		// Compute lif2 based on litg2 and input from ice model (via Glint2)
+		for (int ihc=0; ihc<counts[1]; ++ihc) {
+		for (int j=0; j<counts[2]; ++j) {
+		for (int i=0; i<counts[3]; ++i) {
+
+			// Constants taken from ModelE
+			const double Z2LI = 2.9;
+			const double LHM = 3.34;
+			const double bySHI = 1./2060.;
+			const double ALAMI0 = 2.11;
+						
+
+			// Enthalpy of top layer of ice sheet
+			double enth3 = ice_surface_enth(ihc, j, i);
+
+			// DZ2 = Distance above bottom of surface model where we will create
+			//       a fictitious finite difference point with temperature = TG2
+			// Z2LI = Thickness of second layer of ice (2.9m)
+			double dz2 = Z2LI * .5;
+
+			// DZ3 = Distance below top of dynamic ice model we will use as another
+			//       fictitious finite difference point.
+			double dz3 = dz2;
+
+			// Temperature of top layer of ice sheet (C)
+			// Convert enthalpy to Temperature.
+			// Enthalpy reference point is 0C, 100% water
+			// To convert temperature to enthalpy for ice: EDIFS=DIFS*(TG2*SHI-LHM)
+			double tg3,f2denom;
+			if (enth3 < -LHM) {
+				// It's fully frozen
+				// This matches the formula in SEAICE.f: Ti=(Ei+lhm)*byshi
+				tg3 = (enth3 + LHM) * bySHI;
+
+				// Since we have fully frozen ice, we can compute flux
+				// using the cold ice formula, using standard Fourier's law.
+		    	f2denom = 1.0 / (dz2 + dz3);
+
+			} else {
+				// It's partial or full melt, but we know it's 0C
+				// because the ice model won't give us anything warmer
+				// than that.
+				tg3 = 0;
+
+				// We know Tx (boundary T) is 0, solve heat eq just in TG2 layer
+				f2denom = 1.0 / dz2;
+			}
+
+			// F2 = (W m-1 K-1) * K * m-1 ==> W m-2    :-)
+			double f2 = ALAMI0 * (litg2_c(ihc,j,i) - tg3) * f2denom;
+
+			lif2_c(ihc,j,i) = f2;
+		}}}
+
+		for (int vi=0; vi<nvar+nfree; ++vi) {
+			blitz::Array<double,3> &var_c = vars_c[vi];
+			blitz::Array<double,3> &var_f = vars_f[vi];
+
 			// HACK: Clear things not in our domain on this MPI node
 			for (int j=1; j<j0; ++j)
 				var_f(blitz::Range::all(), j, blitz::Range::all()) = 0;
@@ -413,7 +458,7 @@ var_kji = -3. + (double)time_index*1.;
 		}
 
 		// Run the coupling step
-		glint2_modele_couple_to_ice_c(api, end_time_i, impm_ff, imph_ff, tice_ff, gcm_inputs_f);
+		glint2_modele_couple_to_ice_c(api, end_time_i, lismb_ff, liseb_ff, litg2_ff, lif2_ff, gcm_inputs_f);
 
 		// (No need to scatter back to GCM.  But if we did scatter,
 		// we would be doing (in Fortran):

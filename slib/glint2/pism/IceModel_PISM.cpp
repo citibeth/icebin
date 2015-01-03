@@ -330,10 +330,13 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// in the PISM data structures.
 	int ix;
 	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
-	ix = contract[INPUT].index("surface_downward_mass_flux");
-		pism_ivars[ix] = &pism_surface_model->climatic_mass_balance;
-	ix = contract[INPUT].index("surface_temperature");
-		pism_ivars[ix] = &pism_surface_model->ice_surface_temp;
+	ix = contract[INPUT].index("smb_mass");
+		pism_ivars[ix] = &pism_surface_model->glint2_smb_mass;
+	// Ignore smb_enth input because there's nothing we can do about it.
+	ix = contract[INPUT].index("surface_temp");
+		pism_ivars[ix] = &pism_surface_model->glint2_surface_temp;
+	ix = contract[INPUT].index("heat_flux");	// Positive is down
+		pism_ivars[ix] = &pism_surface_model->glint2_heat_flux;
 
 	// Initialize scatter/gather stuff
 	ierr = pism_grid->get_dm(1, pism_grid->max_stencil_width, da2); CHKERRQ(ierr);

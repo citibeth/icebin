@@ -62,17 +62,17 @@ void IceModel_PISM::setup_contracts_modele()
 	// ============ GCM -> Ice
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
-	std::string const MASS_FLUX = "surface_downward_mass_flux";
-	std::string const ENTHALPY_FLUX = "surface_downward_enthalpy_flux";
-	std::string const T = "surface_temperature";
-	std::string const HEAT_FLUX = "surface_downward_conductive_heat_flux";
+	std::string const MASS_FLUX = "smb_mass";
+	std::string const ENTHALPY_FLUX = "smb_enth";
+	std::string const T = "surface_temp";
+	std::string const HEAT_FLUX = "heat_flux";
 
 	// ------ Decide on the coupling contract for this ice sheet
 	ice_input.add_field(MASS_FLUX, "kg m-2 s-1", contracts::ICE,
 		"'Surface Mass Balance' over the coupling interval.\n"
 		"Convention: Down is positive");
 	ice_input.add_field(ENTHALPY_FLUX, "W m-2", contracts::ICE,
-		"Advective enthalpy associated with land_ice_surface_downward_mass_flux."
+		"Advective enthalpy associated with smb_mass."
 		"Convention: Down is positive");
 
 	switch(params->coupling_type.index()) {
@@ -88,7 +88,8 @@ void IceModel_PISM::setup_contracts_modele()
 				"Names containing the where_type qualifier are deprecated and newly "
 				"created data should use the cell_methods attribute to indicate the "
 				"horizontal area to which the quantity applies.");
-		break;
+		// break;
+		// We want this field on DIRICHLET_BC as well.
 		case ModelE_CouplingType::NEUMANN_BC :
 			ice_input.add_field(HEAT_FLUX, "W m-2", contracts::ICE,
 				"Conductive heat between ice sheet and snow/firn model on top of it.\n"
@@ -126,15 +127,17 @@ void IceModel_PISM::setup_contracts_modele()
 	// enthalpy flux (PISM) = liseb + enth_modele_to_pism * lismb
 	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "liseb", "unit", 1.0);
 	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "lismb", "unit", enth_modele_to_pism);
+	ok = ok && ice_input_vt.set(T, "litg2", "unit", 1.0);
 
 	switch(params->coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
 			ok = ok && ice_input_vt.set(T, "litg2", "unit", 1.0);
 			ok = ok && ice_input_vt.set(T, "unit", "unit", C2K);	// +273.15
+			ok = ok && ice_input_vt.set(HEAT_FLUX, "lif2", "unit", 1.0);
 		break;
 		case ModelE_CouplingType::NEUMANN_BC :
 // Nothing for now...
-//			ok = ok && ice_input_vt.set(HEAT_FLUX, "liseb", "unit", 1.0);
+//			ok = ok && ice_input_vt.set(HEAT_FLUX, "lif2", "unit", 1.0);
 		break;
 	}
 

@@ -46,21 +46,21 @@ printf("BEGIN PSConstantGLINT2::allocate_PSConstantGLINT2()\n");
 	PetscErrorCode ierr;
 
 printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx, grid.My);
-	ierr = climatic_mass_balance.create(grid, "climatic_mass_balance", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = climatic_mass_balance.set_attrs("climate_state",
+	ierr = glint2_smb_mass.create(grid, "glint2_smb_mass", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_smb_mass.set_attrs("climate_state",
 		"constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
 		"kg m-2 s-1",
 		"land_ice_surface_specific_mass_balance"); CHKERRQ(ierr);
-	ierr = climatic_mass_balance.set_glaciological_units("kg m-2 year-1"); CHKERRQ(ierr);
-	climatic_mass_balance.write_in_glaciological_units = true;
+	ierr = glint2_smb_mass.set_glaciological_units("kg m-2 year-1"); CHKERRQ(ierr);
+	glint2_smb_mass.write_in_glaciological_units = true;
 
-	ierr = ice_surface_temp.create(grid, "ps_ice_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = ice_surface_temp.set_attrs("climate_state",
+	ierr = glint2_surface_temp.create(grid, "glint2_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_surface_temp.set_attrs("climate_state",
 		"constant-in-time ice temperature at the ice surface",
 		"K", ""); CHKERRQ(ierr);
 
-	ierr = _ice_surface_hflux.create(grid, "ice_surface_hflux", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = _ice_surface_hflux.set_attrs("climate_state",
+	ierr = glint2_heat_flux.create(grid, "glint2_heat_flux", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_heat_flux.set_attrs("climate_state",
 		"constant-in-time heat flux through top surface",
 		"W m-2", ""); CHKERRQ(ierr);
 
@@ -96,23 +96,23 @@ printf("BEGIN PSConstantGLINT2::init(this=%p)\n", this);
 	// read snow precipitation rate from file
 printf("AA1\n");
 	ierr = verbPrintf(2, grid.com,
-		"		reading ice-equivalent surface mass balance rate 'climatic_mass_balance' from %s ... \n",
+		"		reading ice-equivalent surface mass balance rate 'glint2_smb_mass' from %s ... \n",
 		input_file.c_str()); CHKERRQ(ierr);
 	if (do_regrid) {
-		ierr = climatic_mass_balance.regrid(input_file, CRITICAL); CHKERRQ(ierr); // fails if not found!
+		ierr = glint2_smb_mass.regrid(input_file, CRITICAL); CHKERRQ(ierr); // fails if not found!
 	} else {
 		// *** This is the branch we're using
-		ierr = climatic_mass_balance.read(input_file, start); CHKERRQ(ierr); // fails if not found!
+		ierr = glint2_smb_mass.read(input_file, start); CHKERRQ(ierr); // fails if not found!
 	}
 #else
 	// It doesn't matter what we set this to, it will be re-set later.
-	ierr = climatic_mass_balance.set(0.0); CHKERRQ(ierr);
+	ierr = glint2_smb_mass.set(0.0); CHKERRQ(ierr);
 #endif
 
 	// Set ice_surface_temp to a harmless value for now. (FIXME, though.)
-	ierr = ice_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
+	ierr = glint2_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
 
-	ierr = _ice_surface_hflux.set(0.0); CHKERRQ(ierr);
+	ierr = glint2_heat_flux.set(0.0); CHKERRQ(ierr);
 
 	// parameterizing the ice surface temperature 'ice_surface_temp'
 	ierr = verbPrintf(2, grid.com,
@@ -138,9 +138,9 @@ PetscErrorCode PSConstantGLINT2::update(PetscReal my_t, PetscReal my_dt)
 
 #if 0
 printf("PSConstantGLINT2::update(%f) dumping variables\n", my_t);
-_ice_surface_hflux.dump("ice_surface_hflux.nc");
+glint2_heat_flux.dump("glint2_heat_flux.nc");
 ice_surface_temp.dump("ice_surface_temp.nc");
-climatic_mass_balance.dump("climatic_mass_balance.nc");
+glint2_smb_mass.dump("glint2_smb_mass.nc");
 printf("PSConstantGLINT2::update(%f) done dumping variables\n", my_t);
 #endif
 
@@ -158,28 +158,30 @@ void PSConstantGLINT2::get_diagnostics(std::map<std::string, pism::Diagnostic*> 
 PetscErrorCode PSConstantGLINT2::ice_surface_mass_flux(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
-	ierr = climatic_mass_balance.copy_to(result); CHKERRQ(ierr);
+	ierr = glint2_smb_mass.copy_to(result); CHKERRQ(ierr);
 	return 0;
 }
 
 PetscErrorCode PSConstantGLINT2::ice_surface_temperature(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
-	ierr = ice_surface_temp.copy_to(result); CHKERRQ(ierr);
+	ierr = glint2_surface_temp.copy_to(result); CHKERRQ(ierr);
 	return 0;
 }
 
-PetscErrorCode PSConstantGLINT2::ice_surface_hflux(IceModelVec2S &result) {
+#if 0
+PetscErrorCode PSConstantGLINT2::ice_surface_heat_flux(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
-	ierr = _ice_surface_hflux.copy_to(result); CHKERRQ(ierr);
+	ierr = glint2_heat_flux.copy_to(result); CHKERRQ(ierr);
 	return 0;
 }
+#endif
 
 void PSConstantGLINT2::add_vars_to_output(std::string /*keyword*/, std::set<std::string> &result) {
-	result.insert("climatic_mass_balance");
+	result.insert("glint2_smb_mass");
 	result.insert("ice_surface_temp");
-	result.insert("ice_surface_hflux");
+	result.insert("glint2_heat_flux");
 	// does not call atmosphere->add_vars_to_output().
 }
 
@@ -188,16 +190,16 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 
 	ierr = pism::SurfaceModel::define_variables(vars, nc, nctype); CHKERRQ(ierr);
 
-	if (set_contains(vars, "ice_surface_temp")) {
-		ierr = ice_surface_temp.define(nc, nctype); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_surface_temp")) {
+		ierr = glint2_surface_temp.define(nc, nctype); CHKERRQ(ierr);
 	}
 
-	if (set_contains(vars, "ice_surface_hflux")) {
-		ierr = _ice_surface_hflux.define(nc, nctype); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_heat_flux")) {
+		ierr = glint2_heat_flux.define(nc, nctype); CHKERRQ(ierr);
 	}
 
-	if (set_contains(vars, "climatic_mass_balance")) {
-		ierr = climatic_mass_balance.define(nc, nctype); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_smb_mass")) {
+		ierr = glint2_smb_mass.define(nc, nctype); CHKERRQ(ierr);
 	}
 
 	return 0;
@@ -207,15 +209,15 @@ PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, con
 	PetscErrorCode ierr;
 
 	if (set_contains(vars, "ice_surface_temp")) {
-		ierr = ice_surface_temp.write(nc); CHKERRQ(ierr);
+		ierr = glint2_surface_temp.write(nc); CHKERRQ(ierr);
 	}
 
-	if (set_contains(vars, "ice_surface_hflux")) {
-		ierr = _ice_surface_hflux.write(nc); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_heat_flux")) {
+		ierr = glint2_heat_flux.write(nc); CHKERRQ(ierr);
 	}
 
-	if (set_contains(vars, "climatic_mass_balance")) {
-		ierr = climatic_mass_balance.write(nc); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_smb_mass")) {
+		ierr = glint2_smb_mass.write(nc); CHKERRQ(ierr);
 	}
 
 	return 0;

@@ -24,10 +24,10 @@ void IceModel_DISMAL::setup_contracts_modele()
 	// ============ GCM -> Ice
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
-	std::string const MASS_FLUX = "surface_downward_mass_flux";
-	std::string const ENTHALPY_FLUX = "surface_downward_enthalpy_flux";
-	std::string const T = "surface_temperature";
-	std::string const HEAT_FLUX = "surface_downward_conductive_heat_flux";
+	std::string const MASS_FLUX = "smb_mass";
+	std::string const ENTHALPY_FLUX = "smb_enth";
+	std::string const T = "surface_temp";
+	std::string const HEAT_FLUX = "heat_flux";	// Positive is down
 
 	// ------ Decide on the coupling contract for this ice sheet
 	ice_input.add_field(MASS_FLUX, "kg m-2 s-1");

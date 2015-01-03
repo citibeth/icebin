@@ -234,7 +234,7 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	// This will call through to accumulateFluxes_massContExplicitStep()
 	// in the inner loop
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
-	ierr = cur.pism_smb.begin_access(); CHKERRQ(ierr);
+	ierr = cur.pism_smb_mass.begin_access(); CHKERRQ(ierr);
 	ierr = cur.melt_grounded.begin_access(); CHKERRQ(ierr);
 	ierr = cur.melt_floating.begin_access(); CHKERRQ(ierr);
 	ierr = cur.internal_advection.begin_access(); CHKERRQ(ierr);
@@ -248,7 +248,7 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	ierr = cur.internal_advection.end_access(); CHKERRQ(ierr);
 	ierr = cur.melt_floating.end_access(); CHKERRQ(ierr);
 	ierr = cur.melt_grounded.end_access(); CHKERRQ(ierr);
-	ierr = cur.pism_smb.end_access(); CHKERRQ(ierr);
+	ierr = cur.pism_smb_mass.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 
 
@@ -258,23 +258,28 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	// ----------- SMB: mass and enthalpy
 	PSConstantGLINT2 *surface = ps_constant_glint2();
 	double p_air = EC->getPressureFromDepth(0.0);
-	ierr = surface->climatic_mass_balance.begin_access(); CHKERRQ(ierr);
-	ierr = surface->ice_surface_temp.begin_access(); CHKERRQ(ierr);
-	ierr = cur.surface_mass_balance.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_smb_mass.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_surface_temp.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_heat_flux.begin_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_smb.begin_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_heat_flux.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		double mass = surface->climatic_mass_balance(i,j);		// Our input is in [kg m-2 s-1]
+		double mass = surface->glint2_smb_mass(i,j);		// Our input is in [kg m-2 s-1]
 		double specific_enth;
-		double T = surface->ice_surface_temp(i,j);
+		double T = surface->glint2_surface_temp(i,j);
 		ierr = EC->getEnthPermissive(T,
 			0.0, p_air, specific_enth);	CHKERRQ(ierr); // [J kg-1]
 
-		cur.surface_mass_balance.mass(i,j) += dt * mass;					// [kg m-2]
-		cur.surface_mass_balance.enth(i,j) += dt * mass * specific_enth;	// [J m-2]
+		cur.glint2_smb.mass(i,j) += dt * mass;					// [kg m-2]
+		cur.glint2_smb.enth(i,j) += dt * mass * specific_enth;	// [J m-2]
+		cur.glint2_heat_flux(i,j) += dt * surface->glint2_heat_flux(i,j);
 	}}
-	ierr = cur.surface_mass_balance.end_access(); CHKERRQ(ierr);
-	ierr = surface->ice_surface_temp.end_access(); CHKERRQ(ierr);
-	ierr = surface->climatic_mass_balance.end_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_heat_flux.end_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_smb.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_heat_flux.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_surface_temp.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_smb_mass.end_access(); CHKERRQ(ierr);
 
 	printf("END PISMIceModel::MassContExplicitStep()\n");
 	return 0;
@@ -298,7 +303,7 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	PetscErrorCode ierr;
 
 	// -------------- Get the easy veriables out of the way...
-	cur.pism_smb(i,j) += surface_mass_balance * _meter_per_s_to_kg_per_m2;
+	cur.pism_smb_mass(i,j) += surface_mass_balance * _meter_per_s_to_kg_per_m2;
 	cur.nonneg_rule(i,j) -= nonneg_rule_flux * _ice_density;
 	cur.href_to_h(i,j) += Href_to_H_flux * _ice_density;
 
@@ -572,7 +577,7 @@ PetscErrorCode PISMIceModel::misc_setup()
 	ice_thickness.define(*nc, PISM_DOUBLE);
 	ice_surface_temp.define(*nc, PISM_DOUBLE);
 	PSConstantGLINT2 *surface = ps_constant_glint2();
-	surface->ice_surface_temp.define(*nc, PISM_DOUBLE);
+	surface->glint2_surface_temp.define(*nc, PISM_DOUBLE);
 	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
 		ierr = ii->vec.define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}

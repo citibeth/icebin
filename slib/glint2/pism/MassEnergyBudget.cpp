@@ -89,20 +89,27 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		"m-2 s-1", "calving"); CHKERRQ(ierr);
 	add_massenth(calving, DELTA, "calving.mass", "calving.enth");
 
-	ierr = surface_mass_balance.create(grid, prefix+"surface_mass_balance",
+	ierr = glint2_smb.create(grid, prefix+"glint2_smb",
 		ghostedp, width); CHKERRQ(ierr);
-	ierr = surface_mass_balance.set_attrs("diagnostic",
-		"surface_mass_balance",
-		"m-2 s-1", "surface_mass_balance"); CHKERRQ(ierr);
-	add_massenth(surface_mass_balance, DELTA, "surface_mass_balance.mass", "surface_mass_balance.enth");
+	ierr = glint2_smb.set_attrs("diagnostic",
+		"glint2_smb",
+		"m-2 s-1", "glint2_smb"); CHKERRQ(ierr);
+	add_massenth(glint2_smb, DELTA, "glint2_smb.mass", "glint2_smb.enth");
 
-	ierr = pism_smb.create(grid, prefix+"pism_smb",
+	ierr = glint2_heat_flux.create(grid, prefix+"glint2_heat_flux",
 		ghostedp, width); CHKERRQ(ierr);
-	ierr = pism_smb.set_attrs("diagnostic",
-		"pism_smb",
-		"kg m-2 s-1", "pism_smb"); CHKERRQ(ierr);
+	ierr = glint2_heat_flux.set_attrs("diagnostic",
+		"glint2_heat_flux",
+		"J m-2 s-1", "glint2_heat_flux"); CHKERRQ(ierr);
+	add_enth(glint2_heat_flux, DELTA, "");
+
+	ierr = pism_smb_mass.create(grid, prefix+"pism_smb_mass",
+		ghostedp, width); CHKERRQ(ierr);
+	ierr = pism_smb_mass.set_attrs("diagnostic",
+		"pism_smb_mass",
+		"kg m-2 s-1", "pism_smb_mass"); CHKERRQ(ierr);
 	// No DELTA< does not participate in epsilon computation
-	add_mass(pism_smb, 0, "");
+	add_mass(pism_smb_mass, 0, "");
 
 	ierr = href_to_h.create(grid, prefix+"href_to_h",
 		ghostedp, width); CHKERRQ(ierr);

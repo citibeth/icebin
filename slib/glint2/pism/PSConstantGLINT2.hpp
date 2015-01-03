@@ -55,7 +55,7 @@ public:
 															 std::map<std::string, pism::TSDiagnostic*> &ts_dict);
 	virtual PetscErrorCode update(PetscReal my_t, PetscReal my_dt);
 	virtual PetscErrorCode ice_surface_mass_flux(pism::IceModelVec2S &result);
-	virtual PetscErrorCode ice_surface_hflux(pism::IceModelVec2S &result);
+//	virtual PetscErrorCode ice_surface_heat_flux(pism::IceModelVec2S &result);
 	virtual PetscErrorCode ice_surface_temperature(pism::IceModelVec2S &result);
 	virtual PetscErrorCode define_variables(std::set<std::string> vars, const pism::PIO &nc, pism::IO_Type nctype);
 	virtual PetscErrorCode write_variables(std::set<std::string> vars, const pism::PIO &nc);
@@ -63,8 +63,11 @@ public:
 protected:
 	std::string input_file;
 public:
-	pism::IceModelVec2S climatic_mass_balance;
-	pism::IceModelVec2S ice_surface_temp;
+	// Inputs from Glint2
+	pism::IceModelVec2S glint2_smb_mass;
+	pism::IceModelVec2S glint2_surface_temp;
+	pism::IceModelVec2S glint2_heat_flux;
+
 	// IMPLIED: liquid fraction of 0 (see our superclass)
 	pism::IceModelVec2S _ice_surface_hflux;
 private:
