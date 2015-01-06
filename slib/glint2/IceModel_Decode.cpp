@@ -38,9 +38,11 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 	//     vals = Individual value array from ivals2
 	//     valsd = Individual valu array from ivals2d
 	// Loop through the fields we require
-	int i=0;
-	for (auto ii = ivals2.begin(); ii != ivals2.end(); ++ii, ++i) {
-		blitz::Array<double,1> const &vals(*ii);
+	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
+	for (int i=0; i<icontract.size_nounit(); ++i) {
+//	for (int i=0; i<ivals2.size(); ++i)
+
+		blitz::Array<double,1> const &vals(ivals2[i]);
 
 		// Decode the field!
 		blitz::Array<double,1> valsd(ndata());
@@ -60,9 +62,17 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 			else oval += vals(i);
 		}
 
+		// Convert any remaining nans to default value,
+		// so we have a valid number everywhere.
+		double default_value = icontract.field(i).default_value;
+		for (int j=0; j<ndata(); ++j) {
+			double &val(valsd(j));
+			if (std::isnan(val)) val = default_value;
+		}
+
 		// Store decoded field in our output
 		ivals2d.push_back(valsd);
-printf("Done decoding required field, %s\n", contract[IceModel::INPUT].name(i).c_str());
+printf("Done decoding required field, %s\n", icontract.name(i).c_str());
 	}
 
 	// Pass decoded fields on to subclass

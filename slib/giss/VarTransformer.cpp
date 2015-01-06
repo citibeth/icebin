@@ -113,7 +113,7 @@ std::ostream &operator<<(std::ostream &out, CSRMatrix const &mat)
 	for (unsigned int i=0; i < mat.size(); ++i) {
 		out << "    " << i << ":";
 		for (auto ele : mat[i]) {
-			out << " (" << ele.first << ", " << ele.second << ")";
+			out << " (" << ele.second << "*[" << ele.first << "])";
 		}
 		out << std::endl;
 	}

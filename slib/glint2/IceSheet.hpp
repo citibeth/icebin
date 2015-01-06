@@ -125,8 +125,12 @@ public:
 	virtual void accum_areas(
 		giss::MapSparseVector<int,double> &area1_m) = 0;
 
-	/** Computes matrix to go from elevation point space [nhp * n1] to ice grid [n2] */
-	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceinterp(IceInterp dest) = 0;
+	/** Computes matrix to go from elevation point space [nhp * n1] to ice grid [n2]
+	@param fill_masked If true, then ice/exch grid cells that are masked out will be treated as
+		if they have an elevation point of -1.  This can be used later, where the matrix is applied,
+		to fill in a background field for masked ice grid cells.
+	*/
+	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceinterp(IceInterp dest, bool fill_masked=false) = 0;
 
 	/** Convert from ice grid to the interpolation grid.
 	NOTE: This simple/stub implementation will generally be overridden. */

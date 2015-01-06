@@ -54,16 +54,20 @@ protected:
 
 protected :
 	/** Builds an interpolation matrix to go from height points to ice/exchange grid.
-	@param overlap_type Controls matrix output to ice or exchange grid. */
-	std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceexch(IceExch dest);
+	@param dest Controls matrix output to ice or exchange grid.
+	@param fill_masked If true, then ice/exch grid cells that are masked out will be treated as
+		if they have an elevation point of -1.  This can be used later, where the matrix is applied,
+		to fill in a background field for masked ice grid cells.
+	*/
+	std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceexch(IceExch dest, bool fill_masked = false);
 
 public :
 	virtual std::unique_ptr<giss::VectorSparseMatrix> hp_to_iceinterp(
-		IceInterp dest)
+		IceInterp dest, bool fill_masked)
 	{
 		IceExch iedest = (dest == IceInterp::ICE ? IceExch::ICE : interp_grid);
 printf("hp_to_iceinterp(): dest=%s, iedest=%s\n", dest.str(), iedest.str());
-		return hp_to_iceexch(iedest);
+		return hp_to_iceexch(iedest, fill_masked);
 	}
 
 

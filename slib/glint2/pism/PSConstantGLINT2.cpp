@@ -54,8 +54,8 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 	ierr = glint2_smb_mass.set_glaciological_units("kg m-2 year-1"); CHKERRQ(ierr);
 	glint2_smb_mass.write_in_glaciological_units = true;
 
-	ierr = glint2_surface_temp.create(grid, "glint2_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = glint2_surface_temp.set_attrs("climate_state",
+	ierr = effective_surface_temp.create(grid, "effective_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = effective_surface_temp.set_attrs("climate_state",
 		"constant-in-time ice temperature at the ice surface",
 		"K", ""); CHKERRQ(ierr);
 
@@ -110,7 +110,7 @@ printf("AA1\n");
 #endif
 
 	// Set ice_surface_temp to a harmless value for now. (FIXME, though.)
-	ierr = glint2_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
+	ierr = effective_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
 
 	ierr = glint2_heat_flux.set(0.0); CHKERRQ(ierr);
 
@@ -165,7 +165,7 @@ PetscErrorCode PSConstantGLINT2::ice_surface_mass_flux(IceModelVec2S &result) {
 PetscErrorCode PSConstantGLINT2::ice_surface_temperature(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
-	ierr = glint2_surface_temp.copy_to(result); CHKERRQ(ierr);
+	ierr = effective_surface_temp.copy_to(result); CHKERRQ(ierr);
 	return 0;
 }
 
@@ -190,8 +190,8 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 
 	ierr = pism::SurfaceModel::define_variables(vars, nc, nctype); CHKERRQ(ierr);
 
-	if (set_contains(vars, "glint2_surface_temp")) {
-		ierr = glint2_surface_temp.define(nc, nctype); CHKERRQ(ierr);
+	if (set_contains(vars, "effective_surface_temp")) {
+		ierr = effective_surface_temp.define(nc, nctype); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "glint2_heat_flux")) {
@@ -208,8 +208,8 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, const PIO &nc) {
 	PetscErrorCode ierr;
 
-	if (set_contains(vars, "ice_surface_temp")) {
-		ierr = glint2_surface_temp.write(nc); CHKERRQ(ierr);
+	if (set_contains(vars, "effective_surface_temp")) {
+		ierr = effective_surface_temp.write(nc); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "glint2_heat_flux")) {

@@ -425,6 +425,8 @@ unsigned int mask)
 	// This method is meant to be run only on the GCM root.
 	if (!am_i_root()) return;
 
+	printf("BEGIN GCMCoupler::regrid_gcm_inputs_onroot\n");
+
 	// (ONLY ON GCM ROOT)
 	// =============== Regrid to the grid requested by the GCM
 
@@ -491,14 +493,8 @@ unsigned int mask)
 		model->free_ovals_ivals_I();
 	}
 
+	printf("END GCMCoupler::regrid_gcm_inputs_onroot\n");
 }
-
-
-
-
-
-
-
 
 
 /** Follows the pattern of couple_to_ice()
@@ -548,14 +544,6 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 		// Call all our ice models
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			model->get_initial_state();
-
-			int sheetno = model.key();
-			// Assume we have data for all ice models
-			// (So we can easily maintain MPI SIMD operation)
-
-			// Fills in gcm_ivals_I.  This is done 
-//			model->set_gcm_inputs(contracts::INITIAL);
-
 		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
 
 	}

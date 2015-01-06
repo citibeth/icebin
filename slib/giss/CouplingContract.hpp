@@ -1,14 +1,17 @@
 #pragma once
 
+#include <ostream>
+#include <limits>
 #include <giss/cfnames.hpp>
 #include <giss/DynamicEnum.hpp>
 #include <giss/VarMetaData.hpp>
-#include <ostream>
 
 namespace giss {
 
 struct CoupledField : public giss::VarMetaData {
+
 	std::string name;
+	double default_value;
 	std::string units;			//!< UDUnits-compatible string
 	unsigned flags;			//!< Allows arbitrary subsets
 	std::string description;
@@ -20,10 +23,11 @@ struct CoupledField : public giss::VarMetaData {
 	std::string const &get_description() const { return description; }
 
 	CoupledField(std::string const &_name,
+		double _default_value,
 		std::string const &_units,
 		unsigned _flags,
 		std::string const &_description)
-	: name(_name),
+	: name(_name), default_value(_default_value),
 	units(_units),
 	flags(_flags),
 	description(_description)
@@ -59,11 +63,15 @@ public:
 		return add_field(std::move(cf));
 	}
 
+	int add_field(std::string const &name, double default_value, std::string const &units,
+		unsigned flags = 0,
+		std::string const &description = "<no description>")
+	{ return add_field(CoupledField(name, default_value, units, flags, description)); }
+
 	int add_field(std::string const &name, std::string const &units,
 		unsigned flags = 0,
 		std::string const &description = "<no description>")
-	{ return add_field(CoupledField(name, units, flags, description)); }
-
+	{ return add_field(CoupledField(name, std::numeric_limits<double>::quiet_NaN(), units, flags, description)); }
 
 	long size_withunit() const { return _ix_to_field.size(); }
 //	long size() const { return size_withunit(); }

@@ -89,6 +89,14 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		"m-2 s-1", "calving"); CHKERRQ(ierr);
 	add_massenth(calving, DELTA, "calving.mass", "calving.enth");
 
+	ierr = pism_smb.create(grid, prefix+"pism_smb",
+		ghostedp, width); CHKERRQ(ierr);
+	ierr = pism_smb.set_attrs("diagnostic",
+		"pism_smb",
+		"m-2 s-1", "pism_smb"); CHKERRQ(ierr);
+	// No DELTA< does not participate in epsilon computation
+	add_massenth(pism_smb, 0, "pism_smb.mass", "pism_smb.enth");
+
 	ierr = glint2_smb.create(grid, prefix+"glint2_smb",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = glint2_smb.set_attrs("diagnostic",
@@ -102,14 +110,6 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 		"glint2_heat_flux",
 		"J m-2 s-1", "glint2_heat_flux"); CHKERRQ(ierr);
 	add_enth(glint2_heat_flux, DELTA, "");
-
-	ierr = pism_smb_mass.create(grid, prefix+"pism_smb_mass",
-		ghostedp, width); CHKERRQ(ierr);
-	ierr = pism_smb_mass.set_attrs("diagnostic",
-		"pism_smb_mass",
-		"kg m-2 s-1", "pism_smb_mass"); CHKERRQ(ierr);
-	// No DELTA< does not participate in epsilon computation
-	add_mass(pism_smb_mass, 0, "");
 
 	ierr = href_to_h.create(grid, prefix+"href_to_h",
 		ghostedp, width); CHKERRQ(ierr);

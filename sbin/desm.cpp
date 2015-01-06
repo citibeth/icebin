@@ -31,20 +31,6 @@ const double SHI  = 2060.;
 //@param lhm   latent heat of melt at 0 C (334590 J/kg)
 const double LHM = 3.34e5;
 
-#if 0
-struct GCMInput {
-	int ix;			// Index into the gcm_inputs array where this starts
-	int nhp;		// Number of elevation classes for this variable (1 for atmosphere variables, or the nhp for elevation-classified variables)
-	std::string field;
-	std::string units;
-	std::string long_name;
-
-	GCMInput(int _ix, int _nhp, std::string const &_field, std::string const &_units, std::string const &_long_name) :
-		ix(_ix), nhp(_nhp), field(_field), units(_units), long_name(_long_name)
-		{}
-};
-#endif
-
 class Desm {
 	int nhp;		// Number of elevation points for this grid.
 
@@ -99,9 +85,7 @@ void Desm::allocate_gcm_input()
 	// --------- State Outputs
 	add_gcm_input_ij("elev1", "m", 1, "ice upper surface elevation");
 
-	int ix = add_gcm_input_ijhc("ice_surface_enth", "J kg-1", 1, "Enthalpy state (temperature) at surface of ice sheet.");
-	ice_surface_enth.reference(gcm_inputs(blitz::Range(ix, ix+nhp-1), blitz::Range::all(), blitz::Range::all()));
-
+	int ice_surface_enth_ix = add_gcm_input_ijhc("ice_surface_enth", "J kg-1", 1, "Enthalpy state (temperature) at surface of ice sheet.");
 	add_gcm_input_ijhc("ice_surface_enth_depth", "m", 1, "Depth below surface at which ice_surface_enth is given.");
 
 	// ---------- Heat Flux Outputs
@@ -119,8 +103,8 @@ void Desm::allocate_gcm_input()
 	add_gcm_input_ij("calving.enth", "W m-2", 0, "Calving rate for grid cells containing a calving front.");
 
 #if 0
-	add_gcm_input_ij("surface_mass_balance.mass", "kg m-2 s-1", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
-	add_gcm_input_ij("surface_mass_balance.enth", "W m-2", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
+	add_gcm_input_ij("gcm_smb.mass", "kg m-2 s-1", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
+	add_gcm_input_ij("gcm_smb.enth", "W m-2", 0, "Mass transfer from snow/firn model above (as seen by GCM).");
 #endif
 
 	add_gcm_input_ij("basal_runoff.mass", "kg m-2 s-1", 0, "Basal melting of grounded ice");
@@ -134,10 +118,16 @@ void Desm::allocate_gcm_input()
 	add_gcm_input_ij("epsilon.enth", "W m-2", 0, "Changes not otherwise accounted for");
 
 	if (api->gcm_coupler.am_i_root()) {
+		int nhp = glint2_modele_nhp(api);
 		int nhp_total = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
 printf("Allocating gcm_inputs with nhp = %d\n", nhp_total);
 		gcm_inputs.reference(blitz::Array<double,3>(nhp_total,
 			api->domain->jm, api->domain->im));
+
+		const int ix = ice_surface_enth_ix;
+printf("ice_surface_enth_ix = %d + %d\n", ix, nhp);
+		ice_surface_enth.reference(gcm_inputs(blitz::Range(ix, ix+nhp-1), blitz::Range::all(), blitz::Range::all()));
+
 	}
 }
 // --------------------------------------------------------
@@ -284,9 +274,6 @@ int Desm::main(int argc, char **argv)
 
 	glint2_modele_set_start_time(api, iyear1, time0_i, dtsrc);
 
-//	int nhp = api->gcm_coupler.maker->nhp(-1);
-//	printf("desm.cpp: Number Elevation Points (nhp)== %d\n", nhp);
-
 	glint2_modele_init_hp_to_ices(api);
 
 	// ----------------------------------------------------------
@@ -316,9 +303,9 @@ int Desm::main(int argc, char **argv)
 
 	// Allocate arrays (buffers) for one timestep
 	// These are gcm_outputs (lismb, liseb, litg2, lif2)
-	blitz::Array<double, 3> vars_c[nvar];		// C ordering of dimensions, 0-based
-	blitz::Array<double, 3> vars_f[nvar];		// Fortran ordering of dimensions, 1-based
-	giss::F90Array<double,3> vars_ff[nvar];		// Dope vector
+	blitz::Array<double, 3> vars_c[nvar+nfree];		// C ordering of dimensions, 0-based
+	blitz::Array<double, 3> vars_f[nvar+nfree];		// Fortran ordering of dimensions, 1-based
+	giss::F90Array<double,3> vars_ff[nvar+nfree];		// Dope vector
 	for (int i=0; i<nvar+nfree; ++i) {
 		vars_c[i].reference(
 			blitz::Array<double, 3>(counts[1], counts[2], counts[3]));
@@ -401,7 +388,6 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 			const double LHM = 3.34;
 			const double bySHI = 1./2060.;
 			const double ALAMI0 = 2.11;
-						
 
 			// Enthalpy of top layer of ice sheet
 			double enth3 = ice_surface_enth(ihc, j, i);
@@ -456,6 +442,7 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 				var_f(blitz::Range::all(), j, blitz::Range::all()) = 0;
 
 		}
+printf("BB2\n");
 
 		// Run the coupling step
 		glint2_modele_couple_to_ice_c(api, end_time_i, lismb_ff, liseb_ff, litg2_ff, lif2_ff, gcm_inputs_f);

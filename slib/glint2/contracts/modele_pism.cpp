@@ -14,6 +14,8 @@ using namespace glint2::gpism;
 namespace glint2 {
 namespace gpism {
 
+static double const nan = std::numeric_limits<double>::quiet_NaN();
+
 /** GCM-specific contract */
 void IceModel_PISM::setup_contracts_modele()
 {
@@ -40,6 +42,8 @@ void IceModel_PISM::setup_contracts_modele()
 	transfer_constant("standard_gravity", "constant::grav");
 	transfer_constant("ideal_gas_constant", "constant::gasc");
 
+	Z2LI = coupler->gcm_constants.get_as("landice::z2li", "m");
+
 	// To set this, see (in ModelE): Function SHCGS in ocnfuntab.f is
 	// used for the Russell ocean. I. The simple models use SHW=4185.
 	// This probably doesn't matter much at this point (May 2014)
@@ -62,40 +66,22 @@ void IceModel_PISM::setup_contracts_modele()
 	// ============ GCM -> Ice
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
-	std::string const MASS_FLUX = "smb_mass";
-	std::string const ENTHALPY_FLUX = "smb_enth";
-	std::string const T = "surface_temp";
-	std::string const HEAT_FLUX = "heat_flux";
-
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field(MASS_FLUX, "kg m-2 s-1", contracts::ICE,
+	ice_input.add_field("smb_mass", nan, "kg m-2 s-1", contracts::ICE,
 		"'Surface Mass Balance' over the coupling interval.\n"
 		"Convention: Down is positive");
-	ice_input.add_field(ENTHALPY_FLUX, "W m-2", contracts::ICE,
+	ice_input.add_field("smb_enth", nan, "W m-2", contracts::ICE,
 		"Advective enthalpy associated with smb_mass."
 		"Convention: Down is positive");
 
-	switch(params->coupling_type.index()) {
-		case ModelE_CouplingType::DIRICHLET_BC :
-			ice_input.add_field(T, "K", contracts::ICE,
-				"The surface called \"surface\" means the lower boundary of the "
-				"atmosphere. The surface temperature is the temperature at the "
-				"interface, not the bulk temperature of the medium above or "
-				"below. Unless indicated in the cell_methods attribute, a quantity is "
-				"assumed to apply to the whole area of each horizontal grid "
-				"box. Previously, the qualifier where_type was used to specify that the "
-				"quantity applies only to the part of the grid box of the named type. "
-				"Names containing the where_type qualifier are deprecated and newly "
-				"created data should use the cell_methods attribute to indicate the "
-				"horizontal area to which the quantity applies.");
-		// break;
-		// We want this field on DIRICHLET_BC as well.
-		case ModelE_CouplingType::NEUMANN_BC :
-			ice_input.add_field(HEAT_FLUX, "W m-2", contracts::ICE,
-				"Conductive heat between ice sheet and snow/firn model on top of it.\n"
-				"Convention: Down is positive");
-		break;
-	}
+	ice_input.add_field("surface_temp", nan, "K", contracts::ICE,
+		"Mean temperature of the bottom of the ice surface model, over the "
+		"coupling timestep.  This is for informational purposes ONLY, it is not "
+		"used as a boundary condition.");
+
+	ice_input.add_field("heat_flux", 0., "W m-2", contracts::ICE,
+		"Conductive heat between ice sheet and snow/firn model on top of it.\n"
+		"Convention: Down is positive");
 
 	// Figure out the conversion between GCM and PISM enthalpy
 	// ModelE's reference state is 1atm, 0C, 100% liquid water.
@@ -122,24 +108,16 @@ void IceModel_PISM::setup_contracts_modele()
 	// Add some recipes for gcm_to_ice
 	std::string out;
 	bool ok = true;
-	ok = ok && ice_input_vt.set(MASS_FLUX, "lismb", "unit", 1.0);
+	ok = ok && ice_input_vt.set("smb_mass", "lismb", "unit", 1.0);
 
 	// enthalpy flux (PISM) = liseb + enth_modele_to_pism * lismb
-	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "liseb", "unit", 1.0);
-	ok = ok && ice_input_vt.set(ENTHALPY_FLUX, "lismb", "unit", enth_modele_to_pism);
-	ok = ok && ice_input_vt.set(T, "litg2", "unit", 1.0);
+	ok = ok && ice_input_vt.set("smb_enth", "liseb", "unit", 1.0);
+	ok = ok && ice_input_vt.set("smb_enth", "lismb", "unit", enth_modele_to_pism);
 
-	switch(params->coupling_type.index()) {
-		case ModelE_CouplingType::DIRICHLET_BC :
-			ok = ok && ice_input_vt.set(T, "litg2", "unit", 1.0);
-			ok = ok && ice_input_vt.set(T, "unit", "unit", C2K);	// +273.15
-			ok = ok && ice_input_vt.set(HEAT_FLUX, "lif2", "unit", 1.0);
-		break;
-		case ModelE_CouplingType::NEUMANN_BC :
-// Nothing for now...
-//			ok = ok && ice_input_vt.set(HEAT_FLUX, "lif2", "unit", 1.0);
-		break;
-	}
+	ok = ok && ice_input_vt.set("surface_temp", "litg2", "unit", 1.0);
+	ok = ok && ice_input_vt.set("surface_temp", "unit", "unit", C2K);	// +273.15
+
+	ok = ok && ice_input_vt.set("heat_flux", "lif2", "unit", 1.0);
 
 	// ============== Ice -> GCM
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
@@ -158,8 +136,8 @@ void IceModel_PISM::setup_contracts_modele()
 
 	ice_output.add_field("calving.mass", "kg m-2 s-1", contracts::ICE, "");
 	ice_output.add_field("calving.enth", "W m-2", contracts::ICE, "");
-	ice_output.add_field("surface_mass_balance.mass", "kg m-2 s-1", contracts::ICE, "");
-	ice_output.add_field("surface_mass_balance.enth", "W m-2", contracts::ICE, "");
+	ice_output.add_field("glint2_smb.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("glint2_smb.enth", "W m-2", contracts::ICE, "");
 
 	// basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
 	ice_output.add_field("melt_grounded.mass", "kg m-2 s-1", contracts::ICE, "");
@@ -202,9 +180,11 @@ void IceModel_PISM::setup_contracts_modele()
 	ok = ok && vt.set("geothermal_flux", "geothermal_flux", "unit", 1.0);
 	ok = ok && vt.set("upward_geothermal_flux", "upward_geothermal_flux", "unit", 1.0);
 
-	ok = ok && vt.set("surface_mass_balance.mass", "surface_mass_balance.mass", "unit", 1.0);
-	ok = ok && vt.set("surface_mass_balance.enth", "surface_mass_balance.enth", "unit", 1.0);
-	ok = ok && vt.set("surface_mass_balance.enth", "surface_mass_balance.mass", "unit", -enth_modele_to_pism);
+#if 0
+	ok = ok && vt.set("glint2_smb.mass", "glint2_smb.mass", "unit", 1.0);
+	ok = ok && vt.set("glint2_smb.enth", "glint2_smb.enth", "unit", 1.0);
+	ok = ok && vt.set("glint2_smb.enth", "glint2_smb.mass", "unit", -enth_modele_to_pism);
+#endif
 
 	ok = ok && vt.set("basal_runoff.mass", "melt_grounded.mass", "unit", 1.0);
 	ok = ok && vt.set("basal_runoff.enth", "melt_grounded.enth", "unit", 1.0);

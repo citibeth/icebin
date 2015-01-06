@@ -234,7 +234,7 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	// This will call through to accumulateFluxes_massContExplicitStep()
 	// in the inner loop
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
-	ierr = cur.pism_smb_mass.begin_access(); CHKERRQ(ierr);
+	ierr = cur.pism_smb.begin_access(); CHKERRQ(ierr);
 	ierr = cur.melt_grounded.begin_access(); CHKERRQ(ierr);
 	ierr = cur.melt_floating.begin_access(); CHKERRQ(ierr);
 	ierr = cur.internal_advection.begin_access(); CHKERRQ(ierr);
@@ -248,38 +248,32 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	ierr = cur.internal_advection.end_access(); CHKERRQ(ierr);
 	ierr = cur.melt_floating.end_access(); CHKERRQ(ierr);
 	ierr = cur.melt_grounded.end_access(); CHKERRQ(ierr);
-	ierr = cur.pism_smb_mass.end_access(); CHKERRQ(ierr);
+	ierr = cur.pism_smb.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 
 
 
 	// =========== AFTER the Mass Continuity Step
 
-	// ----------- SMB: mass and enthalpy
+	// ----------- SMB: Pass inputs through to outputs.
+	// They are needed to participate in mass/energy budget
 	PSConstantGLINT2 *surface = ps_constant_glint2();
-	double p_air = EC->getPressureFromDepth(0.0);
 	ierr = surface->glint2_smb_mass.begin_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_surface_temp.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_smb_enth.begin_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_heat_flux.begin_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_smb.begin_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_heat_flux.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		double mass = surface->glint2_smb_mass(i,j);		// Our input is in [kg m-2 s-1]
-		double specific_enth;
-		double T = surface->glint2_surface_temp(i,j);
-		ierr = EC->getEnthPermissive(T,
-			0.0, p_air, specific_enth);	CHKERRQ(ierr); // [J kg-1]
-
-		cur.glint2_smb.mass(i,j) += dt * mass;					// [kg m-2]
-		cur.glint2_smb.enth(i,j) += dt * mass * specific_enth;	// [J m-2]
+		cur.glint2_smb.mass(i,j) += dt * surface->glint2_smb_mass(i,j);
+		cur.glint2_smb.enth(i,j) += dt * surface->glint2_smb_enth(i,j);
 		cur.glint2_heat_flux(i,j) += dt * surface->glint2_heat_flux(i,j);
 	}}
-	ierr = cur.glint2_heat_flux.end_access(); CHKERRQ(ierr);
-	ierr = cur.glint2_smb.end_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_heat_flux.end_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_surface_temp.end_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_smb_mass.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_smb_enth.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_heat_flux.end_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_smb.end_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_heat_flux.end_access(); CHKERRQ(ierr);
 
 	printf("END PISMIceModel::MassContExplicitStep()\n");
 	return 0;
@@ -302,40 +296,42 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 {
 	PetscErrorCode ierr;
 
-	// -------------- Get the easy veriables out of the way...
-	cur.pism_smb_mass(i,j) += surface_mass_balance * _meter_per_s_to_kg_per_m2;
-	cur.nonneg_rule(i,j) -= nonneg_rule_flux * _ice_density;
-	cur.href_to_h(i,j) += Href_to_H_flux * _ice_density;
-
-
 	// -------------- Melting
 	double p_basal = EC->getPressureFromDepth(ice_thickness(i,j));
 	double T = EC->getMeltingTemp(p_basal);
-	double specific_enth;
-	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth); CHKERRQ(ierr);
+	double specific_enth_basal;
+	ierr = EC->getEnthPermissive(T, 1.0, p_basal, specific_enth_basal); CHKERRQ(ierr);
 	double mass;
 
 	// ------- Melting at base of ice sheet
 	mass = -meltrate_grounded * _meter_per_s_to_kg_per_m2;
 	cur.melt_grounded.mass(i,j) += mass;
-	cur.melt_grounded.enth(i,j) += mass * specific_enth;
+	cur.melt_grounded.enth(i,j) += mass * specific_enth_basal;
 
 	// ------- Melting under ice shelf
 	mass = -meltrate_floating * _meter_per_s_to_kg_per_m2;
 	cur.melt_floating.mass(i,j) += mass;
-	cur.melt_floating.enth(i,j) += mass * specific_enth;
+	cur.melt_floating.enth(i,j) += mass * specific_enth_basal;
 
 
 	// -------------- internal_advection
 	const int ks = grid.kBelowHeight(ice_thickness(i,j));
 	double *Enth;
 	ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
-	specific_enth = Enth[ks];		// Approximate, we will use the enthalpy of the top layer...
+	double specific_enth_top = Enth[ks];		// Approximate, we will use the enthalpy of the top layer...
 
 	mass = -(divQ_SIA + divQ_SSA) * _meter_per_s_to_kg_per_m2;
 
 	cur.internal_advection.mass(i,j) += mass;
-	cur.internal_advection.enth(i,j) += mass * specific_enth;
+	cur.internal_advection.enth(i,j) += mass * specific_enth_top;
+
+
+	// -------------- Get the easy veriables out of the way...
+	mass = surface_mass_balance * _meter_per_s_to_kg_per_m2;
+	cur.pism_smb.mass(i,j) += mass;
+	cur.pism_smb.enth(i,j) += mass * specific_enth_top;
+	cur.nonneg_rule(i,j) -= nonneg_rule_flux * _ice_density;
+	cur.href_to_h(i,j) += Href_to_H_flux * _ice_density;
 
 
 //	printf("END PISMIceModel::accumulateFluxes_MassContExplicitStep()\n");
@@ -476,7 +472,7 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	ice_thickness.write(nc, PISM_DOUBLE);
 	ice_surface_temp.write(nc, PISM_DOUBLE);
 	PSConstantGLINT2 *surface = ps_constant_glint2();
-	surface->ice_surface_temp.write(nc, PISM_DOUBLE);
+	surface->effective_surface_temp.write(nc, PISM_DOUBLE);
 	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
 		ierr = ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
@@ -577,7 +573,7 @@ PetscErrorCode PISMIceModel::misc_setup()
 	ice_thickness.define(*nc, PISM_DOUBLE);
 	ice_surface_temp.define(*nc, PISM_DOUBLE);
 	PSConstantGLINT2 *surface = ps_constant_glint2();
-	surface->glint2_surface_temp.define(*nc, PISM_DOUBLE);
+	surface->effective_surface_temp.define(*nc, PISM_DOUBLE);
 	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
 		ierr = ii->vec.define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
 	}
@@ -638,6 +634,75 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	ierr = mass2.end_access(); CHKERRQ(ierr);
 	return 0;
 }
+
+#if 0
+/** Given a Neumann boundary condition (heat flux) for the top of the
+ice sheet, computes a Dirichlet boundary condition (top temperature)
+that should have approximately the same effect.  This is all done
+(presumeably) on the ice grid; however, this function is
+grid-independent.
+@param heat_flux (W m-2) Downward heat flux INTO the ice sheet.
+@param tg2 (C or K) Temperature of bottom of ice surface model (ABOVE) the ice sheet.
+@param tg3 (C or K) Temperature of top of ice sheet.  Must be same units as tg2
+@param tg2_effective (C or K) Effective temperature to use for Dirichlet BC.
+@param ice_thermal_conductivity (W K-1 m-1) Lambda coefficient (Fourier's Law) for ice.
+@param dz (m) Distance to use for heat flow calculation (Fourier's Law) */
+void PISMIceModel::set_effective_surface_temp(
+double dz)
+{
+	const double byALAMI0 = 1.0 / config.get("ice_thermal_conductivity");
+	const double SHI = config.get("ice_specific_heat_capacity");
+	const double bySHI = 1.0 / SHI;
+	const double LHM = config.get("water_latent_heat_fusion");
+
+	IceModelVec2S &glint2_heat_flux(surface->glint2_heat_flux);
+	IceModelVec2S &effective_surface_temp(surface->effective_surface_temp);
+
+	ierr = Enth3.begin_access(); CHKERRQ(ierr);
+	ierr = effective_surface_temp.begin_access(); CHKERRQ(ierr);
+	ierr = glint2_heat_flux.begin_access(); CHKERRQ(ierr);
+	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+		double *Enth;
+		ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
+
+		// Enthalpy at top of ice sheet
+		const int ks = grid.kBelowHeight(ice_thickness(i,j));
+		double enth3 = Enth[ks];
+
+		// Temperature of top layer of ice sheet (C)
+		// Convert enthalpy to Temperature.
+		// Enthalpy reference point is 0C, 100% water
+		// To convert temperature to enthalpy for ice: EDIFS=DIFS*(TG2*SHI-LHM)
+		double tg3,ddz;
+		if (enth3 < -LHM) then
+			// It's fully frozen
+			// This matches the formula in SEAICE.f: Ti=(Ei+lhm)*byshi
+			tg3 = (enth3 + LHM) * bySHI;
+
+			// Since we have fully frozen ice, we can compute flux
+			// using the cold ice formula, using standard Fourier's law.
+			ddz = dz;
+
+		else
+			// It's partial or full melt, but we know it's 0C
+			// because the ice model won't give us anything warmer
+			// than that.
+			tg3 = 0
+
+			// We know Tx (boundary T) is 0, solve heat eq just in TG2 layer
+			ddz = .5 * dz;
+		end if
+
+		effective_surface_temp(i,j) = tg3 + (glint2_heat_flux(i,j) * ddz * byALAMI0);
+	}}
+	ierr = glint2_heat_flux.end_access(); CHKERRQ(ierr);
+	ierr = effective_surface_temp.end_access(); CHKERRQ(ierr);
+	ierr = Enth3.end_access(); CHKERRQ(ierr);
+}
+#endif
+
+
 
 }}	// namespace glint2::gpism
 
@@ -700,4 +765,12 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 //   return 0;
 // }
 
+
+#if 0
+    IceModelVec2S tg3;
+    ierr = tg3.create(grid, "ice_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
+    tg3.metadata() = effective_surface_temp;
+	ierr = ice_surface_temperature(tg3); CHKERRQ(ierr);
+//	IceModelVec2S &effective_surface_temp(surface->effective_surface_temp);
+#endif
 

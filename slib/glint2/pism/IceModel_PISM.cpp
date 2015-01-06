@@ -332,9 +332,18 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
 	ix = contract[INPUT].index("smb_mass");
 		pism_ivars[ix] = &pism_surface_model->glint2_smb_mass;
-	// Ignore smb_enth input because there's nothing we can do about it.
+
+	// We don't really use this, but we do need to store and pass through for conservation computations
+	ix = contract[INPUT].index("smb_enth");
+		pism_ivars[ix] = &pism_surface_model->glint2_smb_enth;
+
+#if 0
+
+	// Ignore surface_temp, it is not useful...
 	ix = contract[INPUT].index("surface_temp");
 		pism_ivars[ix] = &pism_surface_model->glint2_surface_temp;
+#endif
+
 	ix = contract[INPUT].index("heat_flux");	// Positive is down
 		pism_ivars[ix] = &pism_surface_model->glint2_heat_flux;
 
@@ -544,9 +553,11 @@ ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKER
 //ierr = ice_model->ps_constant_glint2()->climatic_mass_balance.set(0); CHKERRQ(ierr);
 
 printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time->current(), time_s, ice_model.get());
+	// =========== Compute Dirichlet boundary condition from Neumann BC
+	// Set surface->effective_surface_temp, used in the Dirichlet BC
+	ice_model->set_effective_surface_temp(Z2LI);
+
 	// =========== Run PISM for one coupling timestep
-
-
 	// Time of last time we coupled
 	auto old_pism_time(pism_grid->time->current());
 	ierr = ice_model->run_to(time_s); CHKERRQ(ierr);	// See glint2::gpism::PISMIceModel::run_to()

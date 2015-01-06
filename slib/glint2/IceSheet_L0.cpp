@@ -81,13 +81,24 @@ static int nearest_1d(
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
 @param dest Controls matrix output to ice or exchange grid. */
 std::unique_ptr<giss::VectorSparseMatrix> 
-IceSheet_L0::hp_to_iceexch(IceExch dest)
+IceSheet_L0::hp_to_iceexch(IceExch dest, bool fill_masked)
 {
 printf("BEGIN hp_to_iceexch(%s) mask1=%p\n", dest.str(), &*gcm->mask1);
+	// Offset added to elevation points.  This is to account for the "exta"
+	// elevation point that will be provided, if fill_masked.
+	// In theory, this parameter can be set independently.
+	int hp_offset = (fill_masked ? 1 : 0);
+
+	// Get bilinear interpolation out of the way
 	if (interp_style == InterpStyle::BILIN_INTERP) {
 
 		if (dest == IceExch::EXCH) {
 			fprintf(stderr, "bilin_interp() does not (yet) interpolate to exchange grid, only ice grid.  This functionality would not be hard to implement.  But it's not needed because the exchange grid is only used in cases where the RM matrix can be kept local.  bilin_interp() introduces inherent non-locality into the matrix M.\n");
+			throw std::exception();
+		}
+
+		if (fill_masked) {
+			fprintf(stderr, "bilin_interp() does not (yet) work with fill_masked.\n");
 			throw std::exception();
 		}
 
@@ -96,52 +107,60 @@ printf("BEGIN hp_to_iceexch(%s) mask1=%p\n", dest.str(), &*gcm->mask1);
 			gcm->hpdefs, elev2, &*gcm->mask1, &*mask2);
 	}
 
+	// ---------------------------------------
+	// Handle Z_INTERP or ELEV_CLASS_INTERP
+
 	// Sum overlap matrix by column (ice grid cell)
 	std::vector<double> area2(n2());
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
-		if (masked(cell)) continue;
+		if (masked(cell) && !fill_masked) continue;
 		area2[cell->j] += cell->area;
 	}
-
-
-printf("MID hp_to_iceexch(%s)\n", dest.str());
 
 	int nx = niceexch(dest);
 
 	std::unique_ptr<giss::VectorSparseMatrix> ret(new giss::VectorSparseMatrix(
-		giss::SparseDescr(nx, gcm->n3())));
+		giss::SparseDescr(nx, gcm->n1() * (gcm->nhp(-1) + hp_offset))));
 
 	// Interpolate in the vertical
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
-		if (masked(cell)) continue;
-
 		int const i1 = cell->i;
 		int const i2 = cell->j;
 		int const i4 = cell->index;
-		int ix = (dest == IceExch::ICE ? i2 : i4);
+		int const ix = (dest == IceExch::ICE ? i2 : i4);
 
 		double overlap_ratio =
 			(dest == IceExch::ICE ? cell->area / area2[i2] : 1.0);
-		double elevation = std::max(elev2(i2), 0.0);
-//elevation = 800;
 
-		// Interpolate in height points
-		switch(interp_style.index()) {
-			case InterpStyle::Z_INTERP : {
-				int ihps[2];
-				double whps[2];
-				linterp_1d(gcm->hpdefs, elevation, ihps, whps);
-//printf("LINTERP %d %f %f (%d : %f), (%d : %f)\n", i2, elev2(i2), overlap_ratio, ihps[0], whps[0], ihps[1], whps[1]);
-				ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[0]),
-					overlap_ratio * whps[0]);
-				ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[1]),
-					overlap_ratio * whps[1]);
-			} break;
-			case InterpStyle::ELEV_CLASS_INTERP : {
-				int ihps0 = nearest_1d(gcm->hpdefs, elevation);
-				ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps0),
-					overlap_ratio);
-			} break;
+		if (masked(cell)) {
+			if (!fill_masked) continue;
+
+			// This cell is masked out: use special height point = -1
+			int ihps0 = -1;
+			ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps0+hp_offset),
+				overlap_ratio);
+
+		} else {
+			// This cell not masked: look up elevation point as usual
+			double elevation = std::max(elev2(i2), 0.0);
+
+			// Interpolate in height points
+			switch(interp_style.index()) {
+				case InterpStyle::Z_INTERP : {
+					int ihps[2];
+					double whps[2];
+					linterp_1d(gcm->hpdefs, elevation, ihps, whps);
+					ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[0]+hp_offset),
+						overlap_ratio * whps[0]);
+					ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps[1]+hp_offset),
+						overlap_ratio * whps[1]);
+				} break;
+				case InterpStyle::ELEV_CLASS_INTERP : {
+					int ihps0 = nearest_1d(gcm->hpdefs, elevation);
+					ret->add(ix, gcm->hc_index->ik_to_index(i1, ihps0+hp_offset),
+						overlap_ratio);
+				} break;
+			}
 		}
 	}
 

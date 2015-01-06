@@ -258,12 +258,13 @@ static PyObject *MatrixMaker_hp_to_iceinterp(PyMatrixMaker *self, PyObject *args
 		// Get arguments
 		const char *ice_sheet_name_py;
 		const char *dest_py = "ICE";
-		static char const *keyword_list[] = {"sheetname", "dest", NULL};
+		int fill_masked = 0;
+		static char const *keyword_list[] = {"sheetname", "dest", "fill_masked", NULL};
 
 		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "s|s",
+			args, kwds, "s|si",
 			const_cast<char **>(keyword_list),
-			&ice_sheet_name_py, &dest_py))
+			&ice_sheet_name_py, &dest_py, &fill_masked))
 		{
 			// Throw an exception...
 			PyErr_SetString(PyExc_ValueError,
@@ -283,7 +284,7 @@ static PyObject *MatrixMaker_hp_to_iceinterp(PyMatrixMaker *self, PyObject *args
 		}
 
 		// Get the hp_to_iceinterp matrix from it
-		auto ret_c(sheet->hp_to_iceinterp(dest));
+		auto ret_c(sheet->hp_to_iceinterp(dest, fill_masked));
 
 		// Create an output tuple of Numpy arrays
 		ret_py = giss::VectorSparseMatrix_to_py(*ret_c);

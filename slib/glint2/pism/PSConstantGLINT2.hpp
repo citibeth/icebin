@@ -65,11 +65,10 @@ protected:
 public:
 	// Inputs from Glint2
 	pism::IceModelVec2S glint2_smb_mass;
-	pism::IceModelVec2S glint2_surface_temp;
+	pism::IceModelVec2S glint2_smb_enth;	// Not used here, along for the ride.
 	pism::IceModelVec2S glint2_heat_flux;
+	pism::IceModelVec2S effective_surface_temp;	// Computed based on glint2_heat_flux
 
-	// IMPLIED: liquid fraction of 0 (see our superclass)
-	pism::IceModelVec2S _ice_surface_hflux;
 private:
 	PetscErrorCode allocate_PSConstantGLINT2();
 };

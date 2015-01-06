@@ -954,7 +954,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 			msg.i2 = jj.row;
 
 #if 1
-			// Convert from input to output units while regridding
+			// Convert from (GCM output) to (Ice Model input) units while regridding
 			for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {
 				double inp = 0;
 				std::vector<std::pair<int, double>> const &row(trans.mat[xi]);

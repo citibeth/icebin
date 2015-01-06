@@ -115,7 +115,7 @@ public:
 
 	MassEnthVec2S glint2_smb;		//!< accumulation / ablation, as provided by Glint2
 	pism::IceModelVec2S glint2_heat_flux;
-	pism::IceModelVec2S pism_smb_mass;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check glint2_smb.mass, but does not figure into contract.
+	MassEnthVec2S pism_smb;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check glint2_smb.mass, but does not figure into contract.
 	pism::IceModelVec2S href_to_h;
 	pism::IceModelVec2S nonneg_rule;
 	MassEnthVec2S melt_grounded;		//!< basal melt (grounded) (from summing meltrate_grounded)

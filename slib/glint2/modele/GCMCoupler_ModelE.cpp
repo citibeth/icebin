@@ -19,7 +19,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	gcm_outputs.add_field("liseb", "J m-2 s-1", ELEVATION, "Ethalpy of SMB");
 	// Specific enthalpy of the SMB computed as liseb / lismb (J kg-1)
 
-	gcm_outputs.add_field("litg2", "degC", ELEVATION, "T of bottom layer of snow/firn");
+	gcm_outputs.add_field("litg2", "degC", ELEVATION, "Mean T of bottom layer of snow/firn");
 	gcm_outputs.add_field("lif2", "J m-2 s-1", ELEVATION, "Heat flow out of bottom layer of snow/firn");
 	gcm_outputs.add_field("unit", "", 0, "Dimensionless identity");
 
