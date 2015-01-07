@@ -635,25 +635,24 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	return 0;
 }
 
-#if 0
 /** Given a Neumann boundary condition (heat flux) for the top of the
 ice sheet, computes a Dirichlet boundary condition (top temperature)
 that should have approximately the same effect.  This is all done
 (presumeably) on the ice grid; however, this function is
 grid-independent.
-@param heat_flux (W m-2) Downward heat flux INTO the ice sheet.
-@param tg2 (C or K) Temperature of bottom of ice surface model (ABOVE) the ice sheet.
-@param tg3 (C or K) Temperature of top of ice sheet.  Must be same units as tg2
-@param tg2_effective (C or K) Effective temperature to use for Dirichlet BC.
-@param ice_thermal_conductivity (W K-1 m-1) Lambda coefficient (Fourier's Law) for ice.
 @param dz (m) Distance to use for heat flow calculation (Fourier's Law) */
-void PISMIceModel::set_effective_surface_temp(
-double dz)
+PetscErrorCode PISMIceModel::set_effective_surface_temp(double dz)
 {
+	PetscErrorCode ierr;
+
+	printf("BEGIN PISMIceModel::set_effective_temp(%f)\n", dz);
+
+	PSConstantGLINT2 *surface = ps_constant_glint2();
+
 	const double byALAMI0 = 1.0 / config.get("ice_thermal_conductivity");
-	const double SHI = config.get("ice_specific_heat_capacity");
-	const double bySHI = 1.0 / SHI;
-	const double LHM = config.get("water_latent_heat_fusion");
+//	const double SHI = config.get("ice_specific_heat_capacity");
+//	const double bySHI = 1.0 / SHI;
+//	const double LHM = config.get("water_latent_heat_fusion");
 
 	IceModelVec2S &glint2_heat_flux(surface->glint2_heat_flux);
 	IceModelVec2S &effective_surface_temp(surface->effective_surface_temp);
@@ -661,11 +660,11 @@ double dz)
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
 	ierr = effective_surface_temp.begin_access(); CHKERRQ(ierr);
 	ierr = glint2_heat_flux.begin_access(); CHKERRQ(ierr);
+	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 		double *Enth;
 		ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
-
 		// Enthalpy at top of ice sheet
 		const int ks = grid.kBelowHeight(ice_thickness(i,j));
 		double enth3 = Enth[ks];
@@ -674,33 +673,28 @@ double dz)
 		// Convert enthalpy to Temperature.
 		// Enthalpy reference point is 0C, 100% water
 		// To convert temperature to enthalpy for ice: EDIFS=DIFS*(TG2*SHI-LHM)
+
+		// TODO: We should really use PISM's enthalpy converter here!!!!!
 		double tg3,ddz;
-		if (enth3 < -LHM) then
-			// It's fully frozen
-			// This matches the formula in SEAICE.f: Ti=(Ei+lhm)*byshi
-			tg3 = (enth3 + LHM) * bySHI;
-
-			// Since we have fully frozen ice, we can compute flux
-			// using the cold ice formula, using standard Fourier's law.
-			ddz = dz;
-
-		else
-			// It's partial or full melt, but we know it's 0C
-			// because the ice model won't give us anything warmer
-			// than that.
-			tg3 = 0
-
-			// We know Tx (boundary T) is 0, solve heat eq just in TG2 layer
+		const double p = 0.0;		// Pressure at top of ice sheet
+		EC->getAbsTemp(enth3, p, tg3);
+		if (EC->isTemperate(enth3, p)) {
 			ddz = .5 * dz;
-		end if
+		} else {
+			ddz = dz;
+		}
 
 		effective_surface_temp(i,j) = tg3 + (glint2_heat_flux(i,j) * ddz * byALAMI0);
 	}}
+	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
 	ierr = glint2_heat_flux.end_access(); CHKERRQ(ierr);
 	ierr = effective_surface_temp.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
+
+	printf("END PISMIceModel::set_effective_temp(%f)\n", dz);
+
+	return 0;
 }
-#endif
 
 
 

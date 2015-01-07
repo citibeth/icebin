@@ -139,14 +139,8 @@ public:
 	that should have approximately the same effect.  This is all done
 	(presumeably) on the ice grid; however, this function is
 	grid-independent.
-	@param heat_flux (W m-2) Downward heat flux INTO the ice sheet.
-	@param tg2 (C or K) Temperature of bottom of ice surface model (ABOVE) the ice sheet.
-	@param tg3 (C or K) Temperature of top of ice sheet.  Must be same units as tg2
-	@param tg2_effective (C or K) Effective temperature to use for Dirichlet BC.
-	@param ice_thermal_conductivity (W K-1 m-1) Lambda coefficient (Fourier's Law) for ice.
 	@param dz (m) Distance to use for heat flow calculation (Fourier's Law) */
-	void set_effective_surface_temp(
-		double dz);
+	PetscErrorCode set_effective_surface_temp(double dz);
 
 };
 

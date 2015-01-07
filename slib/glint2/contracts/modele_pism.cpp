@@ -129,6 +129,8 @@ void IceModel_PISM::setup_contracts_modele()
 	ice_output.add_field("ice_surface_enth", "J kg-1", contracts::ICE|contracts::INITIAL, "");
 	ice_output.add_field("ice_surface_enth_depth", "m", contracts::ICE|contracts::INITIAL, "");
 
+	ice_output.add_field("effective_surface_temp", "degC", contracts::ICE, "");
+
 	ice_output.add_field("basal_frictional_heating", "W m-2", contracts::ICE, "");
 	ice_output.add_field("strain_heating", "W m-2", contracts::ICE, "");
 	ice_output.add_field("geothermal_flux", "W m-2", contracts::ICE, "");
@@ -138,6 +140,8 @@ void IceModel_PISM::setup_contracts_modele()
 	ice_output.add_field("calving.enth", "W m-2", contracts::ICE, "");
 	ice_output.add_field("glint2_smb.mass", "kg m-2 s-1", contracts::ICE, "");
 	ice_output.add_field("glint2_smb.enth", "W m-2", contracts::ICE, "");
+	ice_output.add_field("pism_smb.mass", "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("pism_smb.enth", "W m-2", contracts::ICE, "");
 
 	// basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
 	ice_output.add_field("melt_grounded.mass", "kg m-2 s-1", contracts::ICE, "");
