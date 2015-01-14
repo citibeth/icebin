@@ -499,19 +499,6 @@ printf("AA1\n");
 	ierr = surface->glint2_surface_temp.set(nan); CHKERRQ(ierr);
 #endif
 
-#if 0
-	// Needed because indices is not contiguous in RAM (has non-unit stride).
-	// Also because Glint2 and PISM index cells in different order
-	blitz::Array<int,1> indices_pism1d(nvals);
-	for (int ix=0; ix<nvals; ++ix) {
-		indices_pism1d(ix) = glint2_to_pism1d(indices(ix));
-	}
-	std::vector<int> perm = sorted_perm(indices_pism1d);
-
-	blitz::Array<int,1> g2_ix(nvals);
-	int nconsolidated = consolidate_by_perm(indices_pism1d, perm,
-		indices_pism1d, g2_ix, DuplicatePolicy::REPLACE);
-#else
 	std::vector<int> perm = sorted_perm(indices);
 
 	blitz::Array<int,1> g2_ix(nvals);
@@ -522,8 +509,6 @@ printf("AA1\n");
 	for (int ix=0; ix<nconsolidated; ++ix) {
 		g2_ix(ix) = glint2_to_pism1d(g2_ix(ix));
 	}
-
-#endif
 
 	blitz::Array<PetscScalar,1> g2_y(nconsolidated);
 //for (int ix=0; ix<nconsolidated; ++ix) g2_y[ix] = 17.;
