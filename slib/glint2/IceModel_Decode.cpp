@@ -18,6 +18,9 @@
 
 #include <mpi.h>		// Must be first
 #include <glint2/IceModel_Decode.hpp>
+#include <giss/sort.hpp>
+
+using namespace giss;
 
 namespace glint2 {
 
@@ -30,6 +33,36 @@ void IceModel_Decode::run_timestep(double time_s,
 	std::vector<blitz::Array<double,1>> const &ivals2)
 {
 printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, indices.size());
+
+	blitz::Array<int,1> nindices;
+	std::vector<blitz::Array<double,1>> nivals2;
+
+	blitz::Array<int,1> const *xindices;
+	std::vector<blitz::Array<double,1>> const *xivals2;
+
+	// Test out freestanding sorting/consolidation code
+	// This section of code is NOT necessary.
+	if (false) {
+		std::vector<int> perm = sorted_perm(indices);
+		nindices.reference(blitz::Array<int,1>(indices.size()));
+		int nconsolidated = consolidate_by_perm(indices, perm, indices, nindices, DuplicatePolicy::REPLACE);
+printf("IceModel_Decode: consolidated from %d down to %d\n", indices.size(), nconsolidated);
+		nindices.reference(blitz::Array<int,1>(nconsolidated));
+		consolidate_by_perm(indices, perm, indices, nindices, DuplicatePolicy::REPLACE);
+
+		for (unsigned int i=0; i<ivals2.size(); ++i) {
+			blitz::Array<double,1> nvals(nconsolidated);
+			consolidate_by_perm(indices, perm, ivals2[i], nvals, DuplicatePolicy::ADD);
+			nivals2.push_back(nvals);
+		}
+
+		xindices = &nindices;
+		xivals2 = &nivals2;
+	} else {
+		xindices = &indices;
+		xivals2 = &ivals2;
+	}
+
 	std::vector<blitz::Array<double,1>> ivals2d;	/// Decoded fields
 
 	// Naming convention on array variables:
@@ -40,16 +73,16 @@ printf("BEGIN IceModel_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, in
 	// Loop through the fields we require
 	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
 	for (int i=0; i<icontract.size_nounit(); ++i) {
-//	for (int i=0; i<ivals2.size(); ++i)
+//	for (int i=0; i<xivals2->size(); ++i)
 
-		blitz::Array<double,1> const &vals(ivals2[i]);
+		blitz::Array<double,1> const &vals((*xivals2)[i]);
 
 		// Decode the field!
 		blitz::Array<double,1> valsd(ndata());
 		valsd = nan;
-		int n = indices.size();
+		int n = xindices->size();
 		for (int i=0; i < n; ++i) {
-			int ix = indices(i);
+			int ix = (*xindices)(i);
 			// Do our own bounds checking!
 			if (ix < 0 || ix >= ndata()) {
 				fprintf(stderr, "IceModel: index %d out of range [0, %d)\n", ix, ndata());

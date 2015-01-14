@@ -4,14 +4,13 @@
 #include <algorithm>
 #include <unordered_map>
 #include <blitz/array.h>
+#include <giss/sort.hpp>
 
 namespace giss{
 
 template<class IndexT, class ValT>
 class SparseVector {
 public:
-
-	enum class DuplicatePolicy {REPLACE, ADD};
 
 	/** Returns the number of non-zero elements in the SparseMatrix. */
 	virtual size_t size() const = 0;
@@ -34,7 +33,7 @@ public:
 
 	/** Sums or otherwise consolidates the sparse representation so
 	there is no more than one entry per index. */
-	virtual void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD) = 0;
+	virtual void consolidate(giss::DuplicatePolicy dups = giss::DuplicatePolicy::ADD) = 0;
 
 #if 0
 	/** Used to write this data structure to a netCDF file.
@@ -95,7 +94,7 @@ public:
 	void sort_stable()
 		{ std::stable_sort(vals.begin(), vals.end()); }
 
-	void consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups = SparseVector<IndexT,ValT>::DuplicatePolicy::ADD);
+	void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD);
 
 };
 
@@ -121,7 +120,7 @@ void to_parallel_arrays(SparseVectorT const &mat,
 
 // ---------------------------------------------------
 template<class IndexT, class ValT>
-void VectorSparseVector<IndexT,ValT>::consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups)
+void VectorSparseVector<IndexT,ValT>::consolidate(DuplicatePolicy dups)
 {
 	if (size() == 0) return;
 
@@ -136,7 +135,7 @@ void VectorSparseVector<IndexT,ValT>::consolidate(typename SparseVector<IndexT,V
 		ValT &val = vals[i].second;
 
 		if (index == last_index) {
-			if (dups == SparseVector<IndexT,ValT>::DuplicatePolicy::ADD) {
+			if (dups == DuplicatePolicy::ADD) {
 				vals[j].second += val;
 			} else {
 				vals[j].second = val;
@@ -201,7 +200,7 @@ public :
 	}
 
 	/** Nothing to do for consolidate with MapSparseVector. */
-	void consolidate(typename SparseVector<IndexT,ValT>::DuplicatePolicy dups = SparseVector<IndexT,ValT>::DuplicatePolicy::ADD) {}
+	void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD) {}
 
 	/** Inserts a new <index, value> pair to sparse vector.  If that
 	element was already non-zero, replaces it. */
@@ -305,7 +304,6 @@ inline void accum_per_col(SparseMatrixT const &mat,
 	for (auto ii = mat.begin(); ii != mat.end(); ++ii)
 		accum.add(ii.col(), ii.val());
 }
-
 
 
 

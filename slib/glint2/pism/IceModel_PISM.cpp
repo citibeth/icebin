@@ -10,6 +10,7 @@
 #include <string>
 #include <glint2/GCMCoupler.hpp>
 #include <glint2/contracts/contracts.hpp>
+#include <giss/sort.hpp>
 
 using namespace giss;
 using namespace pism;
@@ -498,41 +499,63 @@ printf("AA1\n");
 	ierr = surface->glint2_surface_temp.set(nan); CHKERRQ(ierr);
 #endif
 
+#if 0
 	// Needed because indices is not contiguous in RAM (has non-unit stride).
 	// Also because Glint2 and PISM index cells in different order
-	std::unique_ptr<int[]> g2_ix(new int[nvals]);
-	for (int ix=0; ix<nvals; ++ix) g2_ix[ix] = glint2_to_pism1d(indices(ix));
-printf("AA1\n");
+	blitz::Array<int,1> indices_pism1d(nvals);
+	for (int ix=0; ix<nvals; ++ix) {
+		indices_pism1d(ix) = glint2_to_pism1d(indices(ix));
+	}
+	std::vector<int> perm = sorted_perm(indices_pism1d);
 
-	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[nvals]);
-for (int ix=0; ix<nvals; ++ix) g2_y[ix] = 17.;
-printf("AA1\n");
+	blitz::Array<int,1> g2_ix(nvals);
+	int nconsolidated = consolidate_by_perm(indices_pism1d, perm,
+		indices_pism1d, g2_ix, DuplicatePolicy::REPLACE);
+#else
+	std::vector<int> perm = sorted_perm(indices);
+
+	blitz::Array<int,1> g2_ix(nvals);
+	int nconsolidated = consolidate_by_perm(indices, perm,
+		indices, g2_ix, DuplicatePolicy::REPLACE);
+
+	// Convert to PISM indexing
+	for (int ix=0; ix<nconsolidated; ++ix) {
+		g2_ix(ix) = glint2_to_pism1d(g2_ix(ix));
+	}
+
+#endif
+
+	blitz::Array<PetscScalar,1> g2_y(nconsolidated);
+//for (int ix=0; ix<nconsolidated; ++ix) g2_y[ix] = 17.;
+
 	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
 
 printf("BB1\n");
 		giss::CoupledField const &cf(contract[IceModel::INPUT].field(i));
 
 		// Get matching input (val) and output (pism_var) variables
-		blitz::Array<double,1> const &val(ivals2[i]);
 		IceModelVec2S *pism_var = pism_ivars[i];
 
-printf("BB1\n");
 		// Inputs specified in the contract are not (necessarily) attached
 		// to any PISM var.  If they are not, just drop them on the ground.
 		if (!pism_var) continue;
 
-		// Copy sparse array
-		for (int ix=0; ix<nvals; ++ix) g2_y[ix] = val(ix);
-for (int ix=0; ix<nvals; ++ix) g2_y[ix] += 1.;
+		// Consolidate the value array
+		// Now we have a sparse vector, represented as (g2_ix, g2_y)
+		g2_y = 0.;
+		consolidate_by_perm(indices, perm,
+			ivals2[i], g2_y, DuplicatePolicy::ADD);
+//g2_y = 250.;
 
 		// Put into a natural-ordering global distributed Petsc Vec
 		ierr = VecSet(g2natural, cf.default_value); CHKERRQ(ierr);
-		ierr = VecSetValues(g2natural, nvals, g2_ix.get(), g2_y.get(), ADD_VALUES); CHKERRQ(ierr);
+		ierr = VecSetValues(g2natural, nconsolidated, &g2_ix(0), &g2_y(0), INSERT_VALUES); CHKERRQ(ierr);
 
 		ierr = VecAssemblyBegin(g2natural); CHKERRQ(ierr);
 		ierr = VecAssemblyEnd(g2natural); CHKERRQ(ierr);
 
 		// Copy to Petsc-ordered global vec
+ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 		ierr = DMDANaturalToGlobalBegin(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
 		ierr = DMDANaturalToGlobalEnd(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
 
@@ -545,8 +568,8 @@ for (int ix=0; ix<nvals; ++ix) g2_y[ix] += 1.;
 	// At this point, glint2_surface_temp will be NaN in places off the ice sheet.
 	// So replace those NaN values with temperatures from the Enth3 array.
 	PSConstantGLINT2 * const surface = ice_model->ps_constant_glint2();
-	ice_model->merge_surface_temp(surface->glint2_surface_temp,
-		contract[INPUT].field("surface_temp").default_value);
+//	ice_model->merge_surface_temp(surface->glint2_surface_temp,
+//		contract[INPUT].field("surface_temp").default_value);
 
 	// Write out what wev'e now calculated (for debugging)
 	if (write_pism_inputs) {
