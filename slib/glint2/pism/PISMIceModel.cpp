@@ -563,6 +563,7 @@ PetscErrorCode PISMIceModel::misc_setup()
 		cur_ii->vec.copy_to(base_ii->vec);
 	}
 
+#if 0
 	// ---------- Create the netCDF output file
 	std::unique_ptr<PIO> nc;
 	std::string ofname = (params.output_dir / "post_energy.nc").string();
@@ -580,6 +581,8 @@ PetscErrorCode PISMIceModel::misc_setup()
 
 	// --------- Close and return
 	nc->close();
+#endif
+
 	return 0;
 }
 
@@ -635,6 +638,7 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	return 0;
 }
 
+#if 0
 /** Given a Neumann boundary condition (heat flux) for the top of the
 ice sheet, computes a Dirichlet boundary condition (top temperature)
 that should have approximately the same effect.  This is all done
@@ -684,6 +688,10 @@ PetscErrorCode PISMIceModel::set_effective_surface_temp(double dz)
 			ddz = dz;
 		}
 
+		//                             C/K        W m-2                m      m K W-1
+		// ===> K
+		// Q = -kA dT / L
+		// dT = -Q/A * L / k
 		effective_surface_temp(i,j) = tg3 + (glint2_heat_flux(i,j) * ddz * byALAMI0);
 	}}
 	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
@@ -695,76 +703,48 @@ PetscErrorCode PISMIceModel::set_effective_surface_temp(double dz)
 
 	return 0;
 }
+#endif
 
+
+/** Merges surface temperature derived from Enth3 into any NaN values
+in the vector provided. */
+PetscErrorCode PISMIceModel::merge_surface_temp(IceModelVec2S &surface_temp, double default_val)
+{
+	PetscErrorCode ierr;
+
+	printf("BEGIN PISMIceModel::merge_surface_temp default_val=%g\n", default_val);
+
+	PSConstantGLINT2 *surface = ps_constant_glint2();
+
+	ierr = Enth3.begin_access(); CHKERRQ(ierr);
+	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
+	ierr = surface_temp.begin_access(); CHKERRQ(ierr);
+
+	// First time around, set effective_surface_temp to top temperature
+	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+		double &surface_temp_ij(surface_temp(i,j));
+
+		if (surface_temp_ij == default_val) {
+			double *Enth;
+			ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
+			// Enthalpy at top of ice sheet
+			const int ks = grid.kBelowHeight(ice_thickness(i,j));
+			double enth3 = Enth[ks];
+
+			double tg3;		// Temperature at top of ice sheet
+			const double p = 0.0;		// Pressure at top of ice sheet
+			EC->getAbsTemp(enth3, p, surface_temp_ij);
+		}
+	}}
+	ierr = surface_temp.end_access(); CHKERRQ(ierr);
+	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
+	ierr = Enth3.end_access(); CHKERRQ(ierr);
+
+	printf("END PISMIceModel::merge_surface_temp\n");
+
+	return 0;
+}
 
 
 }}	// namespace glint2::gpism
-
-
-
-// This subroutine might be useful in the future.
-// It is like an optimized version of calling compute_enth2() twice.
-// /** Computes enth(vH1 configuration) - enth(vH0 configuration).
-// vH1 is new height of ice sheet, vH0 is old height.
-// NOTE: Caller MUST have already called Enth3.begin_access()!
-// @param i The gridcell for which enthalpy difference is to be computed.
-// @param j
-// @param vH0 Old ice thickness.
-// @param vH1 New ice thickness.
-// @param dMass OUT: Difference in mass [kg m-2]
-// @param dEnth OUT: Difference in enthalpy [J m-2] */
-// PetscErrorCode PISMIceModel::enth_diff(int i, int j, double vH0, double vH1,
-// double &dMass, double &dEnth)
-// {
-//   PetscErrorCode ierr;
-//   
-//   double sign = 1.0;
-//   if (vH1 < vH0) {
-//     std::swap(vH0, vH1);
-//     sign = -1.0;
-//   }
-// 
-//   // This is inefficient...
-//   const int ks0 = grid.kBelowHeight(vH0);
-//   const int ks1 = grid.kBelowHeight(vH1);
-// 
-//   double *Enth;  // J/kg do NOT delete this pointer: space returned by
-//   ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
-// 
-//   if (ks0 == ks1) {
-//     return Enth(ks0) * (vH1 - vH0);
-//   } else {
-//     double sum_enth = 0;
-// 
-//     // First level is partial
-//     zhi = grid.zlevels[ks0+1];
-//     sum_enth += Enth(ks0) * (zhi - vH0);
-// 
-//     // Middle full levels
-//     for (ks=ks0+1; ks<ks1; ++ks) {
-//       zlo = grid.zlevels[ks0];
-//       zhi = grid.zlevels[ks0+1];
-//       sum_enth += Enth(ks) * (zhi - zlo);
-//     }
-// 
-//     // Last level is partial
-//     zlo = grid.zlevels[ks1];
-//     sum_enth += Enth(ks0) * (vH1 - zlo);
-// 
-//   }
-// 
-//   dEnth = sum_enth * sign;
-//   dMass = (vH1 - vH0) * sign * ice_density;
-// 
-//   return 0;
-// }
-
-
-#if 0
-    IceModelVec2S tg3;
-    ierr = tg3.create(grid, "ice_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
-    tg3.metadata() = effective_surface_temp;
-	ierr = ice_surface_temperature(tg3); CHKERRQ(ierr);
-//	IceModelVec2S &effective_surface_temp(surface->effective_surface_temp);
-#endif
-

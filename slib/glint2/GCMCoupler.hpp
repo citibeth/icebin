@@ -80,10 +80,6 @@ public:
 	GCMParams gcm_params;
 	giss::MapDict<int,IceModel> models;
 
-	/** Associated data structures to write out the exact inputs seen
-	by each ice model. */
-	giss::MapDict<int,IceModel_Writer> writers[2];	// INPUT and OUTPUT of ice model
-
 	giss::UTSystem ut_system;		//!< Unit system for ConstantSets and CouplingContracts
 	giss::ConstantSet gcm_constants;		//!< Constants provided by the GCM
 

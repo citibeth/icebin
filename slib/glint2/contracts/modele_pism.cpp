@@ -67,14 +67,16 @@ void IceModel_PISM::setup_contracts_modele()
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field("smb_mass", nan, "kg m-2 s-1", contracts::ICE,
+	ice_input.add_field("smb_mass", 0., "kg m-2 s-1", contracts::ICE,
 		"'Surface Mass Balance' over the coupling interval.\n"
 		"Convention: Down is positive");
-	ice_input.add_field("smb_enth", nan, "W m-2", contracts::ICE,
+	ice_input.add_field("smb_enth", 0., "W m-2", contracts::ICE,
 		"Advective enthalpy associated with smb_mass."
 		"Convention: Down is positive");
 
-	ice_input.add_field("surface_temp", nan, "K", contracts::ICE,
+	// small + x = x, for all "normal" values of x
+	const double small = std::numeric_limits<double>::min();
+	ice_input.add_field("surface_temp", small, "K", contracts::ICE,
 		"Mean temperature of the bottom of the ice surface model, over the "
 		"coupling timestep.  This is for informational purposes ONLY, it is not "
 		"used as a boundary condition.");
@@ -129,7 +131,7 @@ void IceModel_PISM::setup_contracts_modele()
 	ice_output.add_field("ice_surface_enth", "J kg-1", contracts::ICE|contracts::INITIAL, "");
 	ice_output.add_field("ice_surface_enth_depth", "m", contracts::ICE|contracts::INITIAL, "");
 
-	ice_output.add_field("effective_surface_temp", "degC", contracts::ICE, "");
+	ice_output.add_field("effective_surface_temp", "K", contracts::ICE, "");
 
 	ice_output.add_field("basal_frictional_heating", "W m-2", contracts::ICE, "");
 	ice_output.add_field("strain_heating", "W m-2", contracts::ICE, "");

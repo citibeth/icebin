@@ -144,12 +144,12 @@ void GCMCoupler::read_from_netcdf(
 		// Writer for ice model input
 		std::unique_ptr<IceModel_Writer> iwriter(new IceModel_Writer(*name, IceModel::INPUT, this));
 		iwriter->init(sheet->grid2, ice_model);
-		writers[IceModel::INPUT].insert(i, std::move(iwriter));
 
 		// Writer for ice model output
 		std::unique_ptr<IceModel_Writer> owriter(new IceModel_Writer(*name, IceModel::OUTPUT, this));
 		owriter->init(sheet->grid2, ice_model);
-		writers[IceModel::OUTPUT].insert(i, std::move(owriter));
+
+		ice_model->set_writers(std::move(iwriter), std::move(owriter));
 
 		++i;
 	}
@@ -176,10 +176,11 @@ void GCMCoupler::set_start_time(
 
 		model->start_time_set();
 
-		IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
+		// Handle writing stuff, if the
+		IceModel_Writer *iwriter = model->iwriter();	// The affiliated input-writer (if it exists).
 		if (iwriter) iwriter->start_time_set();
 
-		IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
+		IceModel_Writer *owriter = model->owriter();
 		if (owriter) owriter->start_time_set();
 
 		// This function is the last phase of initialization.
@@ -278,7 +279,7 @@ printf("[%d] BEGIN GCMCoupler::call_ice_model(%s, nfields=%ld)\n", gcm_params.gc
 
 	// -------------- Run the model
 	// Record exactly the same inputs that this ice model is seeing.
-	IceModel_Writer *iwriter = writers[IceModel::INPUT][sheetno];		// The affiliated input-writer (if it exists).
+	IceModel_Writer *iwriter = model->iwriter();
 	if (iwriter) iwriter->run_timestep(time_s, indices, ivals2);
 
 	// Now call to the ice model
@@ -288,7 +289,7 @@ printf("[%d] BEGIN GCMCoupler::call_ice_model(%s, nfields=%ld)\n", gcm_params.gc
 
 	// Record what the ice model produced.
 	// NOTE: This shouldn't change model->ice_ovals_I
-	IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
+	IceModel_Writer *owriter = model->owriter();
 	if (owriter) {
 		printf("BEGIN owriter->run_timestep()\n");
 		owriter->run_decoded(time_s, model->ice_ovals_I);
@@ -518,7 +519,7 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 
 			// Record what the ice model produced.
 			// NOTE: This shouldn't change model->ice_ovals_I
-			IceModel_Writer *owriter = writers[IceModel::OUTPUT][sheetno];		// The affiliated input-writer (if it exists).
+			IceModel_Writer *owriter = model->owriter();
 			const double time_s = gcm_params.time_start_s;
 			if (owriter) {
 				printf("BEGIN owriter->run_timestep()\n");

@@ -19,8 +19,8 @@ namespace gpism {
 
 
 IceModel_PISM::IceModel_PISM(std::string const &_name, GCMCoupler const *_coupler)
-	: IceModel_Decode(IceModel::Type::PISM, _name, _coupler),
-	write_pism_inputs(false)
+	: IceModel(IceModel::Type::PISM, _name, _coupler),
+	write_pism_inputs(true)
 {
 	printf("BEGIN/END IceModel_PISM::IceModel_PISM\n");
 }
@@ -337,12 +337,9 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	ix = contract[INPUT].index("smb_enth");
 		pism_ivars[ix] = &pism_surface_model->glint2_smb_enth;
 
-#if 0
-
 	// Ignore surface_temp, it is not useful...
 	ix = contract[INPUT].index("surface_temp");
 		pism_ivars[ix] = &pism_surface_model->glint2_surface_temp;
-#endif
 
 	ix = contract[INPUT].index("heat_flux");	// Positive is down
 		pism_ivars[ix] = &pism_surface_model->glint2_heat_flux;
@@ -375,6 +372,8 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	ix = contract[OUTPUT].index("ice_surface_enth_depth");
 		pism_ovars[ix] = &ice_model->ice_surface_enth_depth;
 
+	ix = contract[OUTPUT].index("effective_surface_temp");
+		pism_ovars[ix] = &ice_model->ps_constant_glint2()->glint2_surface_temp;
 
 	// For MassEnergyBudget variables that have a contract name specified,
 	// link them up into pism_ovars now.
@@ -453,100 +452,123 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 	return 0;
 }
 // --------------------------------------------------
-void IceModel_PISM::run_decoded(double time_s,
+void IceModel_PISM::run_timestep(double time_s,
+	blitz::Array<int,1> const &indices,
 	std::vector<blitz::Array<double,1>> const &ivals2)
 {
-	printf("BEGIN IceModel_PISM::run_decoded(%f)\n", time_s);
+	printf("BEGIN IceModel_PISM::run_timestep(%f)\n", time_s);
 
-	if (run_decoded_petsc(time_s, ivals2) != 0) {
+	if (run_timestep_petsc(time_s, indices, ivals2) != 0) {
 		PetscPrintf(pism_comm, "IceModel_PISM::runtimestep() failed\n");
 		PISMEnd();
 	}
-	printf("END IceModel_PISM::run_decoded(%f)\n", time_s);
+	printf("END IceModel_PISM::run_timestep(%f)\n", time_s);
 }
 
 // --------------------------------------------------
+//static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-PetscErrorCode IceModel_PISM::run_decoded_petsc(double time_s,
-	std::vector<blitz::Array<double,1>> const &ivals2)		// Input values
+PetscErrorCode IceModel_PISM::run_timestep_petsc(double time_s,
+	blitz::Array<int,1> const &indices,
+	std::vector<blitz::Array<double,1>> const &ivals2)
 {
-printf("[%d] BEGIN IceModel_PISM::run_decoded_petsc(%f)\n", pism_rank, time_s);
-	PetscErrorCode ierr;
+printf("[%d] BEGIN IceModel_PISM::run_timestep_petsc(%f)\n", pism_rank, time_s);
+	PetscErrorCode ierr = 0;
+
+	int nvals = indices.extent(0);
 
 	// Check number of variables matches for input
 	if (ivals2.size() != pism_ivars.size()) {
-		fprintf(stderr, "[%d] IceModel_PISM::run_decoded_petsc: ivals2.size()=%ld does not match pism_ivars.size()=%ld\n", pism_rank, ivals2.size(), pism_ivars.size());
-		throw std::exception();
+		fprintf(stderr, "[%d] IceModel_PISM::run_timestep_petsc: ivals2.size()=%ld does not match pism_ivars.size()=%ld\n", pism_rank, ivals2.size(), pism_ivars.size());
+		ierr = -1;
 	}
+	CHKERRQ(ierr);
 
-	// Transfer input to PISM variables (and scatter w/ PETSc as well)
-	std::unique_ptr<int[]> g2_ix(new int[ndata()]);
-	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[ndata()]);
+	// Check Petsc types
+	if (sizeof(double) != sizeof(PetscScalar)) {
+		fprintf(stderr, "PetscScalar must be same as double\n");
+		ierr = -1;
+	}
+	CHKERRQ(ierr);
+
+printf("AA1\n");
+#if 0
+	// Set to NaN, so we can tell where we have no data
+	PSConstantGLINT2 *surface = ice_model->ps_constant_glint2();
+	ierr = surface->glint2_surface_temp.set(nan); CHKERRQ(ierr);
+#endif
+
+	// Needed because indices is not contiguous in RAM (has non-unit stride).
+	// Also because Glint2 and PISM index cells in different order
+	std::unique_ptr<int[]> g2_ix(new int[nvals]);
+	for (int ix=0; ix<nvals; ++ix) g2_ix[ix] = glint2_to_pism1d(indices(ix));
+printf("AA1\n");
+
+	std::unique_ptr<PetscScalar[]> g2_y(new PetscScalar[nvals]);
+for (int ix=0; ix<nvals; ++ix) g2_y[ix] = 17.;
+printf("AA1\n");
 	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
+
+printf("BB1\n");
+		giss::CoupledField const &cf(contract[IceModel::INPUT].field(i));
 
 		// Get matching input (val) and output (pism_var) variables
 		blitz::Array<double,1> const &val(ivals2[i]);
 		IceModelVec2S *pism_var = pism_ivars[i];
 
+printf("BB1\n");
 		// Inputs specified in the contract are not (necessarily) attached
 		// to any PISM var.  If they are not, just drop them on the ground.
 		if (!pism_var) continue;
 
-		// Change sparse format
-		int nval = 0;
-		for (int ix0=0; ix0<ndata(); ++ix0) {
-			if (std::isnan(val(ix0))) continue;
-
-			g2_y[nval] = val(ix0);
-			g2_ix[nval] = glint2_to_pism1d(ix0);
-			++nval;
-		}
+		// Copy sparse array
+		for (int ix=0; ix<nvals; ++ix) g2_y[ix] = val(ix);
+for (int ix=0; ix<nvals; ++ix) g2_y[ix] += 1.;
 
 		// Put into a natural-ordering global distributed Petsc Vec
-		ierr = VecSet(g2natural, 0.0); CHKERRQ(ierr);
-#if 1
-//for (int i=0; i<ndata(); ++i) printf("G2 %s: %d %f\n", field.str(), g2_ix[i], g2_y[i]);
-		ierr = VecSetValues(g2natural, nval, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKERRQ(ierr);
-#else
-// Debug: send in zero vectors
-ierr = VecSetValues(g2natural, 0, g2_ix.get(), g2_y.get(), INSERT_VALUES); CHKERRQ(ierr);
-#endif
+		ierr = VecSet(g2natural, cf.default_value); CHKERRQ(ierr);
+		ierr = VecSetValues(g2natural, nvals, g2_ix.get(), g2_y.get(), ADD_VALUES); CHKERRQ(ierr);
 
 		ierr = VecAssemblyBegin(g2natural); CHKERRQ(ierr);
 		ierr = VecAssemblyEnd(g2natural); CHKERRQ(ierr);
 
 		// Copy to Petsc-ordered global vec
 		ierr = DMDANaturalToGlobalBegin(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
-		ierr =   DMDANaturalToGlobalEnd(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
+		ierr = DMDANaturalToGlobalEnd(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
 
 		// Copy to the output variable
 		// (Could we just do DMDANaturalToGlobal() directly to this?)
 		ierr = pism_var->copy_from_vec(g2); CHKERRQ(ierr);
 
-		if (write_pism_inputs) {
-			// ================ BEGIN Write PISM Inputs
-			long time_day = (int)(time_s / 86400. + .5);
-			std::stringstream fname;
-			std::string const &fnpart = contract[INPUT].name(i);
+	}
 
-			fname << time_day << "-" << fnpart << ".nc";
-			boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());
+	// At this point, glint2_surface_temp will be NaN in places off the ice sheet.
+	// So replace those NaN values with temperatures from the Enth3 array.
+	PSConstantGLINT2 * const surface = ice_model->ps_constant_glint2();
+	ice_model->merge_surface_temp(surface->glint2_surface_temp,
+		contract[INPUT].field("surface_temp").default_value);
 
-//			printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
-			pism_var->dump(pfname.c_str());
-			// ================ END Write PISM Inputs
-		}
-				
-	}	// For each pism_var
+	// Write out what wev'e now calculated (for debugging)
+	if (write_pism_inputs) {
+	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
+
+		// ================ BEGIN Write PISM Inputs
+		long time_day = (int)(time_s / 86400. + .5);
+		std::stringstream fname;
+		std::string const &fnpart = contract[INPUT].name(i);
+
+		fname << time_day << "-" << fnpart << ".nc";
+		boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());
+
+//		printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
+		IceModelVec2S *pism_var = pism_ivars[i];
+		pism_var->dump(pfname.c_str());
+		// ================ END Write PISM Inputs
+	}}	// For each pism_var
 
 
-//ierr = ice_model->ps_constant_glint2()->climatic_mass_balance.set(0); CHKERRQ(ierr);
 
 printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time->current(), time_s, ice_model.get());
-	// =========== Compute Dirichlet boundary condition from Neumann BC
-	// Set surface->effective_surface_temp, used in the Dirichlet BC
-	ice_model->set_effective_surface_temp(Z2LI);
-
 	// =========== Run PISM for one coupling timestep
 	// Time of last time we coupled
 	auto old_pism_time(pism_grid->time->current());
@@ -558,7 +580,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 
 	// ice_model->enthalpy_t() == time_s here
 	ierr = ice_model->prepare_outputs(old_pism_time); CHKERRQ(ierr);
-	ierr = get_state_petsc(); CHKERRQ(ierr);
+	ierr = get_state_petsc(0); CHKERRQ(ierr);	// Copy PISM->Glint2 output vars
 	ierr = ice_model->reset_rate(); CHKERRQ(ierr);
 
 printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
@@ -578,6 +600,11 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 	// Copy the outputs to the blitz arrays
 	if (am_i_root()) allocate_ice_ovals_I();		// ROOT in PISM communicator
 	for (unsigned int i=0; i<pism_ovars.size(); ++i) {
+		if (!pism_ovars[i]) {
+			fprintf(stderr, "IceModel_PISM: Contract output %s is not linked up to a pism_ovar\n", ocontract.field(i).name.c_str());
+			throw std::exception();
+		}
+
 
 		giss::CoupledField const &cf(ocontract.field(i));
 		if ((cf.flags & mask) != mask) continue;
@@ -588,7 +615,7 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 
 			// Check number of variables matches for output
 			if (ice_ovals_I.size() != pism_ovars.size()) {
-				fprintf(stderr, "[%d] IceModel_PISM::run_decoded_petsc: ice_ovals_I.size()=%ld does not match pism_ovars.size()=%ld\n", pism_rank, ice_ovals_I.size(), pism_ovars.size());
+				fprintf(stderr, "[%d] IceModel_PISM::run_timestep_petsc: ice_ovals_I.size()=%ld does not match pism_ovars.size()=%ld\n", pism_rank, ice_ovals_I.size(), pism_ovars.size());
 				throw std::exception();
 			}
 

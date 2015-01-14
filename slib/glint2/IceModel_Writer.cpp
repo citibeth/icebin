@@ -108,7 +108,6 @@ void IceModel_Writer::start_time_set()
 {
 	// We just need the input (or output) coupling contract
 	contract[io] = main_model->contract[io];
-
 }
 
 void IceModel_Writer::init_output_file()

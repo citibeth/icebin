@@ -31,6 +31,7 @@
 namespace glint2 {
 
 class GCMCoupler;
+class IceModel_Writer;
 
 // -------------------------------------------------------
 // GCM-specific types for parameters to setup_contracts_xxxxx()
@@ -62,7 +63,10 @@ protected:
 	// Parameters provided by the GCM, to inform the coupling
 	std::unique_ptr<GCMPerIceSheetParams> gcm_per_ice_sheet_params;
 	GCMCoupler const * const coupler;		// parent back-pointer
-	
+
+	// Writers called to record the input and output seen by this IceModel
+	std::unique_ptr<IceModel_Writer> _iwriter, _owriter;
+
 public:
 	BOOST_ENUM_VALUES( Type, int,
 		(DISMAL)		(0)		// Demo Ice Sheet Model and LandIce
@@ -95,6 +99,17 @@ public:
 
 	/** Input to the GCM, but on the ice grid */
 	std::vector<blitz::Array<double,1>> gcm_ivals_I;
+	// ======================================================
+
+	void set_writers(
+		std::unique_ptr<IceModel_Writer> &&iwriter,
+		std::unique_ptr<IceModel_Writer> &&owriter);
+
+	/** @return the iwriter associated with this IceModel, if the
+	IceModel is NOT responsible for calling the writer itself.
+	If the IceModel WILL call the writer, returns NULL. */
+	virtual IceModel_Writer *iwriter() { return _iwriter.get(); }
+	virtual IceModel_Writer *owriter() { return _owriter.get(); }
 
 
 	/** Tells whether we are running on the root node of the ice model. */

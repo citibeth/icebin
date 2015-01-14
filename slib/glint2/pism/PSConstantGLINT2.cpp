@@ -61,9 +61,10 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 	ierr = glint2_smb_enth.set_glaciological_units("kg m-2 year-1"); CHKERRQ(ierr);
 //	glint2_smb_enth.write_in_glaciological_units = true;
 
-	ierr = effective_surface_temp.create(grid, "effective_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = effective_surface_temp.set_attrs("climate_state",
-		"constant-in-time ice temperature at the ice surface",
+
+	ierr = glint2_surface_temp.create(grid, "glint2_surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_surface_temp.set_attrs("climate_state",
+		"enthalpy of constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
 		"K", ""); CHKERRQ(ierr);
 
 
@@ -103,10 +104,7 @@ printf("BEGIN PSConstantGLINT2::init(this=%p)\n", this);
 	// It doesn't matter what we set this to, it will be re-set later.
 	ierr = glint2_smb_mass.set(0.0); CHKERRQ(ierr);
 	ierr = glint2_smb_enth.set(0.0); CHKERRQ(ierr);
-
-	// Set ice_surface_temp to a harmless value for now. (FIXME, though.)
-	ierr = effective_surface_temp.set(grid.convert(-10.0, "Celsius", "Kelvin")); CHKERRQ(ierr);
-
+	ierr = glint2_surface_temp.set(0.0); CHKERRQ(ierr);
 	ierr = glint2_heat_flux.set(0.0); CHKERRQ(ierr);
 
 	// parameterizing the ice surface temperature 'ice_surface_temp'
@@ -148,7 +146,7 @@ PetscErrorCode PSConstantGLINT2::ice_surface_mass_flux(IceModelVec2S &result) {
 PetscErrorCode PSConstantGLINT2::ice_surface_temperature(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
-	ierr = effective_surface_temp.copy_to(result); CHKERRQ(ierr);
+	ierr = glint2_surface_temp.copy_to(result); CHKERRQ(ierr);
 	return 0;
 }
 
@@ -164,7 +162,7 @@ PetscErrorCode PSConstantGLINT2::ice_surface_heat_flux(IceModelVec2S &result) {
 void PSConstantGLINT2::add_vars_to_output(std::string /*keyword*/, std::set<std::string> &result) {
 	result.insert("glint2_smb_mass");
 	result.insert("glint2_smb_enth");
-	result.insert("ice_surface_temp");
+	result.insert("glint2_surface_temp");
 	result.insert("glint2_heat_flux");
 	// does not call atmosphere->add_vars_to_output().
 }
@@ -173,10 +171,6 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 	PetscErrorCode ierr;
 
 	ierr = pism::SurfaceModel::define_variables(vars, nc, nctype); CHKERRQ(ierr);
-
-	if (set_contains(vars, "effective_surface_temp")) {
-		ierr = effective_surface_temp.define(nc, nctype); CHKERRQ(ierr);
-	}
 
 	if (set_contains(vars, "glint2_heat_flux")) {
 		ierr = glint2_heat_flux.define(nc, nctype); CHKERRQ(ierr);
@@ -190,15 +184,15 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 		ierr = glint2_smb_enth.define(nc, nctype); CHKERRQ(ierr);
 	}
 
+	if (set_contains(vars, "glint2_surface_temp")) {
+		ierr = glint2_surface_temp.define(nc, nctype); CHKERRQ(ierr);
+	}
+
 	return 0;
 }
 
 PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, const PIO &nc) {
 	PetscErrorCode ierr;
-
-	if (set_contains(vars, "effective_surface_temp")) {
-		ierr = effective_surface_temp.write(nc); CHKERRQ(ierr);
-	}
 
 	if (set_contains(vars, "glint2_heat_flux")) {
 		ierr = glint2_heat_flux.write(nc); CHKERRQ(ierr);
@@ -210,6 +204,10 @@ PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, con
 
 	if (set_contains(vars, "glint2_smb_enth")) {
 		ierr = glint2_smb_enth.write(nc); CHKERRQ(ierr);
+	}
+
+	if (set_contains(vars, "glint2_surface_temp")) {
+		ierr = glint2_surface_temp.write(nc); CHKERRQ(ierr);
 	}
 
 	return 0;

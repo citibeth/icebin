@@ -16,7 +16,6 @@
 #include <mpi.h>
 #include <glint2/pism/PetscContext.hpp>
 #include <glint2/IceModel.hpp>
-#include <glint2/IceModel_Decode.hpp>
 #include <memory>
 #include <glint2/pism/PSConstantGLINT2.hpp>
 #include <glint2/pism/PISMIceModel.hpp>		// Our specialized subclass of PISM's ::IceModel
@@ -29,7 +28,7 @@ namespace gpism {
 // =================================================
 
 
-class IceModel_PISM : public IceModel_Decode
+class IceModel_PISM : public IceModel
 {
 	std::shared_ptr<glint2::Grid_XY const> glint2_grid;
 	MPI_Comm pism_comm;			// Commnicator used by ice model
@@ -164,14 +163,16 @@ protected:
 	void set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new = false);
 
 public:
-	void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &vals2);
+	void run_timestep(double time_s,
+		blitz::Array<int,1> const &indices,
+		std::vector<blitz::Array<double,1>> const &ivals2);
 
 	void get_initial_state();
 
 private:
-	PetscErrorCode run_decoded_petsc(double time_s,
-		std::vector<blitz::Array<double,1>> const &vals2);
+	PetscErrorCode run_timestep_petsc(double time_s,
+		blitz::Array<int,1> const &indices,
+		std::vector<blitz::Array<double,1>> const &ivals2);
 
 	/** Copies PISM->Glint2 output variables from PISM variables to
 	the Glint2-supplied variables (on the root node).

@@ -1,5 +1,6 @@
 #include <mpi.h>	// Must be first
 #include <glint2/IceModel.hpp>
+#include <glint2/IceModel_Writer.hpp>
 #include <glint2/GCMCoupler.hpp>
 
 namespace glint2 {
@@ -11,6 +12,15 @@ IceModel::IceModel(IceModel::Type _type, std::string const &_name, GCMCoupler co
 }
 
 IceModel::~IceModel() {}
+
+
+void IceModel::set_writers(
+	std::unique_ptr<IceModel_Writer> &&iwriter,
+	std::unique_ptr<IceModel_Writer> &&owriter)
+{
+	_iwriter = std::move(iwriter);
+	_owriter = std::move(owriter);
+}
 
 
 giss::CouplingContract *IceModel::new_CouplingContract() {

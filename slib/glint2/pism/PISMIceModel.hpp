@@ -134,13 +134,9 @@ public:
 	the first coupling timestep (eg, ice surface enthalpy) */
 	PetscErrorCode prepare_initial_outputs();
 
-	/** Given a Neumann boundary condition (heat flux) for the top of the
-	ice sheet, computes a Dirichlet boundary condition (top temperature)
-	that should have approximately the same effect.  This is all done
-	(presumeably) on the ice grid; however, this function is
-	grid-independent.
-	@param dz (m) Distance to use for heat flow calculation (Fourier's Law) */
-	PetscErrorCode set_effective_surface_temp(double dz);
+	/** Merges surface temperature derived from Enth3 into any NaN values
+	in the vector provided. */
+	PetscErrorCode merge_surface_temp(pism::IceModelVec2S &curface_temp, double default_val);
 
 };
 
