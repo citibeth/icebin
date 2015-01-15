@@ -817,6 +817,8 @@ void densify_gcm_inputs_onroot(glint2_modele *api,
 	// This should only be run on the MPI root node
 	if (!api->gcm_coupler.am_i_root()) return;
 
+	printf("BEGIN densify_gcm_inputs_onroot()\n");
+
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
 	int n1 = api->gcm_coupler.maker->n1();
@@ -858,12 +860,18 @@ void densify_gcm_inputs_onroot(glint2_modele *api,
 			blitz::shape(n1*modele_var_nhp), blitz::neverDeleteData);
 
 		// Convert this sparse vector...
+		printf("Setting gcm_input %s to %g\n", contract.field(ix).name.c_str(), contract.field(ix).default_value);
+//		dense1d = contract.field(ix).default_value;
+		dense1d = 0;
 		for (auto ii=gcm_ivals_global[ix].begin(); ii != gcm_ivals_global[ix].end(); ++ii) {
 			int const i1 = ii->first;
 			double const val = ii->second;
-			dense1d(i1) = val;
+			dense1d(i1) += val;
 		}
 	}
+
+	printf("END densify_gcm_inputs_onroot()\n");
+
 
 }
 // -------------------------------------------------------------

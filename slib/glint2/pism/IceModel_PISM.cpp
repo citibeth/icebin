@@ -373,7 +373,7 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	ix = contract[OUTPUT].index("ice_surface_enth_depth");
 		pism_ovars[ix] = &ice_model->ice_surface_enth_depth;
 
-	ix = contract[OUTPUT].index("effective_surface_temp");
+	ix = contract[OUTPUT].index("glint2_surface_temp");
 		pism_ovars[ix] = &ice_model->ps_constant_glint2()->glint2_surface_temp;
 
 	// For MassEnergyBudget variables that have a contract name specified,
@@ -553,8 +553,8 @@ ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 	// At this point, glint2_surface_temp will be NaN in places off the ice sheet.
 	// So replace those NaN values with temperatures from the Enth3 array.
 	PSConstantGLINT2 * const surface = ice_model->ps_constant_glint2();
-//	ice_model->merge_surface_temp(surface->glint2_surface_temp,
-//		contract[INPUT].field("surface_temp").default_value);
+	ice_model->merge_surface_temp(surface->glint2_surface_temp,
+		contract[INPUT].field("surface_temp").default_value);
 
 	// Write out what wev'e now calculated (for debugging)
 	if (write_pism_inputs) {

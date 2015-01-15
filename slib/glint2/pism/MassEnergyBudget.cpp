@@ -1,3 +1,4 @@
+#include <iostream>
 #include <glint2/pism/MassEnergyBudget.hpp>
 
 namespace glint2{
@@ -39,6 +40,13 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 	pism::IceModelVecKind ghostedp, unsigned int width)
 {
 	PetscErrorCode ierr;
+
+	if (all_vecs.size() != 0) {
+		fprintf(stderr, "MassEnergyBudget::create() cannot be called twice, fix your code!\n");
+		throw std::exception();
+	}
+
+printf("MassEnergyBudget(%p)::create()\n", this);
 
 	// ----------- Mass and Enthalpy State of the Ice Sheet
 	ierr = total.create(grid, prefix+"total",
@@ -159,6 +167,36 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 
 	return 0;
 }
+
+std::ostream &MassEnergyBudget::print_formulas(std::ostream &out)
+{
+	// MASS
+	out << "epsilon.mass = total.mass -" << std::endl;
+	out << "    (";
+	for (auto ii=all_vecs.begin(); ii != all_vecs.end(); ++ii) {
+		if ((ii->flags & (DELTA | MASS)) != (DELTA | MASS)) continue;
+		char str[20];
+		sprintf(str, "%p", &ii->vec);
+		out << ii->vec.name() << " + ";
+	}
+	out << ")" << std::endl;
+
+	// Energy
+	out << "epsilon.enth = total.enth -" << std::endl;
+	out << "    (";
+	for (auto ii=all_vecs.begin(); ii != all_vecs.end(); ++ii) {
+		if ((ii->flags & (DELTA | ENTH)) != (DELTA | ENTH)) continue;
+		char str[20];
+		sprintf(str, "%p", &ii->vec);
+		out << ii->vec.name() << " + ";
+	}
+	out << ")" << std::endl;
+
+
+
+	return out;
+}
+
 
 PetscErrorCode MassEnergyBudget::set_epsilon(pism::IceGrid &grid)
 {

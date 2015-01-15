@@ -1,3 +1,4 @@
+#include <iostream>
 #include <glint2/pism/PISMIceModel.hpp>
 #include <glint2/pism/GLINT2EnthalpyConverter.hpp>
 #include "bedrockThermalUnit.hh"
@@ -134,6 +135,12 @@ PetscErrorCode PISMIceModel::createVecs()
 	ierr = cur.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = rate.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	printf("END PISMIceModel::createVecs()\n");
+
+	ierr = ice_surface_enth.create(grid, "surface_enth", pism::WITHOUT_GHOSTS);
+	ierr = ice_surface_enth_depth.create(grid, "surface_enth_depth", pism::WITHOUT_GHOSTS);
+
+	std::cout << "PISMIceModel Conservation Formulas:" << std::endl;
+	cur.print_formulas(std::cout);
 
 	return 0;
 }
@@ -524,6 +531,7 @@ PetscErrorCode PISMIceModel::grid_setup()
 }
 
 
+#if 0
 PetscErrorCode PISMIceModel::allocate_internal_objects()
 {
 	PetscErrorCode ierr;
@@ -535,13 +543,10 @@ PetscErrorCode PISMIceModel::allocate_internal_objects()
 	ierr = cur.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = rate.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 
-	ierr = ice_surface_enth.create(grid, "surface_enth", pism::WITHOUT_GHOSTS);
-	ierr = ice_surface_enth_depth.create(grid, "surface_enth_depth", pism::WITHOUT_GHOSTS);
-
 
 	return 0;
 }
-
+#endif
 
 PetscErrorCode PISMIceModel::misc_setup()
 {

@@ -144,7 +144,9 @@ public:
 	// This makes it easy to difference two MassEnergyBudget instances.
 	std::vector<VecWithFlags> all_vecs;
 
+
 // =====================================================================
+	std::ostream &print_formulas(std::ostream &out);
 
 protected:
 	void add_mass(pism::IceModelVec2S &vec, int flags,
@@ -153,6 +155,7 @@ protected:
 		all_vecs.push_back(VecWithFlags(vec, MASS | flags, contract_name));
 	}
 
+	/** @param contract_name The name of this variable in the ice model's output contract. */
 	void add_enth(pism::IceModelVec2S &vec, int flags,
 		std::string const &contract_name)
 	{

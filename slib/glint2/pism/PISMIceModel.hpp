@@ -62,7 +62,7 @@ protected:
 protected:
 	// see iceModel.cc
 	virtual PetscErrorCode createVecs();
-	virtual PetscErrorCode allocate_internal_objects();
+//	virtual PetscErrorCode allocate_internal_objects();
 
 public:
 	virtual PetscErrorCode massContExplicitStep();

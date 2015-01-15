@@ -73,7 +73,6 @@ printf("IceModel_Decode: consolidated from %d down to %d\n", indices.size(), nco
 	// Loop through the fields we require
 	giss::CouplingContract const &icontract(contract[IceModel::INPUT]);
 	for (int i=0; i<icontract.size_nounit(); ++i) {
-//	for (int i=0; i<xivals2->size(); ++i)
 
 		blitz::Array<double,1> const &vals((*xivals2)[i]);
 
