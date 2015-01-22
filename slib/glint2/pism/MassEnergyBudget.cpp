@@ -77,7 +77,7 @@ printf("MassEnergyBudget(%p)::create()\n", this);
 	ierr = geothermal_flux.set_attrs("internal",
 		"Geothermal energy through (compare to upward_geothermal_flux?)",
 		"W m-2", ""); CHKERRQ(ierr);
-	add_enth(geothermal_flux, DELTA, "geothermal_flux");	//!< Total amount of geothermal energy [J/m^2]
+	add_enth(geothermal_flux, 0, "geothermal_flux");	//!< Total amount of geothermal energy [J/m^2]
 
 	ierr = upward_geothermal_flux.create(grid, prefix+"upward_geothermal_flux",
 		ghostedp, width); CHKERRQ(ierr);
