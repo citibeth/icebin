@@ -15,12 +15,17 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	// ------------ GCM Outputs
 	// The GCM must produce the same set of outputs, no matter what
 	// ice model is being used
-	gcm_outputs.add_field("lismb", "kg m-2 s-1", ELEVATION, "Surface mass balance");
-	gcm_outputs.add_field("liseb", "J m-2 s-1", ELEVATION, "Ethalpy of SMB");
-	// Specific enthalpy of the SMB computed as liseb / lismb (J kg-1)
+	gcm_outputs.add_field("wflux", "m^3 m-2 s-1", ELEVATION,
+		"Downward water flux out of surface model's bottom layer");
+	gcm_outputs.add_field("hflux", "W m-2", ELEVATION,
+		"Change of enthalpy in ice model's top layer");
+	gcm_outputs.add_field("massxfer", "m^3 m-2 s-1", ELEVATION,		// [m water equiv]
+		"Mass of ice being transferred Stieglitz --> Glint2");
+	gcm_outputs.add_field("enthxfer", "W m-2", ELEVATION,
+		"Enthalpy of ice being transferred Stieglitz --> Glint2");
+	gcm_outputs.add_field("volxfer", "m^3 m-2 s-1", ELEVATION,
+		"Volume of ice being transferred Stieglitz --> Glint2");
 
-	gcm_outputs.add_field("litg2", "degC", ELEVATION, "Mean T of bottom layer of snow/firn");
-	gcm_outputs.add_field("lif2", "J m-2 s-1", ELEVATION, "Heat flow out of bottom layer of snow/firn");
 	gcm_outputs.add_field("unit", "", 0, "Dimensionless identity");
 
 

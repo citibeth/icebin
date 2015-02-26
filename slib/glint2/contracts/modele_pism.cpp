@@ -67,23 +67,16 @@ void IceModel_PISM::setup_contracts_modele()
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field("smb_mass", 0., "kg m-2 s-1", contracts::ICE,
-		"'Surface Mass Balance' over the coupling interval.\n"
-		"Convention: Down is positive");
-	ice_input.add_field("smb_enth", 0., "W m-2", contracts::ICE,
-		"Advective enthalpy associated with smb_mass."
-		"Convention: Down is positive");
-
-	// small + x = x, for all "normal" values of x
-	const double small = std::numeric_limits<double>::min();
-	ice_input.add_field("surface_temp", small, "K", contracts::ICE,
-		"Mean temperature of the bottom of the ice surface model, over the "
-		"coupling timestep.  This is for informational purposes ONLY, it is not "
-		"used as a boundary condition.");
-
-	ice_input.add_field("heat_flux", 0., "W m-2", contracts::ICE,
-		"Conductive heat between ice sheet and snow/firn model on top of it.\n"
-		"Convention: Down is positive");
+	ice_inputs.add_field("wflux", "kg m-2 s-1", ELEVATION,
+		"Downward water flux out of surface model's bottom layer");
+	ice_inputs.add_field("hflux", "W m-2", ELEVATION,
+		"Conductive change of energy in ice model's top layer");
+	ice_inputs.add_field("massxfer", "kg m-2 s-1", ELEVATION,
+		"Mass of ice being transferred Stieglitz --> Glint2");
+	ice_inputs.add_field("enthxfer", "W m-2", ELEVATION,
+		"Enthalpy of ice being transferred Stieglitz --> Glint2");
+	ice_inputs.add_field("volxfer", "m^3 m-2 s-1", ELEVATION,
+		"Volume of ice being transferred Stieglitz --> Glint2");
 
 	// Figure out the conversion between GCM and PISM enthalpy
 	// ModelE's reference state is 1atm, 0C, 100% liquid water.
@@ -100,26 +93,22 @@ void IceModel_PISM::setup_contracts_modele()
 	// NOTE: enth_modele_to_pism == 437000 J/kg
 	if (pism_rank == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
 
-	// ------------- Convert the contract to a var transformer
-	VarTransformer &ice_input_vt(var_transformer[IceModel::INPUT]);
-	ice_input_vt.set_names(VarTransformer::INPUTS, &coupler->gcm_outputs);
-	ice_input_vt.set_names(VarTransformer::OUTPUTS, &ice_input);
-	ice_input_vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
-	ice_input_vt.allocate();
-
-	// Add some recipes for gcm_to_ice
-	std::string out;
 	bool ok = true;
-	ok = ok && ice_input_vt.set("smb_mass", "lismb", "unit", 1.0);
 
-	// enthalpy flux (PISM) = liseb + enth_modele_to_pism * lismb
-	ok = ok && ice_input_vt.set("smb_enth", "liseb", "unit", 1.0);
-	ok = ok && ice_input_vt.set("smb_enth", "lismb", "unit", enth_modele_to_pism);
+	// ------------- Convert the contract to a var transformer
+	{VarTransformer &vt(var_transformer[IceModel::INPUT]);
+	vt.set_names(VarTransformer::INPUTS, &coupler->gcm_outputs);
+	vt.set_names(VarTransformer::OUTPUTS, &ice_input);
+	vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
+	vt.allocate();
 
-	ok = ok && ice_input_vt.set("surface_temp", "litg2", "unit", 1.0);
-	ok = ok && ice_input_vt.set("surface_temp", "unit", "unit", C2K);	// +273.15
-
-	ok = ok && ice_input_vt.set("heat_flux", "lif2", "unit", 1.0);
+	ok = ok && vt.set("wflux", "wflux", "unit", RHOW);
+	ok = ok && vt.set("hflux", "hflux", "unit", 1.0);
+	ok = ok && vt.set("massxfer", "massxfer", "unit", RHOW);
+	ok = ok && vt.set("enthxfer", "enthxfer", "unit", 1.0);
+	ok = ok && vt.set("enthxfer", "massxfer", "unit", enth_modele_to_pism*RHOW);
+	ok = ok && vt.set("volxfer", "volxfer", "unit", 1.0);
+	}
 
 	// ============== Ice -> GCM
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
@@ -128,8 +117,12 @@ void IceModel_PISM::setup_contracts_modele()
 
 	ice_output.add_field("usurf", "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
 
-	ice_output.add_field("ice_surface_enth", "J kg-1", contracts::ICE|contracts::INITIAL, "");
-	ice_output.add_field("ice_surface_enth_depth", "m", contracts::ICE|contracts::INITIAL, "");
+	ice_output.add_field("M1", "kg m-2", contracts::ICE|contracts::INITIAL, "");
+	ice_output.add_field("M2", "kg m-2", contracts::ICE|contracts::INITIAL, "");
+	ice_output.add_field("H1", "J m-2", contracts::ICE|contracts::INITIAL, "");
+	ice_output.add_field("H2", "J m-2", contracts::ICE|contracts::INITIAL, "");
+	ice_output.add_field("V1", "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
+	ice_output.add_field("V2", "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
 
 	ice_output.add_field("basal_frictional_heating", "W m-2", contracts::ICE, "");
 	ice_output.add_field("strain_heating", "W m-2", contracts::ICE, "");
@@ -163,6 +156,7 @@ void IceModel_PISM::setup_contracts_modele()
 	// ------- Variable and unit conversions, Ice -> GCM
 	{VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
 
+	// NOTE: coupler->gcm_inputs is set up through calls to add_gcm_input_xx() in LANDICE_COM.f
 	vt.set_names(VarTransformer::INPUTS, &ice_output);
 	vt.set_names(VarTransformer::OUTPUTS, &coupler->gcm_inputs);
 	vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
@@ -171,12 +165,20 @@ void IceModel_PISM::setup_contracts_modele()
 //	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);
 	ok = ok && vt.set("elev1", "usurf", "unit", 1.0);
 
-	// For specific enthalpy: Enth_e = Enth_p - enth_modele_to_pism
-	// where X_e is ModelE and X_p is PISM
-	ok = ok && vt.set("ice_surface_enth", "ice_surface_enth", "unit", 1.0);
-	ok = ok && vt.set("ice_surface_enth", "unit", "unit", -enth_modele_to_pism);
-	ok = ok && vt.set("ice_surface_enth_depth", "ice_surface_enth_depth", "unit", 1.0);
+	double const RHOW = coupler->gcm_constants.get_as("constant::rhow", "kg m-3");
+	double const byRHOW = 1.0 / RHOW;
 
+	// Top layer state from ice model
+	ok = ok && vt.set("M1", "M1", "unit", byRHOW);	// Divide by RHOW to convert to m water equiv
+	ok = ok && vt.set("H1", "H1", "unit", 1.0);
+	ok = ok && vt.set("H1", "M1", "unit", -enth_modele_to_pism*byRHOW);
+	ok = ok && vt.set("V1", "V1", "unit", 1.0);
+
+	// Second-top layer state from ice model
+	ok = ok && vt.set("M1", "M1", "unit", byRHOW);	// Divide by RHOW to convert to m water equiv
+	ok = ok && vt.set("H1", "H1", "unit", 1.0);
+	ok = ok && vt.set("H1", "M1", "unit", -enth_modele_to_pism*byRHOW);
+	ok = ok && vt.set("V1", "V1", "unit", 1.0);
 
 
 	ok = ok && vt.set("basal_frictional_heating", "basal_frictional_heating", "unit", 1.0);
@@ -184,12 +186,6 @@ void IceModel_PISM::setup_contracts_modele()
 
 	ok = ok && vt.set("geothermal_flux", "geothermal_flux", "unit", 1.0);
 	ok = ok && vt.set("upward_geothermal_flux", "upward_geothermal_flux", "unit", 1.0);
-
-#if 0
-	ok = ok && vt.set("glint2_smb.mass", "glint2_smb.mass", "unit", 1.0);
-	ok = ok && vt.set("glint2_smb.enth", "glint2_smb.enth", "unit", 1.0);
-	ok = ok && vt.set("glint2_smb.enth", "glint2_smb.mass", "unit", -enth_modele_to_pism);
-#endif
 
 	ok = ok && vt.set("basal_runoff.mass", "melt_grounded.mass", "unit", 1.0);
 	ok = ok && vt.set("basal_runoff.enth", "melt_grounded.enth", "unit", 1.0);
