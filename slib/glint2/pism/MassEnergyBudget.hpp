@@ -113,9 +113,9 @@ public:
 	//    Including basal_runoff would be double-counting it.
 //	MassEnthVec2S basal_runoff;		//!< Enthalpy here is predictable, since runoff is 0C 100% water fraction.
 
-	MassEnthVec2S glint2_smb;		//!< accumulation / ablation, as provided by Glint2
-	pism::IceModelVec2S glint2_heat_flux;
-	MassEnthVec2S pism_smb;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check glint2_smb.mass, but does not figure into contract.
+	MassEnthVec2S glint2_xfer;		//!< accumulation / ablation, as provided by Glint2
+	pism::IceModelVec2S glint2_deltah;	//!< Change in enthalpy of top layer
+	MassEnthVec2S pism_smb;		//! SMB as seen by PISM in iMgeometry.cc massContExplicitSte().  Used to check glint2_xfer.mass, but does not figure into contract.
 	pism::IceModelVec2S href_to_h;
 	pism::IceModelVec2S nonneg_rule;
 	MassEnthVec2S melt_grounded;		//!< basal melt (grounded) (from summing meltrate_grounded)

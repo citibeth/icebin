@@ -17,14 +17,12 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	// ice model is being used
 	gcm_outputs.add_field("wflux", "m^3 m-2 s-1", ELEVATION,
 		"Downward water flux out of surface model's bottom layer");
-	gcm_outputs.add_field("hflux", "W m-2", ELEVATION,
-		"Change of enthalpy in ice model's top layer");
 	gcm_outputs.add_field("massxfer", "m^3 m-2 s-1", ELEVATION,		// [m water equiv]
 		"Mass of ice being transferred Stieglitz --> Glint2");
 	gcm_outputs.add_field("enthxfer", "W m-2", ELEVATION,
 		"Enthalpy of ice being transferred Stieglitz --> Glint2");
-	gcm_outputs.add_field("volxfer", "m^3 m-2 s-1", ELEVATION,
-		"Volume of ice being transferred Stieglitz --> Glint2");
+	gcm_outputs.add_field("deltah", "W m-2", ELEVATION,
+		"Change of enthalpy in ice model's top layer");
 
 	gcm_outputs.add_field("unit", "", 0, "Dimensionless identity");
 

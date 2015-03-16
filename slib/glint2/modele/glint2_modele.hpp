@@ -161,10 +161,9 @@ extern "C"
 void glint2_modele_couple_to_ice_c(
 glint2::modele::glint2_modele *api,
 int itime,			// ModelE itime counter
-giss::F90Array<double,3> &smb1hp_f,
-giss::F90Array<double,3> &seb1hp_,
-giss::F90Array<double,3> &tg21hp_f,
-giss::F90Array<double,3> &f21hp_f,
+giss::F90Array<double,3> &massxfer_f,
+giss::F90Array<double,3> &enthxfer_f,
+giss::F90Array<double,3> &deltah_f,		// Enthalpy change of top layer (use this to create Dirichlet B.C. on ice grid)
 giss::F90Array<double,3> &gcm_inputs_d_f);
 
 extern "C"

@@ -886,10 +886,9 @@ extern "C"
 void  glint2_modele_couple_to_ice_c(
 glint2_modele *api,
 int itime,
-giss::F90Array<double,3> &smb1h_f,		// kg m-2 s-1
-giss::F90Array<double,3> &seb1h_f,		// W m-2: Latent Heat
-giss::F90Array<double,3> &tg21h_f,		// C
-giss::F90Array<double,3> &f21h_f,		// W m2: Conductive heat flow
+giss::F90Array<double,3> &massxfer_f,
+giss::F90Array<double,3> &enthxfer_f,
+giss::F90Array<double,3> &deltah_f,		// Enthalpy change of top layer (use this to create Dirichlet B.C. on ice grid)
 giss::F90Array<double,3> &gcm_inputs_d_f)
 {
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
@@ -902,10 +901,9 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
 	std::vector<blitz::Array<double,3>> inputs(gcm_outputs_contract.size_nounit());
-	inputs[gcm_outputs_contract.index("lismb")].reference(smb1h_f.to_blitz());
-	inputs[gcm_outputs_contract.index("liseb")].reference(seb1h_f.to_blitz());
-	inputs[gcm_outputs_contract.index("litg2")].reference(tg21h_f.to_blitz());
-	inputs[gcm_outputs_contract.index("lif2")].reference(f21h_f.to_blitz());
+	inputs[gcm_outputs_contract.index("massxfer")].reference(massxfer_f.to_blitz());
+	inputs[gcm_outputs_contract.index("enthxfer")].reference(enthxfer_f.to_blitz());
+	inputs[gcm_outputs_contract.index("deltah")].reference(deltah_f.to_blitz());
 
 	if (coupler.gcm_out_file.length() > 0) {
 		// Write out to DESM file

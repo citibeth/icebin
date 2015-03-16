@@ -1,0 +1,38 @@
+\section{Four Contracts}
+
+We think of the coupling as going direclty between GCM and Ice Model.
+However, this is not the case: not only do the GCM and Ice Model run
+on different grids, they might also produce/accept different
+variables, or variables in different units.  For this reason, we can
+think of the process of transferring data from GCM to Ice Model (or
+vice versa) as a multi-step process.
+
+Suppose that the GCM produces $n$ outputs on the elevation grid $E$,
+$\bm{D}^E_1 \ldots \bm{D}^E_n$.  We can think of this as an
+$n$-dimensional vector $\bm{\mathcal{D}}^E$.  The following two steps
+are involved in transferring to the ice model.  They may be carried
+out in either order, since they are both linear:
+
+\begin{enumerate}
+
+\item Regrid $\bm{\mathcal{D}}^E$ to $\bm{mathcal{D}}^I$.
+
+\item Take a linear combination of the $\bm{D}^I$ variables to produce $\bm{E}_I$ variables, which will be the ice model input.  The linear combination is needed for the following unit conversion scenarios:
+ \begin{enumerate}
+ \item Simple unit conversion (eg: \si{\kilo\gram\per\square\meter} = $\rho_w$ \si{\milli\meter} water equivalent)
+ \item Offset unit conversion (eg: \si{K} = \si{\degC} + 273.15)
+ \item Linear combination required for enthalpy conversions.
+ \end{enumerate}
+
+For this reason, coupling involves four contracts: GCM-out, Ice-in,
+Ice-out, GCM-in, and two linear transformations converting GCM-out
+$\rightarrow$ Ice-in, and Ice-out $\rightarrow$ GCM-in.
+
+The contracts are set in the following places:
+
+\begin{enumerate}
+ \item[GCM-out:] {\tt GCMCoupler_ModelE.cpp}
+ \item[Ice-in:] {\tt contracts/modele_pism.cpp}
+ \item[Ice-out:] {\tt contracts/modele_pism.cpp}
+ \item[GCM-in:] {\tt LANDICE_COM.f}
+\end{}

@@ -64,10 +64,12 @@ protected:
 	std::string input_file;
 public:
 	// Inputs from Glint2
-	pism::IceModelVec2S glint2_smb_mass;
-	pism::IceModelVec2S glint2_smb_enth;	// Not used here, along for the ride.
-	pism::IceModelVec2S glint2_surface_temp;
-	pism::IceModelVec2S glint2_heat_flux;
+	pism::IceModelVec2S glint2_wflux;
+	pism::IceModelVec2S glint2_deltah;
+	pism::IceModelVec2S glint2_massxfer;
+	pism::IceModelVec2S glint2_enthxfer;
+	// Calculated
+	pism::IceModelVec2S surface_temp;
 
 private:
 	PetscErrorCode allocate_PSConstantGLINT2();

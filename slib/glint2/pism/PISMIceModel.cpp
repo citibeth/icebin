@@ -136,8 +136,12 @@ PetscErrorCode PISMIceModel::createVecs()
 	ierr = rate.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	printf("END PISMIceModel::createVecs()\n");
 
-	ierr = ice_surface_enth.create(grid, "surface_enth", pism::WITHOUT_GHOSTS);
-	ierr = ice_surface_enth_depth.create(grid, "surface_enth_depth", pism::WITHOUT_GHOSTS);
+	ierr = M1.create(grid, "M1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = M2.create(grid, "M2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = M1.create(grid, "H1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = M2.create(grid, "H2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = M1.create(grid, "V1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = M2.create(grid, "V2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 
 	std::cout << "PISMIceModel Conservation Formulas:" << std::endl;
 	cur.print_formulas(std::cout);
@@ -265,22 +269,22 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	// ----------- SMB: Pass inputs through to outputs.
 	// They are needed to participate in mass/energy budget
 	PSConstantGLINT2 *surface = ps_constant_glint2();
-	ierr = surface->glint2_smb_mass.begin_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_smb_enth.begin_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_heat_flux.begin_access(); CHKERRQ(ierr);
-	ierr = cur.glint2_smb.begin_access(); CHKERRQ(ierr);
-	ierr = cur.glint2_heat_flux.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_massxfer.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_enthxfer.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_deltah.begin_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_xfer.begin_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_deltah.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		cur.glint2_smb.mass(i,j) += dt * surface->glint2_smb_mass(i,j);
-		cur.glint2_smb.enth(i,j) += dt * surface->glint2_smb_enth(i,j);
-		cur.glint2_heat_flux(i,j) += dt * surface->glint2_heat_flux(i,j);
+		cur.glint2_xfer.mass(i,j) += dt * surface->glint2_massxfer(i,j);
+		cur.glint2_xfer.enth(i,j) += dt * surface->glint2_enthxfer(i,j);
+		cur.glint2_deltah(i,j) += dt * surface->glint2_deltah(i,j);
 	}}
-	ierr = surface->glint2_smb_mass.end_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_smb_enth.end_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_heat_flux.end_access(); CHKERRQ(ierr);
-	ierr = cur.glint2_smb.end_access(); CHKERRQ(ierr);
-	ierr = cur.glint2_heat_flux.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_massxfer.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_enthxfer.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_deltah.end_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_xfer.end_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_deltah.end_access(); CHKERRQ(ierr);
 
 	printf("END PISMIceModel::MassContExplicitStep()\n");
 	return 0;
@@ -494,25 +498,48 @@ PetscErrorCode PISMIceModel::prepare_initial_outputs()
 {
 	PetscErrorCode ierr;
 
+	double ice_density = config.get("ice_density");	// [kg m-3]
+
 	// --------- ice_surface_enth from Enth3
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
-	ierr = ice_surface_enth.begin_access(); CHKERRQ(ierr);
-	ierr = ice_surface_enth_depth.begin_access(); CHKERRQ(ierr);
+	ierr = M1.begin_access(); CHKERRQ(ierr);
+	ierr = M2.begin_access(); CHKERRQ(ierr);
+	ierr = H1.begin_access(); CHKERRQ(ierr);
+	ierr = H2.begin_access(); CHKERRQ(ierr);
+	ierr = V1.begin_access(); CHKERRQ(ierr);
+	ierr = V2.begin_access(); CHKERRQ(ierr);
 	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 		double *Enth;
 		ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
 
-		const int ks = grid.kBelowHeight(ice_thickness(i,j));
-		ice_surface_enth(i,j) = Enth[ks];
-		// Depth at which enthalpy is as above (could be zero)
-		ice_surface_enth_depth(i,j) = ice_thickness(i,j) - grid.zlevels[ks];
+		// Top Layer
+		int const ks = grid.kBelowHeight(ice_thickness(i,j));
+		V1(i,j) = ice_thickness(i,j) - grid.zlevels[ks];	// [m^3 m-2]
+		M1(i,j) = V1(i,j) * ice_density;	// [kg m-2] = [m^3 m-2] [kg m-3]
+		H1(i,j) = Enth[ks] * M1(i,j);		// [J m-2] = [J kg-1] [kg m-2]
 
+		// Second layer
+		int const ks2 = ks - 1;
+		if (ks2 >= 0) {
+			V2(i,j) = grid.zlevels[ks] - grid.zlevels[ks2];
+			M2(i,j) = V2(i,j) * ice_density;
+			H2(i,j) = Enth[ks2] * M2(i,j);
+		} else {
+			// There is no second layer
+			V2(i,j) = 0;
+			M2(i,j) = 0;
+			H2(i,j) = 0;
+		}
 	}}
 	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
-	ierr = ice_surface_enth_depth.end_access(); CHKERRQ(ierr);
-	ierr = ice_surface_enth.end_access(); CHKERRQ(ierr);
+	ierr = M1.end_access(); CHKERRQ(ierr);
+	ierr = M2.end_access(); CHKERRQ(ierr);
+	ierr = H1.end_access(); CHKERRQ(ierr);
+	ierr = H2.end_access(); CHKERRQ(ierr);
+	ierr = V1.end_access(); CHKERRQ(ierr);
+	ierr = V2.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 
 	// ====================== Write to the post_energy.nc file (OPTIONAL)
@@ -530,23 +557,6 @@ PetscErrorCode PISMIceModel::grid_setup()
 	return 0;
 }
 
-
-#if 0
-PetscErrorCode PISMIceModel::allocate_internal_objects()
-{
-	PetscErrorCode ierr;
-
-	ierr = super::allocate_internal_objects(); CHKERRQ(ierr);
-
-
-	ierr = base.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = cur.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = rate.create(grid, "", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
-
-
-	return 0;
-}
-#endif
 
 PetscErrorCode PISMIceModel::misc_setup()
 {
@@ -608,7 +618,6 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	//	 getInternalColumn() is allocated already
 	double ice_density = config.get("ice_density");
 	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
-//	ierr = ice_surface_temp.begin_access(); CHKERRQ(ierr);
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
 	ierr = enth2.begin_access(); CHKERRQ(ierr);
 	ierr = mass2.begin_access(); CHKERRQ(ierr);
@@ -643,77 +652,22 @@ PetscErrorCode PISMIceModel::compute_enth2(pism::IceModelVec2S &enth2, pism::Ice
 	return 0;
 }
 
-#if 0
-/** Given a Neumann boundary condition (heat flux) for the top of the
-ice sheet, computes a Dirichlet boundary condition (top temperature)
-that should have approximately the same effect.  This is all done
-(presumeably) on the ice grid; however, this function is
-grid-independent.
-@param dz (m) Distance to use for heat flow calculation (Fourier's Law) */
-PetscErrorCode PISMIceModel::set_effective_surface_temp(double dz)
-{
-	PetscErrorCode ierr;
-
-	printf("BEGIN PISMIceModel::set_effective_temp(%f)\n", dz);
-
-	PSConstantGLINT2 *surface = ps_constant_glint2();
-
-	const double byALAMI0 = 1.0 / config.get("ice_thermal_conductivity");
-//	const double SHI = config.get("ice_specific_heat_capacity");
-//	const double bySHI = 1.0 / SHI;
-//	const double LHM = config.get("water_latent_heat_fusion");
-
-	IceModelVec2S &glint2_heat_flux(surface->glint2_heat_flux);
-	IceModelVec2S &effective_surface_temp(surface->effective_surface_temp);
-
-	ierr = Enth3.begin_access(); CHKERRQ(ierr);
-	ierr = effective_surface_temp.begin_access(); CHKERRQ(ierr);
-	ierr = glint2_heat_flux.begin_access(); CHKERRQ(ierr);
-	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
-	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		double *Enth;
-		ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
-		// Enthalpy at top of ice sheet
-		const int ks = grid.kBelowHeight(ice_thickness(i,j));
-		double enth3 = Enth[ks];
-
-		// Temperature of top layer of ice sheet (C)
-		// Convert enthalpy to Temperature.
-		// Enthalpy reference point is 0C, 100% water
-		// To convert temperature to enthalpy for ice: EDIFS=DIFS*(TG2*SHI-LHM)
-
-		// TODO: We should really use PISM's enthalpy converter here!!!!!
-		double tg3,ddz;
-		const double p = 0.0;		// Pressure at top of ice sheet
-		EC->getAbsTemp(enth3, p, tg3);
-		if (EC->isTemperate(enth3, p)) {
-			ddz = .5 * dz;
-		} else {
-			ddz = dz;
-		}
-
-		//                             C/K        W m-2                m      m K W-1
-		// ===> K
-		// Q = -kA dT / L
-		// dT = -Q/A * L / k
-		effective_surface_temp(i,j) = tg3 + (glint2_heat_flux(i,j) * ddz * byALAMI0);
-	}}
-	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
-	ierr = glint2_heat_flux.end_access(); CHKERRQ(ierr);
-	ierr = effective_surface_temp.end_access(); CHKERRQ(ierr);
-	ierr = Enth3.end_access(); CHKERRQ(ierr);
-
-	printf("END PISMIceModel::set_effective_temp(%f)\n", dz);
-
-	return 0;
-}
-#endif
-
 
 /** Merges surface temperature derived from Enth3 into any NaN values
-in the vector provided. */
-PetscErrorCode PISMIceModel::merge_surface_temp(IceModelVec2S &surface_temp, double default_val)
+in the vector provided.
+@param deltah IN: Input from Glint2 (change in enthalpy of each grid
+	cell over the timestep) [W m-2].
+@param default_val: The value that deltah(i,j) will have if no value
+	is listed for that grid cell
+@param timestep_s: Length of the current coupling timestep [s]
+@param surface_temp OUT: Resulting surface temperature to use as the Dirichlet B.C.
+*/
+PetscErrorCode PISMIceModel::construct_surface_temp(
+	pism::IceModelVec2S &deltah,			// IN: Input from Glint2
+	double default_val,
+	double timestep_s,		// Length of this coupling interval [s]
+	pism::IceModelVec2S &surface_temp)	// OUT: Temperature @ top of ice sheet (to use for Dirichlet B.C.)
+
 {
 	PetscErrorCode ierr;
 
@@ -721,7 +675,10 @@ PetscErrorCode PISMIceModel::merge_surface_temp(IceModelVec2S &surface_temp, dou
 
 	PSConstantGLINT2 *surface = ps_constant_glint2();
 
+	double ice_density = config.get("ice_density");
+
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
+	ierr = deltah.begin_access(); CHKERRQ(ierr);
 	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
 	ierr = surface_temp.begin_access(); CHKERRQ(ierr);
 
@@ -729,21 +686,34 @@ PetscErrorCode PISMIceModel::merge_surface_temp(IceModelVec2S &surface_temp, dou
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 		double &surface_temp_ij(surface_temp(i,j));
+		double const &deltah_ij(deltah(i,j));
 
-		if (surface_temp_ij == default_val) {
-			double *Enth;
-			ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
-			// Enthalpy at top of ice sheet
-			const int ks = grid.kBelowHeight(ice_thickness(i,j));
-			double enth3 = Enth[ks];
+		double *Enth;
+		ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
 
-			double tg3;		// Temperature at top of ice sheet
-			const double p = 0.0;		// Pressure at top of ice sheet
-			EC->getAbsTemp(enth3, p, surface_temp_ij);
+		// Enthalpy at top of ice sheet
+		const int ks = grid.kBelowHeight(ice_thickness(i,j));
+		double spec_enth3 = Enth[ks];		// Specific enthalpy [J kg-1]
+
+		if (deltah_ij != default_val) {
+			// Adjust enthalpy @top by deltah
+			double toplayer_dz = ice_thickness(i,j) - grid.zlevels[ks];		// [m]
+
+			// [J kg-1] = [J kg-1]
+			//     + [J m-2 s-1] * [m^2 m-3] * [m^3 kg-1] * [s]
+			spec_enth3 = spec_enth3
+				+ deltah_ij / (toplayer_dz * ice_density) * timestep_s;
 		}
+
+
+		// Convert specific enthalpy value to surface temperature
+		double tg3;		// Temperature at top of ice sheet
+		const double p = 0.0;		// Pressure at top of ice sheet
+		EC->getAbsTemp(spec_enth3, p, surface_temp_ij);
 	}}
 	ierr = surface_temp.end_access(); CHKERRQ(ierr);
-	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
+	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
+	ierr = deltah.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 
 	printf("END PISMIceModel::merge_surface_temp\n");

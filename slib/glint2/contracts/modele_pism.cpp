@@ -67,16 +67,14 @@ void IceModel_PISM::setup_contracts_modele()
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_inputs.add_field("wflux", "kg m-2 s-1", ELEVATION,
+	ice_input.add_field("wflux", "kg m-2 s-1", contracts::ELEVATION,
 		"Downward water flux out of surface model's bottom layer");
-	ice_inputs.add_field("hflux", "W m-2", ELEVATION,
-		"Conductive change of energy in ice model's top layer");
-	ice_inputs.add_field("massxfer", "kg m-2 s-1", ELEVATION,
+	ice_input.add_field("massxfer", "kg m-2 s-1", contracts::ELEVATION,
 		"Mass of ice being transferred Stieglitz --> Glint2");
-	ice_inputs.add_field("enthxfer", "W m-2", ELEVATION,
+	ice_input.add_field("enthxfer", "W m-2", contracts::ELEVATION,
 		"Enthalpy of ice being transferred Stieglitz --> Glint2");
-	ice_inputs.add_field("volxfer", "m^3 m-2 s-1", ELEVATION,
-		"Volume of ice being transferred Stieglitz --> Glint2");
+	ice_input.add_field("deltah", "W m-2", contracts::ELEVATION,
+		"Change of enthalpy of top layer in PISM");
 
 	// Figure out the conversion between GCM and PISM enthalpy
 	// ModelE's reference state is 1atm, 0C, 100% liquid water.
@@ -94,6 +92,9 @@ void IceModel_PISM::setup_contracts_modele()
 	if (pism_rank == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
 
 	bool ok = true;
+
+	double const RHOW = coupler->gcm_constants.get_as("constant::rhow", "kg m-3");
+	double const byRHOW = 1.0 / RHOW;
 
 	// ------------- Convert the contract to a var transformer
 	{VarTransformer &vt(var_transformer[IceModel::INPUT]);
@@ -164,9 +165,6 @@ void IceModel_PISM::setup_contracts_modele()
 
 //	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);
 	ok = ok && vt.set("elev1", "usurf", "unit", 1.0);
-
-	double const RHOW = coupler->gcm_constants.get_as("constant::rhow", "kg m-3");
-	double const byRHOW = 1.0 / RHOW;
 
 	// Top layer state from ice model
 	ok = ok && vt.set("M1", "M1", "unit", byRHOW);	// Divide by RHOW to convert to m water equiv

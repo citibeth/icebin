@@ -105,19 +105,19 @@ printf("MassEnergyBudget(%p)::create()\n", this);
 	// No DELTA< does not participate in epsilon computation
 	add_massenth(pism_smb, 0, "pism_smb.mass", "pism_smb.enth");
 
-	ierr = glint2_smb.create(grid, prefix+"glint2_smb",
+	ierr = glint2_xfer.create(grid, prefix+"glint2_xfer",
 		ghostedp, width); CHKERRQ(ierr);
-	ierr = glint2_smb.set_attrs("diagnostic",
-		"glint2_smb",
-		"m-2 s-1", "glint2_smb"); CHKERRQ(ierr);
-	add_massenth(glint2_smb, DELTA, "glint2_smb.mass", "glint2_smb.enth");
+	ierr = glint2_xfer.set_attrs("diagnostic",
+		"glint2_xfer",
+		"m-2 s-1", "glint2_xfer"); CHKERRQ(ierr);
+	add_massenth(glint2_xfer, DELTA, "glint2_xfer.mass", "glint2_xfer.enth");
 
-	ierr = glint2_heat_flux.create(grid, prefix+"glint2_heat_flux",
+	ierr = glint2_deltah.create(grid, prefix+"glint2_deltah",
 		ghostedp, width); CHKERRQ(ierr);
-	ierr = glint2_heat_flux.set_attrs("diagnostic",
-		"glint2_heat_flux",
-		"J m-2 s-1", "glint2_heat_flux"); CHKERRQ(ierr);
-	add_enth(glint2_heat_flux, DELTA, "");
+	ierr = glint2_deltah.set_attrs("diagnostic",
+		"glint2_deltah",
+		"J m-2 s-1", "glint2_deltah"); CHKERRQ(ierr);
+	add_enth(glint2_deltah, DELTA, "");
 
 	ierr = href_to_h.create(grid, prefix+"href_to_h",
 		ghostedp, width); CHKERRQ(ierr);

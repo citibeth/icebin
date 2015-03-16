@@ -54,10 +54,10 @@ protected:
 	MassEnergyBudget rate;		// At end of coupling timestep, set to (cur - base) / dt
 
 	// Output variables prepared for return to GCM
-	pism::IceModelVec2S ice_surface_enth;		// Specific enthalpy of top surface of the ice [J kg-1]
-	pism::IceModelVec2S ice_surface_enth_depth;	// Depth below surface at which ice_surface_enth is recorded [m]
-	
-
+	// (relevant ice model state to be exported)
+	pism::IceModelVec2S M1,M2;
+	pism::IceModelVec2S H1,H2;
+	pism::IceModelVec2S V1,V2;
 
 protected:
 	// see iceModel.cc
@@ -135,8 +135,19 @@ public:
 	PetscErrorCode prepare_initial_outputs();
 
 	/** Merges surface temperature derived from Enth3 into any NaN values
-	in the vector provided. */
-	PetscErrorCode merge_surface_temp(pism::IceModelVec2S &curface_temp, double default_val);
+	in the vector provided.
+	@param deltah IN: Input from Glint2 (change in enthalpy of each grid
+		cell over the timestep) [W m-2].
+	@param default_val: The value that deltah(i,j) will have if no value
+		is listed for that grid cell
+	@param timestep_s: Length of the current coupling timestep [s]
+	@param surface_temp OUT: Resulting surface temperature to use as the Dirichlet B.C.
+	*/
+	PetscErrorCode construct_surface_temp(
+		pism::IceModelVec2S &deltah,			// IN: Input from Glint2
+		double default_val,
+		double timestep_s,		// Length of this coupling interval [s]
+		pism::IceModelVec2S &surface_temp);
 
 };
 

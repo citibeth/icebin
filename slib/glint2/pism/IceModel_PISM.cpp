@@ -295,7 +295,7 @@ printf("Initializing PETSc\n");
 	config->write(full_fname.c_str());
 #endif
 
-    pism_grid.reset(new ::IceGrid(pism_comm, *config));
+    pism_grid.reset(new pism::IceGrid(pism_comm, *config));
 printf("pism_grid=%p: (xs,xm,ys,ym,Mx,My) = %d %d %d %d %d %d %ld %ld\n", &*pism_grid, pism_grid->xs, pism_grid->xm, pism_grid->ys, pism_grid->ym, pism_grid->Mx, pism_grid->My, pism_grid->x.size(), pism_grid->y.size());
 	PISMIceModel::Params params;
 		params.time_start_s = coupler->gcm_params.time_start_s;
@@ -331,19 +331,19 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// in the PISM data structures.
 	int ix;
 	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
-	ix = contract[INPUT].index("smb_mass");
-		pism_ivars[ix] = &pism_surface_model->glint2_smb_mass;
+	ix = contract[INPUT].index("wflux");
+		pism_ivars[ix] = &pism_surface_model->glint2_wflux;
 
 	// We don't really use this, but we do need to store and pass through for conservation computations
-	ix = contract[INPUT].index("smb_enth");
-		pism_ivars[ix] = &pism_surface_model->glint2_smb_enth;
+	ix = contract[INPUT].index("massxfer");
+		pism_ivars[ix] = &pism_surface_model->glint2_massxfer;
 
 	// Ignore surface_temp, it is not useful...
-	ix = contract[INPUT].index("surface_temp");
-		pism_ivars[ix] = &pism_surface_model->glint2_surface_temp;
+	ix = contract[INPUT].index("enthxfer");
+		pism_ivars[ix] = &pism_surface_model->glint2_enthxfer;
 
-	ix = contract[INPUT].index("heat_flux");	// Positive is down
-		pism_ivars[ix] = &pism_surface_model->glint2_heat_flux;
+	ix = contract[INPUT].index("deltah");
+		pism_ivars[ix] = &pism_surface_model->glint2_deltah;
 
 	// Initialize scatter/gather stuff
 	ierr = pism_grid->get_dm(1, pism_grid->max_stencil_width, da2); CHKERRQ(ierr);
@@ -368,13 +368,24 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	pism_ovars.resize(contract[OUTPUT].size_nounit(), NULL);
 	ix = contract[OUTPUT].index("usurf");		// Elevation of top surface of ice sheet
 		pism_ovars[ix] = &ice_model->ice_surface_elevation;	// see PISM's iceModel.hh
-	ix = contract[OUTPUT].index("ice_surface_enth");		// Specific enthalpy of top surface
-		pism_ovars[ix] = &ice_model->ice_surface_enth;
-	ix = contract[OUTPUT].index("ice_surface_enth_depth");
-		pism_ovars[ix] = &ice_model->ice_surface_enth_depth;
 
-	ix = contract[OUTPUT].index("glint2_surface_temp");
-		pism_ovars[ix] = &ice_model->ps_constant_glint2()->glint2_surface_temp;
+	// Mass of top two layers
+	ix = contract[OUTPUT].index("M1");
+		pism_ovars[ix] = &ice_model->M1;
+	ix = contract[OUTPUT].index("M2");
+		pism_ovars[ix] = &ice_model->M2;
+
+	// Enthalpy of top two layers
+	ix = contract[OUTPUT].index("H1");
+		pism_ovars[ix] = &ice_model->H1;
+	ix = contract[OUTPUT].index("H2");
+		pism_ovars[ix] = &ice_model->H2;
+
+	// Volume of top two layers
+	ix = contract[OUTPUT].index("V1");
+		pism_ovars[ix] = &ice_model->V1;
+	ix = contract[OUTPUT].index("V2");
+		pism_ovars[ix] = &ice_model->V2;
 
 	// For MassEnergyBudget variables that have a contract name specified,
 	// link them up into pism_ovars now.
@@ -492,13 +503,6 @@ printf("[%d] BEGIN IceModel_PISM::run_timestep_petsc(%f)\n", pism_rank, time_s);
 	}
 	CHKERRQ(ierr);
 
-printf("AA1\n");
-#if 0
-	// Set to NaN, so we can tell where we have no data
-	PSConstantGLINT2 *surface = ice_model->ps_constant_glint2();
-	ierr = surface->glint2_surface_temp.set(nan); CHKERRQ(ierr);
-#endif
-
 	std::vector<int> perm = sorted_perm(indices);
 
 	blitz::Array<int,1> g2_ix(nvals);
@@ -515,7 +519,6 @@ printf("AA1\n");
 
 	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
 
-printf("BB1\n");
 		giss::CoupledField const &cf(contract[IceModel::INPUT].field(i));
 
 		// Get matching input (val) and output (pism_var) variables
@@ -550,11 +553,17 @@ ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 
 	}
 
-	// At this point, glint2_surface_temp will be NaN in places off the ice sheet.
-	// So replace those NaN values with temperatures from the Enth3 array.
+	// Figure out the timestep
+	auto old_pism_time(pism_grid->time->current());	// [s]
+	auto timestep_s = time_s = old_pism_time;		// [s]
+
+	// Determine Dirichlet B.C. for ice sheet
 	PSConstantGLINT2 * const surface = ice_model->ps_constant_glint2();
-	ice_model->merge_surface_temp(surface->glint2_surface_temp,
-		contract[INPUT].field("surface_temp").default_value);
+	ice_model->construct_surface_temp(
+		surface->glint2_deltah,
+		contract[INPUT].field("deltah").default_value,
+		timestep_s,
+		surface->surface_temp);
 
 	// Write out what wev'e now calculated (for debugging)
 	if (write_pism_inputs) {
@@ -579,8 +588,8 @@ ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time->current(), time_s, ice_model.get());
 	// =========== Run PISM for one coupling timestep
 	// Time of last time we coupled
-	auto old_pism_time(pism_grid->time->current());
 	ierr = ice_model->run_to(time_s); CHKERRQ(ierr);	// See glint2::gpism::PISMIceModel::run_to()
+
 	if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
 		throw std::exception();
