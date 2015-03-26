@@ -40,9 +40,9 @@ export NETCDFCXX_LIBS="""-L$NETCDFCXX_HOME/lib -lnetcdf_c++"
 
 #MPI_HOME=$HOME/opt/openmpi-1.6.4
 MPI_HOME=$MACPORTS
-export MPI_INCLUDE="$MPI_HOME/include/openmpi-gcc48"
+export MPI_INCLUDE="$MPI_HOME/include/openmpi-gcc49"
 export MPI_CFLAGS="-I$MPI_INCLUDE"
-export MPI_LIBS="-L$MPI_HOME/lib/openmpi-gcc48 -lmpi -lmpi_cxx"
+export MPI_LIBS="-L$MPI_HOME/lib/openmpi-gcc49 -lmpi -lmpi_cxx"
 
 export PROJ_HOME=$MACPORTS
 export PROJ_CFLAGS="-I$PROJ_HOME/include"
