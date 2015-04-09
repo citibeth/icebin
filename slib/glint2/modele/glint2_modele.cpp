@@ -81,7 +81,7 @@ std::string const &fname)
 	NcFile ncout(fname.c_str(), NcFile::Replace);
 	NcDim *im_dim = ncout.add_dim("im", api->domain->im);
 	NcDim *jm_dim = ncout.add_dim("jm", api->domain->jm);
-	NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
+	NcDim *nhp_dim = ncout.add_dim("nhp", nhc_gcm);
 	NcDim *one_dim = ncout.add_dim("one", 1);
 	NcDim *time_dim = ncout.add_dim("time");		// No dimsize --> unlimited
 
@@ -160,7 +160,7 @@ blitz::Array<double,3> gcm_inputs)
 	printf("BEGIN save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
 
 	// Get dimensions of full domain
-	int nhp = glint2_modele_nhp(api);
+	int nhc_gcm = glint2_modele_nhc_gcm(api);
 	GCMCoupler &coupler(api->gcm_coupler);
 	giss::CouplingContract const &contract(coupler.gcm_inputs);
 
@@ -171,7 +171,7 @@ blitz::Array<double,3> gcm_inputs)
 	NcDim *jm_dim = ncout.get_dim("jm");
 	NcDim *im_dim = ncout.get_dim("im");
 
-	long cur_ijhc[4]{time_dim->size(),0,0,0};		// time, nhp, jm, im
+	long cur_ijhc[4]{time_dim->size(),0,0,0};		// time, nhc_gcm, jm, im
 	long counts_ijhc[4]{1, nhp_dim->size(), jm_dim->size(), im_dim->size()};
 
 	long cur_ij[4]{time_dim->size(),0,0};		// time, nhp, jm, im
@@ -197,7 +197,7 @@ blitz::Array<double,3> gcm_inputs)
 			case contracts::ELEVATION :
 				nc_var->set_cur(cur_ijhc);
 				nc_var->put(array_base, counts_ijhc);
-				base_index += nhp;
+				base_index += nhc_gcm;
 			break;
 			default: ;
 		}
@@ -219,7 +219,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 {
 
 	// Get dimensions of full domain
-	int nhp = glint2_modele_nhp(api);
+	int nhc_gcm = glint2_modele_nhc_gcm(api);
 	ModelEDomain const *domain(&*api->domain);
 
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
@@ -246,7 +246,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 
 	// Fill it in....
 	int nmsg = 0;
-	for (int k=input0.lbound(2); k<=input0.ubound(2); ++k)		// nhp
+	for (int k=input0.lbound(2); k<=input0.ubound(2); ++k)		// nhc_gcm
 	for (int j=domain->j0_f; j <= domain->j1_f; ++j)
 	for (int i=domain->i0_f; i <= domain->i1_f; ++i) {
 		ModelEMsg &msg = sbuf[nmsg];
@@ -274,7 +274,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 		// Allocate ijk arrays
 		std::vector<blitz::Array<double,3>> outputs;
 		for (unsigned int i=0; i<nfields; ++i) {
-			outputs.push_back(blitz::Array<double,3>(nhp, domain->jm, domain->im));
+			outputs.push_back(blitz::Array<double,3>(nhc_gcm, domain->jm, domain->im));
 		}
 
 		// Turn messages into ijk arrays
@@ -294,7 +294,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 		NcDim *jm_dim = ncout.get_dim("jm");
 		NcDim *im_dim = ncout.get_dim("im");
 
-		long cur[4]{time_dim->size(),0,0,0};		// time, nhp, jm, im
+		long cur[4]{time_dim->size(),0,0,0};		// time, nhc_gcm, jm, im
 		long counts[4]{1, nhp_dim->size(), jm_dim->size(), im_dim->size()};
 
 		NcVar *time_var = ncout.get_var("time");
@@ -442,6 +442,8 @@ void glint2_modele_nhc_gcm(glint2_modele const *api, int &nhc_ice, int &nhc_gcm)
 	nhc_gcm = nhc_ice + 1;
 }
 // -----------------------------------------------------
+/** @return Number of "copies" of the atmosphere grid must be used
+to store the inputs. */
 extern "C"
 int glint2_modele_gcm_inputs_nhp(glint2_modele *api)
 {
