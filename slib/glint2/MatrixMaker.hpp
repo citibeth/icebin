@@ -28,7 +28,7 @@
 #include <glint2/HCIndex.hpp>
 
 /*
-Height Points (HP) [nhc*n1] --A--> Ice [n2] --B--> Height Classes (HC) [nhc*n1] --C--> GCM
+Height Points (HP) [nhp*n1] --A--> Ice [n2] --B--> Height Classes (HC) [nhp*n1] --C--> GCM
 
 A: See hp2ice() below
 B: See ice2hc() below
@@ -51,7 +51,7 @@ class MatrixMaker
 public:
     giss::MapDict<std::string, IceSheet> sheets;
 	std::map<int, IceSheet *> sheets_by_id;
-	std::unique_ptr<HCIndex> hc_index;	// Methods to extract i1 and ihc from an elevation index
+	std::unique_ptr<HCIndex> hc_index;	// Methods to extract i1 and ihp from an elevation index
 protected:
 	int _next_sheet_index;
 	std::unique_ptr<GridDomain> domain;

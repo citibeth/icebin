@@ -66,11 +66,11 @@ INTERFACE
 		integer(c_int) :: glint2_modele_add_gcm_input
 	end function
 
-	function glint2_modele_gcm_inputs_nhc_ice(api) bind(c)
+	function glint2_modele_gcm_inputs_nhp_ice(api) bind(c)
 	use iso_c_binding
 		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_gcm_inputs_nhc_ice
-	end function glint2_modele_gcm_inputs_nhc_ice
+		integer(c_int) :: glint2_modele_gcm_inputs_nhp_ice
+	end function glint2_modele_gcm_inputs_nhp_ice
 
 	subroutine glint2_modele_init0(api, &
 		maker_fname_f, maker_fname_len, &

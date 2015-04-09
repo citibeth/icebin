@@ -194,30 +194,30 @@ double epsilon)
 // -------------------------------------------------------------
 class I3XTranslator {
 	HCIndex *hc_index;
-	int nhc;
+	int nhp;
 
 public:
 
-	void init(HCIndex *_hc_index, int _nhc)
+	void init(HCIndex *_hc_index, int _nhp)
 	{
 		hc_index = _hc_index;
-		nhc = _nhc;
+		nhp = _nhp;
 	}
 
 	// Identity Transformation
 	void init_identity() {
 		hc_index = 0;
-		nhc = -1;
+		nhp = -1;
 	}
 
-	I3XTranslator() : hc_index(0), nhc(-1) {}
+	I3XTranslator() : hc_index(0), nhp(-1) {}
 
 	int i3x_to_i3(int i3x)
 	{
 		if (!hc_index) return i3x;		// Identity
 
-		int i1 = i3x / nhc;
-		int k = i3x - i1 * nhc;
+		int i1 = i3x / nhp;
+		int k = i3x - i1 * nhp;
 		return hc_index->ik_to_index(i1, k);
 	}
 
@@ -227,7 +227,7 @@ public:
 
 		int i1, k;
 		hc_index->index_to_ik(i3, i1, k);
-		int i3x = i1 * nhc + k;
+		int i3x = i1 * nhp + k;
 	//printf("i3=%d (%d, %d) --> i3x=%d\n", i3, i1, k, i3x);
 		return i3x;
 	}

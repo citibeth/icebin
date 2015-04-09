@@ -26,17 +26,17 @@ def regrid_5_to_20(ff) :
 # --------------------------------------------------------------------
 class Glint2Files(object) :
 	"""Sets up names of Glint2 files"""
-	def __init__(self, grid1, grid2, ice_dx, nhc, ice_model, searise_fname) :
+	def __init__(self, grid1, grid2, ice_dx, nhp, ice_model, searise_fname) :
 		self.grid1 = grid1
 		self.grid2 = grid2
 		self.ice_dx = ice_dx
-		self.nhc = nhc
+		self.nhp = nhp
 		self.searise_fname = searise_fname
 
 		self.grid1_fname = grid1 + '.nc'
 		self.grid2_fname = grid2 + '.nc'
 		self.grid4_fname = '%s-%s.nc' % (grid1, grid2)	# Exchange grid file
-		self.glint2_in_fname = '%s-%s-%d-%s.nc' % (grid1, grid2, nhc, ice_model)
+		self.glint2_in_fname = '%s-%s-%d-%s.nc' % (grid1, grid2, nhp, ice_model)
 
 		self.gcm_ijhc_fname = '130516-Regrid_examples_e4f40-hc40-g5_JUL1956.ijhce4f40-hc40.nc'
 		self.gcm_aij_fname = '130516-Regrid_examples_e4f40-hc40-g5_JUL1956.aije4f40-hc40-prec.nc'
@@ -58,7 +58,7 @@ def make_glint2_in(gf) :
 
 	# ========== Set up grid1 and height points
 	grid1_name = 'modele_ll_g2x2_5'
-	hpdefs = np.array(range(0,gf.nhc))*(4000. / gf.nhc) - (4000. / (gf.nhc * 2))
+	hpdefs = np.array(range(0,gf.nhp))*(4000. / gf.nhp) - (4000. / (gf.nhp * 2))
 	mm = glint2.MatrixMaker()
 	print hpdefs
 	mm.init(gf.grid1_fname, 'MODELE', hpdefs) # no mask1

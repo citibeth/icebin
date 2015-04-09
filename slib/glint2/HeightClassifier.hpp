@@ -44,7 +44,7 @@ public :
 
 	double operator[](int ix) const { return (*hcmax)(ix); }
 
-	int nhc() const { return hcmax->extent(0); }
+	int nhp() const { return hcmax->extent(0); }
 
 private:
 	blitz::Array<double,1> const *hcmax;

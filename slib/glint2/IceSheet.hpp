@@ -169,7 +169,7 @@ extern void linterp_1d(
 
 /** We only really expect this to work for Greenland.  Don't worry
 about south pole in lon/lat coordinates and Antarctica.
-[n2 x (nhc * n1)] sparse matrix */
+[n2 x (nhp * n1)] sparse matrix */
 extern std::unique_ptr<giss::VectorSparseMatrix> 
 bilin_interp(
 MatrixMaker *gcm,

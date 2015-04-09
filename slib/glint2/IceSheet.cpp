@@ -300,7 +300,7 @@ blitz::Array<int,1> const *mask2)
 
 	// ---------- Check Dimensions
 	long n1 = grid1.ncells_full();
-//	int nhc = hpdefs.size();
+//	int nhp = hpdefs.size();
 	int n2 = elev2.extent(0);
 
 	gassert(!mask1 || mask1->extent(0) == n1);

@@ -42,7 +42,7 @@ for rank in range(0,2) :
 	print nc.dimensions['nx']
 	nx = len(nc.dimensions['nx'])
 	ny = len(nc.dimensions['ny'])
-	nhc = 40
+	nhp = 40
 	nc.close()
 
 	# -----------------------------------------------------
@@ -73,12 +73,12 @@ for rank in range(0,2) :
 
 	# -------------------
 	ncout = netCDF4.Dataset('val1hc-%02d.nc' % rank, 'w')
-	ncout.createDimension('nhc', val1hc.shape[0])
+	ncout.createDimension('nhp', val1hc.shape[0])
 	ncout.createDimension('jm', val1hc.shape[1])
 	ncout.createDimension('im', val1hc.shape[2])
-	val1hc_v = ncout.createVariable('val1hc', 'd', ('nhc', 'jm', 'im'))
+	val1hc_v = ncout.createVariable('val1hc', 'd', ('nhp', 'jm', 'im'))
 	val1hc_v[:] = val1hc
-	val1hp_v = ncout.createVariable('val1hp', 'd', ('nhc', 'jm', 'im'))
+	val1hp_v = ncout.createVariable('val1hp', 'd', ('nhp', 'jm', 'im'))
 	val1hp_v[:] = val1hp
 	ncout.close()
 	# -------------------

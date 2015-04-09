@@ -75,7 +75,7 @@ class Glint2Tests(unittest.TestCase) :
 		if self.vname == 'impm_lndice' :
 			self.val1h *= 86400.		# Convert to more sensible unit
 		nc.close()
-		self.nhc = self.val1h.shape[0]
+		self.nhp = self.val1h.shape[0]
 
 
 	def mytest_remap(self, n2p) :
@@ -171,7 +171,7 @@ class Glint2Tests(unittest.TestCase) :
 		        3150.,  3250.,  3350.,  3450.,  3550.,  3650.,  3750.,  3850.])
 
 		# ========== Height-classify overlap matrix
-		self.assertEqual(len(hcmax), self.nhc)
+		self.assertEqual(len(hcmax), self.nhp)
 		overlaph = glint2.height_classify(self.overlap, self.elev2, hcmax)
 
 		# =========== Mask out overlap matrix
@@ -194,7 +194,7 @@ class Glint2Tests(unittest.TestCase) :
 		if n2p :
 			diag = glint2.proj_native_area_correct(self.grid1, self.sproj, 'n2p')
 			# Convert the native area correction to height-classified space
-			diag = np.tile(diag, (1,self.nhc)).reshape(-1)
+			diag = np.tile(diag, (1,self.nhp)).reshape(-1)
 			glint2.multiply_bydiag(mat_1hc_to_2, diag)
 
 		# -------- Area-weighted remapping using height classes
@@ -217,7 +217,7 @@ class Glint2Tests(unittest.TestCase) :
 		# Evaluate conservation
 
 		# A bit more complication extending native_area1 to full hc scheme
-		factor1h = np.tile(self.native_area1 / self.proj_area1, (self.nhc,1)).reshape(-1)
+		factor1h = np.tile(self.native_area1 / self.proj_area1, (self.nhp,1)).reshape(-1)
 
 		total1h_native = np.nansum(area1h_masked * factor1h * self.val1h.reshape(-1))
 		total1h_proj = np.nansum(area1h_masked * self.val1h.reshape(-1))

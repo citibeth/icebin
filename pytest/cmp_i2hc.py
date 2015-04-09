@@ -54,16 +54,16 @@ val1hc = glint2.coo_multiply(i2hc, val2, fill=np.nan)
 val1hc_r = val1hc.reshape(val1hp.shape)
 
 ncout = netCDF4.Dataset('val1hc-py.nc', 'w')
-ncout.createDimension('nhc', val1hp.shape[0])
+ncout.createDimension('nhp', val1hp.shape[0])
 ncout.createDimension('jm', val1hp.shape[1])
 ncout.createDimension('im', val1hp.shape[2])
-val1hc_v = ncout.createVariable('val1hc', 'd', ('nhc', 'jm', 'im'))
+val1hc_v = ncout.createVariable('val1hc', 'd', ('nhp', 'jm', 'im'))
 val1hc_v[:] = val1hc
-val1hp_v = ncout.createVariable('val1hp', 'd', ('nhc', 'jm', 'im'))
+val1hp_v = ncout.createVariable('val1hp', 'd', ('nhp', 'jm', 'im'))
 val1hp_v[:] = val1hp
 
 val1hc = val1hc_r - val1hp
-diff_v = ncout.createVariable('diff', 'd', ('nhc', 'jm', 'im'))
+diff_v = ncout.createVariable('diff', 'd', ('nhp', 'jm', 'im'))
 diff_v[:] = val1hc
 
 # --------------------------------
@@ -74,7 +74,7 @@ hp2hc = scipy.sparse.coo_matrix(i2hc * hp2i)
 print type(hp2hc)
 val1hc_b = glint2.coo_multiply(hp2hc, val1hp, fill=np.nan)
 
-val1hc_b_v = ncout.createVariable('val1hc_b', 'd', ('nhc', 'jm', 'im'))
+val1hc_b_v = ncout.createVariable('val1hc_b', 'd', ('nhp', 'jm', 'im'))
 val1hc_b_v[:] = val1hc_b
 
 # --------------------------------
@@ -85,7 +85,7 @@ hp2hc_c = giss.read_coo_matrix(nc, 'hp2hc')
 nc.close()
 val1hc_c = glint2.coo_multiply(hp2hc_c, val1hp, fill=np.nan)
 
-val1hc_c_v = ncout.createVariable('val1hc_c', 'd', ('nhc', 'jm', 'im'))
+val1hc_c_v = ncout.createVariable('val1hc_c', 'd', ('nhp', 'jm', 'im'))
 val1hc_c_v[:] = val1hc_c
 
 

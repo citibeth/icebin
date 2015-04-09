@@ -33,7 +33,7 @@ public:
 
 	BOOST_ENUM_VALUES( Type, int,
 		(UNKNOWN)	(0)
-		(MODELE)	(1)		// ModelE-style indexing: C++ (nhc, n1)
+		(MODELE)	(1)		// ModelE-style indexing: C++ (nhp, n1)
 	)
 
 	virtual ~HCIndex() {}

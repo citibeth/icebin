@@ -26,7 +26,7 @@ nc.close()
 nc = netCDF4.Dataset('fhc-00.nc')
 jm = len(nc.dimensions['jm'])
 im = len(nc.dimensions['im'])
-nhc = len(nc.dimensions['nhc'])
+nhp = len(nc.dimensions['nhp'])
 rows_i = nc.variables['rows_i'][:]
 rows_j = nc.variables['rows_j'][:]
 rows_k = nc.variables['rows_k'][:]

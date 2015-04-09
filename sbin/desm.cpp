@@ -296,7 +296,7 @@ int Desm::main(int argc, char **argv)
 	NcVar *var_nc = vars_nc[0];
 	long ntime = var_nc->get_dim(0)->size();
 	long counts[4] = {1,				// time
-		var_nc->get_dim(1)->size(),		// nhc
+		var_nc->get_dim(1)->size(),		// nhp
 		var_nc->get_dim(2)->size(),		// jm
 		var_nc->get_dim(3)->size()};		// im
 	int nhp = counts[1];
@@ -379,7 +379,7 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 		}
 
 		// Compute lif2 based on litg2 and input from ice model (via Glint2)
-		for (int ihc=0; ihc<counts[1]; ++ihc) {
+		for (int ihp=0; ihp<counts[1]; ++ihp) {
 		for (int j=0; j<counts[2]; ++j) {
 		for (int i=0; i<counts[3]; ++i) {
 
@@ -390,7 +390,7 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 			const double ALAMI0 = 2.11;
 
 			// Enthalpy of top layer of ice sheet
-			double enth3 = ice_surface_enth(ihc, j, i);
+			double enth3 = ice_surface_enth(ihp, j, i);
 
 			// DZ2 = Distance above bottom of surface model where we will create
 			//       a fictitious finite difference point with temperature = TG2
@@ -426,9 +426,9 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 			}
 
 			// F2 = (W m-1 K-1) * K * m-1 ==> W m-2    :-)
-			double f2 = ALAMI0 * (litg2_c(ihc,j,i) - tg3) * f2denom;
+			double f2 = ALAMI0 * (litg2_c(ihp,j,i) - tg3) * f2denom;
 
-			lif2_c(ihc,j,i) = f2;
+			lif2_c(ihp,j,i) = f2;
 		}}}
 
 		for (int vi=0; vi<nvar+nfree; ++vi) {

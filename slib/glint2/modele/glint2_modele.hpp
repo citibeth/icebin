@@ -90,8 +90,8 @@ extern "C" void glint2_modele_set_const(
 configuration, INCLUDING the "legacy" elevation point, which is
 used by ModelE but not Glint2. */
 extern "C"
-void glint2_modele_nhc_gcm(glint2::modele::glint2_modele const *api,
-	int &nhc_ice, int &nhc_gcm);
+void glint2_modele_nhp_gcm(glint2::modele::glint2_modele const *api,
+	int &nhp_ice, int &nhp_gcm);
 
 /** Inform Glint2 about a Fortran variable used to hold inputs to the
 GCM (regridded from the ice model output).  This is called from
