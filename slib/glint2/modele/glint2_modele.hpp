@@ -75,7 +75,7 @@ struct glint2_modele {
 }}	// namespace glint2::modele
 // ================================================
 /** Just allocate */
-extern "C" glint2::modele::glint2_modele *new_glint2_modele();
+extern "C" glint2::modele::glint2_modele *new_glint2_modele_c();
 
 /** Set one constant from ModelE into GLINT2.  This is used as a callback
 function for ModelE's set_constant() Fortran subroutine. */
@@ -90,7 +90,8 @@ extern "C" void glint2_modele_set_const(
 configuration, INCLUDING the "legacy" elevation point, which is
 used by ModelE but not Glint2. */
 extern "C"
-int glint2_modele_nhp(glint2::modele::glint2_modele const *api);
+void glint2_modele_nhc_gcm(glint2::modele::glint2_modele const *api,
+	int &nhc_ice, int &nhc_gcm);
 
 /** Inform Glint2 about a Fortran variable used to hold inputs to the
 GCM (regridded from the ice model output).  This is called from
@@ -143,16 +144,12 @@ void glint2_modele_compute_fgice_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 2> &focean1_f,
 	giss::F90Array<double, 2> &flake1_f);
 
+/** Produces the (dense) FHC_ICE array from the (sparse) hp_to_atm
+coming from raw Glint2. */
 extern "C"
-void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
-	giss::F90Array<double, 2> &zatmo1_f,	// IN
-	double const BYGRAV,					// IN
-	giss::F90Array<double, 2> &fgice1_glint2_f,	// IN
-	giss::F90Array<double, 2> &fgice1_f,	// IN
-	giss::F90Array<int,3> &used1h_f,		// IN/OUT
-	giss::F90Array<double, 3> &fhc1h_f,		// OUT: hp-to-atmosphere
-	giss::F90Array<double, 3> &elev1h_f,	// IN/OUT
-	int const i0, int const j0, int const i1, int const j1);			// Array bound to write in
+void glint2_modele_get_fhc_ice_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 3> &fhc_ice1h_f,	// OUT
+	int const i0, int const j0, int const i1, int const j1);		// Array bou
 
 extern "C"
 void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api);

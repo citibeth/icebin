@@ -77,7 +77,7 @@ std::string const &fname)
 	GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
 
 	// Set up NetCDF file to store GCM output as we received them (modele_out.nc)
-	int nhp = glint2_modele_nhp(api);
+	int nhc_gcm = glint2_modele_nhc_gcm(api);
 	NcFile ncout(fname.c_str(), NcFile::Replace);
 	NcDim *im_dim = ncout.add_dim("im", api->domain->im);
 	NcDim *jm_dim = ncout.add_dim("jm", api->domain->jm);
@@ -313,7 +313,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 }
 
 // ================================================================
-extern "C" glint2_modele *new_glint2_modele()
+extern "C" glint2_modele *new_glint2_modele_c()
 {
 	std::unique_ptr<glint2_modele> api(new glint2_modele());
 
@@ -430,13 +430,23 @@ extern "C" void glint2_modele_delete(glint2_modele *&api)
 }
 // -----------------------------------------------------
 extern "C"
-int glint2_modele_nhp(glint2_modele const *api)
+void glint2_modele_nhc_gcm(glint2_modele const *api, int &nhc_ice, int &nhc_gcm)
 {
-	int ret = api->gcm_coupler.maker->nhp(-1);	// Assume all grid cells have same # EP
+	nhc_ice = api->gcm_coupler.maker->nhp(-1);	// Assume all grid cells have same # EP
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
     // (not part of GLINT2)
-	ret += 1;
-	return ret;
+
+	// "nhc_gcm = nhc_ice+1" is embedded in the code in this compilation
+	// unit.  The first elevation point is skipped in arrays passed from the
+	// GCM because that is a non-ice model elevation point.
+	nhc_gcm = nhc_ice + 1;
+}
+// -----------------------------------------------------
+extern "C"
+int glint2_modele_gcm_inputs_nhp(glint2_modele *api)
+{
+	int ihp = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
+	return ihp;
 }
 // -----------------------------------------------------
 /** @para var_nhc Number of elevation points for this variable.
@@ -520,11 +530,7 @@ extern "C"
 void glint2_modele_compute_fgice_c(glint2_modele *api,
 	int replace_fgice_b,
 	giss::F90Array<double, 2> &fgice1_glint2_f,		// OUT
-	giss::F90Array<double, 2> &fgice1_f,		// OUT
-	giss::F90Array<double, 2> &fgrnd1_f,		// IN/OUT
-	giss::F90Array<double, 2> &focean1_f,		// IN
-	giss::F90Array<double, 2> &flake1_f			// IN
-)
+	giss::F90Array<double, 2> &fgice1_f)		// OUT
 {
 
 printf("BEGIN glint2_modele_compute_fgice_c()\n");
@@ -537,7 +543,6 @@ std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
 	// (smallest stride first, whatever-based indexing it came with)
 
 	// Get the sparse vector values
-	giss::VectorSparseVector<std::pair<int,int>,double> fhc1h_s;
 	giss::VectorSparseVector<int,double> fgice1_s;
 	api->gcm_coupler.maker->fgice(fgice1_s);
 
@@ -585,11 +590,11 @@ std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
 	}
 	// -----------------------------------------------------
 	// Balance fgice against other landcover types
-	auto fgrnd1(fgrnd1_f.to_blitz());
-	auto focean1(focean1_f.to_blitz());
-	auto flake1(flake1_f.to_blitz());
+//	auto fgrnd1(fgrnd1_f.to_blitz());
+//	auto focean1(focean1_f.to_blitz());
+//	auto flake1(flake1_f.to_blitz());
 // This correction is taken care of in ModelE (for now)
-// See: FLUXES.f
+// See: FLUXES.f alloc_fluxes()
 //	fgrnd1 = 1.0 - focean1 - flake1 - fgice1;
 
 #if 0
@@ -607,83 +612,15 @@ nc.close();
 printf("END glint2_modele_compute_fgice_c()\n");
 }
 // -----------------------------------------------------
-/**
-Called from LANDICE_COM.f: read_landice_ic().  This needs to happen AFTER
-ModelE alloc() stuff (which calls glint2_modele_add_gcm_input_*().
-I believe that is the order.
-
-@param zatmo1_f ZATMO from ModelE (Elevation of bottom of atmosphere * GRAV)
-@param BYGRAV 1/GRAV = 1/(9.8 m/s^2)
-@param fgice1_glint2_f Amount of GLINT2-related ground ice in each GCM grid cell
-@param fgice1_f Total amount of ground ice in each GCM grid cell
-@param used1h_f Height point mask
-@param fhc1h_f Weights to average height points into GCM grid.
-@param elev1h_f Elevation of each height point
-*/
+/** Produces the (dense) FHC_ICE array from the (sparse) hp_to_atm
+coming from rawl Glint2. */
 extern "C"
-void glint2_modele_init_landice_com_c(glint2::modele::glint2_modele *api,
-	giss::F90Array<double, 2> &zatmo1_f,	// IN
-	double const BYGRAV,					// IN
-	giss::F90Array<double, 2> &fgice1_glint2_f,	// IN
-	giss::F90Array<double, 2> &fgice1_f,	// IN
-	giss::F90Array<int,3> &used1h_f,		// IN/OUT
-	giss::F90Array<double, 3> &fhc1h_f,		// OUT: hp-to-atmosphere
-	giss::F90Array<double, 3> &elev1h_f,	// IN/OUT
-	int const i0, int const j0, int const i1, int const j1)			// Array bound to write in
+void glint2_modele_get_fhc_ice_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 3> &fhc_ice1h_f,	// OUT
+	int const i0, int const j0, int const i1, int const j1)			// Array bou
 {
-printf("init_landice_com_part2 1\n");
+	auto fhc_ice1h(fhc_ice1h_f.to_blitz());
 
-	// =================== elev1h
-	// Just copy out of hpdefs array, elevation points are the same
-	// on all grid cells.
-
-	auto elev1h(elev1h_f.to_blitz());
-	int nhp_glint2 = api->gcm_coupler.maker->nhp(-1);
-	int nhp = api->gcm_coupler.maker->nhp(-1) + 1;	// Add non-model HP
-	if (nhp != elev1h.extent(2)) {
-		fprintf(stderr, "glint2_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp);
-		throw std::exception();
-	}
-
-	// Copy 1-D height point definitions to elev1h
-	for (int k=0; k < nhp_glint2; ++k) {
-		double val = api->gcm_coupler.maker->hpdefs[k];
-		for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
-		for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {
-			// +1 for C-to-Fortran conversion
-			// +1 because lowest HP/HC is reserved
-			elev1h(i,j,k+2) = val;
-		}}
-	}
-
-	// Copy zatmo to elevation of reserved height point
-	auto zatmo1(zatmo1_f.to_blitz());
-	for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
-	for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {
-		elev1h(i,j,1) = zatmo1(i,j) * BYGRAV;
-	}}
-
-printf("init_landice_com_part2 2\n");
-	// ======================= fhc(:,:,1)
-	auto fgice1(fgice1_f.to_blitz());
-	auto fgice1_glint2(fgice1_glint2_f.to_blitz());
-	auto fhc1h(fhc1h_f.to_blitz());
-	fhc1h = 0;
-	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
-	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
-//		double fg1 = fgice1(i,j);
-//		double fg1g = fgice1_glint2(i,j);
-//
-//		if ((fg1 > 0) && (fg1 != fg1g)) {
-		if (fgice1(i,j) > 0) {
-			double val = 1.0d - fgice1_glint2(i,j) / fgice1(i,j);
-			if (std::abs(val) < 1e-13) val = 0;
-			fhc1h(i,j,1) = val;
-		}
-	}}
-
-printf("init_landice_com_part2 3\n");
-	// ======================= fhc(:,:,hp>1)
 	HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->gcm_coupler.maker->hp_to_atm());
 	ModelEDomain &domain(*api->domain);
@@ -710,60 +647,14 @@ printf("init_landice_com_part2 3\n");
 			throw std::exception();
 		}
 
-		// Now fill in FHC
+		// Now fill in FHC_ICE
 		// +1 for C-to-Fortran conversion
-		// +1 because lowest HP/HC is reserved for non-model ice
-		fhc1h(lindex[0], lindex[1], hp1b+2) +=
-			ii.val() * (1.0d - fhc1h(lindex[0], lindex[1],1));
+		fhc_ice1h(lindex[0], lindex[1], hp1b+1) += ii.val();
 	}
 	hp_to_atm.release();
 
-printf("init_landice_com_part2 4\n");
-	// ====================== used
-	auto used1h(used1h_f.to_blitz());
-	used1h = 0;
-
-	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
-	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
-		// Nothing to do if there's no ice in this grid cell
-		if (fgice1(i,j) == 0) continue;
-
-		// Set used for the legacy height point
-		// Compute legacy height point for ALL cells with ice
-		// (This allows us to easily compare running with/without height points)
-		used1h(i,j,1) = 1;
-		// Compute legacy height point just for cells with non-model ice
-		// used1h(i,j,1) = (fhc1h(i,j,1) > 0 ? 1 : 0);
-
-		// Min & max height point used for each grid cell
-		int mink = std::numeric_limits<int>::max();
-		int maxk = std::numeric_limits<int>::min();
-
-		// Loop over HP's (but not the reserved ones) to find
-		// range of HP's used on this grid cell.
-		for (int k=2; k <= nhp; ++k) {
-			if (fhc1h(i,j,k) > 0) {
-				mink = std::min(mink, k);
-				maxk = std::max(maxk, k);
-			}
-		}
-
-		// Add a couple of HPs around it!
-		mink = std::max(2, mink-2);
-		maxk = std::min(nhp, maxk+2);
-
-		// Set everything from mink to maxk (inclusive) as used
-		for (int k=mink; k<=maxk; ++k) used1h(i,j,k) = 1;
-	}}
-
-	// ModelE hack: ModelE disregards used1h, it turns on a height point
-	// iff fhc != 0.  So make sure fhc is non-zero everywhere usedhp is set.
-	for (int k=fhc1h.lbound(2); k <= fhc1h.ubound(2); ++k) {
-	for (int j=fhc1h.lbound(1); j <= fhc1h.ubound(1); ++j) {
-	for (int i=fhc1h.lbound(0); i <= fhc1h.ubound(0); ++i) {
-		if (used1h(i,j,k) && (fhc1h(i,j,k) == 0)) fhc1h(i,j,k) = 1e-30;
-	}}}
 }
+// -----------------------------------------------------
 
 extern "C"
 void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api)

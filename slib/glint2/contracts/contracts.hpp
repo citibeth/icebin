@@ -13,7 +13,7 @@ namespace contracts {
 	const unsigned ICE = 2;
 	const unsigned ELEVATION = 3;
 
-	/** Field is returned at initialization time, before the first coupling. */
+	/** This field is returned at initialization time, before the first coupling. */
 	const unsigned INITIAL = 4;
 
 	extern std::string to_str(unsigned int flags);
