@@ -66,11 +66,17 @@ INTERFACE
 		integer(c_int) :: glint2_modele_add_gcm_input
 	end function
 
-	function glint2_modele_gcm_inputs_nhp_ice(api) bind(c)
+	function glint2_modele_nhp_gcm(api) bind(c)
 	use iso_c_binding
 		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_gcm_inputs_nhp_ice
-	end function glint2_modele_gcm_inputs_nhp_ice
+		integer(c_int) :: glint2_modele_nhp_gcm
+	end function glint2_modele_gcm_inputs_nhp
+
+	function glint2_modele_gcm_inputs_nhp(api) bind(c)
+	use iso_c_binding
+		type(c_ptr), value :: api
+		integer(c_int) :: glint2_modele_gcm_inputs_nhp
+	end function glint2_modele_gcm_inputs_nhp
 
 	subroutine glint2_modele_init0(api, &
 		maker_fname_f, maker_fname_len, &
@@ -101,11 +107,11 @@ INTERFACE
 		type(c_ptr) :: api		! NOT VALUE here.
 	end subroutine
 
-	function glint2_modele_nhp(api) bind(c)
+	function glint2_modele_nhp_gcm(api) bind(c)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_nhp
+		integer(c_int) :: glint2_modele_nhp_gcm
 	end function
 
 	subroutine glint2_modele_set_start_time(api, iyear1, itimei, dtsrc) bind(c)
@@ -116,37 +122,29 @@ INTERFACE
 		real(c_double), value :: dtsrc
 	end subroutine
 
-	subroutine glint2_modele_compute_fgice_c(api, &
-		replace_fgice_b, fgice1_glint2_f, &
-		fgice1_f, fgrnd1_f, focean1_f, flake1_f) bind(c)
+	! -------------------------------------------
+	subroutine glint2_modele_get_flice_im_c(api, &
+		flice1_glint2_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
-		integer(c_int), value :: replace_fgice_b
-		type(arr_spec_2) :: fgice1_glint2_f
-		type(arr_spec_2) :: fgice1_f
-		type(arr_spec_2) :: fgrnd1_f
-		type(arr_spec_2) :: focean1_f
-		type(arr_spec_2) :: flake1_f
+		type(arr_spec_2) :: flice1_glint2_f
 	end subroutine
 
-	subroutine glint2_modele_set_fhc_elevhp_c(api, &
-		zatmo1_f, BYGRAV, fgice1_glint2_f, fgice1_f, &
-		used1h_f, fhc1h_f, elev1h_f, &
-		i0, j0, i1, j1) bind(c)
+	subroutine glint2_modele_get_fhc_im_c(api, fhc_im1h_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
-		type(arr_spec_2) :: zatmo1_f
-		real(c_double), value :: BYGRAV
-		type(arr_spec_2) :: fgice1_glint2_f
-		type(arr_spec_2) :: fgice1_f
-		type(arr_spec_3) :: used1h_f
-		type(arr_spec_3) :: fhc1h_f
-		type(arr_spec_3) :: elev1h_f
-		integer(kind=c_int) :: i0, j0, i1, j1
+		type(arr_spec_3) :: fhc_im1h_f
 	end subroutine
 
+	subroutine glint2_modele_get_elevhp_im_c(api, elevhp_im1h_f) bind(c)
+	use iso_c_binding
+	use f90blitz
+		type(c_ptr), value :: api
+		type(arr_spec_3) :: elevhp_im1h_f
+	end subroutine
+	! -------------------------------------------
 	subroutine glint2_modele_init_hp_to_ices(api) bind(c)
 	use iso_c_binding
 	use f90blitz

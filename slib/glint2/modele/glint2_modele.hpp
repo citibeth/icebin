@@ -90,8 +90,7 @@ extern "C" void glint2_modele_set_const(
 configuration, INCLUDING the "legacy" elevation point, which is
 used by ModelE but not Glint2. */
 extern "C"
-void glint2_modele_nhp_gcm(glint2::modele::glint2_modele const *api,
-	int &nhp_ice, int &nhp_gcm);
+int glint2_modele_nhp_gcm(glint2::modele::glint2_modele const *api);
 
 /** Inform Glint2 about a Fortran variable used to hold inputs to the
 GCM (regridded from the ice model output).  This is called from
@@ -134,22 +133,19 @@ extern "C"
 void glint2_modele_set_start_time(glint2::modele::glint2_modele *api,
 	int iyear1, int itimei, double dtsrc);
 
-/** @param replace_fgice_b Should we replace existing fgice1 values with new ones, where the ice sheet overlaps the GCM grid? */
 extern "C"
-void glint2_modele_compute_fgice_c(glint2::modele::glint2_modele *api,
-	int replace_fgice_b,
-	giss::F90Array<double, 2> &fgice1_glint2_f,		// OUT
-	giss::F90Array<double, 2> &fgice1_f,		// IN/OUT
-	giss::F90Array<double, 2> &fgrnd1_f,		// OUT
-	giss::F90Array<double, 2> &focean1_f,
-	giss::F90Array<double, 2> &flake1_f);
+void glint2_modele_get_flice_im_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 2> &flice1_im_f);		// OUT
 
-/** Produces the (dense) FHC_ICE array from the (sparse) hp_to_atm
+/** Produces the (dense) FHC_IM array from the (sparse) hp_to_atm
 coming from raw Glint2. */
 extern "C"
-void glint2_modele_get_fhc_ice_c(glint2::modele::glint2_modele *api,
-	giss::F90Array<double, 3> &fhc_ice1h_f,	// OUT
-	int const i0, int const j0, int const i1, int const j1);		// Array bou
+void glint2_modele_get_fhc_im_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 3> &fhc_im1h_f);	// OUT
+
+extern "C"
+void glint2_modele_get_elevhp_im_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 3> &elev1h_f);	// IN/OUT
 
 extern "C"
 void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api);

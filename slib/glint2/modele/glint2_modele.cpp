@@ -430,16 +430,16 @@ extern "C" void glint2_modele_delete(glint2_modele *&api)
 }
 // -----------------------------------------------------
 extern "C"
-void glint2_modele_nhp_gcm(glint2_modele const *api, int &nhp_ice, int &nhp_gcm)
+int glint2_modele_nhp_gcm(glint2_modele const *api)
 {
-	nhp_ice = api->gcm_coupler.maker->nhp(-1);	// Assume all grid cells have same # EP
+	int nhp_im = api->gcm_coupler.maker->nhp(-1);	// Assume all grid cells have same # EP
 	// HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
     // (not part of GLINT2)
 
-	// "nhp_gcm = nhp_ice+1" is embedded in the code in this compilation
+	// "nhp_gcm = nhp_im+1" is embedded in the code in this compilation
 	// unit.  The first elevation point is skipped in arrays passed from the
 	// GCM because that is a non-ice model elevation point.
-	nhp_gcm = nhp_ice + 1;
+	return nhp_im + 1;
 }
 // -----------------------------------------------------
 /** @return Number of "copies" of the atmosphere grid must be used
@@ -475,7 +475,7 @@ char const *long_name_f, int long_name_len)
 		var_nhp = 1;
 		flags = contracts::ATMOSPHERE;
 	} else if (grid == "ELEVATION") {
-		var_nhp = glint2_modele_nhp(api);
+		var_nhp = glint2_modele_nhp_gcm(api);
 		flags = contracts::ELEVATION;
 	} else {
 		fprintf(stderr, "Unrecognized grid: %s\n", grid.c_str());
@@ -529,15 +529,12 @@ void glint2_modele_set_start_time(glint2_modele *api, int iyear1, int itimei, do
 }
 // -----------------------------------------------------
 extern "C"
-void glint2_modele_compute_fgice_c(glint2_modele *api,
-	int replace_fgice_b,
-	giss::F90Array<double, 2> &fgice1_glint2_f,		// OUT
-	giss::F90Array<double, 2> &fgice1_f)		// OUT
+void glint2_modele_get_flice_im_c(glint2_modele *api,
+	giss::F90Array<double, 2> &flice1_im_f)		// OUT
 {
 
-printf("BEGIN glint2_modele_compute_fgice_c()\n");
-std::cout << "fgice1_f: " << fgice1_f << std::endl;
-std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
+printf("BEGIN glint2_modele_get_flice_im_c()\n");
+std::cout << "flice1_im_f: " << flice1_im_f << std::endl;
 
 	ModelEDomain &domain(*api->domain);
 
@@ -545,12 +542,12 @@ std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
 	// (smallest stride first, whatever-based indexing it came with)
 
 	// Get the sparse vector values
-	giss::VectorSparseVector<int,double> fgice1_s;
-	api->gcm_coupler.maker->fgice(fgice1_s);
+	giss::VectorSparseVector<int,double> flice1_s;
+	api->gcm_coupler.maker->fgice(flice1_s);
 
 	// Translate the sparse vectors to the ModelE data structures
-	std::vector<std::tuple<int, int, double>> fgice1_vals;
-	for (auto ii = fgice1_s.begin(); ii != fgice1_s.end(); ++ii) {
+	std::vector<std::tuple<int, int, double>> flice1_vals;
+	for (auto ii = flice1_s.begin(); ii != flice1_s.end(); ++ii) {
 		int i1 = ii->first;
 
 		// Filter out things not in our domain
@@ -562,66 +559,52 @@ std::cout << "fgice1_glint2_f: " << fgice1_glint2_f << std::endl;
 
 		// Store it away
 		// (we've eliminated duplicates, so += isn't needed, but doesn't hurt either)
-		fgice1_vals.push_back(std::make_tuple(lindex[0], lindex[1], ii->second));
-	}
-
-	// Zero out fgice1, ONLY where we're touching it.
-	auto fgice1(fgice1_f.to_blitz());
-	if (replace_fgice_b != 0) {
-		for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
-			int ix_i = std::get<0>(*ii);
-			int ix_j = std::get<1>(*ii);
-			// double val = std::get<2>(*ii);
-
-			fgice1(ix_i, ix_j) = 0;
-		}
+		flice1_vals.push_back(std::make_tuple(lindex[0], lindex[1], ii->second));
 	}
 
 	// Zero out the GLINT2-only version completely
-	auto fgice1_glint2(fgice1_glint2_f.to_blitz());
-	fgice1_glint2 = 0;
+	auto flice1_im(flice1_im_f.to_blitz());
+	flice1_im = 0;
 
 	// Replace with our values
-	for (auto ii=fgice1_vals.begin(); ii != fgice1_vals.end(); ++ii) {
+	for (auto ii=flice1_vals.begin(); ii != flice1_vals.end(); ++ii) {
 		int ix_i = std::get<0>(*ii);
 		int ix_j = std::get<1>(*ii);
 		double val = std::get<2>(*ii);
 
-		fgice1(ix_i, ix_j) += val;
-		fgice1_glint2(ix_i, ix_j) += val;
+		flice1_im(ix_i, ix_j) += val;
 	}
 	// -----------------------------------------------------
-	// Balance fgice against other landcover types
+	// Balance flice against other landcover types
 //	auto fgrnd1(fgrnd1_f.to_blitz());
 //	auto focean1(focean1_f.to_blitz());
 //	auto flake1(flake1_f.to_blitz());
 // This correction is taken care of in ModelE (for now)
 // See: FLUXES.f alloc_fluxes()
-//	fgrnd1 = 1.0 - focean1 - flake1 - fgice1;
+//	fgrnd1 = 1.0 - focean1 - flake1 - flice1;
 
 #if 0
-NcFile nc("fgice1_1.nc", NcFile::Replace);
-auto fgice1_c(giss::f_to_c(fgice1));
-auto fgice1_glint2_c(giss::f_to_c(fgice1_glint2));
-auto a(giss::netcdf_define(nc, "fgice1", fgice1_c));
-auto b(giss::netcdf_define(nc, "fgice1_glint2", fgice1_glint2_c));
+NcFile nc("flice1_1.nc", NcFile::Replace);
+auto flice1_c(giss::f_to_c(flice1));
+auto flice1_im_c(giss::f_to_c(flice1_im));
+auto a(giss::netcdf_define(nc, "flice1", flice1_c));
+auto b(giss::netcdf_define(nc, "flice1_im", flice1_im_c));
 a();
 b();
 nc.close();
 #endif
 
 	// -----------------------------------------------------
-printf("END glint2_modele_compute_fgice_c()\n");
+printf("END glint2_modele_get_flice_im_c()\n");
 }
 // -----------------------------------------------------
-/** Produces the (dense) FHC_ICE array from the (sparse) hp_to_atm
+/** Produces the (dense) FHC_IM array from the (sparse) hp_to_atm
 coming from rawl Glint2. */
 extern "C"
-void glint2_modele_get_fhc_ice_c(glint2::modele::glint2_modele *api,
-	giss::F90Array<double, 3> &fhc_ice1h_f,	// OUT
-	int const i0, int const j0, int const i1, int const j1)			// Array bou
+void glint2_modele_get_fhc_im_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 3> &fhc_im1h_f)	// OUT
 {
-	auto fhc_ice1h(fhc_ice1h_f.to_blitz());
+	auto fhc_im1h(fhc_im1h_f.to_blitz());
 
 	HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
 	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->gcm_coupler.maker->hp_to_atm());
@@ -649,15 +632,41 @@ void glint2_modele_get_fhc_ice_c(glint2::modele::glint2_modele *api,
 			throw std::exception();
 		}
 
-		// Now fill in FHC_ICE
+		// Now fill in FHC_IM
 		// +1 for C-to-Fortran conversion
-		fhc_ice1h(lindex[0], lindex[1], hp1b+1) += ii.val();
+		fhc_im1h(lindex[0], lindex[1], hp1b+1) += ii.val();
 	}
 	hp_to_atm.release();
 
 }
 // -----------------------------------------------------
+extern "C"
+void glint2_modele_get_elevhp_im_c(glint2::modele::glint2_modele *api,
+	giss::F90Array<double, 3> &elev1h_f)	// IN/OUT
+{
 
+	// =================== elev1h
+	// Just copy out of hpdefs array, elevation points are the same
+	// on all grid cells.
+
+	auto elev1h(elev1h_f.to_blitz());
+	int nhp_im = api->gcm_coupler.maker->nhp(-1);
+	if (nhp_im != elev1h.extent(2)) {
+		fprintf(stderr, "glint2_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp_im);
+		throw std::exception();
+	}
+
+	// Copy 1-D height point definitions to elev1h
+	for (int k=0; k < nhp_im; ++k) {
+		double val = api->gcm_coupler.maker->hpdefs[k];
+		for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
+		for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {
+			// +1 for C-to-Fortran conversion
+			elev1h(i,j,k+1) = val;
+		}}
+	}
+}
+// -----------------------------------------------------
 extern "C"
 void glint2_modele_init_hp_to_ices(glint2::modele::glint2_modele *api)
 {
@@ -893,7 +902,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 	coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
 
 	// Decode the outputs to a dense array for ModelE
-	int nhp = glint2_modele_nhp(api);	// == Glint2's nhp + 1, for legacy ice in ModelE
+	int nhp = glint2_modele_nhp_gcm(api);	// == Glint2's nhp + 1, for legacy ice in ModelE
 	int n1 = api->gcm_coupler.maker->n1();
 
 
