@@ -638,6 +638,11 @@ void glint2_modele_get_fhc_im_c(glint2::modele::glint2_modele *api,
 	}
 	hp_to_atm.release();
 
+
+	// In a perfect world, summing FHC over elevation points will
+	// sum to one.  But in reality, it sums to something else, depending
+	// on size difference between grids on sphere vs. on the plane.
+
 }
 // -----------------------------------------------------
 extern "C"
