@@ -595,6 +595,45 @@ printf("BEGIN MatrixMaker_area1()\n");
 	}
 }
 
+static PyObject *MatrixMaker_flice(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
+{
+printf("BEGIN MatrixMaker_flice()\n");
+	PyObject *ret_py = NULL;
+	try {
+
+		// Get arguments
+		const char *ice_sheet_name_py;
+		static char const *keyword_list[] = {NULL};
+
+		if (!PyArg_ParseTupleAndKeywords(
+			args, kwds, "",
+			const_cast<char **>(keyword_list),
+			&ice_sheet_name_py))
+		{
+			// Throw an exception...
+			PyErr_SetString(PyExc_ValueError,
+				"Bad arguments for flice().");
+			return 0;
+		}
+
+		glint2::MatrixMaker *maker = self->maker.get();
+		giss::VectorSparseVector<int,double> fgice1_s;
+		maker->fgice(fgice1_s);
+
+		blitz::Array<double,1> ret(maker->n1());
+		ret = 0;
+		for (auto ii = fgice1_s.begin(); ii != fgice1_s.end(); ++ii)
+			ret(ii->first) += ii->second;
+
+		ret_py = giss::blitz_to_py(ret);
+		return ret_py;
+	} catch(...) {
+		if (ret_py) Py_DECREF(ret_py);
+		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_ice_to_hp()");
+		return 0;
+	}
+}
+
 static PyObject *MatrixMaker_set_interp_grid(PyMatrixMaker *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *ret_py = NULL;
@@ -769,6 +808,9 @@ static PyMethodDef MatrixMaker_methods[] = {
 		""},
 	{"area1",  (PyCFunction)MatrixMaker_area1, METH_KEYWORDS,
 		""},
+	{"flice", (PyCFunction)MatrixMaker_flice, METH_KEYWORDS,
+		"Compute the FLICE array (fraction of ice-covered land in each\n"
+		"atmosphere grid cell."},
 	{"set_interp_grid",  (PyCFunction)MatrixMaker_set_interp_grid, METH_KEYWORDS,
 		""},
 	{"set_interp_style",  (PyCFunction)MatrixMaker_set_interp_style, METH_KEYWORDS,
