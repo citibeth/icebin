@@ -70,7 +70,7 @@ INTERFACE
 	use iso_c_binding
 		type(c_ptr), value :: api
 		integer(c_int) :: glint2_modele_nhp_gcm
-	end function glint2_modele_gcm_inputs_nhp
+	end function glint2_modele_nhp_gcm
 
 	function glint2_modele_gcm_inputs_nhp(api) bind(c)
 	use iso_c_binding
@@ -106,13 +106,6 @@ INTERFACE
 		use f90blitz
 		type(c_ptr) :: api		! NOT VALUE here.
 	end subroutine
-
-	function glint2_modele_nhp_gcm(api) bind(c)
-		use iso_c_binding
-		use f90blitz
-		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_nhp_gcm
-	end function
 
 	subroutine glint2_modele_set_start_time(api, iyear1, itimei, dtsrc) bind(c)
 		use iso_c_binding
