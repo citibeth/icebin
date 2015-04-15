@@ -175,9 +175,6 @@ printf("\n");
 
 		int row = a.rows()[abegin[ai]];
 		int col = b.cols()[bbegin[bi]];
-if (col == 25120) {
-	printf("************* 25120 ai=%d (%d of %ld) (%d of %ld)\n", ai, bi, bbegin.size(), bbegin[bi], b.cols().size());
-}
 		ret->add(row, col, val);
 	}}
 

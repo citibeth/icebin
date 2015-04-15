@@ -178,8 +178,6 @@ void IceSheet::read_from_netcdf(NcFile &nc, std::string const &vname)
 {
 	clear();
 
-	printf("IceSheet::read_from_netcdf(%s) 1\n", vname.c_str());
-
 	NcVar *info_var = nc.get_var((vname + ".info").c_str());
 	name = giss::get_att(info_var, "name")->as_string(0);
 	std::string sinterp_style(giss::get_att(info_var, "interp_style")->as_string(0));
@@ -194,7 +192,6 @@ void IceSheet::read_from_netcdf(NcFile &nc, std::string const &vname)
 
 	elev2.reference(giss::read_blitz<double,1>(nc, vname + ".elev2"));
 
-	printf("IceSheet::read_from_netcdf(%s) END\n", vname.c_str());
 }
 // ==========================================================
 // ===================================================================
@@ -284,8 +281,6 @@ blitz::Array<double,1> const &elev2,
 blitz::Array<int,1> const *mask1,		// [n1] Shows where we will / will not expect landice
 blitz::Array<int,1> const *mask2)
 {
-	printf("BEGIN bilin_interp(mask1=%p, mask2=%p)\n", mask1, mask2);
-
 	// Check types
 	auto grid1p = dynamic_cast<Grid_LonLat const *>(&grid1_lonlat);
 	if (!grid1p) {
@@ -438,8 +433,6 @@ blitz::Array<int,1> const *mask2)
 			mmat.add_weights(whp[k] * (   ratio_i) * (   ratio_j), nearest_weights[1][1], ihp[k]);
 		}
 	}
-
-	printf("END bilin_interp()\n");
 
 	return std::move(mmat.M);
 }

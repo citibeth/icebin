@@ -41,7 +41,6 @@ public:
 
 void VectorSparseMatrix::sort(SparseMatrix::SortOrder sort_order)
 {
-printf("VectorSparseMatrix::sort(%d, %ld)\n", sort_order, size());
 	// Decide on how we'll sort
 	CmpIndex2 cmp;
 	switch(sort_order) {
@@ -58,8 +57,6 @@ printf("VectorSparseMatrix::sort(%d, %ld)\n", sort_order, size());
 	std::vector<int> perm; perm.reserve(n);
 	for (int i=0; i<n; ++i) perm.push_back(i);
 	std::sort(perm.begin(), perm.end(), cmp);
-
-//for (int i=0; i<100; ++i) printf("%d, ", perm[i]); printf("\n");
 
 	// Apply permutation to val
 	std::vector<double> dtmp; dtmp.reserve(n);
@@ -112,7 +109,6 @@ void VectorSparseMatrix::sum_duplicates(
 	for (int i=1; i<indx.size(); ++i) {
 		int row = indx[perm[i]];
 		int col = jndx[perm[i]];
-//printf("remove_dup: %d %d\n", row, col);
 		if ((row == nindx.back()) && (col == njndx.back())) {
 			nval.back() += val[perm[i]];
 		} else {

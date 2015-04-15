@@ -78,7 +78,7 @@ class GridDomain_Identity : public GridDomain
 public:
 	GridDomain_Identity() : GridDomain(1) 
 	{
-		printf("new GridDomain_Identity()\n");
+		// printf("new GridDomain_Identity()\n");
 	}
 
 	void global_to_local(int gindex_c, int *lindex) const

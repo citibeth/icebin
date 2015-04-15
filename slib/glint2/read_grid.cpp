@@ -35,7 +35,6 @@ std::unique_ptr<Grid> read_grid(NcFile &nc, std::string const &vname)
 	Grid::Type type = giss::parse_enum<Grid::Type>(
 		giss::get_att(info_var, "type")->as_string(0));
 
-printf("read_grid(type=%s)\n", type.str());
 	std::unique_ptr<Grid> grid;
 	switch(type.index()) {
 		case Grid::Type::XY :
