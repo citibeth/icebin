@@ -118,7 +118,7 @@ void Desm::allocate_gcm_input()
 	add_gcm_input_ij("epsilon.enth", "W m-2", 0, "Changes not otherwise accounted for");
 
 	if (api->gcm_coupler.am_i_root()) {
-		int nhp = glint2_modele_nhp(api);
+		int nhp = glint2_modele_nhp_gcm(api);
 		int nhp_total = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
 printf("Allocating gcm_inputs with nhp = %d\n", nhp_total);
 		gcm_inputs.reference(blitz::Array<double,3>(nhp_total,
@@ -236,7 +236,7 @@ int Desm::main(int argc, char **argv)
 	time0_nc->get(&time0_s, &counts1);	// Just get one item
 	int time0_i = (time0_s / dtsrc + .5);	// Also called itime in ModelE
 
-	api = new_glint2_modele();
+	api = new_glint2_modele_c();
 
 	// Read constants from ModelE into Glint2 data structures.
 	// This is in lieu of the "set_all_constants()" code in the standard ModelE coupler.
@@ -288,9 +288,9 @@ int Desm::main(int argc, char **argv)
 	const int nvar = 3;		// # variables to read from file
 	const int nfree = 1;	// # additional variables we make ourselves
 	NcVar *vars_nc[nvar] = {
-		dnc.get_var("lismb"),
-		dnc.get_var("liseb"),
-		dnc.get_var("litg2")};
+		dnc.get_var("massxfer"),
+		dnc.get_var("enthxfer"),
+		dnc.get_var("deltah")};
 
 	// Get dimensions by querying one variable
 	NcVar *var_nc = vars_nc[0];
@@ -302,7 +302,7 @@ int Desm::main(int argc, char **argv)
 	int nhp = counts[1];
 
 	// Allocate arrays (buffers) for one timestep
-	// These are gcm_outputs (lismb, liseb, litg2, lif2)
+	// These are gcm_outputs (massxfer, enthxfer, deltah, lif2)
 	blitz::Array<double, 3> vars_c[nvar+nfree];		// C ordering of dimensions, 0-based
 	blitz::Array<double, 3> vars_f[nvar+nfree];		// Fortran ordering of dimensions, 1-based
 	giss::F90Array<double,3> vars_ff[nvar+nfree];		// Dope vector
@@ -313,14 +313,14 @@ int Desm::main(int argc, char **argv)
 		vars_ff[i] = giss::F90Array<double,3>(vars_f[i]);
 	}
 
-	giss::F90Array<double,3> &lismb_ff(vars_ff[0]);
-	giss::F90Array<double,3> &liseb_ff(vars_ff[1]);
-	giss::F90Array<double,3> &litg2_ff(vars_ff[2]);
+	giss::F90Array<double,3> &massxfer_ff(vars_ff[0]);
+	giss::F90Array<double,3> &enthxfer_ff(vars_ff[1]);
+	giss::F90Array<double,3> &deltah_ff(vars_ff[2]);
 	giss::F90Array<double,3> &lif2_ff(vars_ff[3]);
 
-	blitz::Array<double,3> &lismb_c(vars_c[0]);
-	blitz::Array<double,3> &liseb_c(vars_c[1]);
-	blitz::Array<double,3> &litg2_c(vars_c[2]);
+	blitz::Array<double,3> &massxfer_c(vars_c[0]);
+	blitz::Array<double,3> &enthxfer_c(vars_c[1]);
+	blitz::Array<double,3> &deltah_c(vars_c[2]);
 	blitz::Array<double,3> &lif2_c(vars_c[3]);
 
 	giss::F90Array<double,3> gcm_inputs_f(gcm_inputs);
@@ -378,7 +378,7 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 			}}}
 		}
 
-		// Compute lif2 based on litg2 and input from ice model (via Glint2)
+		// Compute lif2 based on deltah and input from ice model (via Glint2)
 		for (int ihp=0; ihp<counts[1]; ++ihp) {
 		for (int j=0; j<counts[2]; ++j) {
 		for (int i=0; i<counts[3]; ++i) {
@@ -426,7 +426,7 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 			}
 
 			// F2 = (W m-1 K-1) * K * m-1 ==> W m-2    :-)
-			double f2 = ALAMI0 * (litg2_c(ihp,j,i) - tg3) * f2denom;
+			double f2 = ALAMI0 * (deltah_c(ihp,j,i) - tg3) * f2denom;
 
 			lif2_c(ihp,j,i) = f2;
 		}}}
@@ -445,7 +445,7 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 printf("BB2\n");
 
 		// Run the coupling step
-		glint2_modele_couple_to_ice_c(api, end_time_i, lismb_ff, liseb_ff, litg2_ff, lif2_ff, gcm_inputs_f);
+		glint2_modele_couple_to_ice_c(api, end_time_i, massxfer_ff, enthxfer_ff, deltah_ff, gcm_inputs_f);
 
 		// (No need to scatter back to GCM.  But if we did scatter,
 		// we would be doing (in Fortran):
