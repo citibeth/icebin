@@ -808,8 +808,8 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 
 	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
 	std::vector<blitz::Array<double,3>> inputs(gcm_outputs_contract.size_nounit());
-	inputs[gcm_outputs_contract.index("massxfer")].reference(massxfer_f.to_blitz());
-	inputs[gcm_outputs_contract.index("enthxfer")].reference(enthxfer_f.to_blitz());
+	inputs[gcm_outputs_contract.index("massxfer")].reference(massxfer_f.to_blitz());	// [kg m-2 s-1]
+	inputs[gcm_outputs_contract.index("enthxfer")].reference(enthxfer_f.to_blitz());	// [W m-2]
 	inputs[gcm_outputs_contract.index("deltah")].reference(deltah_f.to_blitz());
 
 	if (coupler.gcm_out_file.length() > 0) {

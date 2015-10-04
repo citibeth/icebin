@@ -14,6 +14,7 @@ lib_LTLIBRARIES = libglint2.la
 
 # the sources to add to the library and to add to the source distribution
 libglint2_la_SOURCES = \
+	libglint2_refaddr.cpp \
 	giss/cfnames.cpp \
 	giss/cfnames_data.cpp \
 	giss/geodesy.cpp \
