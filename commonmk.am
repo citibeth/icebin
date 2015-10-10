@@ -2,7 +2,7 @@
 PYTHON_CFLAGS = $(shell $(PYTHON)-config --cflags)
 #PYTHON_LDFLAGS = $(shell $(PYTHON)-config --ldflags)
 
-NUMPY_CFLAGS = $(shell $(PYTHON) -c "import numpy; print '-I' + numpy.get_include()")
+NUMPY_CFLAGS = $(shell $(PYTHON) -c "import numpy; print('-I' + numpy.get_include())")
 
 # additional include pathes necessary to compile the C++ programs
 AM_CXXFLAGS = -g -std=c++11 -I$(top_srcdir)/slib \
