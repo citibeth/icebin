@@ -27,7 +27,7 @@
 //#include <glint2/IceModel_TConv.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
-#include <contracts/contracts.hpp>
+#include <glint2/contracts/contracts.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
@@ -344,7 +344,6 @@ extern "C" void glint2_modele_set_const(
 }
 
 // ---------------------------------------------------
-
 /** Called immediately after glint2_model_set_const...
 @param glint2_config_fname_f Name of GLINT2 configuration file */
 extern "C" void glint2_modele_init0(
@@ -367,14 +366,27 @@ extern "C" void glint2_modele_init0(
 	int write_constants)
 {
 //iyear1=1950;		// Hard-code iyear1 because it hasn't been initialized yet in ModelE
-	printf("***** BEGIN glint2_modele_init0()\n");
+	printf("BEGIN glint2_modele_init0() %p %ld\n",glint2_config_fname_f, glint2_config_fname_len);
 
 	// Convert Fortran arguments
 	std::string glint2_config_fname(glint2_config_fname_f, glint2_config_fname_len);
+printf("AA1\n");
 	std::string maker_vname(maker_vname_f, maker_vname_len);
+printf("AA1\n");
+glint2_config_fname = "./GLINT2";
+printf("AA1 %s\n", glint2_config_fname.c_str());
+
+boost::filesystem::path curpath(boost::filesystem::current_path());
+printf("AAx\n");
+std::cout << "current path " << curpath << std::endl;
 
 	// Parse directory out of glint2_config_fname
-	boost::filesystem::path glint2_config_rfname = boost::filesystem::canonical(glint2_config_fname);
+boost::filesystem::path mypath(glint2_config_fname);
+printf("AA2\n");
+	boost::filesystem::path glint2_config_rfname(boost::filesystem::canonical(mypath));
+
+//	boost::filesystem::path glint2_config_rfname(boost::filesystem::canonical(glint2_config_fname));
+printf("AA2\n");
 printf("glint2_config_rfname = %s\n", glint2_config_rfname.c_str());
 	boost::filesystem::path glint2_config_dir(glint2_config_rfname.parent_path());
 std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;

@@ -27,8 +27,7 @@
 namespace giss {
 
 PyObject *init_module(
-std::string const &module_name,
-std::string const &module_description,
+PyModuleDef &module_def,
 PyMethodDef **function_sets,	// NULL-terminated Array of NULL-terminated arrays
 PyTypeObject **types);			// NULL-terminated Array of type pointers
 

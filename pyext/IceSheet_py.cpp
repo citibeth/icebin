@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Currently not compiled as part of the extension (Oct 2015).
+
 #define NO_IMPORT_ARRAY
 #include "_glint2_module.hpp"
 
@@ -64,7 +66,7 @@ static int IceSheet__init(PyIceSheet *self, PyObject *args, PyObject *kwds)
 	PyObject *mask2_py = NULL;
 
 	if (!PyArg_ParseTuple(args, "ssOO",
-		&grid2_fname_py, &exgrid_fname_py, &elev2_py, &mask2_py)
+	   &grid2_fname_py, &exgrid_fname_py, &elev2_py, &mask2_py))
 	{
 		// Throw an exception...
 		PyErr_SetString(PyExc_ValueError,
@@ -123,8 +125,7 @@ static PyMemberDef IceSheet_members[] = {
 };
 
 PyTypeObject IceSheetType = {
-   PyObject_HEAD_INIT(NULL)
-   0,                         /* ob_size */
+  PyVarObject_HEAD_INIT(NULL, 0)
    "IceSheet",               /* tp_name */
    sizeof(PyIceSheet),     /* tp_basicsize */
    0,                         /* tp_itemsize */

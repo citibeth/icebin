@@ -1,97 +1,120 @@
-# The name of our project is "HELLO". CMakeLists files in this project can
-# refer to the root source directory of the project as ${HELLO_SOURCE_DIR} and
-# to the root binary directory of the project as ${HELLO_BINARY_DIR}.
-cmake_minimum_required (VERSION 2.6)
-project (Glint2)
+cmake_minimum_required(VERSION 3.1)
+project (GLINT2)
 enable_language(Fortran)
-include ("CMake/PISM_CMake_macros.cmake")
-include ("CMake/GLINT2_CMake_macros.cmake")
-list (APPEND CMAKE_MODULE_PATH "${Glint2_SOURCE_DIR}/CMake")
+set(CMAKE_CXX_STANDARD 11)
 
-# ==========================================================
-## http://stackoverflow.com/questions/2210839/conditional-cxx-flags-using-cmake-based-on-compiler
-## Also, special rounding required for CGAL (-frounding-math)
-if (CMAKE_COMPILER_IS_GNUCXX)
-  set ( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -frounding-math"
-	CACHE STRING "g++ Compiler Flags for Debug Builds" FORCE)
-#
-##  set ( CMAKE_CXX_FLAGS_DEBUG "/DEBUG_FLAGS_GO_HERE")
-##  set ( CMAKE_CXX_FLAGS_RELEASE  "/RELEASE_FLAGS_GO_HERE" )
-endif ()
-
-# See:
-## http://cmake.3232098.n2.nabble.com/CMake-rebuilding-too-much-td5611087.html
-#if(CMAKE_COMPILER_IS_GNUCXX AND NOT __CHECKED_CXX_FLAGS)
-#  # this is the guard so we do this only once
-#  set(__CHECKED_CXX_FLAGS TRUE CACHE INTERNAL "Whether we checked the CXX flags already")
-#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -frounding-math "
-#	CACHE STRING "g++ Compiler Flags for Debug Builds" FORCE)
-##	Wall -Woverloaded-virtual -Wno-unknown-pragmas -Werror"
-##      CACHE STRING "Flags used by the compiler during all build types." FORCE)
-##  endif()
-#endif() 
+list (APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+include (setup_rpath)
 
 
+# ------- Process Configure Options
+if (NOT DEFINED USE_PISM)
+	set(USE_PISM NO)
+endif()
+if(${USE_PISM})
+	add_definitions(-DUSE_PISM)
+endif()
 
-# ==========================================================
-set(NETCDF_F77 "YES")
+if (NOT DEFINED USE_PYTHON)
+	set(USE_PYTHON NO)
+endif()
+
+# -------- Find Dependencies
+
+# Used directly by Glint2
+find_package(GALAHAD REQUIRED)		# This should be optional
+find_package(Blitz++ REQUIRED)
+find_package(CGAL REQUIRED)
+find_package(MPFR REQUIRED)		# Used by CGAL
+find_package(MPI REQUIRED)
+
 set(NETCDF_CXX "YES")
-#pism_find_prerequisites()
-glint2_find_prerequisites()
+set(NETCDF_F90 "YES")
+find_package(NetCDF REQUIRED)
 
-message(NETCDF ${NETCDF_LIBRARIES})
+find_package(PROJ4)
+find_package(Boost COMPONENTS filesystem system date_time thread REQUIRED)
+find_package(UDUNITS2 REQUIRED)
 
+# Used by dependencies
+find_package(GMP REQUIRED)
+find_package(GSL REQUIRED)
+find_package(FFTW REQUIRED)
 
-find_package(GALAHAD)
-find_package(Blitz++)
-find_package(GMP)
-find_package(CGAL)
-find_package(Boost COMPONENTS filesystem system date_time)
-
-find_package(PISM)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_PISM"
-	CACHE STRING "g++ Compiler Flags for Debug Builds" FORCE)
-
-
-
-MESSAGE(PISM ${PISM_INCLUDE_DIRS})
-MESSAGE(PISM ${PISM_LIBRARIES})
+find_package(OpenMP REQUIRED)  # Used by GALAHAD, but not in code we run.  We are an MPI shop.
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 
-# ==========================================================
-# See "Always full RPATH"
-# http://www.cmake.org/Wiki/CMake_RPATH_handling#CMake_and_the_RPATH
+if (${USE_PISM})
+	message('------------ Using PISM')
+	find_package(PISM)
+	find_package(PETSC)
+endif()
 
-# use, i.e. don't skip the full RPATH for the build tree
-SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
-
-# when building, don't use the install RPATH already
-# (but later on when installing)
-SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
-
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-
-# add the automatically determined parts of the RPATH
-# which point to directories outside the build tree to the install RPATH
-SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-
-# the RPATH to be used when installing, but only if it's not a system directory
-LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-IF("${isSystemDir}" STREQUAL "-1")
-   SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-ENDIF("${isSystemDir}" STREQUAL "-1")
-# ==========================================================
-
-## Set rpath in the executable to point to the library
-## http://cmake.3232098.n2.nabble.com/Install-an-executable-with-his-libraries-td7199530.html
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib") 
+if (${USE_PYTHON})
+	find_package(Python REQUIRED)
+	find_package(Numpy REQUIRED)
+endif()
 
 
 
-# Recurse into the "Hello" and "Demo" subdirectories. This does not actually
-# cause another cmake executable to run. The same process will walk through
-# the project's entire directory structure.
-add_subdirectory (slib)
-add_subdirectory (sbin)
-add_subdirectory (pyext)
+# Set Pism_EXTERNAL_LIBS and include directories.
+include_directories (
+	${PROJECT_SOURCE_DIR}/slib
+	${Boost_INCLUDE_DIRS}
+    ${NETCDF_INCLUDES} ${NETCDF_INCLUDES_CXX} ${NETCDF_INCLUDES_F77}
+    ${BLITZ++_INCLUDE_DIR}
+    ${GMP_INCLUDE_DIR}
+    ${CGAL_INCLUDE_DIR}
+    ${FFTW_INCLUDE_DIRS}
+    ${FFTW_INCLUDES}
+    ${GSL_INCLUDES}
+    ${UDUNITS2_INCLUDES}
+    ${MPI_C_INCLUDE_PATH}
+
+	${GALAHAD_INCLUDE_DIRS})     # This should be optional
+
+if (${USE_PISM})
+	message(PISM_INCLUDE_DIRS ${PISM_INCLUDE_DIRS})
+	include_directories(
+		${PISM_INCLUDE_DIRS}
+		${PETSC_INCLUDES}
+	)
+endif()
+
+message('zyx' ${GALAHAD_LIBRARIES})
+
+list(APPEND EXTERNAL_LIBS
+	${Boost_LIBRARIES}
+    ${UDUNITS2_LIBRARIES}
+    ${FFTW_LIBRARIES}
+    ${GSL_LIBRARIES}
+
+    ${NETCDF_LIBRARIES}
+    ${MPI_C_LIBRARIES}
+	${GALAHAD_LIBRARIES}
+	${PROJ4_LIBRARIES}
+	${GMP_LIBRARY}
+	${CGAL_LIBRARY}
+	${MPFR_LIBRARIES}
+)
+
+if (${USE_PISM})
+	list(APPEND EXTERNAL_LIBS
+	    ${PETSC_LIBRARIES}
+		${PISM_LIBRARIES}
+	)
+endif()
+
+
+message(EXTERNAL_LIBS "${EXTERNAL_LIBS}")
+
+# -------- Process subdirectories of the build
+add_subdirectory(slib)
+add_subdirectory(sbin)
+
+if(${USE_PYTHON})
+	add_subdirectory(pyext)
+endif()
+

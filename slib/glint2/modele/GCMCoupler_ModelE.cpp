@@ -1,7 +1,7 @@
 #include <mpi.h>		// Intel MPI wants to be first
 #include <giss/memory.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
-#include <contracts/contracts.hpp>
+#include <glint2/contracts/contracts.hpp>
 
 namespace glint2 {
 namespace modele {

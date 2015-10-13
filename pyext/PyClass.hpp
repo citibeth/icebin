@@ -47,7 +47,7 @@ template<class CppT>
 void PyClass<CppT>::dealloc(PyClass<CppT> *self)
 {
 	self->~PyClass<CppT>();
-	self->ob_type->tp_free((PyObject *)self);
+	self->ob_base.ob_type->tp_free((PyObject *)self);
 }
 
 template<class CppT>

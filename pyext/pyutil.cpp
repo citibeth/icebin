@@ -28,8 +28,7 @@ namespace giss {
 
 // ===============================================================
 PyObject *init_module(
-std::string const &module_name,
-std::string const &module_description,
+PyModuleDef &module_def,
 PyMethodDef **function_sets,	// NULL-terminated Array of NULL-terminated arrays
 PyTypeObject **types)			// NULL-terminated Array of type pointers
 {
@@ -56,7 +55,9 @@ PyTypeObject **types)			// NULL-terminated Array of type pointers
 
 
    // ============= Create the module
-   mod = Py_InitModule3(module_name.c_str(), defs, module_description.c_str());
+   module_def.m_methods = defs;
+
+   mod = PyModule_Create(&module_def);
    if (mod == NULL) {
       return NULL;
    }

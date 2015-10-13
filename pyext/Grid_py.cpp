@@ -81,7 +81,7 @@ static int Grid__init(PyGrid *self, PyObject *args, PyObject *kwds)
 static void Grid_dealloc(PyGrid *self)
 {
 	self->~PyGrid();
-	self->ob_type->tp_free((PyObject *)self);
+	self->ob_base.ob_type->tp_free((PyObject *)self);
 }
 
 //static PyMemberDef Grid_members[] = {{NULL}};
@@ -163,8 +163,7 @@ static char *Grid_doc =
 
 
 PyTypeObject GridType = {
-   PyObject_HEAD_INIT(NULL)
-   0,                         /* ob_size */
+   PyVarObject_HEAD_INIT(NULL, 0)	// ob_size
    "Grid",               /* tp_name */
    sizeof(PyGrid),     /* tp_basicsize */
    0,                         /* tp_itemsize */

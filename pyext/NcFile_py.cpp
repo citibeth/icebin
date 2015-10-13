@@ -98,8 +98,7 @@ static PyMemberDef NcFile_members[] = {
 };
 
 PyTypeObject NcFileType = {
-   PyObject_HEAD_INIT(NULL)
-   0,                         /* ob_size */
+  PyVarObject_HEAD_INIT(NULL, 0)
    "NcFile",               /* tp_name */
    sizeof(PyClass<NcFile>),     /* tp_basicsize */
    0,                         /* tp_itemsize */

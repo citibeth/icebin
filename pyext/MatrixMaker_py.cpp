@@ -224,7 +224,7 @@ static PyObject *MatrixMaker_add_ice_sheet(PyMatrixMaker *self, PyObject *args, 
 		sheet->elev2.reference(giss::py_to_blitz<double,1>(elev2_py, "elev2", {n2}));
 		// ====================================================
 		int ice_sheet_num = self->maker->add_ice_sheet(std::move(sheet));
-		return PyInt_FromLong(ice_sheet_num);
+		return PyLong_FromLong(ice_sheet_num);
 	} catch(...) {
 		PyErr_SetString(PyExc_ValueError, "Error in MatrixMaker_add_ice_sheet()");
 		return 0;
@@ -756,7 +756,7 @@ static PyObject *MatrixMaker_load(PyMatrixMaker *self, PyObject *args)
 static void MatrixMaker_dealloc(PyMatrixMaker *self)
 {
 	self->~PyMatrixMaker();
-	self->ob_type->tp_free((PyObject *)self);
+	self->ob_base.ob_type->tp_free((PyObject *)self);
 }
 
 //static PyMemberDef MatrixMaker_members[] = {{NULL}};
@@ -838,8 +838,7 @@ static PyMemberDef MatrixMaker_members[] = {
 };
 
 PyTypeObject MatrixMakerType = {
-   PyObject_HEAD_INIT(NULL)
-   0,                         /* ob_size */
+  PyVarObject_HEAD_INIT(NULL, 0)
    "MatrixMaker",               /* tp_name */
    sizeof(PyMatrixMaker),     /* tp_basicsize */
    0,                         /* tp_itemsize */

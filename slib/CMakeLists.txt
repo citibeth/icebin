@@ -3,9 +3,6 @@
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
 
-# Set Pism_EXTERNAL_LIBS and include directories.
-pism_set_dependencies()
-
 message("XXX0 " ${PROJECT_SOURCE_DIR}/slib)
 message("XXX1 " ${GMP_INCLUDE_DIR})
 message("XXX2 " ${CGAL_INCLUDE_DIR})
@@ -16,10 +13,6 @@ message("XXX8 " ${PETSC_INCLUDES})
 message("XXX9 " ${NETCDF_INCLUDES})
 
 message("PROJECT_SOURCE_DIR " ${PROJECT_SOURCE_DIR})
-
-glint2_set_dependencies()
-
-#	${NETCDF_LIBRARIES} ${NETCDF_LIBRARIES_CXX} ${NETCDF_LIBRARIES_F77}
 
 # -----------------------------------------------------------
 
@@ -77,6 +70,7 @@ set(glint2_SOURCES
 	glint2/pism/MassEnergyBudget.cpp
 	glint2/pism/PISMIceModel.cpp
 	glint2/pism/PSConstantGLINT2.cpp
+	glint2/pism/GLINT2EnthalpyConverter.cpp
 	glint2/read_grid.cpp
 	glint2/read_icemodel.cpp
 	glint2/read_matrixmaker.cpp
@@ -92,8 +86,7 @@ set(glint2_SOURCES
 	galahad/qpt_c.cpp)
 
 add_library (glint2 SHARED ${glint2_SOURCES})
-target_link_libraries(glint2 ${Glint2_EXTERNAL_LIBS})
-
+target_link_libraries(glint2 ${EXTERNAL_LIBS})
 
 install(TARGETS glint2 DESTINATION lib)
 
@@ -104,10 +97,10 @@ install(FILES ${glint2_HEADERS} DESTINATION include)
 # directory structure.)
 
 
-# Set RPATH in the installed library
-# http://www.cmake.org/pipermail/cmake/2010-February/035157.html
-set_target_properties(glint2 PROPERTIES
-	INSTALL_RPATH_USE_LINK_PATH TRUE)
+## Set RPATH in the installed library
+## http://www.cmake.org/pipermail/cmake/2010-February/035157.html
+#set_target_properties(glint2 PROPERTIES
+#	INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # ---------------------------------------------
 

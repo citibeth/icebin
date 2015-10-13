@@ -49,20 +49,46 @@ static PyTypeObject *glint2_types[] = {
 };
 
 // ===========================================================================
+// Ported to Python3
+// https://docs.python.org/3/howto/cporting.html
 
-extern "C"
-void init_glint2(void)
+
+struct module_state {
+    PyObject *error;
+};
+#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
+
+static int glint2Traverse(PyObject *m, visitproc visit, void *arg) {
+    Py_VISIT(GETSTATE(m)->error);
+    return 0;
+}
+
+static int glint2Clear(PyObject *m) {
+    Py_CLEAR(GETSTATE(m)->error);
+    return 0;
+}
+
+static PyModuleDef glint2ModuleDef = {
+	PyModuleDef_HEAD_INIT,
+	"_glint2",
+	"Interface to C++ GLINT2 Library",
+	sizeof(struct module_state),
+	NULL,
+	NULL,
+	glint2Traverse,
+	glint2Clear,
+	NULL
+};
+
+// ===========================================================================
+
+static int init_numpy()
 {
-	giss::init_module("_glint2",
-		"Interface to C++ GLINT2 Library",
-		glint2_function_sets, glint2_types);
-
-
 	/* See http://dsnra.jpl.nasa.gov/software/Python/numpydoc/numpy-13.html
 
 	In addition to including arrayobject.h , the extension must call
 	import_array() in its initialization function, after the call to
-	Py_InitModule() . This call makes sure that the module which
+	Py_InitModule() . This call makes sure that the module that
 	implements the array type has been imported, and initializes a pointer
 	array through which the NumPy functions are called. If you forget this
 	call, your extension module will crash on the first call to a NumPy
@@ -70,3 +96,18 @@ void init_glint2(void)
 
 	import_array();
 }
+
+extern "C"
+PyObject *PyInit__glint2(void)
+{
+	printf("BEGIN PyInit__glint2\n");
+
+	PyObject *mod = giss::init_module(glint2ModuleDef,
+		glint2_function_sets, glint2_types);
+
+//	init_numpy();
+
+	printf("END PyInit__glint2\n");
+	return (PyObject *)mod;
+}
+
