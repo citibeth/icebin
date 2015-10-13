@@ -1,6 +1,8 @@
 #!/bin/sh
 #
 
+This is an old GNU Autotools script.  Needs to be converted to CMake.
+
 HOME_OPT=/gpfsm/dnb32/ccruz/devel/GLINT2/libraries
 
 DEST_PREFIX=$HOME_OPT/glint2
