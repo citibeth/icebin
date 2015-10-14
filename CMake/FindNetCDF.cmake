@@ -25,13 +25,24 @@
 #  target_link_libraries (uses_f90_interface ${NETCDF_LIBRARIES})
 #  target_link_libraries (only_uses_c_interface ${NETCDF_LIBRARIES_C})
 
+FUNCTION(ADDSUFFIX var suffix)
+   SET(listVar "")
+   FOREACH(f ${ARGN})
+      LIST(APPEND listVar "${f}${suffix}")
+   ENDFOREACH(f)
+   SET(${var} "${listVar}" PARENT_SCOPE)
+ENDFUNCTION(ADDSUFFIX)
+
+ADDSUFFIX(NETCDF_ROOTS_INCLUDE /include ${NETCDF_ROOTS})
+ADDSUFFIX(NETCDF_ROOTS_LIB /lib ${NETCDF_ROOTS})
+
 if (NETCDF_INCLUDES AND NETCDF_LIBRARIES)
   # Already in cache, be silent
   set (NETCDF_FIND_QUIETLY TRUE)
 endif (NETCDF_INCLUDES AND NETCDF_LIBRARIES)
 
 find_path (NETCDF_INCLUDES netcdf.h
-  HINTS "${NETCDF_ROOT}/include" "$ENV{NETCDF_ROOT}/include")
+  HINTS ${NETCDF_ROOTS_INCLUDE})
 
 string(REGEX REPLACE "/include/?$" "/lib"
   NETCDF_LIB_HINT ${NETCDF_INCLUDES})
@@ -62,16 +73,16 @@ if ((NOT NETCDF_LIBRARIES_C) OR (NOT NETCDF_INCLUDES))
 endif()
 
 set (NetCDF_has_interfaces "YES") # will be set to NO if we're missing any interfaces
-set (NetCDF_libs "${NETCDF_LIBRARIES_C}")
+set (NetCDF_libs ${NETCDF_LIBRARIES_C})
 
 get_filename_component (NetCDF_lib_dirs "${NETCDF_LIBRARIES_C}" PATH)
 
 macro (NetCDF_check_interface lang header libs)
   if (NETCDF_${lang})
     find_path (NETCDF_INCLUDES_${lang} NAMES ${header}
-      HINTS "${NETCDF_INCLUDES}" NO_DEFAULT_PATH)
+      HINTS ${NETCDF_ROOTS_INCLUDE} NO_DEFAULT_PATH)
     find_library (NETCDF_LIBRARIES_${lang} NAMES ${libs}
-      HINTS "${NetCDF_lib_dirs}" NO_DEFAULT_PATH)
+      HINTS ${NETCDF_ROOTS_LIB} NO_DEFAULT_PATH)
     mark_as_advanced (NETCDF_INCLUDES_${lang} NETCDF_LIBRARIES_${lang})
     if (NETCDF_INCLUDES_${lang} AND NETCDF_LIBRARIES_${lang})
       list (INSERT NetCDF_libs 0 ${NETCDF_LIBRARIES_${lang}}) # prepend so that -lnetcdf is last
@@ -87,6 +98,7 @@ NetCDF_check_interface (F77 netcdf.inc  netcdff)
 NetCDF_check_interface (F90 netcdf.mod  netcdff)
 
 set (NETCDF_LIBRARIES "${NetCDF_libs}" CACHE STRING "All NetCDF libraries required for interface level")
+
 
 # handle the QUIETLY and REQUIRED arguments and set NETCDF_FOUND to TRUE if
 # all listed variables are TRUE
