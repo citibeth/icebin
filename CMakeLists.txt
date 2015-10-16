@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD 11)
 list (APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include (setup_rpath)
 
-
 # ------- Process Configure Options
 if (NOT DEFINED USE_PISM)
 	set(USE_PISM NO)
