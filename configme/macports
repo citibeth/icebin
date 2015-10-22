@@ -7,12 +7,13 @@ MACPORTS=$HOME/macports/gcc49-python3
 
 #	-DBOOST_ROOT=$HOME/opt/boost-1.55.0 \
 
+export CMAKE_CXX_FLAGS='-g'
+
 cmake \
 	-DUSE_PYTHON=YES \
-	-DCMAKE_CXX_COMPILER=g++ \
-	-DCMAKE_C_COMPILER=gcc \
-	-DCMAKE_Fortran_COMPILER=gfortran \
-	-DCMAKE_CXX_FLAGS="-Wl,-rpath" \
+	-DCMAKE_CXX_COMPILER=g++ -DCMAKE_CXX_FLAGS="-g" \
+	-DCMAKE_C_COMPILER=gcc -DCMAKE_C_FLAGS="-g" \
+	-DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_FORTRAN_FLAGS="-g" \
 	-DCMAKE_INSTALL_PREFIX:PATH=$MACPORTS/opt/glint2 \
 	-DPETSC_DIR=$MACPORTS/opt/petsc-3.4.4 \
 	-DPETSC_ARCH=arch-darwin-c-debug \
@@ -29,6 +30,8 @@ cmake \
 	-DGALAHAD_ROOT=$MACPORTS/opt/galahad \
 	-DGALAHAD_ARCH=mac64.osx.gfo \
 	$@
+
+#	-DCMAKE_CXX_FLAGS="-g -Wl,-rpath" \
 
 #cmake -DCMAKE_C_COMPILER=$MPI_ROOT/bin/mpicc $@
 

@@ -32,12 +32,14 @@ const double EQ_RAD = 6.371e6; /// Radius of the Earth (same as in ModelE)
 
 int main(int argc, char **argv)
 {
+	boost::filesystem::path exe_path(argv[0]);
 	printf("------------- Set up GCM Grid\n");
 
 	Grid_LonLat grid;
-	glint2::modele::set_lonlat_4x5(grid);
-	grid.name = "greenland_4x5";
-	grid.points_in_side = 4;
+	glint2::modele::set_lonlat_2x2_5(grid);
+	grid.name = exe_path.stem().string();
+//	grid.points_in_side = 4;
+	grid.points_in_side = 2;	// Use 2 for comparison with past experiments
 	grid.eq_rad = EQ_RAD;
 	grid.realize(boost::bind(
 		&SphericalClip::lonlat, -74., 59., -10., 87.5,
@@ -48,7 +50,6 @@ int main(int argc, char **argv)
 	// ------------- Write it out to NetCDF
 	fflush(stdout);
 	printf("// ------------- Write it out to NetCDF\n");
-	boost::filesystem::path exe_path(argv[0]);
-	grid.to_netcdf(exe_path.stem().string() + ".nc");
-//	grid.to_netcdf("greenland_4x5.nc");
+	grid.to_netcdf(grid.name + ".nc");
+//	grid.to_netcdf("greenland_2x2_5.nc");
 }

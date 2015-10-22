@@ -21,6 +21,7 @@ message("PROJECT_SOURCE_DIR " ${PROJECT_SOURCE_DIR})
 # The extension is already found. Any number of sources could be listed here.
 
 set(glint2_SOURCES 
+	libglint2_refaddr.cpp
 	galahad/qpt_c.cpp
 	galahad/zd11_c.cpp
 	giss/DynamicEnum.cpp
@@ -91,16 +92,8 @@ target_link_libraries(glint2 ${EXTERNAL_LIBS})
 install(TARGETS glint2 DESTINATION lib)
 
 # install Glint2 headers
-file(GLOB_RECURSE glint2_HEADERS "*.hpp")
-install(FILES ${glint2_HEADERS} DESTINATION include)
-# (Consider using "install(DIRECTORY ...)" if you want to preserve
-# directory structure.)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/slib/ DESTINATION include
+          FILES_MATCHING PATTERN "*.hpp")
 
-
-## Set RPATH in the installed library
-## http://www.cmake.org/pipermail/cmake/2010-February/035157.html
-#set_target_properties(glint2 PROPERTIES
-#	INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-# ---------------------------------------------
-
+install(DIRECTORY ${PROJECT_BINARY_DIR}/slib/ DESTINATION include
+          FILES_MATCHING PATTERN "*.mod")

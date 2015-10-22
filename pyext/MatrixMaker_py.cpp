@@ -765,7 +765,7 @@ static void MatrixMaker_dealloc(PyMatrixMaker *self)
 
 static PyMethodDef MatrixMaker_methods[] = {
 
-	{"init", (PyCFunction)MatrixMaker_init, METH_KEYWORDS,
+	{"init", (PyCFunction)MatrixMaker_init, METH_KEYWORDS|METH_VARARGS,
 		"Function used to contruct a MatrixMaker from scratch\n"
 		"(rather than loading from a file.)\n"
 		"\n"
@@ -792,28 +792,28 @@ static PyMethodDef MatrixMaker_methods[] = {
 	}
 ,
 
-	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS,
+	{"add_ice_sheet", (PyCFunction)MatrixMaker_add_ice_sheet, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"hp_to_iceinterp", (PyCFunction)MatrixMaker_hp_to_iceinterp, METH_KEYWORDS,
+	{"hp_to_iceinterp", (PyCFunction)MatrixMaker_hp_to_iceinterp, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"hp_to_atm", (PyCFunction)MatrixMaker_hp_to_atm, METH_KEYWORDS,
+	{"hp_to_atm", (PyCFunction)MatrixMaker_hp_to_atm, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"atm_to_hp", (PyCFunction)MatrixMaker_atm_to_hp, METH_KEYWORDS,
+	{"atm_to_hp", (PyCFunction)MatrixMaker_atm_to_hp, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"iceinterp_to_atm", (PyCFunction)MatrixMaker_iceinterp_to_atm, METH_KEYWORDS,
+	{"iceinterp_to_atm", (PyCFunction)MatrixMaker_iceinterp_to_atm, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"iceinterp_to_hp", (PyCFunction)MatrixMaker_iceinterp_to_hp, METH_KEYWORDS,
+	{"iceinterp_to_hp", (PyCFunction)MatrixMaker_iceinterp_to_hp, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"ice_to_interp", (PyCFunction)MatrixMaker_ice_to_interp, METH_KEYWORDS,
+	{"ice_to_interp", (PyCFunction)MatrixMaker_ice_to_interp, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"area1",  (PyCFunction)MatrixMaker_area1, METH_KEYWORDS,
+	{"area1",  (PyCFunction)MatrixMaker_area1, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"flice", (PyCFunction)MatrixMaker_flice, METH_KEYWORDS,
+	{"flice", (PyCFunction)MatrixMaker_flice, METH_KEYWORDS|METH_VARARGS,
 		"Compute the FLICE array (fraction of ice-covered land in each\n"
 		"atmosphere grid cell."},
-	{"set_interp_grid",  (PyCFunction)MatrixMaker_set_interp_grid, METH_KEYWORDS,
+	{"set_interp_grid",  (PyCFunction)MatrixMaker_set_interp_grid, METH_KEYWORDS|METH_VARARGS,
 		""},
-	{"set_interp_style",  (PyCFunction)MatrixMaker_set_interp_style, METH_KEYWORDS,
+	{"set_interp_style",  (PyCFunction)MatrixMaker_set_interp_style, METH_KEYWORDS|METH_VARARGS,
 		""},
 	{"set_mask1",  (PyCFunction)MatrixMaker_set_mask1, METH_VARARGS,
 		""},

@@ -36,7 +36,7 @@ struct CoupledField : public giss::VarMetaData {
 };
 
 inline std::ostream &operator<<(std::ostream &out, CoupledField const &cf)
-	{ return out << "(" << cf.name << ": " << cf.units << " [" << cf.flags << "])"; } 
+	{ return out << "(" << cf.name << ": [" << cf.units << "] flags:" << cf.flags << ")"; } 
 
 
 

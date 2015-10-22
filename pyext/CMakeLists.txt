@@ -45,7 +45,7 @@ install(FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/glint2/__init__.py
 	${CMAKE_CURRENT_SOURCE_DIR}/glint2/cext.py
 	${CMAKE_CURRENT_SOURCE_DIR}/glint2/Grid.py
-	${CMAKE_CURRENT_SOURCE_DIR}/glint2/overlap.py
+	${CMAKE_CURRENT_SOURCE_DIR}/glint2/io.py
 		DESTINATION ${PY_SYSCONFIG_PURELIB}/glint2)
 
 

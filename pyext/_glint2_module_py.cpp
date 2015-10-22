@@ -17,7 +17,9 @@
  */
 
 #include "_glint2_module.hpp"
+#include <libglint2_refaddr.hpp>
 
+#include <cstdio>
 #include <vector>
 #include <cmath>
 #include "pyutil.hpp"
@@ -81,9 +83,22 @@ static PyModuleDef glint2ModuleDef = {
 };
 
 // ===========================================================================
-
-static int init_numpy()
+extern "C" void _glint2_refaddr(void)
 {
+	fprintf(stderr, "REFERNCE_ADDRESS _glint2_refaddr %p\n", _glint2_refaddr);
+	fflush(stderr);
+}
+
+extern "C"
+PyObject *PyInit__glint2(void)
+{
+//	libglint2_refaddr();
+//	_glint2_refaddr();
+//	libglint2_ncerror_segfault();
+
+	PyObject *mod = giss::init_module(glint2ModuleDef,
+		glint2_function_sets, glint2_types);
+
 	/* See http://dsnra.jpl.nasa.gov/software/Python/numpydoc/numpy-13.html
 
 	In addition to including arrayobject.h , the extension must call
@@ -93,21 +108,8 @@ static int init_numpy()
 	array through which the NumPy functions are called. If you forget this
 	call, your extension module will crash on the first call to a NumPy
 	function. */
-
 	import_array();
-}
 
-extern "C"
-PyObject *PyInit__glint2(void)
-{
-	printf("BEGIN PyInit__glint2\n");
-
-	PyObject *mod = giss::init_module(glint2ModuleDef,
-		glint2_function_sets, glint2_types);
-
-//	init_numpy();
-
-	printf("END PyInit__glint2\n");
 	return (PyObject *)mod;
 }
 

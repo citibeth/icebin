@@ -42,12 +42,12 @@ int main(int argc, char **argv)
 		proj_lon_0, proj_lat_0);
 
 
-	printf("------------- Read grid1\n");
+	printf("------------- Read grid1 (GCM Grid)\n");
 	NcFile nc1(fname1.c_str());
 	auto grid1(glint2::read_grid(nc1, "grid"));
 	nc1.close();
 
-	printf("------------- Read grid2\n");
+	printf("------------- Read grid2 (Ice Grid)\n");
 	NcFile nc2(fname2.c_str());
 	auto grid2(glint2::read_grid(nc2, "grid"));
 	nc2.close();
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 	ExchangeGrid exch(*grid1, *grid2);
 	exch.sort_renumber_vertices();
 
-	printf("--------------- Writing Out\n");
+	printf("--------------- Writing out\n");
 	std::string fname = grid1->name + "-" + grid2->name + ".nc";
 //	NcFile nc(fname.c_str(), NcFile::Replace);
 	exch.to_netcdf(fname);

@@ -30,7 +30,7 @@ void GCMCoupler::read_from_netcdf(
 	std::string const &vname,
 	std::unique_ptr<GridDomain> &&mdomain)
 {
-	printf("BEGIN GCMCoupler::read_from_netcdf()\n");
+	printf("BEGIN GCMCoupler::read_from_netcdf() %s\n", vname.c_str());
 
 	NcFile nc(fname.c_str(), NcFile::ReadOnly);
 
