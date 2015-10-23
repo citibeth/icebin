@@ -16,7 +16,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cstdio>
 #include <glint2/util.hpp>
+
+#ifdef __GNUC__
+#include <execinfo.h>
+// http://stackoverflow.com/questions/9053658/correct-format-specifier-to-print-pointer-address
+#include <inttypes.h>		// C-99
+#include <cstdlib>
+#endif
 
 namespace giss {
 
@@ -36,9 +44,23 @@ void exit_segfault(int errcode)
 
 void exit_stacktrace(int errcode)
 {
+	const int MAX_TRACE = 200;
+	void *trace[MAX_TRACE];
+
+	fprintf(stderr, "User stacktrace:\n");
+
+	size_t ntrace = backtrace(trace, MAX_TRACE);
+
+	for (size_t i=0; i<ntrace; ++i) {
+		fprintf(stderr, "#%d 0x%lx\n", i, (uintptr_t)(trace[i]));
+	}
+
+	throw std::exception();
 }
+	std::function<void(int)> exit(&exit_stacktrace);
+#else
+	std::function<void(int)> exit(&exit_exception);
 #endif
 
-std::function<void(int)> exit(&exit_segfault);
 
 }
