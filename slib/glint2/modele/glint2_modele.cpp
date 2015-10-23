@@ -370,15 +370,8 @@ extern "C" void glint2_modele_init0(
 
 	// Convert Fortran arguments
 	std::string glint2_config_fname(glint2_config_fname_f, glint2_config_fname_len);
-printf("AA1\n");
 	std::string maker_vname(maker_vname_f, maker_vname_len);
-printf("AA1\n");
 glint2_config_fname = "./GLINT2";
-printf("AA1 %s\n", glint2_config_fname.c_str());
-
-boost::filesystem::path curpath(boost::filesystem::current_path());
-printf("AAx\n");
-std::cout << "current path " << curpath << std::endl;
 
 	// Parse directory out of glint2_config_fname
 boost::filesystem::path mypath(glint2_config_fname);
@@ -386,8 +379,6 @@ printf("AA2\n");
 	boost::filesystem::path glint2_config_rfname(boost::filesystem::canonical(mypath));
 
 //	boost::filesystem::path glint2_config_rfname(boost::filesystem::canonical(glint2_config_fname));
-printf("AA2\n");
-printf("glint2_config_rfname = %s\n", glint2_config_rfname.c_str());
 	boost::filesystem::path glint2_config_dir(glint2_config_rfname.parent_path());
 std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 

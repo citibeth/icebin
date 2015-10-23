@@ -233,6 +233,7 @@ void IceModel_PISM::start_time_set()
 	}
 }
 
+// Called from start_time_set().
 PetscErrorCode IceModel_PISM::allocate()
 {
 	// Convert PISM arguments to old C style
