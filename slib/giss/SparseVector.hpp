@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <blitz/array.h>
 #include <giss/sort.hpp>
+#include <giss/exit.hpp>
 
 namespace giss{
 
@@ -217,7 +218,7 @@ public :
 		auto ii(vals.find(index));
 		if (ii == vals.end()) {
 			std::cout << "SparseAccumulator[" << index << "] doesn't exist" << std::endl;
-			throw std::exception();
+			giss::exit(1);
 		}
 		return ii->second;
 	}
@@ -226,7 +227,7 @@ public :
 	exception if the index does not exist. */
 	ValT const &operator[](IndexT const &index) const {
  		auto ii(vals.find(index));
- 		if (ii == vals.end()) throw std::exception();
+ 		if (ii == vals.end()) giss::exit(1);
 		return ii->second;
 	}
 #endif

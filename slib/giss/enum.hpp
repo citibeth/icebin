@@ -19,6 +19,7 @@
 #pragma once
 
 #include <boost/enum.hpp>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -27,7 +28,7 @@ inline T parse_enum(char const *str) {
 	auto ret = T::get_by_name(str);
 	if (!ret) {
 		fprintf(stderr, "Error converting from string '%s' for boost::enum type %s\n", str, typeid(T).name());
-		throw std::exception();
+		giss::exit(1);
 	}
 	return *ret;
 }

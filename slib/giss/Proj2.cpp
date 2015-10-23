@@ -18,6 +18,7 @@
 
 #include <giss/Proj2.hpp>
 #include <giss/ncutil.hpp>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -97,7 +98,7 @@ std::string const &vname)
 		std::string sdir(std::string(get_att(info_var, (vname + ".direction").c_str())->as_string(0)));
 		if (sdir == "xy2ll") direction = Direction::XY2LL;
 		else if (sdir == "ll2xy") direction = Direction::LL2XY;
-		else throw std::exception();
+		else giss::exit(1);
 	}
 }
 

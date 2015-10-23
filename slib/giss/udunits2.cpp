@@ -2,6 +2,7 @@
 #include <cstring>
 #include <exception>
 #include <giss/udunits2.hpp>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -36,7 +37,7 @@ namespace giss {
 				fprintf(stderr, "UTUnit::get_unit_by_name(): Unknown error\n");
 			break;
 		}
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	UTUnit UTSystem::get_unit_by_symbol(std::string const &symbol) const
@@ -55,7 +56,7 @@ namespace giss {
 				fprintf(stderr, "UTSystem::get_unit_by_system(): Unknown error\n");
 			break;
 		}
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	UTUnit UTSystem::get_dimensionless_unit_one() const
@@ -87,7 +88,7 @@ namespace giss {
 				fprintf(stderr, "UTSystem::parse(): Unknown error\n");
 			break;
 		}
-		throw std::exception();
+		giss::exit(1);
 
 	}
 
@@ -110,7 +111,7 @@ namespace giss {
 			default :
 				fprintf(stderr, "CVConverter(%s -> %s): Unknown problem\n", from.c_str(), to.c_str()); break;
 		}
-		throw std::exception();
+		giss::exit(1);
 
 	}
 

@@ -49,7 +49,7 @@ blitz::Array<double, 2> multiply(blitz::Array<double, 2> const &aa, blitz::Array
 	int ni = aa.extent(0);
 	int nk = bb.extent(1);
 	int nj = aa.extent(1);
-	if (nj != bb.extent(0)) throw std::exception();
+	if (nj != bb.extent(0)) giss::exit(1);
 
 	blitz::Array<double,2> cc(ni,nk);
 	for (int i=0; i<ni; ++i) {

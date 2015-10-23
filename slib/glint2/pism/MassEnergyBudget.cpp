@@ -1,5 +1,6 @@
 #include <iostream>
 #include <glint2/pism/MassEnergyBudget.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2{
 namespace gpism{
@@ -43,7 +44,7 @@ PetscErrorCode MassEnergyBudget::create(pism::IceGrid &grid, std::string const &
 
 	if (all_vecs.size() != 0) {
 		fprintf(stderr, "MassEnergyBudget::create() cannot be called twice, fix your code!\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 printf("MassEnergyBudget(%p)::create()\n", this);

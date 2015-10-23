@@ -96,7 +96,7 @@ int N_ndim)
 		sprintf(buf, "check_dimensions(%s): Number of template dimensions (%d) must match number of array dimensions (%d)", vname.c_str(), N_ndim, ndim);
 		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Check that it's not null
@@ -104,7 +104,7 @@ int N_ndim)
 		std::string serr = "check_dimensions: Array object " + vname + " is null";
 		fprintf(stderr, "%s\n", serr.c_str());
 		PyErr_SetString(PyExc_ValueError, serr.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Check that it's type PyArrayObject
@@ -113,7 +113,7 @@ int N_ndim)
 		fprintf(stderr, "%s\n", serr.c_str());
 		PyErr_SetString(PyExc_ValueError,
 			serr.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 	PyArrayObject *vec = (PyArrayObject *)ovec;
 
@@ -123,7 +123,7 @@ int N_ndim)
 		sprintf(buf, "check_dimensions: %s must be of type_num %d and %d dimensions (its is of type_num=%d and %d dimensions).", vname.c_str(), type_num, ndim, vec->descr->type_num, vec->nd);
 		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Check the dimensions themselves
@@ -136,7 +136,7 @@ int N_ndim)
 				vname.c_str(), i, vec->dimensions[i], dims[i]);
 			fprintf(stderr, "%s\n", buf);
 			PyErr_SetString(PyExc_ValueError, buf);
-			throw std::exception();
+			giss::exit(1);
 		}
 	}
 	return vec;
@@ -177,7 +177,7 @@ PyObject *VectorSparseMatrix_to_py(VectorSparseMatrix const &mat)
 		if (rows_py) Py_DECREF(rows_py);
 		if (cols_py) Py_DECREF(cols_py);
 		if (data_py) Py_DECREF(data_py);
-		throw std::exception();
+		giss::exit(1);
 	}
 }
 
@@ -200,7 +200,7 @@ VectorSparseMatrix py_to_VectorSparseMatrix(PyObject *m_tuple, std::string const
 		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
 
-		throw std::exception();
+		giss::exit(1);
 	}
 printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, ncol, rows_py, cols_py, data_py);
 
@@ -233,7 +233,7 @@ giss::BlitzSparseMatrix py_to_BlitzSparseMatrix(PyObject *m_tuple, std::string c
 		fprintf(stderr, "%s\n", buf);
 		PyErr_SetString(PyExc_ValueError, buf);
 
-		throw std::exception();
+		giss::exit(1);
 	}
 //printf("pyutil: nrow=%d, ncol=%d, rows_py=%p, cols_py=%p, data_py=%p\n", nrow, ncol, rows_py, cols_py, data_py);
 

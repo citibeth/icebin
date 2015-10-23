@@ -17,6 +17,7 @@
  */
 
 #include <glint2/GridDomain.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -31,14 +32,14 @@ void GridDomain::global_to_local(
 {
 	if (olocal.size() != this->num_local_indices) {
 		fprintf(stderr, "MatrixDomainer::get_rows() had bad dimension 1 = %d (expected %ld)\n", olocal.extent(1), this->num_local_indices);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	for (auto ii = olocal.begin(); ii != olocal.end(); ++ii) {
 		// Make sure it has the right dimensions
 		if (olocal[i].extent(0) != global.extent(0)) {
 			fprintf(stderr, "MatrixDomainer::get_rows() had bad dimension 0 = %d (expected %ld)\n", olocal.extent(0), global.extent(0));
-			throw std::exception();
+			giss::exit(1);
 		}
 	}
 
@@ -76,7 +77,7 @@ std::unique_ptr<giss::VectorSparseMatrix> filter_matrix(
 			fprintf(stderr, "Error filtering matrix: grid cell %d (", ii.col());
 			for (int i=0; i<domain2.num_local_indices; ++i) fprintf(stderr, "%d ", lindex2[i]);
 			fprintf(stderr, ") in input (column) is not available in the halo.\n");
-			throw std::exception();
+			giss::exit(1);
 		}
 
 		ret->add(ii.row(), ii.col(), ii.val());

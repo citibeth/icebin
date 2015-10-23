@@ -35,6 +35,7 @@ set(glint2_SOURCES
 	giss/ncutil.cpp
 	giss/sparsemult.cpp
 	giss/udunits2.cpp
+	giss/exit.cpp
 	giss/VarTransformer.cpp
 	glint2/contracts/contracts.cpp
 	glint2/contracts/modele_pism.cpp

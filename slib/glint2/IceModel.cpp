@@ -2,6 +2,7 @@
 #include <glint2/IceModel.hpp>
 #include <glint2/IceModel_Writer.hpp>
 #include <glint2/GCMCoupler.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -12,6 +13,14 @@ IceModel::IceModel(IceModel::Type _type, std::string const &_name, GCMCoupler co
 }
 
 IceModel::~IceModel() {}
+
+// GCM-specific methods used to set up the contract for
+// a particular GCM-IceModel pair
+void IceModel::setup_contracts_modele()
+{
+	fprintf(stderr, "Error: setup_contracts_modele() not implemented for IceModel type %s\n", type.str());
+	giss::exit(1);
+}
 
 
 void IceModel::set_writers(
@@ -40,11 +49,11 @@ void IceModel::allocate_ice_ovals_I()
 	// Check for program errors
 	if (!coupler->am_i_root()) {
 		fprintf(stderr, "IceModel::allocate_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 	if (ice_ovals_I.size() != 0) {
 		fprintf(stderr, "[%d] IceModel::allocate_ice_ovals_I(): called twice without a free() inbetween.  Fix the code. (old size is %ld)\n", coupler->gcm_params.gcm_rank, ice_ovals_I.size());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Allocate for direct output from ice model
@@ -64,11 +73,11 @@ void IceModel::allocate_gcm_ivals_I()
 	// Check for program errors
 	if (!coupler->am_i_root()) {
 		fprintf(stderr, "IceModel::allocate_ice_ivals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 	if (gcm_ivals_I.size() != 0) {
 		fprintf(stderr, "IceModel::allocate_gcm_ivals_I(): called twice without a free() inbetween.  Fix the code.\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	giss::CouplingContract const &gcm_inputs(coupler->gcm_inputs);
@@ -88,7 +97,7 @@ void IceModel::free_ice_ovals_I()
 	// Check for program errors
 	if (!coupler->am_i_root()) {
 		fprintf(stderr, "IceModel::free_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	ice_ovals_I.clear();
@@ -100,7 +109,7 @@ void IceModel::free_ovals_ivals_I()
 	// Check for program errors
 	if (!coupler->am_i_root()) {
 		fprintf(stderr, "IceModel::free_ovals_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	ice_ovals_I.clear();

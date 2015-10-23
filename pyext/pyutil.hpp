@@ -23,6 +23,7 @@
 #include <exception>
 #include <blitz/array.h>
 #include <giss/SparseMatrix.hpp>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -39,7 +40,7 @@ template<class T>
 inline int get_type_num()
 {
 	PyErr_SetString(PyExc_ValueError, "get_type_num(): Unknown type_num");
-	throw std::exception();
+	giss::exit(1);
 }
 
 template<> inline int get_type_num<short>()
@@ -176,7 +177,7 @@ PyObject *vector_to_py(std::vector<T> const &vec)
 	} catch(...) {
 		// De-allocated since we're not returning
 		if (vec_py) Py_DECREF(vec_py);
-		throw std::exception();
+		giss::exit(1);
 	}
 }
 
@@ -198,7 +199,7 @@ PyObject *blitz_to_py(blitz::Array<T,N> const &array)
 	} catch(...) {
 		// De-allocated since we're not returning
 		if (array_py) Py_DECREF(array_py);
-		throw std::exception();
+		giss::exit(1);
 	}
 }
 

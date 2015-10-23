@@ -2,6 +2,7 @@
 
 #include <glint2/IceModel_DISMAL.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
+#include <giss/exit.hpp>
 
 using namespace giss;
 using namespace glint2::modele;
@@ -94,7 +95,7 @@ void IceModel_DISMAL::setup_contracts_modele()
 
 	if (!ok) {
 		printf("modele_dismal.cpp quitting due to errors.\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	printf("END IceModel_DISMAL::setup_contract_modele\n");

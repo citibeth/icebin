@@ -23,6 +23,7 @@
 #include <giss/memory.hpp>
 #include <giss/enum.hpp>
 #include <glint2/util.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -53,26 +54,26 @@ void IceSheet::realize()
 	if (exgrid->grid1_ncells_full != gcm->grid1->ncells_full()) {
 		fprintf(stderr, "Exchange Grid for %s incompatible with GCM grid: ncells_full = %d (vs %d expected)\n",
 			name.c_str(), exgrid->grid1_ncells_full, gcm->grid1->ncells_full());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	if (exgrid->grid2_ncells_full != grid2->ncells_full()) {
 		fprintf(stderr, "Exchange Grid for %s incompatible with Ice grid: ncells_full = %d (vs %d expected)\n",
 			name.c_str(), exgrid->grid2_ncells_full, grid2->ncells_full());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	long n2 = grid2->ndata();
 	if (mask2.get() && mask2->extent(0) != n2) {
 		fprintf(stderr, "Mask2 for %s has wrong size: %ld (vs %ld expected)\n",
 			name.c_str(), mask2->extent(0), n2);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	if (elev2.extent(0) != n2) {
 		fprintf(stderr, "Elev2 for %s has wrong size: %ld (vs %ld expected)\n",
 			name.c_str(), elev2.extent(0), n2);
-		throw std::exception();
+		giss::exit(1);
 	}
 }
 // -----------------------------------------------------
@@ -285,7 +286,7 @@ blitz::Array<int,1> const *mask2)
 	auto grid1p = dynamic_cast<Grid_LonLat const *>(&grid1_lonlat);
 	if (!grid1p) {
 		fprintf(stderr, "grid1 must be of type Grid_LonLat for BILIN_INTERP\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 	Grid_LonLat const &grid1(*grid1p);
 
@@ -376,7 +377,7 @@ blitz::Array<int,1> const *mask2)
 					fprintf(stderr, "No valid neighbors for GCM grid cell (%d, %d).  "
 						"Ice grid cell %d out of range",
 						i, j, i2);
-					throw std::exception();
+					giss::exit(1);
 				}
 
 				// Divide by nvalid

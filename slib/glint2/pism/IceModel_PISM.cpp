@@ -11,6 +11,7 @@
 #include <glint2/GCMCoupler.hpp>
 #include <glint2/contracts/contracts.hpp>
 #include <giss/sort.hpp>
+#include <giss/exit.hpp>
 
 using namespace giss;
 using namespace pism;
@@ -133,7 +134,7 @@ void IceModel_PISM::transfer_constant(std::string const &dest, std::string const
 	// Make sure the PISM constant already exists
 	if (!set_new && !config->is_set(dest)) {
 		fprintf(stderr, "IceModel_PISM::transfer_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?\n", dest.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Discover the units PISM requires.
@@ -149,7 +150,7 @@ void IceModel_PISM::set_constant(std::string const &dest, double src_val, std::s
 	// Make sure the PISM constant already exists
 	if (!set_new && !config->is_set(dest)) {
 		fprintf(stderr, "IceModel_PISM::set_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?\n", dest.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	ConstantSet const &gcm_constants(coupler->gcm_constants);
@@ -401,7 +402,7 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// Check that grid dimensions match
 	if ((pism_grid->Mx != glint2_grid->nx()) || (pism_grid->My != glint2_grid->ny())) {
 		fprintf(stderr, "Grid mismatch: pism=(%d, %d) glint2=(%d, %d)\n", pism_grid->Mx, pism_grid->My, glint2_grid->nx(), glint2_grid->ny());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	printf("END IceModel_PISM::allocate()\n");
@@ -438,7 +439,7 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 		} else {
 			if (ret.extent(0) != xy_shape[0] || ret.extent(1) != xy_shape[1]) {
 				fprintf(stderr, "IceModel_PISM::iceModelVec2S_to_blitz_xy(): ret(%d, %d) should be (%d, %d)\n", ret.extent(0), ret.extent(1), xy_shape[0], xy_shape[1]);
-				throw std::exception();
+				giss::exit(1);
 			}
 		}
 	}
@@ -593,7 +594,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 
 	if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// ice_model->enthalpy_t() == time_s here
@@ -620,7 +621,7 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 	for (unsigned int i=0; i<pism_ovars.size(); ++i) {
 		if (!pism_ovars[i]) {
 			fprintf(stderr, "IceModel_PISM: Contract output %s is not linked up to a pism_ovar\n", ocontract.field(i).name.c_str());
-			throw std::exception();
+			giss::exit(1);
 		}
 
 
@@ -634,7 +635,7 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 			// Check number of variables matches for output
 			if (ice_ovals_I.size() != pism_ovars.size()) {
 				fprintf(stderr, "[%d] IceModel_PISM::run_timestep_petsc: ice_ovals_I.size()=%ld does not match pism_ovars.size()=%ld\n", pism_rank, ice_ovals_I.size(), pism_ovars.size());
-				throw std::exception();
+				giss::exit(1);
 			}
 
 			// Reshape 1D blitz variable to 2D for use with PISM
@@ -654,7 +655,7 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 		// (DUMMY for now, just make sure PISM and GCM have the same root)
 		if (pism_root != coupler->gcm_params.gcm_root) {
 			fprintf(stderr, "PISM and the GCM must share the same root!\n");
-			throw std::exception();
+			giss::exit(1);
 		}
 	}
 

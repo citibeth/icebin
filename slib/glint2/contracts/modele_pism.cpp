@@ -5,6 +5,7 @@
 #include <glint2/pism/IceModel_PISM.hpp>
 #include <glint2/modele/GCMCoupler_ModelE.hpp>
 #include <glint2/contracts/contracts.hpp>
+#include <giss/exit.hpp>
 
 using namespace giss;
 using namespace glint2::modele;
@@ -210,7 +211,7 @@ void IceModel_PISM::setup_contracts_modele()
 	}
 
 	// Catch all our errors at once
-	if (!ok) throw std::exception();
+	if (!ok) giss::exit(1);
 	printf("END IceModel_PISM::setup_contracts_modele\n");
 }
 

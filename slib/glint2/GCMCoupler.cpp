@@ -21,6 +21,7 @@
 #include <glint2/MatrixMaker.hpp>
 #include <glint2/MultiMatrix.hpp>
 #include <glint2/contracts/contracts.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -135,7 +136,7 @@ void GCMCoupler::read_from_netcdf(
 
 			if ((cf.flags & contracts::GRID_BITS) == contracts::ICE) {
 				fprintf(stderr, "ERROR: Ice model outputs must be all on the ice grid, field %s is not\n", cf.name.c_str());
-				throw std::exception();
+				giss::exit(1);
 			}
 		}
 

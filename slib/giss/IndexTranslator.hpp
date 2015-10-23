@@ -22,6 +22,7 @@
 #include <set>
 #include <cstdio>
 #include <string>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -68,12 +69,12 @@ public:
 inline int IndexTranslator::a2b(int a, bool check_result) const {
 	if (a < 0 || a >= _a2b.size()) {
 		fprintf(stderr, "a=%d is out of range (%d, %d)\n", a, 0, _a2b.size());
-		throw std::exception();
+		giss::exit(1);
 	}
 	int b = _a2b[a];
 	if (check_result && b < 0) {
 		fprintf(stderr, "%s: a=%d produces invalid b=%d\n", _name.c_str(), a, b);
-		throw std::exception();
+		giss::exit(1);
 	}
 	return b;
 }
@@ -81,12 +82,12 @@ inline int IndexTranslator::a2b(int a, bool check_result) const {
 inline int IndexTranslator::b2a(int b, bool check_result) const {
 	if (b < 0 || b >= _b2a.size()) {
 		fprintf(stderr, "b=%d is out of range (%d, %d)\n", b, 0, _b2a.size());
-		throw std::exception();
+		giss::exit(1);
 	}
 	int a = _b2a[b];
 	if (check_result && a < 0) {
 		fprintf(stderr, "%s: b=%d produces invalid a=%d\n", _name.c_str(), b, a);
-		throw std::exception();
+		giss::exit(1);
 	}
 	return a;
 }

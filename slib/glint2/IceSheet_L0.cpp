@@ -22,6 +22,7 @@
 #include <giss/IndexTranslator.hpp>
 #include <glint2/HCIndex.hpp>
 #include <giss/enum.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -94,12 +95,12 @@ printf("BEGIN hp_to_iceexch(%s) mask1=%p\n", dest.str(), &*gcm->mask1);
 
 		if (dest == IceExch::EXCH) {
 			fprintf(stderr, "bilin_interp() does not (yet) interpolate to exchange grid, only ice grid.  This functionality would not be hard to implement.  But it's not needed because the exchange grid is only used in cases where the RM matrix can be kept local.  bilin_interp() introduces inherent non-locality into the matrix M.\n");
-			throw std::exception();
+			giss::exit(1);
 		}
 
 		if (fill_masked) {
 			fprintf(stderr, "bilin_interp() does not (yet) work with fill_masked.\n");
-			throw std::exception();
+			giss::exit(1);
 		}
 
 		return bilin_interp(gcm, *gcm->grid1, *grid2,

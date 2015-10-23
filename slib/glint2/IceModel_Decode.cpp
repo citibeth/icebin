@@ -19,6 +19,7 @@
 #include <mpi.h>		// Must be first
 #include <glint2/IceModel_Decode.hpp>
 #include <giss/sort.hpp>
+#include <giss/exit.hpp>
 
 using namespace giss;
 
@@ -85,7 +86,7 @@ printf("IceModel_Decode: consolidated from %d down to %d\n", indices.size(), nco
 			// Do our own bounds checking!
 			if (ix < 0 || ix >= ndata()) {
 				fprintf(stderr, "IceModel: index %d out of range [0, %d)\n", ix, ndata());
-				throw std::exception();
+				giss::exit(1);
 			}
 
 			// Add this value to existing field

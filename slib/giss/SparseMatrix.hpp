@@ -26,6 +26,7 @@
 #include "IndexTranslator.hpp"
 #include <giss/blitz.hpp>
 #include <giss/SparseVector.hpp>
+#include <giss/exit.hpp>
 
 class NcFile;
 
@@ -181,7 +182,7 @@ public:
 	void append(SparseMatrixT const &mat) {
 		if (mat.nrow != this->nrow || mat.ncol != this->ncol) {
 			fprintf(stderr, "SparseMatrix::append() has wrong size argument (%d, %d) vs. (%d, %d) expected\n", mat.nrow, mat.ncol, this->nrow, this->ncol);
-			throw std::exception();
+			giss::exit(1);
 		}
 		for (auto ii=mat.begin(); ii != mat.end(); ++ii)
 			this->add(ii.row(), ii.col(), ii.val());
@@ -208,11 +209,11 @@ void SparseMatrix1<SparseMatrix0T>::set(int row, int col, double const val, Spar
 	// Check range
 	if (row >= this->nrow || row < 0) {
 		fprintf(stderr, "SparseMatrix1<>::set(), row=%d >= nrow=%d or <0\n", row, this->nrow);
-		throw std::exception();
+		giss::exit(1);
 	}
 	if (col >= this->ncol || col < 0) {
 		fprintf(stderr, "SparseMatrix1<>::set(), col=%d >= ncol=%d or <0\n", col, this->ncol);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Adjust for index_base
@@ -390,7 +391,7 @@ protected:
 	{
 		if (_nnz_cur >= zd11().ne) {
 			fprintf(stderr, "ZD11SparseMatrix is full with %d elements\n", zd11().ne);
-			throw std::exception();
+			giss::exit(1);
 		}
 		zd11().row[_nnz_cur] = row;
 		zd11().col[_nnz_cur] = col;
@@ -651,7 +652,7 @@ protected :
 	{
 		if (_nnz_cur >= vals().size()) {
 			fprintf(stderr, "ZD11SparseMatrix is full with %d elements\n", vals().size());
-			throw std::exception();
+			giss::exit(1);
 		}
 		this->indx(_nnz_cur) = row;
 		this->jndx(_nnz_cur) = col;
@@ -948,7 +949,7 @@ blitz::Array<double,1> const &diag)
 	int ndiag = diag.extent(0);
 	if (ndiag != mat.ncol) {
 		fprintf(stderr, "Matrix-diagonal multiply with mismatched dimensions %d vs %d", ndiag, mat.ncol);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Multiply by it
@@ -968,7 +969,7 @@ SparseMatrixT &mat)
 	int ndiag = diag.extent(0);
 	if (ndiag != mat.nrow) {
 		fprintf(stderr, "Matrix-diagonal multiply with mismatched dimensions %d vs %d", ndiag, mat.nrow);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Multiply by it

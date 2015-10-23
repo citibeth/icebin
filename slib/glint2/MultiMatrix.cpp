@@ -1,5 +1,6 @@
 #include <glint2/MultiMatrix.hpp>
 #include <giss/sparse_vec_multiply.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -28,7 +29,7 @@ void MultiMatrix::multiply(std::vector<blitz::Array<double,1>> const &xs,
 
 	if (xs.size() != _matrices.size()) {
 		fprintf(stderr, "The number of _matrices (%ld) and vectors (%ld) must match!\n", _matrices.size(), xs.size());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// y = sum_i M_i x_i

@@ -26,6 +26,7 @@
 #include <galahad/eqp_c.hpp>
 #include <giss/ncutil.hpp>
 #include <giss/enum.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -46,7 +47,7 @@ void MatrixMaker::realize() {
 	if (mask1.get() && mask1->extent(0) != n1) {
 		fprintf(stderr, "mask1 for %s has wrong size: %d (vs %d expected)\n",
 			mask1->extent(0), n1);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// ------------- Realize the ice sheets
@@ -61,7 +62,7 @@ int MatrixMaker::add_ice_sheet(std::unique_ptr<IceSheet> &&sheet)
 {
 	if (sheet->name == "") {
 		fprintf(stderr, "MatrixMaker::add_ice_sheet(): Sheet must have a name\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	int const index = _next_sheet_index++;
@@ -318,7 +319,7 @@ printf("BEGIN MatrixMaker::iceinterp_to_hp()\n");
 			hc_index->index_to_ik(i3, i1b, k);
 			if (i1b != i1) {
 				fprintf(stderr, "RM (hp2atm) matrix is non-local!\n");
-				throw std::exception();
+				giss::exit(1);
 			}
 		}
 
@@ -947,7 +948,7 @@ std::unique_ptr<IceSheet> new_ice_sheet(Grid::Parameterization parameterization)
 #endif
 		default :
 			fprintf(stderr, "Unrecognized parameterization: %s\n", parameterization.str());
-			throw std::exception();
+			giss::exit(1);
 	}
 }
 

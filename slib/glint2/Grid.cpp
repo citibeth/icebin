@@ -22,6 +22,7 @@
 #include <giss/ncutil.hpp>
 #include <boost/bind.hpp>
 #include <giss/constant.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -143,7 +144,7 @@ Cell *Grid::add_cell(Cell &&cell) {
 	if (!inserted) {		// Key already existed
 		fprintf(stderr, "Error adding repeat cell index=%d.  "
 			"Cells must have unique indices.", cell.index);
-		throw std::exception();
+		giss::exit(1);
 	}
 	return valp;
 }
@@ -160,7 +161,7 @@ Vertex *Grid::add_vertex(Vertex &&vertex) {
 	if (!inserted) {		// Key already existed
 		fprintf(stderr, "Error adding repeat vertex index=%d.  "
 			"Vertices must have unique indices.", vertex.index);
-		throw std::exception();
+		giss::exit(1);
 	}
 	return valp;
 }
@@ -463,7 +464,7 @@ printf("get_ll_to_xy(sproj=%s)\n", sproj.c_str());
 		proj.init(sproj, giss::Proj2::Direction::LL2XY);
 	} else {
 		fprintf(stderr, "get_ll_to_xy() only makes sense for grids in Lon/Lat Coordinates!");
-		throw std::exception();
+		giss::exit(1);
 	}
 }
 
@@ -475,7 +476,7 @@ printf("get_xy_to_ll(sproj=%s)\n", sproj.c_str());
 		proj.init(sproj, giss::Proj2::Direction::XY2LL);
 	} else {
 		fprintf(stderr, "get_xy_to_ll() only makes sense for grids in Lon/Lat Coordinates!");
-		throw std::exception();
+		giss::exit(1);
 	}
 }
 

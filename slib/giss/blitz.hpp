@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <vector>
 #include <blitz/array.h>
+#include <giss/exit.hpp>
 
 /** \file blitz.hpp
 Type conversion utilities related to Blitz++ arrays.  Blitz++ arrays
@@ -90,7 +91,7 @@ std::vector<int> const &dims)
 			fprintf(stderr,
 				"Error in %s: expected dimension #%d = %d (is %d instead)\n",
 				vname.c_str(), i, dims[i], arr.extent(i));
-			throw std::exception();
+			giss::exit(1);
 		}
 	}
 }
@@ -157,7 +158,7 @@ blitz::Array<T, rank> f_to_c(blitz::Array<T, rank> &arr)
 	for (int i=0; i<dest_ndim; ++i) dest_n *= dest_shape[i]; \
 	if (src_n != dest_n) { \
 		fprintf(stderr, "blitz.hpp, giss::reshape(): Total dimension mismatch, src=%ld, dest=%ld\n", src_n, dest_n); \
-		throw std::exception(); \
+		giss::exit(1); \
 	} \
  \
 	/* Do the reshaping */ \
@@ -193,7 +194,7 @@ blitz::TinyVector<T, len> vector_to_tiny(std::vector<T> const &vec)
 	if (vec.size() != len) {
 		fprintf(stderr,
 			"vector_to_tiny(): vector length %ld does not match declared length %d\n", vec.size(), len);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	blitz::TinyVector<T, len> ret;

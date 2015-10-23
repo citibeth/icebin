@@ -5,6 +5,7 @@
 #include <giss/cfnames.hpp>
 #include <giss/DynamicEnum.hpp>
 #include <giss/VarMetaData.hpp>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -84,7 +85,7 @@ public:
 		if (ii == _name_to_ix.end()) {
 			if (throw_exception) {
 				fprintf(stderr, "CouplingContract::index(): name '%s' not found\n", name.c_str());
-				throw std::exception();
+				giss::exit(1);
 			} else return -1;
 		}
 		return ii->second;

@@ -31,6 +31,7 @@
 #include <glint2/gridutil.hpp>
 
 #include <glint2/cgal.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -216,7 +217,7 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 			// No projections needed
 			if (grid1.sproj != grid2.sproj) {
 				fprintf(stderr, "Two XY grids must have the same projection\n");
-				throw std::exception();
+				giss::exit(1);
 			}
 		} else {
 			// grid1=xy, grid2=ll: Project from grid 2 to grid1's xy
@@ -233,7 +234,7 @@ ExchangeGrid::ExchangeGrid(Grid const &grid1, Grid const &grid2, std::string con
 			// BUT... since we don't have a projection, we must throw
 			// up our hands!
 			fprintf(stderr, "Program isn't currently equipped to overlap two grids on the sphere.\n");
-			throw std::exception();
+			giss::exit(1);
 		}
 	}
 

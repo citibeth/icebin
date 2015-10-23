@@ -52,7 +52,7 @@ NcDim *get_or_add_dim(NcFile &nc, std::string const &dim_name, long dim_size)
 			if (sz != dim_size) {
 				fprintf(stderr, "Error: dimension %s (size = %ld) being redefined to size = %ld\n",
 					dim_name.c_str(), sz, dim_size);
-				throw std::exception();
+				giss::exit(1);
 			}
 			return dim;
 		}

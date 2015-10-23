@@ -28,6 +28,7 @@
 #include <giss/blitz.hpp>
 #include <giss/VarMetaData.hpp>
 #include <cassert>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -42,7 +43,7 @@ template<class T>
 inline NcType get_nc_type()
 {
 	fprintf(stderr, "get_nc_type(): Unknown type");
-	throw std::exception();
+	giss::exit(1);
 }
 
 
@@ -121,7 +122,7 @@ blitz::Array<T,rank> read_blitz(NcFile &nc, std::string const &var_name)
 	if (ndims != rank) {
 		fprintf(stderr, "NetCDF variable %s has rank %d, expected rank %d\n",
 			var_name.c_str(), ndims, rank);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	blitz::TinyVector<int,rank> shape(0);
@@ -179,7 +180,7 @@ boost::function<void ()> netcdf_define(
 		if (val.stride(i) != stride) {
 			fprintf(stderr, "Unexpected stride of %d (should be %d) in dimension %d (extent=%d) of %s (rank=%d)\n", val.stride(i), stride, i, val.extent(i), vname.c_str(), rank);
 			fprintf(stderr, "Are you trying to write a Fortran-style array?  Use f_to_c() in blitz.hpp first\n");
-			throw std::exception();
+			giss::exit(1);
 		}
 //printf("(stride=%d) *= (val.extent[%d]=%d)\n", stride, i, val.extent(i));
 		stride *= val.extent(i);

@@ -16,16 +16,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
-#include <giss/exit.hpp>
+#include <glint2/util.hpp>
 
-namespace glint2 {
+namespace giss {
 
-// See: http://stackoverflow.com/questions/37473/how-can-i-assert-without-using-abort
-template <typename A>
-inline void gassert(A assertion)
+void exit_exception(int errcode)
 {
-    if( !assertion ) giss::exit(1);
+	throw std::exception();
 }
+
+void exit_segfault(int errcode)
+{
+	int *ptr = 0;
+	*ptr = 17;
+}
+
+#ifdef __GNUC__
+// http://stackoverflow.com/questions/77005/how-to-generate-a-stacktrace-when-my-gcc-c-app-crashes
+
+void exit_stacktrace(int errcode)
+{
+}
+#endif
+
+std::function<void(int)> exit(&exit_segfault);
 
 }

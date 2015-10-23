@@ -28,6 +28,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <glint2/contracts/contracts.hpp>
+#include <giss/exit.hpp>
 
 using namespace glint2;
 using namespace glint2::modele;
@@ -123,7 +124,7 @@ printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), contracts::to_str(
 			break;
 			default:
 				fprintf(stderr, "init_ncfile() unable to handle grid type %s for field %s\n", contracts::to_str(cf.flags).c_str(), cf.name.c_str());
-				throw std::exception();
+				giss::exit(1);
 		}
 
 		auto comment(boost::format(
@@ -260,7 +261,7 @@ std::vector<blitz::Array<double,3>> &inputs)
 	// Sanity check: make sure we haven't overrun our buffer
 	if (nmsg != sbuf.size) {
 		fprintf(stderr, "Wrong number of items in buffer: %d vs %d expected\n", nmsg, sbuf.size);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Gather it to root
@@ -482,7 +483,7 @@ char const *long_name_f, int long_name_len)
 		flags = contracts::ELEVATION;
 	} else {
 		fprintf(stderr, "Unrecognized grid: %s\n", grid.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	if (initial) flags |= contracts::INITIAL;
@@ -632,7 +633,7 @@ void glint2_modele_get_fhc_im_c(glint2::modele::glint2_modele *api,
 		int i1a = ii.row();
 		if (i1a != i1b) {
 			fprintf(stderr, "HP2ATM matrix is non-local!\n");
-			throw std::exception();
+			giss::exit(1);
 		}
 
 		// Now fill in FHC_IM
@@ -661,7 +662,7 @@ void glint2_modele_get_elevhp_im_c(glint2::modele::glint2_modele *api,
 	int nhp_im = api->gcm_coupler.maker->nhp(-1);
 	if (nhp_im != elev1h.extent(2)) {
 		fprintf(stderr, "glint2_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp_im);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// Copy 1-D height point definitions to elev1h
@@ -751,7 +752,7 @@ void densify_gcm_inputs_onroot(glint2_modele *api,
 //std::cout << "Contract = " << contract << std::endl;
 
 			fprintf(stderr, "[%d] gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", rank, gcm_inputs_d.extent(0), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
-			throw std::exception();
+			giss::exit(1);
 		}
 
 		// Ignore elevation point = 0 (for ELEVATION grid only),
@@ -901,7 +902,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 	// Sanity check: make sure we haven't overrun our buffer
 	if (nmsg != sbuf.size) {
 		fprintf(stderr, "Wrong number of items in buffer: %d vs %d expected\n", nmsg, sbuf.size);
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// sbuf has elements for ALL ice sheets here

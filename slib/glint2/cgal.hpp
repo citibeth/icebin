@@ -21,6 +21,7 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Boolean_set_operations_2.h>
 #include <CGAL/bounding_box.h>
+#include <giss/exit.hpp>
 
 
 namespace glint2 {
@@ -78,13 +79,13 @@ poly_overlap(const CGAL::Polygon_2<Kernel, Container> &P,
 	if (ii1 != overlap.end()) {
 		// More than one Polygon here --- complain
 		fprintf(stderr, "ERROR: Overlap expects only simple polygons.  If this is not a bug, you must upgrade your non-CGAL overlap data structures.");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	if (ii0->holes_begin() != ii0->holes_end()) {
 		// Polygon has holes --- again, our format doesn't support it.
 		fprintf(stderr, "ERROR: Overlap expects only simple polygons.  If this is not a bug, you must upgrade your non-CGAL overlap data structures.");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	// We have a nice, clean overlap.  Return it!

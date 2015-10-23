@@ -144,11 +144,7 @@ public:
 	// --------------------------------------------------
 	// GCM-specific methods used to set up the contract for
 	// a particular GCM-IceModel pair
-	virtual void setup_contracts_modele()
-	{
-		fprintf(stderr, "Error: setup_contracts_modele() not implemented for IceModel type %s\n", type.str());
-		throw std::exception();
-	}
+	virtual void setup_contracts_modele();
 
 	// --------------------------------------------------
 
@@ -167,7 +163,7 @@ public:
 		std::string const &vname_base)
 	{
 		fprintf(stderr, "IceModel::init() must be implemented!\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	/** Event handler to let IceModels know the start time is (finally) set */
@@ -189,7 +185,7 @@ public:
 	but doesn't actually run the timestep. */
 	virtual void get_initial_state() {
 		fprintf(stderr, "get_initial_state() not implemented.\n");
-		throw std::exception();
+		giss::exit(1);
 	}
 
 

@@ -17,6 +17,7 @@
  */
 
 #include <giss/IndexTranslator2.hpp>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -42,18 +43,18 @@ int IndexTranslator2::a2b(std::pair<int,int> a, bool check_result) const {
 	int aindex = a.first;
 	if (aindex < 0 || aindex >= nindex()) {
 		fprintf(stderr, "%s: aindex=%d is out of range (%d, %d)\n", _name.c_str(), aindex, 0, nindex());
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	int agrid = a.second;
 	if (agrid < 0 || agrid >= na(aindex)) {
 		fprintf(stderr, "%s: a=%d is out of range (%d, %d)\n", _name.c_str(), a, 0, na(aindex));
-		throw std::exception();
+		giss::exit(1);
 	}
 	auto ib = _a2b.find(a);
 	if (check_result && ib == _a2b.end()) {
 		fprintf(stderr, "%s: a=(%d,%d) not found\n", _name.c_str(), a.first, a.second);
-		throw std::exception();
+		giss::exit(1);
 	}
 	return ib->second;
 }
@@ -62,12 +63,12 @@ int IndexTranslator2::a2b(std::pair<int,int> a, bool check_result) const {
 std::pair<int,int> IndexTranslator2::b2a(int b, bool check_result) const {
 	if (b < 0 || b >= nb()) {
 		fprintf(stderr, "%s: b=%d is out of range (%d, %d)\n", _name.c_str(), b, 0, nb());
-		throw std::exception();
+		giss::exit(1);
 	}
 	std::pair<int,int> a = _b2a[b];
 	if (check_result && a.first < 0) {
 		fprintf(stderr, "%s: b=%d produces invalid a=(%d,%d)\n", _name.c_str(), b, a.first,a.second);
-		throw std::exception();
+		giss::exit(1);
 	}
 	return a;
 }

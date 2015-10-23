@@ -67,7 +67,7 @@ std::vector<int> const &dims)
 			fprintf(stderr,
 				"Error in %s: expected dimension #%d = %d (is %d instead)\n",
 				vname.c_str(), i, dims[i], arr.extent(i));
-			throw std::exception();
+			giss::exit(1);
 		}
 	}
 }

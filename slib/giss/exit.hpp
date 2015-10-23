@@ -17,15 +17,14 @@
  */
 
 #pragma once
-#include <giss/exit.hpp>
+#include <functional>
 
-namespace glint2 {
+namespace giss {
 
-// See: http://stackoverflow.com/questions/37473/how-can-i-assert-without-using-abort
-template <typename A>
-inline void gassert(A assertion)
-{
-    if( !assertion ) giss::exit(1);
-}
+void exit_exception(int);
+void exit_segfault(int);
+
+// User-defineable function to exit
+extern std::function<void(int)> exit;
 
 }

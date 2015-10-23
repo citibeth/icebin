@@ -24,6 +24,7 @@
 #include <glint2/gridutil.hpp>
 #include <giss/ncutil.hpp>
 #include <giss/constant.hpp>
+#include <giss/exit.hpp>
 
 namespace glint2 {
 
@@ -106,11 +107,11 @@ void Grid_LonLat::realize(
 	// Error-check the input parameters
 	if (south_pole && latb[0] == -90.0) {
 		std::cerr << "latb[] cannot include -90.0 if you're including the south pole cap" << std::endl;
-		throw std::exception();
+		giss::exit(1);
 	}
 	if (south_pole && latb.back() == 90.0) {
 		std::cerr << "latb[] cannot include 90.0 if you're including the north pole cap" << std::endl;
-		throw std::exception();
+		giss::exit(1);
 	}
 
 	clear();

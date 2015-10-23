@@ -3,6 +3,7 @@
 #include <giss/udunits2.hpp>
 #include <giss/ncutil.hpp>
 #include <giss/string.hpp>
+#include <giss/exit.hpp>
 
 namespace giss {
 
@@ -57,7 +58,7 @@ printf("ConstantSet: Converting %s: %f %s --> %f %s\n", name.c_str(), (*this)[sr
 		return ret;
 	} catch(const std::exception &ex) {
 		fprintf(stderr, "Exception in ConstantSet::get_as(%s, %s)\n", name.c_str(), units.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 	
 }
@@ -93,7 +94,7 @@ printf("ConstantSet: Converting %f %d --> %f %d\n", src[src_ix], usrc.c_str(), r
 		return ret;
 	} catch(const std::exception &ex) {
 		fprintf(stderr, "Exception in ConstantSet::set(%s, ConstantSet, %s)\n", name.c_str(), src_name.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 }
 #endif
@@ -122,7 +123,7 @@ void ConstantSet::read_from_netcdf(NcFile &nc, std::string const &vname)
 	NcVar *ncvar = giss::get_var_safe(nc, vname.c_str(), true);
 	if (!ncvar) {
 		fprintf(stderr, "ConstantSet::read_from_netcdf() cannot find variable %s\n", vname.c_str());
-		throw std::exception();
+		giss::exit(1);
 	}
 	int n = ncvar->num_atts();
 
