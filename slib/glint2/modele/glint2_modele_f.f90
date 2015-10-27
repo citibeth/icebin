@@ -145,7 +145,6 @@ INTERFACE
 	end subroutine
 
 	subroutine glint2_modele_couple_to_ice_c(api, itime, &
-		massxfer_f, enthxfer_f, deltah_f, &
 		gcm_inputs_d_f) bind(c)
 	use iso_c_binding
 	use f90blitz
@@ -160,6 +159,16 @@ INTERFACE
 	use f90blitz
 		type(c_ptr), value :: api
 		type(arr_spec_3) :: gcm_inputs_d_f
+	end subroutine
+
+	subroutine glint2_modele_set_gcm_output_c(api, &
+		field_name_f, field_name_len, arr_f) bind(c)
+	use iso_c_binding
+	use f90blitz
+		type(c_ptr), value :: api
+		character(c_char) :: field_name_f(*)
+		integer(c_int), value :: field_name_len
+		type(arr_spec_3) :: arr_f
 	end subroutine
 
 END INTERFACE
@@ -192,6 +201,21 @@ print *,'BEGIN glint2_modele_get_initial_state()'
 
 print *,'END glint2_modele_get_initial_state()'
 end subroutine
+
+
+subroutine glint2_modele_set_gcm_output(api, field_name, arr, i0, j0, k0)
+	type(c_ptr), value :: api
+	character(*) :: field_name
+	real*8, dimension(:,:,:), target :: arr
+	integer :: i0,j0,k0
+	! --------- Locals
+	type(arr_spec_3) :: arr_f
+
+	call get_spec_double_3(arr, i0,j0,k0, arr_f)
+	call glint2_modele_set_gcm_output_c(api, &
+		field_name, len(field_name), arr_f)
+
+end subroutine glint2_modele_set_gcm_output
 
 
 ! ! Go from a VectorSparseVector<int, double> output from GCMCoupler, to

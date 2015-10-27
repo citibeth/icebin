@@ -51,6 +51,10 @@ struct glint2_modele {
 	double dtsrc;			// Size of ModelE timestep
 	GCMCoupler_ModelE gcm_coupler;
 
+	/** Vectors handed to us by ModelE, before we pass them along to
+	Glint2 when coupling. */
+	std::vector<blitz::Array<double, 3>> gcm_outputs;
+
 	/** Position with the gcm_inputs array (passed from GCM)
 	where each variable in the gcm_inputs contract starts.
 	This has a sentinel on the end, thus indicating the extent of
@@ -154,9 +158,6 @@ extern "C"
 void glint2_modele_couple_to_ice_c(
 glint2::modele::glint2_modele *api,
 int itime,			// ModelE itime counter
-giss::F90Array<double,3> &massxfer_f,
-giss::F90Array<double,3> &enthxfer_f,
-giss::F90Array<double,3> &deltah_f,		// Enthalpy change of top layer (use this to create Dirichlet B.C. on ice grid)
 giss::F90Array<double,3> &gcm_inputs_d_f);
 
 extern "C"

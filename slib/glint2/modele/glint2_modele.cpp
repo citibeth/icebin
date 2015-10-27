@@ -153,12 +153,15 @@ printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), contracts::to_str(
 
 /** LOCAL FUNCTION: Save the ice model output, after it's been
 transformed by Glint2 (now it's GCM input). */
-void save_gcm_inputs(
+static void save_gcm_inputs(
 glint2_modele *api,
 double time_s,
-blitz::Array<double,3> gcm_inputs)
+giss::F90Array<double,3> &gcm_inputs_d_f)	// Fortran array
 {
 	printf("BEGIN save_gcm_inputs(%s)\n", api->gcm_coupler.gcm_in_file.c_str());
+
+	// Fortran-style array: i,j,ihp, indexing starts at 1
+	blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
 	// Get dimensions of full domain
 	int nhp_gcm = glint2_modele_nhp_gcm(api);
@@ -185,7 +188,7 @@ blitz::Array<double,3> gcm_inputs)
 	// Write arrays to it
 	int base_index = 0;
 	for (unsigned int i=0; i < contract.size_nounit(); ++i) {
-		double const *array_base = &gcm_inputs(base_index,0,0);
+		double const *array_base = &gcm_inputs_d(1,1,base_index);	// i,j,ihp
 
 		NcVar *nc_var = ncout.get_var(contract.name(i).c_str());
 
@@ -213,7 +216,7 @@ blitz::Array<double,3> gcm_inputs)
 ice model.
 @param hpvals Values on height-points GCM grid for various fields
 	the GCM has decided to provide. */
-void save_gcm_outputs(
+static void save_gcm_outputs(
 glint2_modele *api,
 double time_s,
 std::vector<blitz::Array<double,3>> &inputs)
@@ -721,9 +724,9 @@ printf("[%d] BEGIN glint2_modele_init_hp_to_ices\n", rank);
 printf("[%d] END glint2_modele_init_hp_to_ices\n", rank);
 }
 // -----------------------------------------------------
-void densify_gcm_inputs_onroot(glint2_modele *api,
+static void densify_gcm_inputs_onroot(glint2_modele *api,
 	std::vector<giss::VectorSparseVector<int,double>> const &gcm_ivals_global,
-	blitz::Array<double,3> &gcm_inputs_d)
+	giss::F90Array<double,3> &gcm_inputs_d_f)
 {
 	// This should only be run on the MPI root node
 	if (!api->gcm_coupler.am_i_root()) return;
@@ -733,7 +736,9 @@ void densify_gcm_inputs_onroot(glint2_modele *api,
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
 	int n1 = api->gcm_coupler.maker->n1();
-//	blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+
+	// Fortran-style array: i,j,ihp, indexing starts at 1
+	blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
 	// We ARE the root note --- densify the data into the global gcm_inputs array
 	for (long ix = 0; ix < contract.size_nounit(); ++ix) {
@@ -741,17 +746,8 @@ void densify_gcm_inputs_onroot(glint2_modele *api,
 		int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;	// # elevation points for this variable.
 
 		// Check bounds
-		if (ihp+var_nhp > gcm_inputs_d.extent(0)) {
-//printf("[%d] gcm_inputs_ihp = [", rank);
-//for (int i : api->gcm_inputs_ihp) printf(" %d", i);
-//printf("]\n");
-//printf("[%d] gcm_inputs_ihp.size() = %d\n", rank, api->gcm_inputs_ihp.size());
-//printf("[%d] contract.size_nounit() = %d\n", rank, contract.size_nounit());
-//printf("[%d] ihp var_hp = %d %d\n", rank, ihp, var_nhp);
-//printf("[%d] ix = %d\n", rank, ix);
-//std::cout << "Contract = " << contract << std::endl;
-
-			fprintf(stderr, "[%d] gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", rank, gcm_inputs_d.extent(0), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
+		if (ihp+var_nhp > gcm_inputs_d.extent(2)) {
+			fprintf(stderr, "[%d] gcm_inputs_d[nhp=%d] is too small (needs at least %d)\n", rank, gcm_inputs_d.extent(2), api->gcm_inputs_ihp[contract.size_nounit()]); //ihp+var_nhp);
 			giss::exit(1);
 		}
 
@@ -767,7 +763,7 @@ void densify_gcm_inputs_onroot(glint2_modele *api,
 
 		// Index into our big array-of-array of all gcm_inputs
 		blitz::Array<double,1> dense1d(
-			&gcm_inputs_d(modele_ihp, 0, 0),
+			&gcm_inputs_d(1,1,modele_ihp),	// i,j,ihp
 			blitz::shape(n1*modele_var_nhp), blitz::neverDeleteData);
 
 		// Convert this sparse vector...
@@ -791,15 +787,14 @@ void densify_gcm_inputs_onroot(glint2_modele *api,
 
 	@param gcm_inputs_d_f Global (gathered) array of the Glint2
 	outputs to be fed into the GCM.  This only needs to be allocated
-	if api->gcm_coupler.am_i_root(). */
+	if api->gcm_coupler.am_i_root().
 
+	Inputs variables implied by repeated previous calls to glint2_modele_set_gcm_output().
+*/
 extern "C"
 void  glint2_modele_couple_to_ice_c(
 glint2_modele *api,
 int itime,
-giss::F90Array<double,3> &massxfer_f,
-giss::F90Array<double,3> &enthxfer_f,
-giss::F90Array<double,3> &deltah_f,		// Enthalpy change of top layer (use this to create Dirichlet B.C. on ice grid)
 giss::F90Array<double,3> &gcm_inputs_d_f)
 {
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
@@ -807,18 +802,11 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 
 	printf("[%d] BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f, dtsrc=%f)\n", rank, itime, time_s, api->dtsrc);
 
-	GCMCoupler &coupler(api->gcm_coupler);
-	giss::CouplingContract &gcm_outputs_contract(coupler.gcm_outputs);
+//	GCMCoupler &coupler(api->gcm_coupler);
 
-	// Construct vector of GCM input arrays --- to be converted to inputs for GLINT2
-	std::vector<blitz::Array<double,3>> inputs(gcm_outputs_contract.size_nounit());
-	inputs[gcm_outputs_contract.index("massxfer")].reference(massxfer_f.to_blitz());	// [kg m-2 s-1]
-	inputs[gcm_outputs_contract.index("enthxfer")].reference(enthxfer_f.to_blitz());	// [W m-2]
-	inputs[gcm_outputs_contract.index("deltah")].reference(deltah_f.to_blitz());
-
-	if (coupler.gcm_out_file.length() > 0) {
+	if (api->gcm_coupler.gcm_out_file.length() > 0) {
 		// Write out to DESM file
-		save_gcm_outputs(api, time_s, inputs);
+		save_gcm_outputs(api, time_s, api->gcm_outputs);
 	}
 
 	// Count total number of elements in the matrices
@@ -878,15 +866,15 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 				for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
 					int xj = xjj->first;
 					double io_val = xjj->second;
-					inp += io_val * inputs[xj](jj.col_i, jj.col_j, jj.col_k);
+					inp += io_val * api->gcm_outputs[xj](jj.col_i, jj.col_j, jj.col_k);
 				}
 				msg[xi] = jj.val * (inp + trans.units[xi]);
 			}
 #else
 			// This is the old code for the above (that doesn't convert units)
-			msg[0] = jj.val * inputs[0](jj.col_i, jj.col_j, jj.col_k);
-			msg[1] = jj.val * inputs[1](jj.col_i, jj.col_j, jj.col_k);
-			msg[2] = jj.val * inputs[2](jj.col_i, jj.col_j, jj.col_k);
+			msg[0] = jj.val * api->gcm_outputs[0](jj.col_i, jj.col_j, jj.col_k);
+			msg[1] = jj.val * api->gcm_outputs[1](jj.col_i, jj.col_j, jj.col_k);
+			msg[2] = jj.val * api->gcm_outputs[2](jj.col_i, jj.col_j, jj.col_k);
 #endif
 //			// This is even older code (variables are hardwired)
 //			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
@@ -908,7 +896,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 	// sbuf has elements for ALL ice sheets here
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
 	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size_nounit());
-	coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
+	api->gcm_coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
 
 	// Decode the outputs to a dense array for ModelE
 	int nhp = glint2_modele_nhp_gcm(api);	// == Glint2's nhp + 1, for legacy ice in ModelE
@@ -916,13 +904,13 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 
 
 	if (api->gcm_coupler.am_i_root()) {
-		auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+		// auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
-		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d);
+		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d_f);
 
-		if (coupler.gcm_in_file.length() > 0) {
+		if (api->gcm_coupler.gcm_in_file.length() > 0) {
 			// Write out to DESM file
-			save_gcm_inputs(api, time_s, gcm_inputs_d);
+			save_gcm_inputs(api, time_s, gcm_inputs_d_f);
 		}
 	}
 
@@ -938,7 +926,7 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 {
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
 
-	auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+//	auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
 	printf("[%d] BEGIN glint2_modele_get_initial_state_c()\n", rank);
 
@@ -952,16 +940,27 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 	// Decode the outputs to a dense array for ModelE
 	if (api->gcm_coupler.am_i_root()) {
 
-		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d);
+		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d_f);
 		const double time_s = coupler.gcm_params.time_start_s;
 		if (coupler.gcm_in_file.length() > 0) {
 			// Write out to DESM file
-			save_gcm_inputs(api, time_s, gcm_inputs_d);
+			save_gcm_inputs(api, time_s, gcm_inputs_d_f);
 		}
 	}
 
 	printf("[%d] END glint2_modele_get_initial_state_c()\n", rank);
 }
 
+extern"C"
+int glint2_modele_set_gcm_output_c(
+glint2_modele *api,
+char const *field_name_f, int field_name_len,
+giss::F90Array<double, 3> &arr)
+{
+	std::string const field_name(field_name_f, field_name_len);
+	int field_ix = api->gcm_coupler.gcm_outputs.index(field_name);
+	api->gcm_outputs.reserve(field_ix+1);
+	api->gcm_outputs[field_ix].reference(arr.to_blitz());
+}
 
 // ===============================================================
