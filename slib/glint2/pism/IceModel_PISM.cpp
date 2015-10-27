@@ -333,8 +333,6 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	// in the PISM data structures.
 	int ix;
 	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
-	ix = contract[INPUT].index("wflux");
-		pism_ivars[ix] = &pism_surface_model->glint2_wflux;
 
 	// We don't really use this, but we do need to store and pass through for conservation computations
 	ix = contract[INPUT].index("massxfer");
@@ -567,7 +565,7 @@ ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 		timestep_s,
 		surface->surface_temp);
 
-	// Write out what wev'e now calculated (for debugging)
+	// Write out what we've now calculated (for debugging)
 	if (write_pism_inputs) {
 	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
 
@@ -620,7 +618,7 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 	if (am_i_root()) allocate_ice_ovals_I();		// ROOT in PISM communicator
 	for (unsigned int i=0; i<pism_ovars.size(); ++i) {
 		if (!pism_ovars[i]) {
-			fprintf(stderr, "IceModel_PISM: Contract output %s is not linked up to a pism_ovar\n", ocontract.field(i).name.c_str());
+			fprintf(stderr, "IceModel_PISM: Contract output %s (modele_pism.cpp) is not linked up to a pism_ovar (MassEnergyBudget.cpp)\n", ocontract.field(i).name.c_str());
 			giss::exit(1);
 		}
 

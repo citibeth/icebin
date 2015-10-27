@@ -138,10 +138,10 @@ PetscErrorCode PISMIceModel::createVecs()
 
 	ierr = M1.create(grid, "M1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = M2.create(grid, "M2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = M1.create(grid, "H1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = M2.create(grid, "H2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = M1.create(grid, "V1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = M2.create(grid, "V2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = H1.create(grid, "H1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = H2.create(grid, "H2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = V1.create(grid, "V1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = V2.create(grid, "V2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 
 	std::cout << "PISMIceModel Conservation Formulas:" << std::endl;
 	cur.print_formulas(std::cout);
@@ -272,18 +272,18 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	ierr = surface->glint2_massxfer.begin_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_enthxfer.begin_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_deltah.begin_access(); CHKERRQ(ierr);
-	ierr = cur.glint2_xfer.begin_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_smb.begin_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_deltah.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		cur.glint2_xfer.mass(i,j) += dt * surface->glint2_massxfer(i,j);
-		cur.glint2_xfer.enth(i,j) += dt * surface->glint2_enthxfer(i,j);
+		cur.glint2_smb.mass(i,j) += dt * surface->glint2_massxfer(i,j);
+		cur.glint2_smb.enth(i,j) += dt * surface->glint2_enthxfer(i,j);
 		cur.glint2_deltah(i,j) += dt * surface->glint2_deltah(i,j);
 	}}
 	ierr = surface->glint2_massxfer.end_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_enthxfer.end_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_deltah.end_access(); CHKERRQ(ierr);
-	ierr = cur.glint2_xfer.end_access(); CHKERRQ(ierr);
+	ierr = cur.glint2_smb.end_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_deltah.end_access(); CHKERRQ(ierr);
 
 	printf("END PISMIceModel::MassContExplicitStep()\n");

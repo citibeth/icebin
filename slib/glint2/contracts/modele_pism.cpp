@@ -28,7 +28,9 @@ void IceModel_PISM::setup_contracts_modele()
 	printf("BEGIN IceModel_PISM::setup_contracts_modele\n");
 	IceModel &model(*this);
 
-	// =========== Transfer  constants
+	// =========== Transfer  constants from Glint2's gcm_constants --> PISM
+	// transfer_constant(PISM_destionation, glint2_src, multiply_by)
+	// (see IceModel_PISM.cpp)
 	transfer_constant("standard_gravity", "constant::grav");
 	transfer_constant("beta_CC", "seaice::dtdp", -1.0);
 	transfer_constant("water_melting_point_temperature", "constant::tf");
@@ -42,8 +44,6 @@ void IceModel_PISM::setup_contracts_modele()
 	transfer_constant("sea_water_density", "constant::rhows");
 	transfer_constant("standard_gravity", "constant::grav");
 	transfer_constant("ideal_gas_constant", "constant::gasc");
-
-	Z2LI = coupler->gcm_constants.get_as("landice::z2li", "m");
 
 	// To set this, see (in ModelE): Function SHCGS in ocnfuntab.f is
 	// used for the Russell ocean. I. The simple models use SHW=4185.
@@ -104,12 +104,10 @@ void IceModel_PISM::setup_contracts_modele()
 	vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
 	vt.allocate();
 
-	ok = ok && vt.set("wflux", "wflux", "unit", RHOW);
-	ok = ok && vt.set("hflux", "hflux", "unit", 1.0);
-	ok = ok && vt.set("massxfer", "massxfer", "unit", RHOW);
-	ok = ok && vt.set("enthxfer", "enthxfer", "unit", 1.0);
-	ok = ok && vt.set("enthxfer", "massxfer", "unit", enth_modele_to_pism*RHOW);
-	ok = ok && vt.set("volxfer", "volxfer", "unit", 1.0);
+	ok = ok && vt.set("massxfer", "massxfer", "by_dt", 1.0);
+	ok = ok && vt.set("enthxfer", "enthxfer", "by_dt", 1.0);
+	ok = ok && vt.set("enthxfer", "massxfer", "by_dt", enth_modele_to_pism);
+	ok = ok && vt.set("deltah", "deltah", "by_dt", 1.0);
 	}
 
 	// ============== Ice -> GCM
@@ -135,7 +133,6 @@ void IceModel_PISM::setup_contracts_modele()
 	ice_output.add_field("calving.enth", "W m-2", contracts::ICE, "");
 	ice_output.add_field("glint2_smb.mass", "kg m-2 s-1", contracts::ICE, "");
 	ice_output.add_field("glint2_smb.enth", "W m-2", contracts::ICE, "");
-	ice_output.add_field("glint2_surface_temp", "K", contracts::ICE, "");
 	ice_output.add_field("pism_smb.mass", "kg m-2 s-1", contracts::ICE, "");
 	ice_output.add_field("pism_smb.enth", "W m-2", contracts::ICE, "");
 
@@ -168,16 +165,16 @@ void IceModel_PISM::setup_contracts_modele()
 	ok = ok && vt.set("elev1", "usurf", "unit", 1.0);
 
 	// Top layer state from ice model
-	ok = ok && vt.set("M1", "M1", "unit", byRHOW);	// Divide by RHOW to convert to m water equiv
+	ok = ok && vt.set("M1", "M1", "unit", 1.0);	// Divide by RHOW to convert to m water equiv
 	ok = ok && vt.set("H1", "H1", "unit", 1.0);
-	ok = ok && vt.set("H1", "M1", "unit", -enth_modele_to_pism*byRHOW);
+	ok = ok && vt.set("H1", "M1", "unit", -enth_modele_to_pism);
 	ok = ok && vt.set("V1", "V1", "unit", 1.0);
 
 	// Second-top layer state from ice model
-	ok = ok && vt.set("M1", "M1", "unit", byRHOW);	// Divide by RHOW to convert to m water equiv
-	ok = ok && vt.set("H1", "H1", "unit", 1.0);
-	ok = ok && vt.set("H1", "M1", "unit", -enth_modele_to_pism*byRHOW);
-	ok = ok && vt.set("V1", "V1", "unit", 1.0);
+	ok = ok && vt.set("M2", "M2", "unit", 1.0);	// Divide by RHOW to convert to m water equiv
+	ok = ok && vt.set("H2", "H2", "unit", 1.0);
+	ok = ok && vt.set("H2", "M2", "unit", -enth_modele_to_pism);
+	ok = ok && vt.set("V2", "V2", "unit", 1.0);
 
 
 	ok = ok && vt.set("basal_frictional_heating", "basal_frictional_heating", "unit", 1.0);

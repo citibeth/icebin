@@ -46,13 +46,6 @@ printf("BEGIN PSConstantGLINT2::allocate_PSConstantGLINT2()\n");
 	PetscErrorCode ierr;
 
 printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx, grid.My);
-	ierr = glint2_wflux.create(grid, "glint2_wflux", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = glint2_wflux.set_attrs("climate_state",
-		"constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
-		"kg m-2 s-1",
-		"land_ice_surface_specific_mass_balance"); CHKERRQ(ierr);
-	ierr = glint2_wflux.set_glaciological_units("kg m-2 year-1"); CHKERRQ(ierr);
-	glint2_wflux.write_in_glaciological_units = true;
 
 	ierr = glint2_deltah.create(grid, "glint2_deltah", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = glint2_deltah.set_attrs("climate_state",
@@ -107,7 +100,6 @@ printf("BEGIN PSConstantGLINT2::init(this=%p)\n", this);
 	ierr = find_pism_input(input_file, do_regrid, start); CHKERRQ(ierr);
 
 	// It doesn't matter what we set this to, it will be re-set later.
-	ierr = glint2_wflux.set(0.0); CHKERRQ(ierr);
 	ierr = glint2_deltah.set(0.0); CHKERRQ(ierr);
 	ierr = glint2_massxfer.set(0.0); CHKERRQ(ierr);
 	ierr = glint2_enthxfer.set(0.0); CHKERRQ(ierr);
@@ -164,7 +156,6 @@ PetscErrorCode PSConstantGLINT2::ice_surface_temperature(IceModelVec2S &result) 
 // }
 
 void PSConstantGLINT2::add_vars_to_output(std::string /*keyword*/, std::set<std::string> &result) {
-	result.insert("glint2_wflux");
 	result.insert("glint2_deltah");
 	result.insert("glint2_massxfer");
 	result.insert("glint2_enthxfer");
@@ -179,10 +170,6 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 
 	if (set_contains(vars, "glint2_enthxfer")) {
 		ierr = glint2_enthxfer.define(nc, nctype); CHKERRQ(ierr);
-	}
-
-	if (set_contains(vars, "glint2_wflux")) {
-		ierr = glint2_wflux.define(nc, nctype); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "glint2_deltah")) {
@@ -204,10 +191,6 @@ PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, con
 
 	if (set_contains(vars, "glint2_enthxfer")) {
 		ierr = glint2_enthxfer.write(nc); CHKERRQ(ierr);
-	}
-
-	if (set_contains(vars, "glint2_wflux")) {
-		ierr = glint2_wflux.write(nc); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "glint2_deltah")) {

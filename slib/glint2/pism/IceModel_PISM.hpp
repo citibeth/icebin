@@ -47,9 +47,6 @@ class IceModel_PISM : public IceModel
 
 	/** Constants used by PISM, and fetched from GCM config */
 
-	// (m) Depth of bottom layer of surface ice model
-	double Z2LI;
-
 	// These should be declared in the same order they're created,
 	// so they get destroyed in the proper reverse order.
 	// See: http://msdn.microsoft.com/en-us/library/8183zf3x%28v=vs.110%29.aspx

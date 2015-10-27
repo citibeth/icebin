@@ -15,14 +15,24 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	// ------------ GCM Outputs
 	// The GCM must produce the same set of outputs, no matter what
 	// ice model is being used
-	gcm_outputs.add_field("wflux", "m^3 m-2 s-1", ELEVATION,
-		"Downward water flux out of surface model's bottom layer");
-	gcm_outputs.add_field("massxfer", "m^3 m-2 s-1", ELEVATION,		// [m water equiv]
-		"Mass of ice being transferred Stieglitz --> Glint2");
-	gcm_outputs.add_field("enthxfer", "W m-2", ELEVATION,
-		"Enthalpy of ice being transferred Stieglitz --> Glint2");
-	gcm_outputs.add_field("deltah", "W m-2", ELEVATION,
-		"Change of enthalpy in ice model's top layer");
+	gcm_outputs.add_field("runo", "kg m-2", ELEVATION,
+		"Downward water flux through bottom layer");
+	gcm_outputs.add_field("eruno", "J m-2", ELEVATION,
+		"Enthalpy of downward water flux through bottom layer");
+#ifdef TRACERS_WATER
+	gcm_outputs.add_field("trruno")
+#endif
+	gcm_outputs.add_field("deltah", "J m-2", ELEVATION,
+		"Enthalpy change of 'borrowed' layer");
+	gcm_outputs.add_field("massxfer", "kg m-2", ELEVATION,
+		"Mass of ice being transferred Stieglitz --> GLint2");
+	gcm_outputs.add_field("enthxfer", "J m-2", ELEVATION,
+		"Enthlpy of ice being transferred Stieglitz --> GLint2");
+#ifdef TRACERS_WATER
+	gcm_outputs.add_field("trxfer");
+#endif
+	gcm_outputs.add_field("volxfer", "m^3 m-2", ELEVATION,
+		"Volume of ice being transferred Stieglitz --> GLint2");
 
 	gcm_outputs.add_field("unit", "", 0, "Dimensionless identity");
 
@@ -37,8 +47,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	// can be computed at or before contract initialization time can
 	// be placed directly into the VarTransformer.
 
-// We don't need this, GCM is converting to s-1 on its own.
-//	ice_input_scalars.add_field("by_dt", "s-1", "Inverse of coupling timestep");
+	ice_input_scalars.add_field("by_dt", "s-1", 1., "Inverse of coupling timestep");
 
 	ice_input_scalars.add_field("unit", "", 0, "Dimensionless identity");
 //	gcm_input_scalars.add_field("unit", "", 0, "Dimensionless identity");
