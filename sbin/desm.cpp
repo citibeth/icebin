@@ -445,7 +445,9 @@ printf("counts = [%ld %ld %ld %ld]\n", counts[0], counts[1], counts[2], counts[3
 printf("BB2\n");
 
 		// Run the coupling step
-		glint2_modele_couple_to_ice_c(api, end_time_i, massxfer_ff, enthxfer_ff, deltah_ff, gcm_inputs_f);
+		// massxfer_ff, enthxfer_ff, deltah_ff, 
+		// TODO: Add inputs via glint2_modele_set
+		glint2_modele_couple_to_ice_c(api, end_time_i, gcm_inputs_f);
 
 		// (No need to scatter back to GCM.  But if we did scatter,
 		// we would be doing (in Fortran):
