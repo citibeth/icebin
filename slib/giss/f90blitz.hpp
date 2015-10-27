@@ -33,6 +33,7 @@ shape arrays in Fortran 90.  Used as parameters in C++ functions to
 accept Fortran 90 arrays and re-constitute them as blitz++ arrays.
 Peered with the Fortran derived types arr_spec_<x>, where <x> is a
 number of dimensions.
+@param ArrT double, etc.
 @see f90blitz_f.py */
 template<class ArrT, int rank>
 struct F90Array {

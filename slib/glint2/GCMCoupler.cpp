@@ -97,7 +97,8 @@ void GCMCoupler::read_from_netcdf(
 
 	int ix=0;
 	for (auto field = gcm_constants.begin(); field != gcm_constants.end(); ++field, ++ix) {
-		std::cout << "    " << *field << " = " << gcm_constants[ix] << std::endl;
+		printf("    %s = %g [%s] (flags:0x%x)\n", field->name.c_str(), gcm_constants[ix], field->units.c_str(), field->flags);
+//		std::cout << "    " << *field << " = " << gcm_constants[ix] << std::endl;
 	}
 	std::cout << "========= GCM Outputs" << std::endl;
 	std::cout << gcm_outputs << std::endl;
