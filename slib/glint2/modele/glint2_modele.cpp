@@ -219,7 +219,7 @@ ice model.
 static void save_gcm_outputs(
 glint2_modele *api,
 double time_s,
-std::vector<blitz::Array<double,3>> &inputs)
+std::vector<std::unique_ptr<blitz::Array<double,3>>> &inputs)
 {
 
 	// Get dimensions of full domain
@@ -235,9 +235,9 @@ std::vector<blitz::Array<double,3>> &inputs)
 	giss::CouplingContract &gcm_outputs(coupler.gcm_outputs);
 
 	// Count total number of elements in the inputs (for this MPI domain)
-	blitz::Array<double,3> &input0(inputs[0]);
+	auto &input0(inputs[0]);
 	int nele_l =
-		(input0.ubound(2) - input0.lbound(2) + 1) *
+		(input0->ubound(2) - input0->lbound(2) + 1) *
 		(domain->j1_f - domain->j0_f + 1) *
 		(domain->i1_f - domain->i0_f + 1);
 
@@ -250,14 +250,14 @@ std::vector<blitz::Array<double,3>> &inputs)
 
 	// Fill it in....
 	int nmsg = 0;
-	for (int k=input0.lbound(2); k<=input0.ubound(2); ++k)		// nhp_gcm
+	for (int k=input0->lbound(2); k<=input0->ubound(2); ++k)		// nhp_gcm
 	for (int j=domain->j0_f; j <= domain->j1_f; ++j)
 	for (int i=domain->i0_f; i <= domain->i1_f; ++i) {
 		ModelEMsg &msg = sbuf[nmsg];
 		msg.i = i;
 		msg.j = j;
 		msg.k = k;
-		for (unsigned int l=0; l<nfields; ++l) msg[l] = inputs[l](i,j,k);
+		for (unsigned int l=0; l<nfields; ++l) msg[l] = (*inputs[l])(i,j,k);
 		++nmsg;
 	}
 
@@ -352,6 +352,7 @@ extern "C" void glint2_modele_set_const(
 @param glint2_config_fname_f Name of GLINT2 configuration file */
 extern "C" void glint2_modele_init0(
 	glint2::modele::glint2_modele *api,
+	char const *run_dir_f, int run_dir_len,
 	char const *glint2_config_fname_f, int glint2_config_fname_len,
 	char const *maker_vname_f, int maker_vname_len,
 
@@ -370,35 +371,33 @@ extern "C" void glint2_modele_init0(
 	int write_constants)
 {
 //iyear1=1950;		// Hard-code iyear1 because it hasn't been initialized yet in ModelE
-	printf("BEGIN glint2_modele_init0() %p %ld\n",glint2_config_fname_f, glint2_config_fname_len);
 
 	// Convert Fortran arguments
+	std::string run_dir(run_dir_f, run_dir_len);		// The file specified in ModelE -i on the command line (i.e. the processed rundeck)
 	std::string glint2_config_fname(glint2_config_fname_f, glint2_config_fname_len);
+
+	printf("BEGIN glint2_modele_init0(%s)\n", glint2_config_fname.c_str());
+
 	std::string maker_vname(maker_vname_f, maker_vname_len);
-glint2_config_fname = "./GLINT2";
+//glint2_config_fname = "./GLINT2";
 
 	// Parse directory out of glint2_config_fname
 boost::filesystem::path mypath(glint2_config_fname);
 printf("AA2\n");
 	boost::filesystem::path glint2_config_rfname(boost::filesystem::canonical(mypath));
-
-//	boost::filesystem::path glint2_config_rfname(boost::filesystem::canonical(glint2_config_fname));
 	boost::filesystem::path glint2_config_dir(glint2_config_rfname.parent_path());
-std::cout << "glint2_config_dir = " << glint2_config_dir << std::endl;
 
 	// Set up parmaeters from the GCM to the ice model
 	api->gcm_coupler.gcm_params = GCMParams(
 		MPI_Comm_f2c(comm_f),
 		root,
-		glint2_config_dir);
+		glint2_config_dir, run_dir);
 
 	if (write_constants) {
 		// Store constants int NetCDF file, so we can desm without ModelE.
-		giss::ConstantSet &gcm_constants(api->gcm_coupler.gcm_constants);
-		GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
-	
-		NcFile nc((gcm_params.config_dir / "modele_constants.nc").c_str(), NcFile::Replace);
-		gcm_constants.netcdf_define(nc, "constants");
+		NcFile nc((api->gcm_coupler.gcm_params.run_dir / "modele_constants.nc").c_str(), NcFile::Replace);
+		api->gcm_coupler.gcm_constants.netcdf_define(nc, "constants");
+		// No NetCDF write phase is required here, constants are all in the define phase.
 		nc.close();
 	}
 
@@ -866,15 +865,15 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 				for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
 					int xj = xjj->first;
 					double io_val = xjj->second;
-					inp += io_val * api->gcm_outputs[xj](jj.col_i, jj.col_j, jj.col_k);
+					inp += io_val * (*api->gcm_outputs[xj])(jj.col_i, jj.col_j, jj.col_k);
 				}
 				msg[xi] = jj.val * (inp + trans.units[xi]);
 			}
 #else
 			// This is the old code for the above (that doesn't convert units)
-			msg[0] = jj.val * api->gcm_outputs[0](jj.col_i, jj.col_j, jj.col_k);
-			msg[1] = jj.val * api->gcm_outputs[1](jj.col_i, jj.col_j, jj.col_k);
-			msg[2] = jj.val * api->gcm_outputs[2](jj.col_i, jj.col_j, jj.col_k);
+			msg[0] = jj.val * (*api->gcm_outputs[0])(jj.col_i, jj.col_j, jj.col_k);
+			msg[1] = jj.val * (*api->gcm_outputs[1])(jj.col_i, jj.col_j, jj.col_k);
+			msg[2] = jj.val * (*api->gcm_outputs[2])(jj.col_i, jj.col_j, jj.col_k);
 #endif
 //			// This is even older code (variables are hardwired)
 //			msg[0] = jj.val * smb1h(jj.col_i, jj.col_j, jj.col_k);
@@ -955,12 +954,13 @@ extern"C"
 int glint2_modele_set_gcm_output_c(
 glint2_modele *api,
 char const *field_name_f, int field_name_len,
-giss::F90Array<double, 3> &arr)
+giss::F90Array<double, 3> &arr_f)
 {
 	std::string const field_name(field_name_f, field_name_len);
 	int field_ix = api->gcm_coupler.gcm_outputs.index(field_name);
-	api->gcm_outputs.reserve(field_ix+1);
-	api->gcm_outputs[field_ix].reference(arr.to_blitz());
+	if (api->gcm_outputs.size() <= field_ix) api->gcm_outputs.resize(field_ix+1);
+	blitz::Array<double,3> *arrp = new blitz::Array<double,3>(arr_f.to_blitz());
+	api->gcm_outputs[field_ix].reset(arrp);
 }
 
 // ===============================================================
