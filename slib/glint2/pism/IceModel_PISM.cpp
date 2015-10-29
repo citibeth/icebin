@@ -13,8 +13,11 @@
 #include <giss/sort.hpp>
 #include <giss/exit.hpp>
 
+extern "C" void libpismutil_refaddr();
+
 using namespace giss;
 using namespace pism;
+
 
 namespace glint2 {
 namespace gpism {
@@ -174,7 +177,14 @@ printf("IceModel_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c
 // For stable0.5 branch
 // static std::set<std::string> path_args = {"config_override", "i", "o", "surface_given_file", "extra_file", "ts_file"};
 // For dev branch
-static std::set<std::string> path_args = {"i", "o", "surface_given_file", "ocean_kill", "ocean_kill_file", "extra_file", "ts_file"};
+static std::map<std::string, std::string> path_args = {
+	{"i", "i"},
+	{"surface_given_file", "i"},
+	{"ocean_kill", "i"},
+	{"ocean_kill_file", "i"},
+	{"o", "o"},
+	{"extra_file", "o"},
+	{"ts_file", "o"}};
 
 void IceModel_PISM::init(
 	std::shared_ptr<glint2::Grid> const &grid2,
@@ -204,14 +214,18 @@ void IceModel_PISM::init(
 		std::string name = att->name();
 		std::string val = att->as_string(0);
 
-		if (path_args.find(name) == path_args.end()) {
+		auto ii(path_args.find(name));
+		if (ii == path_args.end()) {
 			// Regular case, just use the value there
 			val = std::string(att->as_string(0));
 		} else {
 			// Resolve path names according to the configuration directory
+			auto &resolve(ii->second == "i" ?
+				coupler->gcm_params.config_dir : coupler->gcm_params.run_dir);
+
 			val = boost::filesystem::absolute(
 				boost::filesystem::path(att->as_string(0)),
-				coupler->gcm_params.config_dir).string();
+				resolve).string();
 			printf("IceModel_PISM resolving %s: %s --> %s\n", name.c_str(), att->as_string(0), val.c_str());
 		}
 
@@ -233,6 +247,14 @@ void IceModel_PISM::start_time_set()
 		PISMEnd();
 	}
 }
+
+// -------------------------------------------
+static void myPISMEnd()
+{
+	fprintf(stderr, "Exiting via PISMEnd\n");
+	giss::exit(1);
+}
+// -------------------------------------------
 
 // Called from start_time_set().
 PetscErrorCode IceModel_PISM::allocate()
@@ -271,9 +293,10 @@ printf("\n");
 printf("[%d] pism_size = %d\n", pism_rank, pism_size);
 
 	// Initialize Petsc
-printf("Initializing PETSc\n");
 	petsc_context.reset(new PetscContext(pism_comm, argc, argv));
 
+	pism::PISMEnd_ptr = &myPISMEnd;
+	libpismutil_refaddr();	// Set up for stacktrace
     unit_system.reset(new pism::UnitSystem(NULL));
     config.reset(new pism::Config(pism_comm, "pism_config", *unit_system));
 	overrides.reset(new pism::Config(pism_comm, "pism_overrides", *unit_system));
@@ -344,6 +367,19 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 
 	ix = contract[INPUT].index("deltah");
 		pism_ivars[ix] = &pism_surface_model->glint2_deltah;
+
+	// Check that all PISM inputs are bound to a variable
+	bool err = false;
+	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
+		IceModelVec2S *pism_var = pism_ivars[i];
+		if (!pism_var) {
+			fprintf(stderr, "PISM input %s is not bound to a variable\n", contract[INPUT].name(ix).c_str());
+			err = true;
+		}
+	}
+	if (err) giss::exit(1);
+
+
 
 	// Initialize scatter/gather stuff
 	ierr = pism_grid->get_dm(1, pism_grid->max_stencil_width, da2); CHKERRQ(ierr);
@@ -536,6 +572,7 @@ printf("[%d] BEGIN IceModel_PISM::run_timestep_petsc(%f)\n", pism_rank, time_s);
 //g2_y = 250.;
 
 		// Put into a natural-ordering global distributed Petsc Vec
+printf("Running VecSet: cf.default_value = %g\n", cf.default_value);
 		ierr = VecSet(g2natural, cf.default_value); CHKERRQ(ierr);
 		ierr = VecSetValues(g2natural, nconsolidated, &g2_ix(0), &g2_y(0), INSERT_VALUES); CHKERRQ(ierr);
 
@@ -575,7 +612,11 @@ ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 		std::string const &fnpart = contract[INPUT].name(i);
 
 		fname << time_day << "-" << fnpart << ".nc";
-		boost::filesystem::path pfname(coupler->gcm_params.config_dir / "pism_inputs" / fname.str());
+
+		boost::filesystem::path output_dir(
+			coupler->gcm_params.run_dir / "pism_in");
+		boost::filesystem::create_directory(output_dir);	// Make sure it exists
+		boost::filesystem::path pfname(output_dir / fname.str());
 
 //		printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
 		IceModelVec2S *pism_var = pism_ivars[i];

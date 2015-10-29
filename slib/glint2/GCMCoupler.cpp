@@ -67,7 +67,7 @@ void GCMCoupler::read_from_netcdf(
 			if (gcm_out_file.length() > 0) {
 			    gcm_out_file = boost::filesystem::absolute(
 					boost::filesystem::path(gcm_out_file),
-					gcm_params.config_dir).string();
+					gcm_params.run_dir).string();
 			}
 		}
 		printf("gcm_out_file = %s\n", gcm_out_file.c_str());
@@ -86,7 +86,7 @@ void GCMCoupler::read_from_netcdf(
 			if (gcm_in_file.length() > 0) {
 			    gcm_in_file = boost::filesystem::absolute(
 					boost::filesystem::path(gcm_in_file),
-					gcm_params.config_dir).string();
+					gcm_params.run_dir).string();
 			}
 		}
 		printf("gcm_in_file = %s\n", gcm_in_file.c_str());

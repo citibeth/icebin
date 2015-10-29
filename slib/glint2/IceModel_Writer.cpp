@@ -92,8 +92,8 @@ void IceModel_Writer::init(
 	// Put our output files in this directory, one named per ice sheet.
 	auto output_dir = boost::filesystem::absolute(
 		boost::filesystem::path(
-			(io == IceModel::INPUT ? "ice_model_inputs" : "ice_model_outputs")),
-		coupler->gcm_params.config_dir);
+			(io == IceModel::INPUT ? "ice_model_in" : "ice_model_out")),
+		coupler->gcm_params.run_dir);
 	boost::filesystem::create_directory(output_dir);	// Make sure it exists
 
 	// Set up the output file

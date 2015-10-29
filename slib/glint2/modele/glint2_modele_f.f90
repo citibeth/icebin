@@ -79,6 +79,7 @@ INTERFACE
 	end function glint2_modele_gcm_inputs_nhp
 
 	subroutine glint2_modele_init0(api, &
+		run_dir_f, run_dir_len, &
 		maker_fname_f, maker_fname_len, &
 		maker_vname_f, maker_vname_len, &
 		im,jm, &
@@ -89,6 +90,8 @@ INTERFACE
         write_constants) bind(c)
 	use iso_c_binding
 		type(c_ptr), value :: api
+		character(c_char) :: run_dir_f(*)
+		integer(c_int), value :: run_dir_len
 		character(c_char) :: maker_fname_f(*)
 		integer(c_int), value :: maker_fname_len
 		character(c_char) :: maker_vname_f(*)

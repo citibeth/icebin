@@ -53,7 +53,7 @@ struct glint2_modele {
 
 	/** Vectors handed to us by ModelE, before we pass them along to
 	Glint2 when coupling. */
-	std::vector<blitz::Array<double, 3>> gcm_outputs;
+	std::vector<std::unique_ptr<blitz::Array<double, 3>>> gcm_outputs;
 
 	/** Position with the gcm_inputs array (passed from GCM)
 	where each variable in the gcm_inputs contract starts.
@@ -114,6 +114,7 @@ char const *long_name_f, int long_name_len);
 // First init to be called after new
 extern "C" void glint2_modele_init0(
 	glint2::modele::glint2_modele *api,
+	char const *run_dir, int run_dir_len,
 	char const *maker_fname_f, int maker_fname_len,
 	char const *maker_vname_f, int maker_vname_len,
 

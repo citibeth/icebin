@@ -248,6 +248,7 @@ int Desm::main(int argc, char **argv)
 
 	printf("glint2_modele_init(fname = %s)\n", glint2_config_fname.c_str());
 	glint2_modele_init0(api,
+		".", 1,
 		glint2_config_fname.c_str(), glint2_config_fname.size(),
 		glint2_config_vname.c_str(), glint2_config_vname.size(),
 

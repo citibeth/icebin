@@ -68,8 +68,6 @@ void IceModel_PISM::setup_contracts_modele()
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field("wflux", "kg m-2 s-1", contracts::ELEVATION,
-		"Downward water flux out of surface model's bottom layer");
 	ice_input.add_field("massxfer", "kg m-2 s-1", contracts::ELEVATION,
 		"Mass of ice being transferred Stieglitz --> Glint2");
 	ice_input.add_field("enthxfer", "W m-2", contracts::ELEVATION,
