@@ -88,7 +88,8 @@ set(glint2_SOURCES
 	galahad/zd11_c.cpp
 	galahad/qpt_c.cpp)
 
-add_library (glint2 SHARED ${glint2_SOURCES})
+add_library (glint2 SHARED ${glint2_SOURCES} ${EVERYTRACE_REFADDR})
+
 target_link_libraries(glint2 ${EXTERNAL_LIBS})
 
 install(TARGETS glint2 DESTINATION lib)

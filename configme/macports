@@ -29,6 +29,7 @@ cmake \
 	-DPISM_LIB=$MACPORTS/opt/pism/lib \
 	-DGALAHAD_ROOT=$MACPORTS/opt/galahad \
 	-DGALAHAD_ARCH=mac64.osx.gfo \
+	-DEVERYTRACE_ROOT=$MACPORTS/opt/everytrace \
 	$@
 
 #	-DCMAKE_CXX_FLAGS="-g -Wl,-rpath" \

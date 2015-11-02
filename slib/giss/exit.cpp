@@ -18,6 +18,7 @@
 
 #include <cstdio>
 #include <glint2/util.hpp>
+#include <everytrace.h>
 
 #ifdef __GNUC__
 #include <execinfo.h>
@@ -28,47 +29,6 @@
 
 namespace giss {
 
-void exit_exception(int errcode)
-{
-	throw std::exception();
-}
-
-void exit_segfault(int errcode)
-{
-	int *ptr = 0;
-	*ptr = 17;
-}
-
-#ifdef __GNUC__
-// http://stackoverflow.com/questions/77005/how-to-generate-a-stacktrace-when-my-gcc-c-app-crashes
-
-extern "C" void print_stacktrace();		// From exit_f.F90
-
-void exit_stacktrace(int errcode)
-{
-	const int MAX_TRACE = 200;
-	void *trace[MAX_TRACE];
-
-	fprintf(stderr, "User stacktrace:\n");
-#if 0
-	size_t ntrace = backtrace(trace, MAX_TRACE);
-	for (size_t i=0; i<ntrace; ++i) {
-		fprintf(stderr, "#%d 0x%lx\n", i, (uintptr_t)(trace[i]));
-	}
-#else
-	// Fortran backtrace seems to work better.
-	print_stacktrace();
-#endif
-
-	throw std::exception();
-}
-#endif
-
-#ifdef __GNUC__
-	std::function<void(int)> exit(&exit_stacktrace);
-#else
-	std::function<void(int)> exit(&exit_exception);
-#endif
-
+std::function<void(int)> exit(&everytrace_exit);
 
 }

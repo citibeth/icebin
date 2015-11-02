@@ -12,6 +12,7 @@ ADD_LIBRARY(_glint2 MODULE
 	MatrixMaker_py.cpp
 	matrix_ops_py.cpp
 	_glint2_module_py.cpp
+	${EVERYTRACE_REFADDR}
 )
 
 include_directories(${PYTHON_INCLUES} ${NUMPY_INCLUDE_DIRS})

@@ -31,6 +31,8 @@ set(NETCDF_CXX "YES")
 set(NETCDF_F90 "YES")
 find_package(NetCDF REQUIRED)
 
+find_package(Everytrace)
+
 find_package(PROJ4)
 find_package(Boost COMPONENTS filesystem system date_time thread REQUIRED)
 find_package(UDUNITS2 REQUIRED)
@@ -60,6 +62,7 @@ endif()
 
 # Set Pism_EXTERNAL_LIBS and include directories.
 include_directories (
+	${EVERYTRACE_INCLUDE_DIR}
 	${PROJECT_SOURCE_DIR}/slib
 	${Boost_INCLUDE_DIRS}
     ${NETCDF_INCLUDES} ${NETCDF_INCLUDES_CXX} ${NETCDF_INCLUDES_F77}
@@ -85,12 +88,13 @@ endif()
 message('zyx' ${GALAHAD_LIBRARIES})
 
 list(APPEND EXTERNAL_LIBS
+	${EVERYTRACE_CF_LIBRARY}
 	${Boost_LIBRARIES}
     ${UDUNITS2_LIBRARIES}
     ${FFTW_LIBRARIES}
     ${GSL_LIBRARIES}
 
-    ${NETCDF_LIBRARIES}
+    ${NETCDF_LIBRARIES_F90} ${NETCDF_LIBRARIES_CXX} ${NETCDF_LIBRARIES_C}
     ${MPI_C_LIBRARIES}
 	${GALAHAD_LIBRARIES}
 	${PROJ4_LIBRARIES}

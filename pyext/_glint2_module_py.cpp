@@ -17,7 +17,6 @@
  */
 
 #include "_glint2_module.hpp"
-#include <libglint2_refaddr.hpp>
 
 #include <cstdio>
 #include <vector>
@@ -83,17 +82,10 @@ static PyModuleDef glint2ModuleDef = {
 };
 
 // ===========================================================================
-extern "C" void _glint2_refaddr(void)
-{
-	fprintf(stderr, "REFERNCE_ADDRESS _glint2_refaddr %p\n", _glint2_refaddr);
-	fflush(stderr);
-}
 
 extern "C"
 PyObject *PyInit__glint2(void)
 {
-//	libglint2_refaddr();
-//	_glint2_refaddr();
 //	libglint2_ncerror_segfault();
 
 	PyObject *mod = giss::init_module(glint2ModuleDef,
