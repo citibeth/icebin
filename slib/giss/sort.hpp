@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <vector>
 #include <algorithm>
 #include <blitz/array.h>
@@ -70,26 +71,34 @@ int consolidate_by_perm(
 	// Location to put this in the final array
 	std::vector<int> dest; dest.reserve(sorted_perm.size());
 
+	// Special case for zero-length arrays.
+	if (sorted_perm.size() == 0) return 0;
+
 	// Scan through, overwriting our array
 	// New array will never be bigger than original
-	int j=0;		// Last-written item in output array
+
+	// --- Initialize the first element
 	IndexT last_index = indices(sorted_perm[0]);	// Last index we saw in input array
+	int j_out=0;		// Last-written item in output array, j_out <= i always
+	ovalues(j_out) = ivalues(last_index);
+
+	// --- Copy over the rest
 	for (unsigned int i=1; i<sorted_perm.size(); ++i) {
 		IndexT const &index = indices(sorted_perm[i]);
 		ValT const &val = ivalues(sorted_perm[i]);
 
 		if (index == last_index) {
 			if (duplicate_policy == DuplicatePolicy::ADD)
-				ovalues(j) += val;
+				ovalues(j_out) += val;
 			else
-				ovalues(j) = val;
+				ovalues(j_out) = val;
 		} else {
-			++j;
-			ovalues(j) = val;
+			++j_out;
+			ovalues(j_out) = val;
 			last_index = index;
 		}
 	}
-	int n = j+1;	// Size of output array
+	int n = j_out+1;	// Size of output array
 
 	return n;
 }
