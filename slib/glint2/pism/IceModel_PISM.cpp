@@ -324,7 +324,7 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
 printf("pism_grid=%p: (xs,xm,ys,ym,Mx,My) = %d %d %d %d %d %d %ld %ld\n", &*pism_grid, pism_grid->xs, pism_grid->xm, pism_grid->ys, pism_grid->ym, pism_grid->Mx, pism_grid->My, pism_grid->x.size(), pism_grid->y.size());
 	PISMIceModel::Params params;
 		params.time_start_s = coupler->gcm_params.time_start_s;
-		params.output_dir = boost::filesystem::absolute(coupler->gcm_params.config_dir).string();
+		params.output_dir = boost::filesystem::absolute(coupler->gcm_params.run_dir).string();
     ice_model.reset(new PISMIceModel(*pism_grid, *config, *overrides, params));
 
 	// Transfer constants from GCM to PISM, and also set up coupling contracts.
@@ -432,6 +432,23 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 		pism_ovars[ix] = &ii->vec;
 	}
 
+	// -------------- Initialize pism_out.nc
+	// ---------- Create the netCDF output file
+	{
+		std::unique_ptr<PIO> nc;
+		std::string ofname = (params.output_dir / "pism_out.nc").string();
+		ierr = ice_model->prepare_nc(ofname, nc); CHKERRQ(ierr);
+
+		// -------- Define MethEnth structres in netCDF file
+		for (unsigned int i=0; i<pism_ovars.size(); ++i) {
+			ierr = pism_ovars[i]->define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
+		}
+
+		// --------- Close and return
+		nc->close();
+	}
+
+
 	// ============== Miscellaneous
 	// Check that grid dimensions match
 	if ((pism_grid->Mx != glint2_grid->nx()) || (pism_grid->My != glint2_grid->ny())) {
@@ -520,7 +537,9 @@ PetscErrorCode IceModel_PISM::run_timestep_petsc(double time_s,
 	blitz::Array<int,1> const &indices,
 	std::vector<blitz::Array<double,1>> const &ivals2)
 {
-printf("[%d] BEGIN IceModel_PISM::run_timestep_petsc(%f)\n", pism_rank, time_s);
+	// This subroutine happens AFTER the gather to root.
+	// THEREFORE... indices.size() will be 0, EXCEPT for root.
+
 	PetscErrorCode ierr = 0;
 
 	int nvals = indices.extent(0);
@@ -539,8 +558,16 @@ printf("[%d] BEGIN IceModel_PISM::run_timestep_petsc(%f)\n", pism_rank, time_s);
 	}
 	CHKERRQ(ierr);
 
+	// Create a sorted order of our indices
+	// (so we can eliminate duplicates via consolidate_by_perm)
 	std::vector<int> perm = sorted_perm(indices);
 
+	// --------- Create g2_ix: PISM index of each value we received.
+	// nvals: the LARGEST our resulting vector might have
+	//     to be, if we don't have any duplicates.  In 
+    // nconsolidated: the ACTUAL size of our resulting vector.
+
+	// Remove duplicates (and sort too)
 	blitz::Array<int,1> g2_ix(nvals);
 	int nconsolidated = consolidate_by_perm(indices, perm,
 		indices, g2_ix, DuplicatePolicy::REPLACE);
@@ -550,9 +577,10 @@ printf("[%d] BEGIN IceModel_PISM::run_timestep_petsc(%f)\n", pism_rank, time_s);
 		g2_ix(ix) = glint2_to_pism1d(g2_ix(ix));
 	}
 
+	// -----------------
+	// Use the uniq-ified indices to fill pism_ivars[i] <-- ivals2[i]
+	// pism_ivars are distributed (global) vectors.
 	blitz::Array<PetscScalar,1> g2_y(nconsolidated);
-//for (int ix=0; ix<nconsolidated; ++ix) g2_y[ix] = 17.;
-
 	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
 
 		giss::CoupledField const &cf(contract[IceModel::INPUT].field(i));
@@ -572,7 +600,6 @@ printf("[%d] BEGIN IceModel_PISM::run_timestep_petsc(%f)\n", pism_rank, time_s);
 //g2_y = 250.;
 
 		// Put into a natural-ordering global distributed Petsc Vec
-printf("Running VecSet: cf.default_value = %g\n", cf.default_value);
 		ierr = VecSet(g2natural, cf.default_value); CHKERRQ(ierr);
 		ierr = VecSetValues(g2natural, nconsolidated, &g2_ix(0), &g2_y(0), INSERT_VALUES); CHKERRQ(ierr);
 
@@ -580,21 +607,24 @@ printf("Running VecSet: cf.default_value = %g\n", cf.default_value);
 		ierr = VecAssemblyEnd(g2natural); CHKERRQ(ierr);
 
 		// Copy to Petsc-ordered global vec
-ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 		ierr = DMDANaturalToGlobalBegin(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
 		ierr = DMDANaturalToGlobalEnd(da2, g2natural, INSERT_VALUES, g2); CHKERRQ(ierr);
 
 		// Copy to the output variable
 		// (Could we just do DMDANaturalToGlobal() directly to this?)
 		ierr = pism_var->copy_from_vec(g2); CHKERRQ(ierr);
-
 	}
 
-	// Figure out the timestep
-	auto old_pism_time(pism_grid->time->current());	// [s]
-	auto timestep_s = time_s = old_pism_time;		// [s]
+	// -------- Figure out the timestep
+	auto old_pism_time(pism_grid->time->current());	// beginning of this PISM timestep [s]
+	auto timestep_s = time_s - old_pism_time;		// [s]
 
-	// Determine Dirichlet B.C. for ice sheet
+printf("IceModel_PISM::run_timestep_petsc(): timestep_s = %g\n", timestep_s);
+
+	// -------- Determine Dirichlet B.C. for ice sheet
+	// This is done by taking the changes in the "borrowed" enthalpies
+	// from the GCM, and applying them to the corresponding top layer in
+	// the ice model.  The result is placed in surface->surface_temp.
 	PSConstantGLINT2 * const surface = ice_model->ps_constant_glint2();
 	ice_model->construct_surface_temp(
 		surface->glint2_deltah,
@@ -602,6 +632,8 @@ ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 		timestep_s,
 		surface->surface_temp);
 
+#if 0
+TODO: Follow the pattern for pism_out.nc
 	// Write out what we've now calculated (for debugging)
 	if (write_pism_inputs) {
 	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
@@ -623,13 +655,33 @@ ierr = VecSet(g2, 0.0); CHKERRQ(ierr);
 		pism_var->dump(pfname.c_str());
 		// ================ END Write PISM Inputs
 	}}	// For each pism_var
+#endif
 
 
-
-printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time->current(), time_s, ice_model.get());
 	// =========== Run PISM for one coupling timestep
 	// Time of last time we coupled
-	ierr = ice_model->run_to(time_s); CHKERRQ(ierr);	// See glint2::gpism::PISMIceModel::run_to()
+	printf("BEGIN ice_model->run_to(%f -> %f) %p\n",
+		pism_grid->time->current(), time_s, ice_model.get());
+	// See glint2::gpism::PISMIceModel::run_to()
+	ierr = ice_model->run_to(time_s); CHKERRQ(ierr);
+	printf("END ice_model->run_to()\n");
+
+
+	// ----------- Write pism_ovars
+	if (true || write_pism_inputs) {
+		double t1;
+		auto &grid(ice_model->grid);
+		pism::PIO nc(grid, grid.config.get_string("output_format"));
+
+		auto ofname(coupler->gcm_params.run_dir / "pism_out.nc");
+		nc.open(ofname.c_str(), PISM_READWRITE); // append to file
+		nc.append_time(ice_model->config.get_string("time_dimension_name"), t1);
+
+		for (unsigned int i=0; i<pism_ovars.size(); ++i) {
+			ierr = pism_ovars[i]->write(nc, PISM_DOUBLE); CHKERRQ(ierr);
+		}
+		nc.close();
+	}
 
 	if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
@@ -641,8 +693,7 @@ printf("[%d] BEGIN ice_model->run_to(%f -> %f) %p\n", pism_rank, pism_grid->time
 	ierr = get_state_petsc(0); CHKERRQ(ierr);	// Copy PISM->Glint2 output vars
 	ierr = ice_model->reset_rate(); CHKERRQ(ierr);
 
-printf("Current time is pism: %f-%f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
-printf("[%d] END ice_model->run_to()\n", pism_rank);
+printf("Current time is pism: %f --> %f, GLINT2: %f\n", old_pism_time, pism_grid->time->current(), time_s);
 
 	return 0;
 }
