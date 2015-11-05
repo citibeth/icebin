@@ -18,6 +18,10 @@ if (NOT DEFINED USE_PYTHON)
 	set(USE_PYTHON NO)
 endif()
 
+if (NOT DEFINED USE_EVERYTRACE)
+	set(USE_EVERYTRACE NO)
+endif()
+
 # -------- Find Dependencies
 
 # Used directly by Glint2
