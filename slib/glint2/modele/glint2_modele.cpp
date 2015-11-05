@@ -382,8 +382,7 @@ extern "C" void glint2_modele_init0(
 //glint2_config_fname = "./GLINT2";
 
 	// Parse directory out of glint2_config_fname
-boost::filesystem::path mypath(glint2_config_fname);
-printf("AA2\n");
+	boost::filesystem::path mypath(glint2_config_fname);
 	boost::filesystem::path glint2_config_rfname(boost::filesystem::canonical(mypath));
 	boost::filesystem::path glint2_config_dir(glint2_config_rfname.parent_path());
 
