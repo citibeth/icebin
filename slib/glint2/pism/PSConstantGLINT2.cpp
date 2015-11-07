@@ -50,19 +50,19 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 	ierr = glint2_deltah.create(grid, "glint2_deltah", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = glint2_deltah.set_attrs("climate_state",
 		"enthalpy of constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
-		"W m-2", ""); CHKERRQ(ierr);
+		"J m-2", ""); CHKERRQ(ierr);
 	ierr = glint2_deltah.set_glaciological_units("kg m-2 year-1"); CHKERRQ(ierr);
 //	glint2_deltah.write_in_glaciological_units = true;
 
 
-	ierr = glint2_massxfer.create(grid, "glint2_massxfer", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = glint2_massxfer.set_attrs("climate_state",
+	ierr = glint2_massxfer_rate.create(grid, "glint2_massxfer_rate", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_massxfer_rate.set_attrs("climate_state",
 		"enthalpy of constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
 		"kg m-2 s-1", ""); CHKERRQ(ierr);
 
 
-	ierr = glint2_enthxfer.create(grid, "glint2_enthxfer", WITHOUT_GHOSTS); CHKERRQ(ierr);
-	ierr = glint2_enthxfer.set_attrs("climate_state",
+	ierr = glint2_enthxfer_rate.create(grid, "glint2_enthxfer_rate", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_enthxfer_rate.set_attrs("climate_state",
 		"constant-in-time heat flux through top surface",
 		"W m-2", ""); CHKERRQ(ierr);
 
@@ -101,8 +101,8 @@ printf("BEGIN PSConstantGLINT2::init(this=%p)\n", this);
 
 	// It doesn't matter what we set this to, it will be re-set later.
 	ierr = glint2_deltah.set(0.0); CHKERRQ(ierr);
-	ierr = glint2_massxfer.set(0.0); CHKERRQ(ierr);
-	ierr = glint2_enthxfer.set(0.0); CHKERRQ(ierr);
+	ierr = glint2_massxfer_rate.set(0.0); CHKERRQ(ierr);
+	ierr = glint2_enthxfer_rate.set(0.0); CHKERRQ(ierr);
 	ierr = surface_temp.set(0.0); CHKERRQ(ierr);
 
 	// parameterizing the ice surface temperature 'ice_surface_temp'
@@ -134,10 +134,11 @@ void PSConstantGLINT2::get_diagnostics(std::map<std::string, pism::Diagnostic*> 
 	// empty (does not have an atmosphere model)
 }
 
+  // Returns [kg m-2 s-1]
 PetscErrorCode PSConstantGLINT2::ice_surface_mass_flux(IceModelVec2S &result) {
 	PetscErrorCode ierr;
 
-	ierr = glint2_massxfer.copy_to(result); CHKERRQ(ierr);
+	ierr = glint2_massxfer_rate.copy_to(result); CHKERRQ(ierr);
 	return 0;
 }
 
@@ -151,14 +152,14 @@ PetscErrorCode PSConstantGLINT2::ice_surface_temperature(IceModelVec2S &result) 
 // PetscErrorCode PSConstantGLINT2::ice_surface_heat_flux(IceModelVec2S &result) {
 // 	PetscErrorCode ierr;
 // 
-// 	ierr = glint2_enthxfer.copy_to(result); CHKERRQ(ierr);
+// 	ierr = glint2_enthxfer_rate.copy_to(result); CHKERRQ(ierr);
 // 	return 0;
 // }
 
 void PSConstantGLINT2::add_vars_to_output(std::string /*keyword*/, std::set<std::string> &result) {
 	result.insert("glint2_deltah");
-	result.insert("glint2_massxfer");
-	result.insert("glint2_enthxfer");
+	result.insert("glint2_massxfer_rate");
+	result.insert("glint2_enthxfer_rate");
 	result.insert("surface_temp");
 	// does not call atmosphere->add_vars_to_output().
 }
@@ -168,16 +169,16 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 
 	ierr = pism::SurfaceModel::define_variables(vars, nc, nctype); CHKERRQ(ierr);
 
-	if (set_contains(vars, "glint2_enthxfer")) {
-		ierr = glint2_enthxfer.define(nc, nctype); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_enthxfer_rate")) {
+		ierr = glint2_enthxfer_rate.define(nc, nctype); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "glint2_deltah")) {
 		ierr = glint2_deltah.define(nc, nctype); CHKERRQ(ierr);
 	}
 
-	if (set_contains(vars, "glint2_massxfer")) {
-		ierr = glint2_massxfer.define(nc, nctype); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_massxfer_rate")) {
+		ierr = glint2_massxfer_rate.define(nc, nctype); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "surface_temp")) {
@@ -189,16 +190,16 @@ PetscErrorCode PSConstantGLINT2::define_variables(std::set<std::string> vars, co
 PetscErrorCode PSConstantGLINT2::write_variables(std::set<std::string> vars, const PIO &nc) {
 	PetscErrorCode ierr;
 
-	if (set_contains(vars, "glint2_enthxfer")) {
-		ierr = glint2_enthxfer.write(nc); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_enthxfer_rate")) {
+		ierr = glint2_enthxfer_rate.write(nc); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "glint2_deltah")) {
 		ierr = glint2_deltah.write(nc); CHKERRQ(ierr);
 	}
 
-	if (set_contains(vars, "glint2_massxfer")) {
-		ierr = glint2_massxfer.write(nc); CHKERRQ(ierr);
+	if (set_contains(vars, "glint2_massxfer_rate")) {
+		ierr = glint2_massxfer_rate.write(nc); CHKERRQ(ierr);
 	}
 
 	if (set_contains(vars, "surface_temp")) {

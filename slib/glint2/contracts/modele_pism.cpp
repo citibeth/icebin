@@ -72,7 +72,7 @@ void IceModel_PISM::setup_contracts_modele()
 		"Mass of ice being transferred Stieglitz --> Glint2");
 	ice_input.add_field("enthxfer", "W m-2", contracts::ELEVATION,
 		"Enthalpy of ice being transferred Stieglitz --> Glint2");
-	ice_input.add_field("deltah", "W m-2", contracts::ELEVATION,
+	ice_input.add_field("deltah", "J m-2", contracts::ELEVATION,
 		"Change of enthalpy of top layer in PISM");
 
 	// Figure out the conversion between GCM and PISM enthalpy
@@ -105,7 +105,7 @@ void IceModel_PISM::setup_contracts_modele()
 	ok = ok && vt.set("massxfer", "massxfer", "by_dt", 1.0);
 	ok = ok && vt.set("enthxfer", "enthxfer", "by_dt", 1.0);
 	ok = ok && vt.set("enthxfer", "massxfer", "by_dt", enth_modele_to_pism);
-	ok = ok && vt.set("deltah", "deltah", "by_dt", 1.0);
+	ok = ok && vt.set("deltah", "deltah", "unit", 1.0);
 	}
 
 	// ============== Ice -> GCM

@@ -399,7 +399,7 @@ printf("[%d] EE6\n", rank);
 			model->free_ice_ovals_I();
 		}
 
-		regrid_gcm_inputs_onroot(gcm_ivals, 0);
+		regrid_gcm_inputs_onroot(time_s, gcm_ivals, 0);
 	} else {
 		// (ONLY ON NOT GCM ROOT)
 		// We're not root --- we have no data to send to ice
@@ -420,8 +420,8 @@ printf("[%d] EE6\n", rank);
 	printf("[%d] END GCMCoupler::couple_to_ice()\n", gcm_params.gcm_rank);
 }
 
-
 void GCMCoupler:: regrid_gcm_inputs_onroot(
+double time_s,
 std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals,	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 unsigned int mask)
 {
@@ -484,8 +484,27 @@ unsigned int mask)
 			// Use previous return as our initial guess
 			blitz::Array<double,1> initial3(maker_full->n3());
 			giss::to_blitz(gcm_ivals[var_ix], initial3);
+
+			// --------- Devise to write out this QP problem before we solve.
+			std::string qpt_fname;
+			if (true) {
+				long time_day = (int)(time_s / 86400. + .5);
+				std::stringstream fname;
+				fname << time_day << "-" << cf.name << ".nc";
+				boost::filesystem::path output_dir(
+					gcm_params.run_dir / "qp_problems");
+				boost::filesystem::create_directory(output_dir);	// Make sure it exists
+				boost::filesystem::path pfname(output_dir / fname.str());
+
+				qpt_fname = pfname.string();
+			} else {
+				qpt_fname = "";
+			}
+
+			// Do the regridding (involves a QP problem)
 			gcm_ivals[var_ix] = maker_full->iceinterp_to_hp(
-				f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP);
+				f4s, initial3, IceInterp::ICE, QPAlgorithm::SINGLE_QP,
+				qpt_fname);
 			gcm_ivals[var_ix].consolidate();
 		}
 	}
@@ -503,6 +522,7 @@ unsigned int mask)
 /** Follows the pattern of couple_to_ice()
 @param sbuf the (filled) array of ice grid values for this MPI node. */
 void GCMCoupler::get_initial_state(
+double time_s,
 std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 {
 
@@ -537,7 +557,7 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 		}
 
 		// Fill in gcm_ivals
-		regrid_gcm_inputs_onroot(gcm_ivals, contracts::INITIAL);
+		regrid_gcm_inputs_onroot(time_s, gcm_ivals, contracts::INITIAL);
 
 	} else {
 		// (NOT GCM ROOT)

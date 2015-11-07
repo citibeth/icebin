@@ -68,6 +68,7 @@ set(glint2_SOURCES
 	glint2/modele/glint2_modele.cpp
 	glint2/modele/GCMCoupler_ModelE.cpp
 	glint2/modele/grids_ll.cpp
+	glint2/pism/VecBundleWriter.cpp
 	glint2/pism/IceModel_PISM.cpp
 	glint2/pism/NullTransportHydrology.cpp
 	glint2/pism/MassEnergyBudget.cpp

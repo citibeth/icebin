@@ -164,4 +164,5 @@ giss::F90Array<double,3> &gcm_inputs_d_f);
 extern "C"
 void  glint2_modele_get_initial_state_c(
 glint2::modele::glint2_modele *api,
+int itime,
 giss::F90Array<double,3> &gcm_inputs_d_f);

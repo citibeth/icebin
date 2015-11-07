@@ -17,6 +17,7 @@
 #include <glint2/pism/PSConstantGLINT2.hpp>
 #include <glint2/pism/NullTransportHydrology.hpp>
 #include <glint2/pism/MassEnergyBudget.hpp>
+#include <glint2/pism/VecBundleWriter.hpp>
 
 namespace glint2 {
 namespace gpism {
@@ -83,7 +84,7 @@ private:
 
 private:
 	// Utility function
-	PetscErrorCode prepare_nc(std::string const &fname, std::unique_ptr<pism::PIO> &nc);
+//	PetscErrorCode prepare_nc(std::string const &fname, std::unique_ptr<pism::PIO> &nc);
 
 public:
 
@@ -92,11 +93,7 @@ public:
 
 	PetscErrorCode reset_rate();
 
-
-	std::unique_ptr<pism::PIO> pre_mass_nc;	//!< Write variables every time massContPostHook() is called.
-	std::unique_ptr<pism::PIO> post_mass_nc;
-	std::unique_ptr<pism::PIO> pre_energy_nc;
-	std::unique_ptr<pism::PIO> post_energy_nc;
+	std::unique_ptr<VecBundleWriter> pism_state_nc;
 
 	// see iceModel.cc for implementation of constructor and destructor:
 	/** @param gcm_params Pointer to IceModel::gcm_params.  Lives at least as long as this object. */

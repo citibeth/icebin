@@ -157,10 +157,11 @@ INTERFACE
 		type(arr_spec_3) :: gcm_inputs_d_f
 	end subroutine
 
-	subroutine glint2_modele_get_initial_state_c(api, gcm_inputs_d_f) bind(c)
+	subroutine glint2_modele_get_initial_state_c(api, itime, gcm_inputs_d_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
+		integer(c_int), value :: itime
 		type(arr_spec_3) :: gcm_inputs_d_f
 	end subroutine
 
@@ -184,8 +185,9 @@ END INTERFACE
 contains
 
 ! ---------------------------------------------------
-subroutine glint2_modele_get_initial_state(api, gcm_inputs_d)
+subroutine glint2_modele_get_initial_state(api, itime, gcm_inputs_d)
 type(c_ptr), value :: api
+integer, intent(in) :: itime
 real*8, dimension(:,:,:) :: gcm_inputs_d
 
 	integer :: n
@@ -200,7 +202,7 @@ print *,'BEGIN glint2_modele_get_initial_state()'
 	call get_spec_double_3(gcm_inputs_d, 1,1,1, gcm_inputs_d_f)
 
 	! Call the C-side of the interface
-	call glint2_modele_get_initial_state_c(api, gcm_inputs_d_f)
+	call glint2_modele_get_initial_state_c(api, itime, gcm_inputs_d_f)
 
 print *,'END glint2_modele_get_initial_state()'
 end subroutine

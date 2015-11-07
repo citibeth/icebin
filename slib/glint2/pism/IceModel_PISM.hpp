@@ -21,6 +21,7 @@
 #include <glint2/pism/PISMIceModel.hpp>		// Our specialized subclass of PISM's ::IceModel
 #include <glint2/Grid_XY.hpp>
 #include <glint2/GCMParams.hpp>
+#include <glint2/pism/VecBundleWriter.hpp>
 
 namespace glint2 {
 namespace gpism {
@@ -82,6 +83,9 @@ class IceModel_PISM : public IceModel
 	set of elevations than the ice model is using --- then this can cause problems
 	in the generated SMB fields. */
 	bool update_elevation = true;
+
+	// NetCDF output files
+	std::unique_ptr<VecBundleWriter> pism_in_nc, pism_out_nc;
 
 	// ------------------------
 public:

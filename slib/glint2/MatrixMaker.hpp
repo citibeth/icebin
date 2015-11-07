@@ -124,9 +124,8 @@ public:
 		std::map<int, blitz::Array<double,1>> &f4s,
 		blitz::Array<double,1> initial3,
 		IceInterp src,
-		QPAlgorithm qp_algorithm = QPAlgorithm::SINGLE_QP);
-
-
+		QPAlgorithm qp_algorithm = QPAlgorithm::SINGLE_QP,
+		std::string const &dump_qpt_fname = "");
 
 	/** @params f2 Some field on each ice grid (referenced by ID)
 	TODO: This only works on one ice sheet.  Will need to be extended

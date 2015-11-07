@@ -268,14 +268,16 @@ public:
 static int get_subid(int i1) { return i1; }
 
 
+/** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete.
 
-/** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete. */
+dump_qpt: Call this function on the QP problem we generate. */
 giss::VectorSparseVector<int, double>
 MatrixMaker::iceinterp_to_hp(
 std::map<int, blitz::Array<double,1>> &f2_or_4s,		// Actually f2 or f4
 blitz::Array<double,1> initial3,
 IceInterp src,
-QPAlgorithm qp_algorithm)
+QPAlgorithm qp_algorithm,
+std::string const &dump_qpt_fname)
 {
 printf("BEGIN MatrixMaker::iceinterp_to_hp()\n");
 
@@ -617,6 +619,13 @@ printf("AA1 Done\n");
 					qpt.X[i3p] = val;
 				}
 			}
+		}
+
+		// Write out the QP problem we've created
+		if (dump_qpt_fname != "") {
+			NcFile nc(dump_qpt_fname.c_str(), NcFile::Replace);
+			qpt.netcdf_define(nc, "qpt")();
+			nc.close();
 		}
 
 		// =========================== Solve the Problem!

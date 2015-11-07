@@ -137,11 +137,19 @@ PetscErrorCode PISMIceModel::createVecs()
 	printf("END PISMIceModel::createVecs()\n");
 
 	ierr = M1.create(grid, "M1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = M1.set_attrs("diagnostic", "Mass of top layer", "kg m-2", "M1");
 	ierr = M2.create(grid, "M2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = M2.set_attrs("diagnostic", "Mass of second-top layer", "kg m-2", "M2");
+
 	ierr = H1.create(grid, "H1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = H1.set_attrs("diagnostic", "Enthalpy of top layer", "J m-2", "H1");
 	ierr = H2.create(grid, "H2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = H2.set_attrs("diagnostic", "Enthalpy of second-top layer", "J m-2", "H2");
+
 	ierr = V1.create(grid, "V1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = V1.set_attrs("diagnostic", "Volume of top layer", "m^3 m-2", "V1");
 	ierr = V2.create(grid, "V2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = V2.set_attrs("diagnostic", "Volume of second-top layer", "m^3 m-2", "V2");
 
 	std::cout << "PISMIceModel Conservation Formulas:" << std::endl;
 	cur.print_formulas(std::cout);
@@ -235,7 +243,7 @@ PetscErrorCode PISMIceModel::energyStep()
 PetscErrorCode PISMIceModel::massContExplicitStep() {
 	PetscErrorCode ierr;
 
-	printf("BEGIN PISMIceModel::MassContExplicitStep()\n");
+	printf("BEGIN PISMIceModel::MassContExplicitStep(dt = %g)\n", dt);
 
 	_ice_density = config.get("ice_density");
 	_meter_per_s_to_kg_per_m2 = dt * _ice_density;
@@ -269,19 +277,19 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	// ----------- SMB: Pass inputs through to outputs.
 	// They are needed to participate in mass/energy budget
 	PSConstantGLINT2 *surface = ps_constant_glint2();
-	ierr = surface->glint2_massxfer.begin_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_enthxfer.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_massxfer_rate.begin_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_enthxfer_rate.begin_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_deltah.begin_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_smb.begin_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_deltah.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-		cur.glint2_smb.mass(i,j) += dt * surface->glint2_massxfer(i,j);
-		cur.glint2_smb.enth(i,j) += dt * surface->glint2_enthxfer(i,j);
-		cur.glint2_deltah(i,j) += dt * surface->glint2_deltah(i,j);
+		cur.glint2_smb.mass(i,j) += dt * surface->glint2_massxfer_rate(i,j);
+		cur.glint2_smb.enth(i,j) += dt * surface->glint2_enthxfer_rate(i,j);
+		cur.glint2_deltah(i,j) += surface->glint2_deltah(i,j);
 	}}
-	ierr = surface->glint2_massxfer.end_access(); CHKERRQ(ierr);
-	ierr = surface->glint2_enthxfer.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_massxfer_rate.end_access(); CHKERRQ(ierr);
+	ierr = surface->glint2_enthxfer_rate.end_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_deltah.end_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_smb.end_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_deltah.end_access(); CHKERRQ(ierr);
@@ -349,26 +357,6 @@ PetscErrorCode PISMIceModel::accumulateFluxes_massContExplicitStep(
 	return 0;
 }
 
-
-
-PetscErrorCode PISMIceModel::prepare_nc(std::string const &fname, std::unique_ptr<PIO> &nc)
-{
-	PetscErrorCode ierr;
-
-	nc.reset(new PIO(grid, grid.config.get_string("output_format")));
-
-	ierr = nc->open(fname, PISM_READWRITE_MOVE); CHKERRQ(ierr);
-    ierr = nc->def_time(config.get_string("time_dimension_name"),
-                       grid.time->calendar(),
-                       grid.time->CF_units_string()); CHKERRQ(ierr);
-// These are in iMtimseries, but not listed as required in iceModelVec.hh
-//    ierr = nc->put_att_text(config.get_string("time_dimension_name"),
-//                           "bounds", "time_bounds"); CHKERRQ(ierr);
-//    ierr = write_metadata(nc, true, false); CHKERRQ(ierr);
-//	ierr = nc->close(): CHKERRQ(ierr);
-
-	return 0;
-}
 
 /** @param t0 Time of last time we coupled. */
 PetscErrorCode PISMIceModel::set_rate(double dt)
@@ -472,24 +460,6 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	// ice_surface_enth & ice_surfac_enth_depth
 	ierr = prepare_initial_outputs(); CHKERRQ(ierr);
 
-	// ------ Write it out
-#if 0
-	// This is not really needed, since Glint2 also writes out
-	// the same fields.
-	PIO nc(grid, grid.config.get_string("output_format"));
-	nc.open((params.output_dir / "post_energy.nc").c_str(), PISM_READWRITE);	// append to file
-	nc.append_time(config.get_string("time_dimension_name"), t1);
-	Enth3.write(nc, PISM_DOUBLE);
-	ice_thickness.write(nc, PISM_DOUBLE);
-	ice_surface_temp.write(nc, PISM_DOUBLE);
-	PSConstantGLINT2 *surface = ps_constant_glint2();
-	surface->effective_surface_temp.write(nc, PISM_DOUBLE);
-	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
-		ierr = ii->vec.write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-	}
-	nc.close();
-#endif
-
 	printf("END PISMIceModel::prepare_outputs()\n");
 	return 0;
 }
@@ -542,7 +512,6 @@ PetscErrorCode PISMIceModel::prepare_initial_outputs()
 	ierr = V2.end_access(); CHKERRQ(ierr);
 	ierr = Enth3.end_access(); CHKERRQ(ierr);
 
-	// ====================== Write to the post_energy.nc file (OPTIONAL)
 	return 0;
 }
 
@@ -578,25 +547,20 @@ PetscErrorCode PISMIceModel::misc_setup()
 		cur_ii->vec.copy_to(base_ii->vec);
 	}
 
-#if 0
-	// ---------- Create the netCDF output file
-	std::unique_ptr<PIO> nc;
-	std::string ofname = (params.output_dir / "post_energy.nc").string();
-	ierr = prepare_nc(ofname, nc); CHKERRQ(ierr);
-
-	// -------- Define MethEnth structres in netCDF file
-	Enth3.define(*nc, PISM_DOUBLE);
-	ice_thickness.define(*nc, PISM_DOUBLE);
-	ice_surface_temp.define(*nc, PISM_DOUBLE);
+	// --------- Set up to write pism_state.nc
 	PSConstantGLINT2 *surface = ps_constant_glint2();
-	surface->effective_surface_temp.define(*nc, PISM_DOUBLE);
+	std::vector<IceModelVec *> vecs;
+	vecs.push_back(&Enth3);
+	vecs.push_back(&ice_thickness);
+	vecs.push_back(&ice_surface_temp);
+	vecs.push_back(&surface->surface_temp);
 	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
-		ierr = ii->vec.define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
+		vecs.push_back(&ii->vec);
 	}
+	std::string ofname = (params.output_dir / "pism_state.nc").string();
+	pism_state_nc.reset(new VecBundleWriter(&grid, ofname, std::move(vecs)));
+	ierr = pism_state_nc->init(); CHKERRQ(ierr);
 
-	// --------- Close and return
-	nc->close();
-#endif
 
 	return 0;
 }
@@ -700,9 +664,9 @@ PetscErrorCode PISMIceModel::construct_surface_temp(
 			double toplayer_dz = ice_thickness(i,j) - grid.zlevels[ks];		// [m]
 
 			// [J kg-1] = [J kg-1]
-			//     + [J m-2 s-1] * [m^2 m-3] * [m^3 kg-1] * [s]
+			//     + [J m-2] * [m^2 m-3] * [m^3 kg-1]
 			spec_enth3 = spec_enth3
-				+ deltah_ij / (toplayer_dz * ice_density) * timestep_s;
+				+ deltah_ij / (toplayer_dz * ice_density) ; //* timestep_s;
 		}
 
 

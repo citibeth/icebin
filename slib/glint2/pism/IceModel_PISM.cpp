@@ -359,11 +359,11 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 
 	// We don't really use this, but we do need to store and pass through for conservation computations
 	ix = contract[INPUT].index("massxfer");
-		pism_ivars[ix] = &pism_surface_model->glint2_massxfer;
+		pism_ivars[ix] = &pism_surface_model->glint2_massxfer_rate;
 
 	// Ignore surface_temp, it is not useful...
 	ix = contract[INPUT].index("enthxfer");
-		pism_ivars[ix] = &pism_surface_model->glint2_enthxfer;
+		pism_ivars[ix] = &pism_surface_model->glint2_enthxfer_rate;
 
 	ix = contract[INPUT].index("deltah");
 		pism_ivars[ix] = &pism_surface_model->glint2_deltah;
@@ -433,19 +433,23 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	}
 
 	// -------------- Initialize pism_out.nc
-	// ---------- Create the netCDF output file
 	{
-		std::unique_ptr<PIO> nc;
 		std::string ofname = (params.output_dir / "pism_out.nc").string();
-		ierr = ice_model->prepare_nc(ofname, nc); CHKERRQ(ierr);
+		std::vector<pism::IceModelVec *> vecs;
+		for (auto vec : pism_ovars) vecs.push_back(vec);
+		pism_out_nc.reset(new VecBundleWriter(
+			&ice_model->grid, ofname, std::move(vecs)));
+		ierr = pism_out_nc->init(); CHKERRQ(ierr);
+	}
 
-		// -------- Define MethEnth structres in netCDF file
-		for (unsigned int i=0; i<pism_ovars.size(); ++i) {
-			ierr = pism_ovars[i]->define(*nc, PISM_DOUBLE); CHKERRQ(ierr);
-		}
-
-		// --------- Close and return
-		nc->close();
+	// ------------- Initialize pism_in.nc
+	{
+		std::string ofname = (params.output_dir / "pism_in.nc").string();
+		std::vector<pism::IceModelVec *> vecs;
+		for (auto vec : pism_ivars) vecs.push_back(vec);
+		pism_in_nc.reset(new VecBundleWriter(
+			&ice_model->grid, ofname, std::move(vecs)));
+		ierr = pism_in_nc->init(); CHKERRQ(ierr);
 	}
 
 
@@ -658,6 +662,9 @@ TODO: Follow the pattern for pism_out.nc
 #endif
 
 
+	pism_in_nc->write();
+
+
 	// =========== Run PISM for one coupling timestep
 	// Time of last time we coupled
 	printf("BEGIN ice_model->run_to(%f -> %f) %p\n",
@@ -667,22 +674,6 @@ TODO: Follow the pattern for pism_out.nc
 	printf("END ice_model->run_to()\n");
 
 
-	// ----------- Write pism_ovars
-	if (true || write_pism_inputs) {
-		double t1;
-		auto &grid(ice_model->grid);
-		pism::PIO nc(grid, grid.config.get_string("output_format"));
-
-		auto ofname(coupler->gcm_params.run_dir / "pism_out.nc");
-		nc.open(ofname.c_str(), PISM_READWRITE); // append to file
-		nc.append_time(ice_model->config.get_string("time_dimension_name"), t1);
-
-		for (unsigned int i=0; i<pism_ovars.size(); ++i) {
-			ierr = pism_ovars[i]->write(nc, PISM_DOUBLE); CHKERRQ(ierr);
-		}
-		nc.close();
-	}
-
 	if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
 		fprintf(stderr, "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match GLINT2 time %f\n", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
 		giss::exit(1);
@@ -690,6 +681,9 @@ TODO: Follow the pattern for pism_out.nc
 
 	// ice_model->enthalpy_t() == time_s here
 	ierr = ice_model->prepare_outputs(old_pism_time); CHKERRQ(ierr);
+printf("pism_out_nc->write() after regular timestep\n");
+	ierr = pism_out_nc->write(); CHKERRQ(ierr);
+	ierr = ice_model->pism_state_nc->write(); CHKERRQ(ierr);
 	ierr = get_state_petsc(0); CHKERRQ(ierr);	// Copy PISM->Glint2 output vars
 	ierr = ice_model->reset_rate(); CHKERRQ(ierr);
 
@@ -759,6 +753,9 @@ PetscErrorCode IceModel_PISM::get_initial_state_petsc()
 
 	// Only prepare PISMIceModel outputs for things we need at init time.
 	ierr = ice_model->prepare_initial_outputs(); CHKERRQ(ierr);
+printf("pism_out_nc->write() after get_initial_state\n");
+	ierr = pism_out_nc->write(); CHKERRQ(ierr);
+	ierr = ice_model->pism_state_nc->write(); CHKERRQ(ierr);
 
 	// Copy outputs to Glint2-supplied variables, only for INITIAL variables
 printf("[%d] Calling get_state_petsc(%d)\n", pism_rank, contracts::INITIAL);

@@ -66,8 +66,8 @@ public:
 	// Inputs from Glint2
 	pism::IceModelVec2S glint2_wflux;
 	pism::IceModelVec2S glint2_deltah;
-	pism::IceModelVec2S glint2_massxfer;
-	pism::IceModelVec2S glint2_enthxfer;
+	pism::IceModelVec2S glint2_massxfer_rate;
+	pism::IceModelVec2S glint2_enthxfer_rate;
 	// Calculated
 	pism::IceModelVec2S surface_temp;
 

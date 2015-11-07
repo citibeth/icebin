@@ -133,6 +133,8 @@ static bool in_good(std::unordered_set<int> const *set, int index_c)
 
 void IceSheet::filter_cells1(boost::function<bool (int)> const &include_cell1)
 {
+
+// TODO: This segfaults because it is changing a collection in the middle of an iterator!
 	// Remove unneeded cells from exgrid
 	// Figure out which cells in grid2 to keep
 	std::unordered_set<int> good_index2;

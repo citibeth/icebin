@@ -329,7 +329,7 @@ int Desm::main(int argc, char **argv)
 
 	// Initial query of ice sheet initial state
 	// (so the GCM can compute conductive heat flows)
-	glint2_modele_get_initial_state_c(api, gcm_inputs_f);
+	glint2_modele_get_initial_state_c(api, time0_i, gcm_inputs_f);
 
 	// The main loop
 	double begin_time_s;
