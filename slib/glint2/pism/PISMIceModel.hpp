@@ -93,7 +93,14 @@ public:
 
 	PetscErrorCode reset_rate();
 
-	std::unique_ptr<VecBundleWriter> pism_state_nc;
+	/** Various internal PISM variables at the point that PISM output
+	is sent to the GCM */
+	std::unique_ptr<VecBundleWriter> pism_out_state_nc;
+
+	/** Various internal PISM variables just after input from the GCM
+	is absorbed into state (but before running the PISM timestep) */
+	std::unique_ptr<VecBundleWriter> pism_in_state_nc;
+
 
 	// see iceModel.cc for implementation of constructor and destructor:
 	/** @param gcm_params Pointer to IceModel::gcm_params.  Lives at least as long as this object. */

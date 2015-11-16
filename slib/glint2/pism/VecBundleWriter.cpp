@@ -34,14 +34,13 @@ PetscErrorCode VecBundleWriter::init()
 }
 
 /** Dump the value of the Vectors at curent PISM simulation time. */
-PetscErrorCode VecBundleWriter::write()
+PetscErrorCode VecBundleWriter::write(double time_s)
 {
 	PetscErrorCode ierr;
-	double t1;
 	pism::PIO nc(*grid, grid->config.get_string("output_format"));
 
 	ierr = nc.open(fname.c_str(), PISM_READWRITE); CHKERRQ(ierr); // append to file
-	ierr = nc.append_time(grid->config.get_string("time_dimension_name"), t1); CHKERRQ(ierr);
+	ierr = nc.append_time(grid->config.get_string("time_dimension_name"), time_s); CHKERRQ(ierr);
 
 	for (pism::IceModelVec *vec : vecs) {
 		ierr = vec->write(nc, PISM_DOUBLE); CHKERRQ(ierr);

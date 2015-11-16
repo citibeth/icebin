@@ -741,7 +741,7 @@ static void densify_gcm_inputs_onroot(glint2_modele *api,
 	// We ARE the root note --- densify the data into the global gcm_inputs array
 	for (long ix = 0; ix < contract.size_nounit(); ++ix) {
 		int ihp = api->gcm_inputs_ihp[ix];				// First elevation point for this variable
-		int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;	// # elevation points for this variable.
+		int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;	// # elevation points for this variable (in ModelE)
 
 		// Check bounds
 		if (ihp+var_nhp > gcm_inputs_d.extent(2)) {
@@ -751,18 +751,33 @@ static void densify_gcm_inputs_onroot(glint2_modele *api,
 
 		// Ignore elevation point = 0 (for ELEVATION grid only),
 		// which is reserved for ModelE's "legacy" elevation point.
-		int modele_ihp = ihp;
-		int modele_var_nhp = var_nhp;
-		if (modele_var_nhp > 1) {
+		int glint2_ihp;			// First elevation point for this variable in Glint2
+		int glint2_var_nhp;	// Number of elevation points for this variable in Glint2
+		if (var_nhp == 1) {
+			// ATMOSPHERE grid destination, only one "elevation point"
+			glint2_ihp = ihp;
+			glint2_var_nhp = var_nhp;
+		} else {
 			// We have an ELEVATION grid destination (not ATMOSPHERE)
-			modele_ihp += 1;
-			modele_var_nhp -= 1;
+
+			// Skip over elevation point zero for further regridding
+			glint2_ihp = ihp + 1;
+			glint2_var_nhp = var_nhp - 1;
+
+			// Clear elevation point 0, since it's not involved in the
+			// Glint2 computation.
+			blitz::Array<double,1> ep_zero(
+				&gcm_inputs_d(1,1,ihp),	// i,j,ihp
+				blitz::shape(n1*1), blitz::neverDeleteData);
+//			ep_zero = contract.field(ix).default_value;
+			ep_zero = 0;
 		}
 
 		// Index into our big array-of-array of all gcm_inputs
+		// (ignoring the modelE elevation point 0)
 		blitz::Array<double,1> dense1d(
-			&gcm_inputs_d(1,1,modele_ihp),	// i,j,ihp
-			blitz::shape(n1*modele_var_nhp), blitz::neverDeleteData);
+			&gcm_inputs_d(1,1,glint2_ihp),	// i,j,ihp
+			blitz::shape(n1*glint2_var_nhp), blitz::neverDeleteData);
 
 		// Convert this sparse vector...
 		printf("Setting gcm_input %s to %g\n", contract.field(ix).name.c_str(), contract.field(ix).default_value);

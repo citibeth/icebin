@@ -31,7 +31,7 @@ public:
 	PetscErrorCode init();
 
 	/** Dump the value of the Vectors at curent PISM simulation time. */
-	PetscErrorCode write();
+	PetscErrorCode write(double time_s);
 };
 
 

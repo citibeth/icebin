@@ -61,9 +61,6 @@ PyObject *coo_matvec_py(PyObject *self, PyObject *args, PyObject *kwds)
 			return NULL;
 		}
 
-printf("ignore_nan = %d\n", ignore_nan);
-int nancount = 0;
-
 		// Cast and typecheck arguments
 		giss::BlitzSparseMatrix mat(giss::py_to_BlitzSparseMatrix(mat_py, "mat"));
 		auto xx(giss::py_to_blitz<double,1>(xx_py, "xx", {mat.ncol}));
@@ -95,7 +92,6 @@ int nancount = 0;
 			yy(row) = old_yy + val * xx(col);
 		}
 
-printf("nancount = %d\n", nancount);
 	} catch(...) {
 		return NULL;	// Error
 	}
@@ -107,7 +103,7 @@ printf("nancount = %d\n", nancount);
 
 
 PyMethodDef matrix_ops_functions[] = {
-	{"coo_matvec", (PyCFunction)coo_matvec_py, METH_KEYWORDS,
+	{"coo_matvec", (PyCFunction)coo_matvec_py, METH_VARARGS|METH_KEYWORDS,
 		"Compute M*x, taking care with unspecified elements in M"},
 
 	{NULL}     /* Sentinel - marks the end of this structure */

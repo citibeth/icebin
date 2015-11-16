@@ -134,21 +134,25 @@ static bool in_good(std::unordered_set<int> const *set, int index_c)
 void IceSheet::filter_cells1(boost::function<bool (int)> const &include_cell1)
 {
 
-// TODO: This segfaults because it is changing a collection in the middle of an iterator!
-	// Remove unneeded cells from exgrid
-	// Figure out which cells in grid2 to keep
-	std::unordered_set<int> good_index2;
+  // Figure out which cells to keep
+
+	// List of cells in grid2 / exgrid that overlap a cell we want to keep
+	std::unordered_set<int> good_index_grid2;
+	std::unordered_set<int> good_index_exgrid;
+
+
+	std::unordered_set<int> good_j;
 	for (auto excell = exgrid->cells_begin(); excell != exgrid->cells_end(); ++excell) {
 		int index1 = excell->i;
 		if (include_cell1(index1)) {
-			good_index2.insert(excell->j);
-		} else {
-			exgrid->cells_erase(excell);
+			good_index_grid2.insert(excell->j);
+			good_index_exgrid.insert(excell->index);
 		}
 	}
 
 	// Remove unneeded cells from grid2
-	grid2->filter_cells(boost::bind(&in_good, &good_index2, _1));
+	grid2->filter_cells(boost::bind(&in_good, &good_index_grid2, _1));
+	exgrid->filter_cells(boost::bind(&in_good, &good_index_exgrid, _1));
 }
 // -----------------------------------------------------
 

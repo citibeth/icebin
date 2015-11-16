@@ -1,3 +1,4 @@
+#include <cfloat>
 #include <iostream>
 #include <glint2/pism/PISMIceModel.hpp>
 #include <glint2/pism/GLINT2EnthalpyConverter.hpp>
@@ -487,6 +488,12 @@ PetscErrorCode PISMIceModel::prepare_initial_outputs()
 		// Top Layer
 		int const ks = grid.kBelowHeight(ice_thickness(i,j));
 		V1(i,j) = ice_thickness(i,j) - grid.zlevels[ks];	// [m^3 m-2]
+
+		// In PISM, ice_thickness is NaN for some (land-based) cells
+		// outside the ice sheet.  Just set it to zero...
+		if (std::isnan(V1(i,j))) V1(i,j) = 0;
+
+//if (V1(i,j) != 0) printf("V1(%d, %d): %g %d %g --> %g\n", i,j, ice_thickness(i,j), ks, grid.zlevels[ks], V1(i,j));
 		M1(i,j) = V1(i,j) * ice_density;	// [kg m-2] = [m^3 m-2] [kg m-3]
 		H1(i,j) = Enth[ks] * M1(i,j);		// [J m-2] = [J kg-1] [kg m-2]
 
@@ -557,9 +564,9 @@ PetscErrorCode PISMIceModel::misc_setup()
 	for (auto ii = rate.all_vecs.begin(); ii != rate.all_vecs.end(); ++ii) {
 		vecs.push_back(&ii->vec);
 	}
-	std::string ofname = (params.output_dir / "pism_state.nc").string();
-	pism_state_nc.reset(new VecBundleWriter(&grid, ofname, std::move(vecs)));
-	ierr = pism_state_nc->init(); CHKERRQ(ierr);
+	std::string ofname = (params.output_dir / "pism_out_state.nc").string();
+	pism_out_state_nc.reset(new VecBundleWriter(&grid, ofname, std::move(vecs)));
+	ierr = pism_out_state_nc->init(); CHKERRQ(ierr);
 
 
 	return 0;

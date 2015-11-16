@@ -22,6 +22,8 @@
 #include <vector>
 #include <cmath>
 #include "pyutil.hpp"
+#include <giss/exit.hpp>
+#include <everytrace.h>
 
 // ============================================================
 // Type definitions for the Python classes this module defines
@@ -83,10 +85,22 @@ static PyModuleDef glint2ModuleDef = {
 
 // ===========================================================================
 
+/** Exit subroutine to use when we're running Python */
+static void python_exit(int i)
+{
+	everytrace_dump();
+	fprintf(stderr, "Returning to Python interpreter.\n");
+	throw std::exception();		// This will get caught, then go back to Python
+}
+
+
 extern "C"
 PyObject *PyInit__glint2(void)
 {
 //	libglint2_ncerror_segfault();
+
+	giss::exit = &python_exit;
+
 
 	PyObject *mod = giss::init_module(glint2ModuleDef,
 		glint2_function_sets, glint2_types);

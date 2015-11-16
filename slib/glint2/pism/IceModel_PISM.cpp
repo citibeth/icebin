@@ -636,6 +636,9 @@ printf("IceModel_PISM::run_timestep_petsc(): timestep_s = %g\n", timestep_s);
 		timestep_s,
 		surface->surface_temp);
 
+
+
+
 #if 0
 TODO: Follow the pattern for pism_out.nc
 	// Write out what we've now calculated (for debugging)
@@ -662,7 +665,7 @@ TODO: Follow the pattern for pism_out.nc
 #endif
 
 
-	pism_in_nc->write();
+	pism_in_nc->write(time_s);
 
 
 	// =========== Run PISM for one coupling timestep
@@ -682,8 +685,8 @@ TODO: Follow the pattern for pism_out.nc
 	// ice_model->enthalpy_t() == time_s here
 	ierr = ice_model->prepare_outputs(old_pism_time); CHKERRQ(ierr);
 printf("pism_out_nc->write() after regular timestep\n");
-	ierr = pism_out_nc->write(); CHKERRQ(ierr);
-	ierr = ice_model->pism_state_nc->write(); CHKERRQ(ierr);
+	ierr = pism_out_nc->write(time_s); CHKERRQ(ierr);
+	ierr = ice_model->pism_out_state_nc->write(time_s); CHKERRQ(ierr);
 	ierr = get_state_petsc(0); CHKERRQ(ierr);	// Copy PISM->Glint2 output vars
 	ierr = ice_model->reset_rate(); CHKERRQ(ierr);
 
@@ -735,7 +738,7 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 			iceModelVec2S_to_blitz_xy(*pism_ovars[i], oval2_xy);
 		}
 
-		// Now send those data from the PISM root to the GCM root
+		// Now send those data from the PISM root to the GCM root (MPI nodes)
 		// (DUMMY for now, just make sure PISM and GCM have the same root)
 		if (pism_root != coupler->gcm_params.gcm_root) {
 			fprintf(stderr, "PISM and the GCM must share the same root!\n");
@@ -751,11 +754,13 @@ PetscErrorCode IceModel_PISM::get_initial_state_petsc()
 {
 	PetscErrorCode ierr;
 
+	double time_s = coupler->gcm_params.time_start_s;
+
 	// Only prepare PISMIceModel outputs for things we need at init time.
 	ierr = ice_model->prepare_initial_outputs(); CHKERRQ(ierr);
 printf("pism_out_nc->write() after get_initial_state\n");
-	ierr = pism_out_nc->write(); CHKERRQ(ierr);
-	ierr = ice_model->pism_state_nc->write(); CHKERRQ(ierr);
+	ierr = pism_out_nc->write(time_s); CHKERRQ(ierr);
+	ierr = ice_model->pism_out_state_nc->write(time_s); CHKERRQ(ierr);
 
 	// Copy outputs to Glint2-supplied variables, only for INITIAL variables
 printf("[%d] Calling get_state_petsc(%d)\n", pism_rank, contracts::INITIAL);
