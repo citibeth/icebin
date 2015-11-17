@@ -938,6 +938,7 @@ glint2_modele *api,
 int itime,
 giss::F90Array<double,3> &gcm_inputs_d_f)
 {
+
 	double time_s = itime * api->dtsrc;
 	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
 
