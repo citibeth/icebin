@@ -260,7 +260,7 @@ void GCMCoupler::call_ice_model(
 	// of fields in SMBMsg
 	int nfields = model->contract[IceModel::INPUT].size_nounit();
 
-printf("[%d] BEGIN GCMCoupler::call_ice_model(%s, nfields=%ld)\n", gcm_params.gcm_rank, model->name.c_str(), nfields);
+printf("BEGIN GCMCoupler::call_ice_model(%s, nfields=%ld)\n", model->name.c_str(), nfields);
 
 	// Construct indices vector
 	blitz::TinyVector<int,1> shape(rbuf.diff(end, begin));
@@ -314,16 +314,12 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 	int num_mpi_nodes;
 	MPI_Comm_size(gcm_params.gcm_comm, &num_mpi_nodes); 
 
-	int const rank = gcm_params.gcm_rank;
-
-printf("[%d] BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size=%d\n", gcm_params.gcm_rank, time_s, sbuf.size, sbuf.ele_size);
+printf("BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size=%d\n", time_s, sbuf.size, sbuf.ele_size);
 
 	// MPI_Gather the count
 	std::unique_ptr<int[]> rcounts;
 	rcounts.reset(new int[num_mpi_nodes]);
 	for (int i=0; i<num_mpi_nodes; ++i) rcounts[i] = 0;
-
-printf("[%d] EE1\n", rank);
 
 	int nele_l = sbuf.size;
 	MPI_Gather(&nele_l, 1, MPI_INT, &rcounts[0], 1, MPI_INT, gcm_params.gcm_root, gcm_params.gcm_comm);
@@ -332,7 +328,6 @@ printf("[%d] EE1\n", rank);
 	std::unique_ptr<int[]> displs;
 	std::unique_ptr<giss::DynArray<SMBMsg>> rbuf;
 
-printf("[%d] EE2\n", rank);
 	displs.reset(new int[num_mpi_nodes+1]);
 	displs[0] = 0;
 	for (int i=0; i<num_mpi_nodes; ++i) displs[i+1] = displs[i] + rcounts[i];
@@ -342,16 +337,13 @@ printf("[%d] EE2\n", rank);
 	// (There's an extra item in the array for a sentinel)
 	rbuf.reset(new giss::DynArray<SMBMsg>(SMBMsg::size(nfields), nele_g+1));
 
-printf("[%d] EE3\n", rank);
 	MPI_Datatype mpi_type(SMBMsg::new_MPI_struct(nfields));
 	MPI_Gatherv(sbuf.begin().get(), sbuf.size, mpi_type,
 		rbuf->begin().get(), &rcounts[0], &displs[0], mpi_type,
 		gcm_params.gcm_root, gcm_params.gcm_comm);
 	MPI_Type_free(&mpi_type);
-printf("[%d] EE4\n", rank);
 
 	if (am_i_root()) {
-printf("[%d] EE5\n", rank);
 		// (ONLY ON GCM ROOT)
 		// Clear output arrays, which will be filled in additively
 		// on each ice model
@@ -364,7 +356,6 @@ printf("[%d] EE5\n", rank);
 		// are found together
 		qsort(rbuf->begin().get(), rbuf->size, rbuf->ele_size, &SMBMsg::compar);
 
-printf("[%d] EE6\n", rank);
 		// (ONLY ON GCM ROOT)
 		// Figure out which ice sheets we have data for
 		auto lscan(rbuf->begin());
@@ -417,7 +408,7 @@ printf("[%d] EE6\n", rank);
 
 	}
 
-	printf("[%d] END GCMCoupler::couple_to_ice()\n", gcm_params.gcm_rank);
+	printf("END GCMCoupler::couple_to_ice()\n");
 }
 
 void GCMCoupler:: regrid_gcm_inputs_onroot(
@@ -525,10 +516,7 @@ void GCMCoupler::get_initial_state(
 double time_s,
 std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 {
-
-	int const rank = gcm_params.gcm_rank;
-
-	printf("[%d] BEGIN GCMCoupler::get_initial_state()\n", gcm_params.gcm_rank);
+	printf("BEGIN GCMCoupler::get_initial_state()\n");
 
 	if (am_i_root()) {
 
@@ -537,7 +525,7 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 		// Call all our ice models
 		for (auto model = models.begin(); model != models.end(); ++model) {
 			int sheetno = model.key();
-			model->get_initial_state();
+			model->get_initial_state(time_s);
 
 			// Record what the ice model produced.
 			// NOTE: This shouldn't change model->ice_ovals_I
@@ -566,12 +554,12 @@ std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals)	// Root node only:
 		// receive data in an upcomming MPI_Scatter
 		// Call all our ice models
 		for (auto model = models.begin(); model != models.end(); ++model) {
-			model->get_initial_state();
+			model->get_initial_state(time_s);
 		}		// if (gcm_params.gcm_rank == gcm_params.gcm_root)
 
 	}
 
-	printf("[%d] END GCMCoupler::get_initial_state()\n", gcm_params.gcm_rank);
+	printf("END GCMCoupler::get_initial_state()\n");
 }
 
 

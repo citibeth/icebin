@@ -183,7 +183,7 @@ public:
 
 	/** Called at the beginning.  Returns variables in same place as run_timestep(),
 	but doesn't actually run the timestep. */
-	virtual void get_initial_state() {
+	virtual void get_initial_state(double time_s) {
 		fprintf(stderr, "get_initial_state() not implemented.\n");
 		giss::exit(1);
 	}

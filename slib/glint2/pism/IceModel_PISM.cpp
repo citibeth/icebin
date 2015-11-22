@@ -402,8 +402,18 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 
 	// -------------- Link to PISM-format output variables, used to fill ovars
 	pism_ovars.resize(contract[OUTPUT].size_nounit(), NULL);
-	ix = contract[OUTPUT].index("usurf");		// Elevation of top surface of ice sheet
+	ix = contract[OUTPUT].index("ice_surface_elevation");		// Elevation of top surface of ice sheet
 		pism_ovars[ix] = &ice_model->ice_surface_elevation;	// see PISM's iceModel.hh
+
+	ix = contract[OUTPUT].index("ice_surface_elevation");
+		pism_ovars[ix] = &ice_model->ice_surface_elevation;
+	ix = contract[OUTPUT].index("ice_thickness");
+		pism_ovars[ix] = &ice_model->ice_thickness;
+	ix = contract[OUTPUT].index("bed_topography");
+		pism_ovars[ix] = &ice_model->bed_topography;
+
+	ix = contract[OUTPUT].index("mask");
+		pism_ovars[ix] = &ice_model->mask;
 
 	// Mass of top two layers
 	ix = contract[OUTPUT].index("M1");
@@ -701,6 +711,7 @@ the Glint2-supplied variables (on the root node).
 @param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
 PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 {
+	printf("BEGIN IceModel_PISM::get_state_petsc: %ld\n", pism_ovars.size());
 	giss::CouplingContract const &ocontract(contract[IceModel::OUTPUT]);
 
 	// Copy the outputs to the blitz arrays
@@ -715,7 +726,7 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 		giss::CoupledField const &cf(ocontract.field(i));
 		if ((cf.flags & mask) != mask) continue;
 
-		printf("[%d] IceModel_PISM::get_state_petsc(mask=%d) copying field %s\n", pism_rank, mask, cf.name.c_str());
+		printf("IceModel_PISM::get_state_petsc(mask=%d) copying field %s\n", mask, cf.name.c_str());
 
 		if (am_i_root()) {		// ROOT in PISM communicator
 
@@ -745,16 +756,17 @@ PetscErrorCode IceModel_PISM::get_state_petsc(unsigned int mask)
 			giss::exit(1);
 		}
 	}
+	printf("END IceModel_PISM::get_state_petsc\n");
 
 	return 0;
 }
 
 
-PetscErrorCode IceModel_PISM::get_initial_state_petsc()
+PetscErrorCode IceModel_PISM::get_initial_state_petsc(double time_s)
 {
 	PetscErrorCode ierr;
 
-	double time_s = coupler->gcm_params.time_start_s;
+//	double time_s = coupler->gcm_params.time_start_s;
 
 	// Only prepare PISMIceModel outputs for things we need at init time.
 	ierr = ice_model->prepare_initial_outputs(); CHKERRQ(ierr);
@@ -770,11 +782,11 @@ printf("[%d] Calling get_state_petsc(%d)\n", pism_rank, contracts::INITIAL);
 	return 0;
 }
 
-void IceModel_PISM::get_initial_state()
+void IceModel_PISM::get_initial_state(double time_s)
 {
 	printf("[%d] BEGIN IceModel_PISM::get_initial_state()\n", pism_rank);
 
-	if (get_initial_state_petsc() != 0) {
+	if (get_initial_state_petsc(time_s) != 0) {
 		PetscPrintf(pism_comm, "IceModel_PISM::get_initial_state() failed\n");
 		PISMEnd();
 	}

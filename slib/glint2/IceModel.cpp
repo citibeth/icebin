@@ -121,7 +121,7 @@ void IceModel::free_ovals_ivals_I()
 @param mask Control which GCM input variables to set (according to, etc, INITIAL flag in contract) */
 void IceModel::set_gcm_inputs(unsigned int mask)
 {
-	printf("[%d] BEGIN IceModel::set_gcm_inputs()\n", coupler->gcm_params.gcm_rank);
+  printf("BEGIN IceModel::set_gcm_inputs()\n");
 	allocate_gcm_ivals_I();
 
 	// Compute the variable transformation

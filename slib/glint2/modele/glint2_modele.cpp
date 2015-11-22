@@ -815,8 +815,6 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 
 	printf("[%d] BEGIN glint2_modele_couple_to_ice_c(itime=%d, time_s=%f, dtsrc=%f)\n", rank, itime, time_s, api->dtsrc);
 
-//	GCMCoupler &coupler(api->gcm_coupler);
-
 	if (api->gcm_coupler.gcm_out_file.length() > 0) {
 		// Write out to DESM file
 		save_gcm_outputs(api, time_s, api->gcm_outputs);
@@ -912,10 +910,6 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 	api->gcm_coupler.couple_to_ice(time_s, nfields_max, sbuf, gcm_ivals_global);
 
 	// Decode the outputs to a dense array for ModelE
-	int nhp = glint2_modele_nhp_gcm(api);	// == Glint2's nhp + 1, for legacy ice in ModelE
-	int n1 = api->gcm_coupler.maker->n1();
-
-
 	if (api->gcm_coupler.am_i_root()) {
 		// auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
@@ -940,30 +934,28 @@ giss::F90Array<double,3> &gcm_inputs_d_f)
 {
 
 	double time_s = itime * api->dtsrc;
-	int rank = api->gcm_coupler.rank();	// MPI rank; debugging
 
 //	auto gcm_inputs_d(gcm_inputs_d_f.to_blitz());
 
-	printf("[%d] BEGIN glint2_modele_get_initial_state_c()\n", rank);
-
-	GCMCoupler &coupler(api->gcm_coupler);
+	printf("BEGIN glint2_modele_get_initial_state_c()\n");
 
 	// sbuf has elements for ALL ice sheets here
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
 	std::vector<giss::VectorSparseVector<int,double>> gcm_ivals_global(contract.size_nounit());
-	coupler.get_initial_state(time_s, gcm_ivals_global);
+	api->gcm_coupler.get_initial_state(time_s, gcm_ivals_global);
 
 	// Decode the outputs to a dense array for ModelE
 	if (api->gcm_coupler.am_i_root()) {
 
 		densify_gcm_inputs_onroot(api, gcm_ivals_global, gcm_inputs_d_f);
-		const double time_s = coupler.gcm_params.time_start_s;
-		if (coupler.gcm_in_file.length() > 0) {
+
+		if (api->gcm_coupler.gcm_in_file.length() > 0) {
 			save_gcm_inputs(api, time_s, gcm_inputs_d_f);
 		}
 	}
+	api->itime_last = itime;
 
-	printf("[%d] END glint2_modele_get_initial_state_c()\n", rank);
+	printf("END glint2_modele_get_initial_state_c()\n");
 }
 
 extern"C"

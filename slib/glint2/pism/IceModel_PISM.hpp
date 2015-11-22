@@ -168,7 +168,7 @@ public:
 		blitz::Array<int,1> const &indices,
 		std::vector<blitz::Array<double,1>> const &ivals2);
 
-	void get_initial_state();
+	void get_initial_state(double time_s);
 
 private:
 	PetscErrorCode run_timestep_petsc(double time_s,
@@ -180,7 +180,7 @@ private:
 	@param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
 	PetscErrorCode get_state_petsc(unsigned int mask = 0);
 
-	PetscErrorCode get_initial_state_petsc();
+	PetscErrorCode get_initial_state_petsc(double time_s);
 
 
 

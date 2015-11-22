@@ -54,6 +54,8 @@ protected:
 	MassEnergyBudget cur;		// Cumulative totals now
 	MassEnergyBudget rate;		// At end of coupling timestep, set to (cur - base) / dt
 
+	pism::IceModelVec2S mask;	// vMask, converted to double
+
 	// Output variables prepared for return to GCM
 	// (relevant ice model state to be exported)
 	pism::IceModelVec2S M1,M2;

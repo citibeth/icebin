@@ -185,29 +185,6 @@ END INTERFACE
 contains
 
 ! ---------------------------------------------------
-subroutine glint2_modele_get_initial_state(api, itime, gcm_inputs_d)
-type(c_ptr), value :: api
-integer, intent(in) :: itime
-real*8, dimension(:,:,:) :: gcm_inputs_d
-
-	integer :: n
-
-	! ------------------- local vars
-	type(arr_spec_3) :: gcm_inputs_d_f
-
-	! ------------------- subroutine body
-print *,'BEGIN glint2_modele_get_initial_state()'
-
-	! Grab array descriptors
-	call get_spec_double_3(gcm_inputs_d, 1,1,1, gcm_inputs_d_f)
-
-	! Call the C-side of the interface
-	call glint2_modele_get_initial_state_c(api, itime, gcm_inputs_d_f)
-
-print *,'END glint2_modele_get_initial_state()'
-end subroutine
-
-
 subroutine glint2_modele_set_gcm_output(api, field_name, arr, i0, j0, k0)
 	type(c_ptr), value :: api
 	character(*) :: field_name

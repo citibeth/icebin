@@ -137,6 +137,9 @@ PetscErrorCode PISMIceModel::createVecs()
 	ierr = rate.create(grid, "", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	printf("END PISMIceModel::createVecs()\n");
 
+	ierr = mask.create(grid, "mask", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = mask.set_attrs("diagnostic", "Land surface types", "", "mask");
+
 	ierr = M1.create(grid, "M1", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = M1.set_attrs("diagnostic", "Mass of top layer", "kg m-2", "M1");
 	ierr = M2.create(grid, "M2", pism::WITHOUT_GHOSTS); CHKERRQ(ierr);
@@ -464,12 +467,111 @@ PetscErrorCode PISMIceModel::prepare_outputs(double t0)
 	printf("END PISMIceModel::prepare_outputs()\n");
 	return 0;
 }
+// -----------------------------------------------------------------------
+/** This is an optimized version of the following function, optimized for two layers only:
+def integrate_weights(dz, z0, z1):
+	"""dz: Depth of each layer"""
+
+	top = np.cumsum(dz)		# Top of each layer
+	ix = []
+	weights = []
+
+	# Nothing to do here
+	z0 = min(z0, top[-1])
+	z1 = min(z1, top[-1])
+	if (z0 >= z1):
+		return ix,weights
+
+	i0 = bisect.bisect_right(top, z0)
+	i1 = bisect.bisect_left(top, z1)
+
+	# First interval
+	ix.append(i0)
+	weights.append((min(z1, top[i0]) - z0)/dz[i0])
+
+	if i1 > i0:
+		# Middle intervals
+		if i1 > i0+1:
+			for i in range(i0+1,i1):
+				ix.append(i)
+				weights.append(1.)
+
+		# Last interval
+		ix.append(i1)
+		weights.append((z1 - top[i1-1]) / dz[i1])
+
+#	print(dz,z0,z1,ix,weights,wsum,i0,i1)
+	return ix,weights
+*/
+static PetscErrorCode integrate_weights_2(
+double dz[2],		// Thickness of each PISM layer
+double z0,			// Start of integration
+double z1,			// End of integration
+double w[2])		// Weight of each layer
+{
+	w[0] = 0;
+	w[1] = 0;
+	double const top[2] = {dz[0], dz[0]+dz[1]};
+
+	// Assume zero outside our range
+	z0 = std::max(std::min(z0, top[1]), 0.);
+	z1 = std::max(std::min(z1, top[1]), 0.);
+
+	// Assume z0 <= z1
+	if (z0 > z1) {
+		fprintf(stderr, "Must have z0 (%g) <= z1 (%g)\n", z0, z1);
+		return 1;
+	}
+	if (z0 == z1) return 0;	// All zeros now
+
+
+	// ------ Figure out which grid cell z0 and z1 fall into
+	// i0 = bisect.bisect_right(top, z0)
+	int i0 = (z0 >= top[0] ? 1 : 0);
+	int i1 = (z1 > top[0] ? 1 : 0);
+
+	// ------- First interval
+	w[i0] = (std::min(z1, top[i0]) - z0) / dz[i0];
+	if (i1 > i0) {
+		w[1] = (z1 - top[0]) / dz[1];
+	}
+
+	return 0;
+}
+// -----------------------------------------------------------------------
+#if 0
+static inline void set_gcm_layer(double vv[2], double ee[2], double w[2], double &V1, double &M1, double &H1, double const gcm_thk, double const ice_density)
+{
+	V1 = vv[0]*w[0] + vv[1]*w[1];
+	M1 = V1 * ice_density;
+	H1 = (ee[0]*vv[0]*w[0] + ee[1]*vv[1]*w[1]) * ice_density;
+
+	// Extend layer to proper thickness
+	if (V1 < gcm_thk) {
+		double v1old = V1;
+		V1 = gcm_thk;	// Extend layer to proper thickness
+		double fact = V1 / v1old;
+		M1 *= fact;
+		H1 *= fact;
+	}
+}
+#endif
 
 PetscErrorCode PISMIceModel::prepare_initial_outputs()
 {
 	PetscErrorCode ierr;
 
 	double ice_density = config.get("ice_density");	// [kg m-3]
+
+	// --------- mask
+	ierr = vMask.begin_access(); CHKERRQ(ierr);
+	ierr = mask.begin_access(); CHKERRQ(ierr);
+	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
+	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+		mask(i,j) = vMask(i,j);
+	}}
+	ierr = mask.end_access(); CHKERRQ(ierr);
+	ierr = vMask.end_access(); CHKERRQ(ierr);
 
 	// --------- ice_surface_enth from Enth3
 	ierr = Enth3.begin_access(); CHKERRQ(ierr);
@@ -482,33 +584,108 @@ PetscErrorCode PISMIceModel::prepare_initial_outputs()
 	ierr = ice_thickness.begin_access(); CHKERRQ(ierr);
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+
+		// ----------- Obtain top two layers of PISM
 		double *Enth;
 		ierr = Enth3.getInternalColumn(i,j,&Enth); CHKERRQ(ierr);
 
-		// Top Layer
+		double vv[2];	// Thickness of top two layers of PISM [m^3 m-2]
+		double ee[2];	// Specific Enthalpy of top two yers of PISM [J kg-1]
+
+		// ---- Get depth of the top two layers
 		int const ks = grid.kBelowHeight(ice_thickness(i,j));
-		V1(i,j) = ice_thickness(i,j) - grid.zlevels[ks];	// [m^3 m-2]
-
-		// In PISM, ice_thickness is NaN for some (land-based) cells
-		// outside the ice sheet.  Just set it to zero...
-		if (std::isnan(V1(i,j))) V1(i,j) = 0;
-
-//if (V1(i,j) != 0) printf("V1(%d, %d): %g %d %g --> %g\n", i,j, ice_thickness(i,j), ks, grid.zlevels[ks], V1(i,j));
-		M1(i,j) = V1(i,j) * ice_density;	// [kg m-2] = [m^3 m-2] [kg m-3]
-		H1(i,j) = Enth[ks] * M1(i,j);		// [J m-2] = [J kg-1] [kg m-2]
-
-		// Second layer
+		vv[0] = ice_thickness(i,j) - grid.zlevels[ks];	// [m^3 m-2]
+		ee[0] = Enth[ks];
 		int const ks2 = ks - 1;
 		if (ks2 >= 0) {
-			V2(i,j) = grid.zlevels[ks] - grid.zlevels[ks2];
-			M2(i,j) = V2(i,j) * ice_density;
-			H2(i,j) = Enth[ks2] * M2(i,j);
+			vv[1] = grid.zlevels[ks] - grid.zlevels[ks2];
+			ee[1] = Enth[ks2];
 		} else {
 			// There is no second layer
-			V2(i,j) = 0;
-			M2(i,j) = 0;
-			H2(i,j) = 0;
+			vv[1] = 0;
+			ee[1] = 0;
 		}
+		double E1;
+
+
+		// ---------- Resample to two layers for Glint2
+		const double gcm_thk = 5.;		// Thickness to make each layer we produce [m]
+			// MUST have: gcm_thk*2 <= thickness of normal PISM layer (40m)
+		double w[2];
+
+		// ---- Top layer for GCM
+		ierr = integrate_weights_2(vv, 0., gcm_thk, w); CHKERRQ(ierr);
+		V1(i,j) = vv[0]*w[0] + vv[1]*w[1];
+		M1(i,j) = V1(i,j) * ice_density;
+		H1(i,j) = (ee[0]*vv[0]*w[0] + ee[1]*vv[1]*w[1]) * ice_density;
+
+		// Extend layer to proper thickness
+		if (V1(i,j) < gcm_thk) {
+			double v1old = V1(i,j);
+			V1(i,j) = gcm_thk;	// Extend layer to proper thickness
+			double fact = V1(i,j) / v1old;
+			M1(i,j) *= fact;
+			H1(i,j) *= fact;
+		}
+
+		// ----- Next layer for GCM
+		ierr = integrate_weights_2(vv, gcm_thk, gcm_thk+gcm_thk, w); CHKERRQ(ierr);
+		V2(i,j) = vv[0]*w[0] + vv[1]*w[1];
+		M2(i,j) = V2(i,j) * ice_density;
+		H2(i,j) = (ee[0]*vv[0]*w[0] + ee[1]*vv[1]*w[1]) * ice_density;
+
+		// Extend layer to proper thickness
+		if (V2(i,j) == 0) {
+			V2(i,j) = V1(i,j);
+			M2(i,j) = M1(i,j);
+			H2(i,j) = H1(i,j);
+		} else if (V2(i,j) < gcm_thk) {
+			double v1old = V2(i,j);
+			V2(i,j) = gcm_thk;	// Extend layer to proper thickness
+			double fact = V2(i,j) / v1old;
+			M2(i,j) *= fact;
+			H2(i,j) *= fact;
+		}
+
+
+// 		// In PISM, ice_thickness is NaN for some (land-based) cells
+// 		// outside the ice sheet.  Just set it to zero...
+// 		if (std::isnan(vv[0])) vv[0] = 0;
+// 
+// 		hh[0] = Enth[ks] * vv[0];	// [J m-2] = [J kg-1] [kg m-2]
+// 
+// 		// Second layer
+// 		int const ks2 = ks - 1;
+// 		if (ks2 >= 0) {
+// 			vv[1] = grid.zlevels[ks] - grid.zlevels[ks2];
+// 			hh[1] = Enth[ks2] * vv[1];
+// 		} else {
+// 			// There is no second layer
+// 			vv[1] = 0;
+// 			hh[1] = 0;
+// 		}
+// 
+// 
+// 		// ---------- Resample to two layers for Glint2
+// 		const double gcm_thk = 5.;		// Thickness to make each layer we produce [m]
+// 			// MUST have: gcm_thk*2 <= thickness of normal PISM layer (40m)
+// 
+// 		double w[2];
+// 
+// 		// ---- Top layer for GCM
+// 		ierr = integrate_weights_2(vv, 0., gcm_thk, w); CHKERRQ(ierr);
+// 		V1(i,j) = vv[0]*w[0] + vv[1]*w[1];
+// 		M1(i,j) = V1(i,j) * ice_density;
+// 		H1(i,j) = (hh[0]*w[0] + hh[1]*w[1]) * ice_density;
+// 
+// 
+// 		// ----- Next layer for GCM
+// 		if (gcm_thk >= vv0
+// 		ierr = integrate_weights_2(vv, gcm_thk, gcm_thk+gcm_thk, w); CHKERRQ(ierr);
+// 		V2(i,j) = vv[0]*w[0] + vv[1]*w[1];
+// 		M2(i,j) = V2(i,j) * ice_density;
+// 		H2(i,j) = (hh[0]*w[0] + hh[1]*w[1]) * ice_density;
+
 	}}
 	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
 	ierr = M1.end_access(); CHKERRQ(ierr);

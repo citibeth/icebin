@@ -113,7 +113,12 @@ void IceModel_PISM::setup_contracts_modele()
 
 	// Glint2 requires that all ice models return elev2, so that it can regrid in the vertical.
 
-	ice_output.add_field("usurf", "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");	// See ice_surface_elevation in iceModel.cc
+	ice_output.add_field("ice_surface_elevation", "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");
+	ice_output.add_field("ice_thickness", "m", contracts::ICE|contracts::INITIAL, "thickness of ice");
+	ice_output.add_field("bed_topography", "m", contracts::ICE|contracts::INITIAL, "topography of bedrock");
+
+
+	ice_output.add_field("mask", "", contracts::ICE|contracts::INITIAL, "PISM land surface type");
 
 	ice_output.add_field("M1", "kg m-2", contracts::ICE|contracts::INITIAL, "");
 	ice_output.add_field("M2", "kg m-2", contracts::ICE|contracts::INITIAL, "");
@@ -159,8 +164,8 @@ void IceModel_PISM::setup_contracts_modele()
 	vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
 	vt.allocate();
 
-//	ok = ok && vt.set("elev2", "usurf", "unit", 1.0);
-	ok = ok && vt.set("elev1", "usurf", "unit", 1.0);
+//	ok = ok && vt.set("elev2", "ice_surface_elevation", "unit", 1.0);
+	ok = ok && vt.set("elev1", "ice_surface_elevation", "unit", 1.0);
 
 	// Top layer state from ice model
 	ok = ok && vt.set("M1", "M1", "unit", 1.0);	// Divide by RHOW to convert to m water equiv
