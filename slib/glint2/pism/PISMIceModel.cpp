@@ -647,45 +647,6 @@ PetscErrorCode PISMIceModel::prepare_initial_outputs()
 			H2(i,j) *= fact;
 		}
 
-
-// 		// In PISM, ice_thickness is NaN for some (land-based) cells
-// 		// outside the ice sheet.  Just set it to zero...
-// 		if (std::isnan(vv[0])) vv[0] = 0;
-// 
-// 		hh[0] = Enth[ks] * vv[0];	// [J m-2] = [J kg-1] [kg m-2]
-// 
-// 		// Second layer
-// 		int const ks2 = ks - 1;
-// 		if (ks2 >= 0) {
-// 			vv[1] = grid.zlevels[ks] - grid.zlevels[ks2];
-// 			hh[1] = Enth[ks2] * vv[1];
-// 		} else {
-// 			// There is no second layer
-// 			vv[1] = 0;
-// 			hh[1] = 0;
-// 		}
-// 
-// 
-// 		// ---------- Resample to two layers for Glint2
-// 		const double gcm_thk = 5.;		// Thickness to make each layer we produce [m]
-// 			// MUST have: gcm_thk*2 <= thickness of normal PISM layer (40m)
-// 
-// 		double w[2];
-// 
-// 		// ---- Top layer for GCM
-// 		ierr = integrate_weights_2(vv, 0., gcm_thk, w); CHKERRQ(ierr);
-// 		V1(i,j) = vv[0]*w[0] + vv[1]*w[1];
-// 		M1(i,j) = V1(i,j) * ice_density;
-// 		H1(i,j) = (hh[0]*w[0] + hh[1]*w[1]) * ice_density;
-// 
-// 
-// 		// ----- Next layer for GCM
-// 		if (gcm_thk >= vv0
-// 		ierr = integrate_weights_2(vv, gcm_thk, gcm_thk+gcm_thk, w); CHKERRQ(ierr);
-// 		V2(i,j) = vv[0]*w[0] + vv[1]*w[1];
-// 		M2(i,j) = V2(i,j) * ice_density;
-// 		H2(i,j) = (hh[0]*w[0] + hh[1]*w[1]) * ice_density;
-
 	}}
 	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
 	ierr = M1.end_access(); CHKERRQ(ierr);
