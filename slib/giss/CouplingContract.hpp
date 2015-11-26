@@ -69,11 +69,6 @@ public:
 		std::string const &description = "<no description>")
 	{ return add_field(CoupledField(name, default_value, units, flags, description)); }
 
-	int add_field(std::string const &name, std::string const &units,
-		unsigned flags = 0,
-		std::string const &description = "<no description>")
-	{ return add_field(CoupledField(name, std::numeric_limits<double>::quiet_NaN(), units, flags, description)); }
-
 	long size_withunit() const { return _ix_to_field.size(); }
 //	long size() const { return size_withunit(); }
 	long size_nounit() const { return _size_nounit; }

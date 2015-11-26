@@ -239,9 +239,13 @@ struct UsedAll {
 	std::set<std::pair<int,int>> used4;
 	std::set<int> used3;
 	std::set<int> used3x;
-	giss::IndexTranslator trans_1_1p;
-	giss::IndexTranslator2 trans_4_4p;
-	giss::IndexTranslator trans_3x_3p;
+
+	// The "p" spaces are subspaces that involve only the relevant
+	// dimensions This way, we avoid degenerate rows in our optimization
+	// problem.
+	giss::IndexTranslator trans_1_1p;		// Ice grid
+	giss::IndexTranslator2 trans_4_4p;		// Exchange grid
+	giss::IndexTranslator trans_3x_3p;		// Elevation grid
 
 	std::unique_ptr<giss::VectorSparseMatrix> RMp;
 	std::unique_ptr<giss::VectorSparseMatrix> Sp;
@@ -266,7 +270,6 @@ public:
 };
 
 static int get_subid(int i1) { return i1; }
-
 
 /** @params f2 Some field on each ice grid (referenced by ID).  Do not have to be complete.
 
@@ -573,6 +576,10 @@ printf("AA1 Done\n");
 		for (int i4p=0; i4p<n4p; ++i4p) {
 			qpt.f += f4p(i4p) * f4p(i4p);
 		}
+		if (std::isnan(qpt.f) || std::isinf(qpt.f)) {
+			fprintf(stderr, "Illegal value for qpt.f: %g\n", qpt.f);
+			giss::exit(1);
+		}
 
 		// De-allocate...
 //		H.reset();
@@ -623,8 +630,30 @@ printf("AA1 Done\n");
 
 		// Write out the QP problem we've created
 		if (dump_qpt_fname != "") {
+			std::vector<boost::function<void()>> fns;
+			printf("Writing QP problem: %s\n", dump_qpt_fname.c_str());
 			NcFile nc(dump_qpt_fname.c_str(), NcFile::Replace);
-			qpt.netcdf_define(nc, "qpt")();
+
+			// Write out f2_or_4s original input
+			for (auto ii=f2_or_4s.begin(); ii != f2_or_4s.end(); ++ii) {
+				IceSheet *sheet = (*this)[ii->first];
+				blitz::Array<double,1> &val(ii->second);
+
+				fns.push_back(giss::netcdf_define(nc, sheet->name, val));
+			}
+
+			// Write out f4s input regridded to exchange grid
+			for (auto ii=f4s->begin(); ii != f4s->end(); ++ii) {
+				IceSheet *sheet = (*this)[ii->first];
+				blitz::Array<double,1> &val(ii->second);
+
+				fns.push_back(giss::netcdf_define(nc, sheet->name + ".f4", val));
+			}
+
+			// Write the QP problem
+			fns.push_back(qpt.netcdf_define(nc, "qpt"));
+
+			giss::netcdf_write_functions(fns);
 			nc.close();
 		}
 

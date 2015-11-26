@@ -22,6 +22,7 @@ using namespace pism;
 namespace glint2 {
 namespace gpism {
 
+static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 IceModel_PISM::IceModel_PISM(std::string const &_name, GCMCoupler const *_coupler)
 	: IceModel(IceModel::Type::PISM, _name, _coupler),
@@ -519,6 +520,7 @@ PetscErrorCode IceModel_PISM::iceModelVec2S_to_blitz_xy(IceModelVec2S &pism_var,
 	if (am_i_root()) {
 		// Copy it to blitz array (on the root node only)
 		ierr = VecGetArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
+		ret = nan;	// Vector operation, initializes ice_ovals_I
 		for (PetscInt i=0; i < pism_grid->Mx; i++) {
 			for (PetscInt j=0; j < pism_grid->My; j++) {
 				ret(j, i) = bHp0[i][j];
@@ -645,35 +647,6 @@ printf("IceModel_PISM::run_timestep_petsc(): timestep_s = %g\n", timestep_s);
 		contract[INPUT].field("deltah").default_value,
 		timestep_s,
 		surface->surface_temp);
-
-
-
-
-#if 0
-TODO: Follow the pattern for pism_out.nc
-	// Write out what we've now calculated (for debugging)
-	if (write_pism_inputs) {
-	for (unsigned int i=0; i<pism_ivars.size(); ++i) {
-
-		// ================ BEGIN Write PISM Inputs
-		long time_day = (int)(time_s / 86400. + .5);
-		std::stringstream fname;
-		std::string const &fnpart = contract[INPUT].name(i);
-
-		fname << time_day << "-" << fnpart << ".nc";
-
-		boost::filesystem::path output_dir(
-			coupler->gcm_params.run_dir / "pism_in");
-		boost::filesystem::create_directory(output_dir);	// Make sure it exists
-		boost::filesystem::path pfname(output_dir / fname.str());
-
-//		printf("ICeModel_PISM writing (2) to: %s\n", pfname.c_str());
-		IceModelVec2S *pism_var = pism_ivars[i];
-		pism_var->dump(pfname.c_str());
-		// ================ END Write PISM Inputs
-	}}	// For each pism_var
-#endif
-
 
 	pism_in_nc->write(time_s);
 

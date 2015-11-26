@@ -26,6 +26,8 @@
 
 namespace glint2 {
 
+static double const nan = std::numeric_limits<double>::quiet_NaN();
+
 // --------------------------------------------------------
 /** Tells whether a cell in the exchange grid is masked out or not */
 bool IceSheet_L0::masked(giss::HashDict<int, Cell>::iterator const &it)
@@ -177,8 +179,11 @@ blitz::Array<double,1> const IceSheet_L0::ice_to_interp(
 	if (interp_grid == IceExch::ICE) return f2;
 
 	blitz::Array<double,1> f4(n4());
+	f4 = nan;	// Vector operation; initialize the array.
 	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
-		if (masked(cell)) continue;
+		if (masked(cell)) {
+			continue;
+		}
 		// cell->i = index in atmosphere grid
 		int i2 = cell->j;		// index in ice grid
 		int i4 = cell->index; 	// index in exchange grid

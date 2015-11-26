@@ -10,6 +10,8 @@ using namespace glint2::modele;
 // --------------------------------------------------------
 namespace glint2 {
 
+static double const nan = std::numeric_limits<double>::quiet_NaN();
+
 /** GCM-specific contract */
 void IceModel_DISMAL::setup_contracts_modele()
 {
@@ -31,14 +33,14 @@ void IceModel_DISMAL::setup_contracts_modele()
 	std::string const HEAT_FLUX = "heat_flux";	// Positive is down
 
 	// ------ Decide on the coupling contract for this ice sheet
-	ice_input.add_field(MASS_FLUX, "kg m-2 s-1");
-	ice_input.add_field(ENTHALPY_FLUX, "W m-2");
+	ice_input.add_field(MASS_FLUX, nan, "kg m-2 s-1");
+	ice_input.add_field(ENTHALPY_FLUX, nan, "W m-2");
 	switch(params->coupling_type.index()) {
 		case ModelE_CouplingType::DIRICHLET_BC :
-			ice_input.add_field(T, "K");
+			ice_input.add_field(T, nan, "K");
 		break;
 		case ModelE_CouplingType::NEUMANN_BC :
-			ice_input.add_field(HEAT_FLUX, "W m-2");
+			ice_input.add_field(HEAT_FLUX, nan, "W m-2");
 		break;
 	}
 
@@ -80,7 +82,7 @@ void IceModel_DISMAL::setup_contracts_modele()
 	}
 
 	CouplingContract *ice_output_scalars = new_CouplingContract();
-	ice_output_scalars->add_field("unit", "", 0, "");
+	ice_output_scalars->add_field("unit", nan, "", 0, "");
 
 	VarTransformer &ice_output_vt(var_transformer[OUTPUT]);
 	ice_output_vt.set_names(VarTransformer::INPUTS, &ice_output);

@@ -411,6 +411,7 @@ printf("BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size
 	printf("END GCMCoupler::couple_to_ice()\n");
 }
 
+/** Implicit input: gcm_ivals_I, set by set_gcm_inputs() */
 void GCMCoupler:: regrid_gcm_inputs_onroot(
 double time_s,
 std::vector<giss::VectorSparseVector<int,double>> &gcm_ivals,	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
@@ -477,6 +478,7 @@ unsigned int mask)
 			giss::to_blitz(gcm_ivals[var_ix], initial3);
 
 			// --------- Devise to write out this QP problem before we solve.
+			// (it will actually be written out in maker_full->iceinterp_to_hp())
 			std::string qpt_fname;
 			if (true) {
 				long time_day = (int)(time_s / 86400. + .5);

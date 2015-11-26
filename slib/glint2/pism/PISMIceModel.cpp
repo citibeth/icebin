@@ -9,6 +9,8 @@ using namespace pism;
 namespace glint2 {
 namespace gpism {
 
+static double const nan = std::numeric_limits<double>::quiet_NaN();
+
 // /** Sum a 3-D vector in the Z direction to create a 2-D vector.
 // 
 // <p>Note that this sums up all the values in a column, including ones
@@ -597,56 +599,71 @@ PetscErrorCode PISMIceModel::prepare_initial_outputs()
 		vv[0] = ice_thickness(i,j) - grid.zlevels[ks];	// [m^3 m-2]
 		ee[0] = Enth[ks];
 		int const ks2 = ks - 1;
-		if (ks2 >= 0) {
+		const double gcm_thk = 5.;		// Thickness to make each layer we produce [m]  TODO: Add this as a rundeck parameter
+		if (ks2 >= 0) {	// If there's a second layer
 			vv[1] = grid.zlevels[ks] - grid.zlevels[ks2];
 			ee[1] = Enth[ks2];
+
+			// ---------- Resample to two layers for Glint2
+				// MUST have: gcm_thk*2 <= thickness of normal PISM layer (40m)
+			double w[2];
+
+			// ---- Top layer for GCM
+			ierr = integrate_weights_2(vv, 0., gcm_thk, w); CHKERRQ(ierr);
+			V1(i,j) = vv[0]*w[0] + vv[1]*w[1];
+			M1(i,j) = V1(i,j) * ice_density;
+			H1(i,j) = (ee[0]*vv[0]*w[0] + ee[1]*vv[1]*w[1]) * ice_density;
+
+			// Extend layer to proper thickness
+			if (V1(i,j) < gcm_thk) {
+				double v1old = V1(i,j);
+				V1(i,j) = gcm_thk;	// Extend layer to proper thickness
+				double fact = V1(i,j) / v1old;
+				M1(i,j) *= fact;
+				H1(i,j) *= fact;
+			}
+
+			// ----- Next layer for GCM
+			ierr = integrate_weights_2(vv, gcm_thk, gcm_thk+gcm_thk, w); CHKERRQ(ierr);
+			V2(i,j) = vv[0]*w[0] + vv[1]*w[1];
+			M2(i,j) = V2(i,j) * ice_density;
+			H2(i,j) = (ee[0]*vv[0]*w[0] + ee[1]*vv[1]*w[1]) * ice_density;
+
+			// Extend layer to proper thickness
+			if (V2(i,j) == 0) {
+				V2(i,j) = V1(i,j);
+				M2(i,j) = M1(i,j);
+				H2(i,j) = H1(i,j);
+			} else if (V2(i,j) < gcm_thk) {
+				double v1old = V2(i,j);
+				V2(i,j) = gcm_thk;	// Extend layer to proper thickness
+				double fact = V2(i,j) / v1old;
+				M2(i,j) *= fact;
+				H2(i,j) *= fact;
+			}
 		} else {
-			// There is no second layer
-			vv[1] = 0;
-			ee[1] = 0;
+			// Just one layer in PISM
+			if (ice_thickness(i,j) <= 0.) {
+				// No ice here!
+				V1(i,j) = nan;
+				V2(i,j) = nan;
+				M1(i,j) = nan;
+				M2(i,j) = nan;
+				H1(i,j) = nan;
+				H2(i,j) = nan;
+			} else {
+				// There is some ice; adjust to proper depth
+				double v1old = vv[0];
+				V1(i,j) = gcm_thk;
+				M1(i,j) = V1(i,j) * ice_density;
+				H1(i,j) = ee[0] * V1(i,j) * ice_density;
+
+				// Fake a second layer as well!
+				V2(i,j) = V1(i,j);
+				M2(i,j) = M1(i,j);
+				H2(i,j) = H1(i,j);
+			}
 		}
-		double E1;
-
-
-		// ---------- Resample to two layers for Glint2
-		const double gcm_thk = 5.;		// Thickness to make each layer we produce [m]
-			// MUST have: gcm_thk*2 <= thickness of normal PISM layer (40m)
-		double w[2];
-
-		// ---- Top layer for GCM
-		ierr = integrate_weights_2(vv, 0., gcm_thk, w); CHKERRQ(ierr);
-		V1(i,j) = vv[0]*w[0] + vv[1]*w[1];
-		M1(i,j) = V1(i,j) * ice_density;
-		H1(i,j) = (ee[0]*vv[0]*w[0] + ee[1]*vv[1]*w[1]) * ice_density;
-
-		// Extend layer to proper thickness
-		if (V1(i,j) < gcm_thk) {
-			double v1old = V1(i,j);
-			V1(i,j) = gcm_thk;	// Extend layer to proper thickness
-			double fact = V1(i,j) / v1old;
-			M1(i,j) *= fact;
-			H1(i,j) *= fact;
-		}
-
-		// ----- Next layer for GCM
-		ierr = integrate_weights_2(vv, gcm_thk, gcm_thk+gcm_thk, w); CHKERRQ(ierr);
-		V2(i,j) = vv[0]*w[0] + vv[1]*w[1];
-		M2(i,j) = V2(i,j) * ice_density;
-		H2(i,j) = (ee[0]*vv[0]*w[0] + ee[1]*vv[1]*w[1]) * ice_density;
-
-		// Extend layer to proper thickness
-		if (V2(i,j) == 0) {
-			V2(i,j) = V1(i,j);
-			M2(i,j) = M1(i,j);
-			H2(i,j) = H1(i,j);
-		} else if (V2(i,j) < gcm_thk) {
-			double v1old = V2(i,j);
-			V2(i,j) = gcm_thk;	// Extend layer to proper thickness
-			double fact = V2(i,j) / v1old;
-			M2(i,j) *= fact;
-			H2(i,j) *= fact;
-		}
-
 	}}
 	ierr = ice_thickness.end_access(); CHKERRQ(ierr);
 	ierr = M1.end_access(); CHKERRQ(ierr);

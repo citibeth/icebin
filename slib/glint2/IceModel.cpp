@@ -133,6 +133,7 @@ void IceModel::set_gcm_inputs(unsigned int mask)
 
 	// Apply the variable transformation
 	for (int xi=0; xi<vt.dimension(giss::VarTransformer::OUTPUTS).size_nounit(); ++xi) {	// xi is index of output variable
+		gcm_ivals_I[xi] = 0;	// Vector operation: clear before sum
 		giss::CoupledField const &cf(gcm_inputs.field(xi));
 
 		if ((cf.flags & mask) != mask) continue;

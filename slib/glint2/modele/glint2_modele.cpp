@@ -489,7 +489,8 @@ char const *long_name_f, int long_name_len)
 
 	if (initial) flags |= contracts::INITIAL;
 
-	api->gcm_coupler.gcm_inputs.add_field(field_name, units, flags, long_name);
+	static double const xnan = std::numeric_limits<double>::quiet_NaN();
+	api->gcm_coupler.gcm_inputs.add_field(field_name, xnan, units, flags, long_name);
 
 	api->gcm_inputs_ihp.push_back(ihp + var_nhp);
 	int ret = ihp+1;		// Convert to Fortran (1-based) indexing
