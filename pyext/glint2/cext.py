@@ -110,8 +110,11 @@ class MatrixMaker(_glint2.MatrixMaker) :
 	def iceinterp_to_atm(self, *args, **kwargs) :
 		"""Returns the matrix I->A, converting the ice to the atmosphere grid.
 
+		Required arg:
 		sheetname : str
 		    The ice sheet from which to regrid.
+
+		Keyword args:
 		src : glint2::IceInterp (OPTIONAL, DEFAULT 'ICE')
 			{'ICE' | 'INTERP'}
 		    Specifies whether the source vector space is the ice grid or
@@ -120,7 +123,7 @@ class MatrixMaker(_glint2.MatrixMaker) :
 		tret = super(MatrixMaker, self).iceinterp_to_atm(*args, **kwargs)
 		return _tuple_to_coo(tret)
 
-	def iceinterp_to_hp(self, f2s, *args, **kwargs) :
+	def iceinterp_to_hp(self, f2s, *args, **kwargs):
 		"""Implements the I->E reverse transformation.
 
 		f2s : dict(sheetname -> double[n2]
@@ -150,6 +153,10 @@ class MatrixMaker(_glint2.MatrixMaker) :
 
 		nparray = super(MatrixMaker, self).iceinterp_to_hp(f2s_new, *args, **nkwargs)
 		return nparray
+
+	def ice_to_interp(self, sheetname, f2, *args, **kwargs):
+		f2_1d = f2.reshape(-1)
+		return super(MatrixMaker, self).ice_to_interp(sheetname, f2_1d, *args, **kwargs)
 
 	def realize(self, *args) :
 		super(MatrixMaker, self).realize(*args)
