@@ -212,7 +212,7 @@ MPI_Datatype SMBMsg::new_MPI_struct(int nfields)
 {
 	int nele = 2 + nfields;
 	int blocklengths[] = {1, 1, nfields};
-	MPI_Aint displacements[] = {offsetof(SMBMsg,iI), offsetof(SMBMsg, vals)};
+	MPI_Aint displacements[] = {offsetof(SMBMsg,sheetno), offsetof(SMBMsg,i2), offsetof(SMBMsg, vals)};
 	MPI_Datatype types[] = {MPI_INT, MPI_INT, MPI_DOUBLE};
 	MPI_Datatype ret;
 	MPI_Type_create_struct(3, blocklengths, displacements, types, &ret);
@@ -220,13 +220,15 @@ MPI_Datatype SMBMsg::new_MPI_struct(int nfields)
 	return ret;
 }
 
-///** for use with qsort */
-//int SMBMsg::compar(void const *a, void const *b)
-//{
-//	SMBMsg const *aa = reinterpret_cast<SMBMsg const *>(a);
-//	SMBMsg const *bb = reinterpret_cast<SMBMsg const *>(b);
-//	return aa->iI - bb->iI;
-//}
+/** for use with qsort */
+int SMBMsg::compar(void const *a, void const *b)
+{
+	SMBMsg const *aa = reinterpret_cast<SMBMsg const *>(a);
+	SMBMsg const *bb = reinterpret_cast<SMBMsg const *>(b);
+	int cmp = aa->sheetno - bb->sheetno;
+	if (cmp != 0) return cmp;
+	return aa->i2 - bb->i2;
+}
 
 // ===================================================
 // GCMCoupler
@@ -349,7 +351,6 @@ printf("BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size
 
 		// Add a sentinel
 		(*rbuf)[rbuf->size-1].sheetno = 999999;
-		(*rbuf)[rbuf->size-1].iI = i2_to_iI(999999, 0);
 
 		// Sort the receive buffer so items in same ice sheet
 		// are found together
@@ -448,6 +449,7 @@ unsigned int mask)
 	// ------------ Regrid each GCM input from ice grid to whatever grid it needs.
 	for (int var_ix=0; var_ix < gcm_inputs.size_nounit(); ++var_ix) {
 		giss::CoupledField const &cf(gcm_inputs.field(var_ix));
+
 		if ((cf.flags & mask) != mask) continue;
 
 		if ((cf.flags & contracts::GRID_BITS) == contracts::ATMOSPHERE) {
