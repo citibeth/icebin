@@ -867,8 +867,7 @@ printf("[%d] mat[sheetno=%d].size() == %ld\n", rank, sheetno, mat.size());
 		for (int j=0; j < mat.size(); ++j) {
 			hp_to_ice_rec &jj(mat[j]);
 			SMBMsg &msg = sbuf[nmsg];
-			msg.sheetno = sheetno;
-			msg.i2 = jj.row;
+			msg.iI = i2_to_iI(sheetno, jj.row);
 
 #if 1
 			// Convert from (GCM output) to (Ice Model input) units while regridding

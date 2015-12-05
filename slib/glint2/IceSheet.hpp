@@ -60,7 +60,8 @@ protected:
 	MatrixMaker *gcm;
 
 public:
-	int index;
+	//int index;
+	int sheetno;
 
 	InterpStyle interp_style;
 
@@ -71,6 +72,11 @@ public:
 
 	/** TODO: How does mask2 work for L1 grids? */
 	std::unique_ptr<blitz::Array<int,1>> mask2;
+	bool masked2(int ix2) {
+		if (!mask2.get()) return false;
+		return (*mask2)[ix2] != 0;
+	}
+
 
 	/** Elevation of each cell (L0) or vertex (L1) in the ice model */
 	blitz::Array<double,1> elev2;	// [n2]

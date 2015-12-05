@@ -36,8 +36,9 @@ namespace glint2 {
 
 
 struct SMBMsg {
-	int sheetno;
-	int i2;			// Index into ice model
+//	int sheetno;
+//	int i2;			// Index into ice model
+	long iI;		// Index into ice vector across all ice models
 	double vals[1];		// Always at least one val; but this could be extended
 
 	double &operator[](int i) { return *(vals + i); }

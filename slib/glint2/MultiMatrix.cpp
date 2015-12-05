@@ -4,7 +4,7 @@
 
 namespace glint2 {
 
-/** Computes y = diag(1/_total_area1_m) * M */
+/** Computes y = diag(1/_total_weights) * Mx */
 void MultiMatrix::multiply(std::vector<blitz::Array<double,1>> const &xs,
 	giss::VectorSparseVector<int,double> &y, bool clear_y, bool handle_nan)
 {
@@ -15,13 +15,13 @@ void MultiMatrix::multiply(std::vector<blitz::Array<double,1>> const &xs,
 		giss::multiply(*_matrices[i], xs[i], y, false);
 	}
 
-	// y /= area1_m
-	giss::divide_by(y, _total_area1_m);
+	// y /= weights
+	giss::divide_by(y, _total_weights);
 
 }
 
 
-/** Computes y = diag(1/_total_area1_m) * M */
+/** Computes y = diag(1/_total_weights) * Mx */
 void MultiMatrix::multiply(std::vector<blitz::Array<double,1>> const &xs,
 	blitz::Array<double,1> &y, bool clear_y, bool handle_nan)
 {
@@ -37,8 +37,8 @@ void MultiMatrix::multiply(std::vector<blitz::Array<double,1>> const &xs,
 		giss::multiply(*_matrices[i], xs[i], y, false, true);
 	}
 
-	// y /= area1_m
-	for (auto ii = _total_area1_m.begin(); ii != _total_area1_m.end(); ++ii) {
+	// y /= weights
+	for (auto ii = _total_weights.begin(); ii != _total_weights.end(); ++ii) {
 		y[ii->first] /= ii->second;
 	}
 

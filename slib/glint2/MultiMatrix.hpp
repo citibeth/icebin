@@ -23,26 +23,26 @@ class MultiMatrix
 {
 	std::vector<std::unique_ptr<giss::VectorSparseMatrix>> _matrices;
 
-	giss::MapSparseVector<int,double> _total_area1_m;
+	giss::MapSparseVector<int,double> _total_weights;
 
 public:
-	/** @param area1_m Scaling vector for this matrix */
+	/** @param weights Scaling vector for this matrix */
 	void add_matrix(
 		std::unique_ptr<giss::VectorSparseMatrix> &&mat,
-		giss::MapSparseVector<int,double> const &area1_m)
+		giss::MapSparseVector<int,double> const &weights)
 	{
 		_matrices.push_back(std::move(mat));
 
-		// --------- Compute: _total_area1_m += area1_m
-		_total_area1_m.add(area1_m);
+		// --------- Compute: _total_weights += weights
+		_total_weights.add(weights);
 	}
 
-	/** Computes y = diag(1/_total_area1_m) * M */
+	/** Computes y = diag(1/_total_weights) * M */
 	void multiply(std::vector<blitz::Array<double,1>> const &xs,
 		giss::VectorSparseVector<int,double> &y, bool clear_y = true, bool handle_nan = false);
 
 
-	/** Computes y = diag(1/_total_area1_m) * M */
+	/** Computes y = diag(1/_total_weights) * M */
 	void multiply(std::vector<blitz::Array<double,1>> const &xs,
 		blitz::Array<double,1> &y, bool clear_y = true, bool handle_nan = false);
 

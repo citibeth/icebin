@@ -84,6 +84,11 @@ public:
 	// TODO: This should cover only GCM grid cells that live on our local MPI node.
 	std::unique_ptr<blitz::Array<int,1>> mask1;
 
+	bool masked1(int ix1) {
+		if (!mask1.get()) return false;
+		return (*mask1)[ix1] != 0;
+	}
+
 	/** Position of height points in elevation space (same for all GCM grid cells) */
 	std::vector<double> hpdefs;	// [nhp]
 

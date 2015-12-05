@@ -4,6 +4,7 @@
 
 namespace giss {
 
+
 /// Computes y = A * x
 template<class SparseMatrixT>
 void multiply(SparseMatrixT const &mat,
