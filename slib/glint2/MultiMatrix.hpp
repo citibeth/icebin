@@ -6,9 +6,9 @@ namespace glint2 {
 /** Represents a matrix by a series of sub-matrices (almost but not quite block diagonal).
 It then allows computation of y as follows:
 
-[  ]            [M1][x1]
-[y] = diag(1/a) [M2][x2]
-[ ]             [M3][x3]
+[y]                       [x1]
+[y] = diag(1/a) [M1 M2 M3][x2]
+[ ]                       [x3]
 
 where:
    M1..Mn = matrices (1 per ice sheet)
