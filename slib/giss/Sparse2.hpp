@@ -374,7 +374,9 @@ Or: row_j scale_j col_j   (out of overall matrix computation row_ij scale_j col_
 
 NOTE: row, col and scale must NOT have duplicate elements.  Consolidate() must have been run before --- which gets ride of nans too, via handle_nan.
 */
-static double multiply_row_col(
+static void multiply_row_col(
+	AccumulatorT &ret,
+
 	IndexT[] row_cols,		// Column for each element in the row
 	ValueT[] row_vals,		// Value of each element in the row
 	size_t row_size,		// Number of non-zero elements in the row
@@ -389,7 +391,6 @@ static double multiply_row_col(
 	size_t col_size)		// Number of non-zero elements in the column
 {
 	if (row_size == 0 || col_size == 0) return 0.0;
-	ValueT ret = 0;
 
 	size_t ri = 0;
 	size_t ci = 0;
@@ -429,7 +430,7 @@ static double multiply_row_col(
 			ValueT sval = (has_scale ? scale_vals[si] : 1.0);
 
 			ValueT term = rval * sval * cval;
-			ret += term;
+			ret.add({{rcol}}, term);
 		}
 	}
 }
@@ -541,18 +542,17 @@ static double multiply(
 			// Multiply a row by a column
 			IndexT const a0 = abegin[ai];
 			IndexT const b0 = bbegin[bi];
-			double val =
-				sival *
-				multiply_row_col(
-					&A.indices[0][a0], &A.vals[a0], abegin[ai+1]-a0,
-					scalej,
-						scalej ? &scalej->indices[0][0] : 0,
-						scalej ? &scalej->vals[0] : 0,
-						scalej ? scalej->size() : 0,
-					&B.indices[1][b0], &B.vals[b0], bbegin[bi+1]-b0)
-				* skval;
+			ScalarAccumulator<IndexT, ValueT, RANK> rcval;
+			multiply_row_col(rcval,
+				&A.indices[0][a0], &A.vals[a0], abegin[ai+1]-a0,
+				scalej,
+					scalej ? &scalej->indices[0][0] : 0,
+					scalej ? &scalej->vals[0] : 0,
+					scalej ? scalej->size() : 0,
+				&B.indices[1][b0], &B.vals[b0], bbegin[bi+1]-b0)
 
-			if (val == 0.0) goto continue_inner;
+			double val = sival * rcval.value() * skval;
+			if (val == 0) continue;
 
 			IndexT aRow = a.indices[0][a0];
 			IndexT bCol = b.indices[1][b0];
@@ -619,15 +619,15 @@ static double multiply(
 
 		// Multiply a row by a column
 		IndexT const a0 = abegin[ai];
-		double val =
-			sival *
-			multiply_row_col(
-				&A.indices[0][a0], &A.vals[a0], abegin[ai+1]-a0,
-				0, 0, 0, 0,
-				&b.indices[0][0], &b.vals[0], b.size())
-				handle_nan);
+		ScalarAccumulator<IndexT, ValueT, RANK> rcval;
+		multiply_row_col(rcval,
+			&A.indices[0][a0], &A.vals[a0], abegin[ai+1]-a0,
+			0, 0, 0, 0,
+			&b.indices[0][0], &b.vals[0], b.size())
+			handle_nan);
 
-		if (val == 0.0) goto continue_inner;
+		double val = sival * rcval.value();
+		if (val == 0) continue;
 
 		IndexT aRow = a.indices[0][a0];
 		ret.add({{aRow}}, val);
@@ -636,6 +636,27 @@ static double multiply(
 	break_outer: ;
 
 }
+
+
+
+
+
+
+template<class IndexT, class ValueT, class AccumulatorT>
+static double multiply(
+	AccumulatorT &ret,
+	CooVector<IndexT, ValueT> const &A,
+	CooVector<IndexT, ValueT> const &B,
+	bool handle_nan = false)
+{
+	multiply_row_col(ret,
+		&a.indices[0][0], &a.vals[0], a.size(),
+		0, 0, 0, 0,
+		&b.indices[0][0], &b.vals[0], b.size())
+		handle_nan);
+}
+
+
 
 /** Copy a to b while transposing.  Does not clear b. */
 template<class CooMatrixT>
