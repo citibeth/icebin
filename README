@@ -1,3 +1,4 @@
-GLINT2 Library
+IceBin Library
 
-GLINT2 is a library that makes matrices needed for GCM-ice model coupling.
+IceBin is a library that makes matrices needed for GCM-ice model coupling.
+Formerly known as Glint2.
