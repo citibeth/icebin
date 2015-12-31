@@ -392,7 +392,7 @@ protected:
 	{
 		if (_nnz_cur >= zd11().ne) {
 			fprintf(stderr, "ZD11SparseMatrix is full with %d elements\n", zd11().ne);
-			giss::exit(1);
+svec			giss::exit(1);
 		}
 		zd11().row[_nnz_cur] = row;
 		zd11().col[_nnz_cur] = col;
@@ -550,7 +550,7 @@ public:
 	void sort(SparseMatrix::SortOrder sort_order = SortOrder::ROW_MAJOR);
 
 	/** Sums together items in the matrix with duplicate (row, col) */
-	void sum_duplicates(
+	void consolidate(
 		SparseMatrix::SortOrder sort_order = SparseMatrix::SortOrder::ROW_MAJOR);
 
 	/** Construct a VectorSparseMatrix based on arrays in a netCDF file.

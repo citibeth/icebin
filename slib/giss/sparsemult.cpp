@@ -65,10 +65,14 @@ std::vector<int> get_rowcol_beginnings(
 	return abegin;
 }
 
+/** Computes [row] diag(scale) [[col]].
+Or: row_j scale_j col_j   (out of overall matrix computation row_ij scale_j col_jk */
+
 static double multiply_row_col(
 	VectorSparseMatrix const &r,
 	int const r0,	// Position within the sparsematrix vectors
 	int const r1,
+	blitz::Array<double,1> const * const scale,
 	VectorSparseMatrix const &c,
 	int const c0,
 	int const c1)
@@ -113,31 +117,38 @@ if (orow == 1 && ocol == 0) {
 //if (orow == 1 && ocol == 0) printf("ri=%d ci=%d\n", ri-r0, ci-c0);
 
 
-		if (r.cols()[ri] == c.rows()[ci]) {
-			// Duplicate entries ==> add together
-			int rcol = r.cols()[ri];
+		int rcol = r.cols()[ri];
+		int crow = c.rows()[ci];
+		if (rcol == crow) {			// Duplicate entries ==> add together
 			double rval = 0;
 			do {
 				rval += r.vals()[ri++];
 			} while (ri < r1 && r.cols()[ri] == rcol);
 
 			// Duplicate entries ==> add together
-			int crow = c.rows()[ci];
 			double cval = 0;
 			do {
 				cval += c.vals()[ci++];
 			} while (ci < c1 && c.rows()[ci] == crow);
 
 //if (orow == 1 && ocol == 0)  printf("      + %g * %g = %g\n", rval, cval, rval*cval);
-			ret += rval * cval;
+			ret += rval * (scale ? (*scale)(crow) : 1.0) * cval;
 		}
 	}
 	return ret;
 }
 
 
-// This should work.  But so does Eigen sparse multiplcation
-std::unique_ptr<VectorSparseMatrix> multiply_giss_algorithm(VectorSparseMatrix &a, VectorSparseMatrix &b)
+/** Computes the sparse matrix:
+      A diag(scaleB) B
+*/
+std::unique_ptr<VectorSparseMatrix> multiply(
+//	blitz::Array<double,1> const *scale_i,			// scaleA_i
+	VectorSparseMatrix &a,							// A_ij; sorts row major
+	blitz::Array<double,1> const *scale_j			// scaleB_j
+	VectorSparseMatrix &b,							// B_jk; sorts col major
+	blitz::Array<double,1> const *scale_k			// scaleB_j
+	VectorSparseMatrix &out)
 {
 	// Get beginning of each row in a (including sentinel at end)
 	a.sort(SparseMatrix::SortOrder::ROW_MAJOR);
@@ -166,12 +177,27 @@ printf("\n");
 		SparseDescr(a.nrow, b.ncol)));;
 
 	for (int ai = 0; ai < abegin.size()-1; ++ai) {
-	for (int bi = 0; bi < bbegin.size()-1; ++bi) {
-		// Multiply a row by a column
-		double val = multiply_row_col(
-			a, abegin[ai], abegin[ai+1],
-			b, bbegin[bi], bbegin[bi+1]);
-		if (val == 0.0) continue;
+		// Make sure this row is non-empty
+		if (abegin[ai] == abegin[ai+1]) continue;
+		int aRow = a.rows()[ai];	// Index of this row
+		double iScale = scale_i ? (*scale_i)(aRow) : 1.0;
+
+		for (int bi = 0; bi < bbegin.size()-1; ++bi) {
+			// Make sure this column is non-empty
+			if (bbegin[bi] == bbegin[bi+1]) continue;
+			int bCol = b.rows()[bi];	// Index of this column
+			double kScale = scale_k ? scale_k[bRow] : 1.0;
+
+			// Multiply a row by a column
+			double val =
+				iScale *
+				multiply_row_col(
+					a, abegin[ai], abegin[ai+1],
+					scale_j,
+					b, bbegin[bi], bbegin[bi+1])
+				* kScale;
+
+			if (val == 0.0) continue;
 
 		int row = a.rows()[abegin[ai]];
 		int col = b.cols()[bbegin[bi]];

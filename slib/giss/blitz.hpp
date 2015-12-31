@@ -23,7 +23,7 @@
 #include <blitz/array.h>
 #include <giss/exit.hpp>
 
-/** \file blitz.hpp
+/** file blitz.hpp
 Type conversion utilities related to Blitz++ arrays.  Blitz++ arrays
 are so flexible... if subroutines are written to take them as
 arguments, then other array data types can be converted as needed. */
@@ -41,6 +41,7 @@ void free_array(blitz::Array<T, len> &array)
 
 /** Converts a std::vector to a Blitz++ 1-D array that shares the same memory.
 @param vec The input vector */
+
 template<class T>
 blitz::Array<T,1> vector_to_blitz(std::vector<T> &vec)
 {

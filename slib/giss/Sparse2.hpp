@@ -43,7 +43,26 @@ struct CmpIndex {
 		return (indices[RANK-1][i] < indices[RANK-1][j]);
 	}
 
+// ====================================================
+/** Used as an alternate underlying storage for CooArray */
+template<class T>
+class BlitzCooVec
+{
+	blitz::Array<T,1> vec;
+	size_t size;
 
+	void clear()
+		{ size = 0; }
+	void push_back(T const &val)
+	{
+		if (CHECK_BOUNDS && size >= val.extent(0)) {
+			sparse_error("
+		vec[size++] = val;
+	}
+
+};
+
+// ====================================================
 template<class IndexT, class ValueT, int RANK>
 class CooArray : public ArrayDescr
 {
@@ -338,6 +357,72 @@ using CooMatrix = CooArray<IndexT, ValueT, 2>
 template<class IndexT, class ValueT>
 using CooVector = CooArray<IndexT, ValueT, 1>
 
+// ========================================================
+template<class XIterator1T, class XIterator2T>
+Join2XIterator
+{
+	bool use1;
+	XIterator1T i1;
+	bool use2;
+	XIterator2T i2;
+
+	typename XIterator1T::index_type next_match;
+	bool _eof;
+
+	bool eof()
+		{ return _eof; }
+
+	Join2XIterator(XIterator1T &&_i1, XIterator1T &&_i2) :
+		i1(std::move(_i1)), i2(std::move(_i2)),
+	{
+		if (!i1.eof() && !i2.eof()) {
+			_eof = false;
+			next_match = std::max(i1.index(), i2.index());
+			next_noincr();
+		} else {
+			_eof = true;
+		}
+	}
+
+	bool next_noincr()
+	{
+		do {
+			// Scan forward first iterator
+			if (use1) {
+				for (;;++i1) {
+					if (i1.eof()) {
+						_eof = true;
+						return _eof;
+					}
+					if (i1.index() >= next_match) break;
+				}
+				next_match = i1.index();
+			}
+
+			// Scan forward second iterator
+			if (use2) {
+				for (;;++i2) {
+					if (i2.eof()) {
+						_eof = true;
+						return _eof;
+					}
+					if (i2.index() >= next_match) break;
+				}
+				next_match = i2.index();
+			}
+
+		} while (i1.index() == i2.index());
+		return _eof;
+	}
+
+	bool next()
+	{
+		++i1;
+		++i2;
+		return next_noincr();
+	}
+
+}
 // ========================================================
 
 /** (Sparse Matrix) * (Dense Vector) */

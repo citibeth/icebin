@@ -60,12 +60,18 @@ support multiple <index, value> types.
 template<class IndexT, class ValT>
 class VectorSparseVector : public SparseVector<IndexT, ValT>
 {
-	std::vector<std::pair<IndexT, ValT>> vals;
+	std::vector<IndexT> indx;
+	std::vector<ValT> val;
 
 public:
 	VectorSparseVector() {}
-	VectorSparseVector(VectorSparseVector &&b) : vals(std::move(b.vals)) {}
-	void operator=(VectorSparseVector &&b) { vals = std::move(b.vals); }
+	VectorSparseVector(VectorSparseVector &&b) :
+		indx(std::move(b.indx)),
+		val(std::move(b.val)) {}
+	void operator=(VectorSparseVector &&b) {
+		indx = std::move(b.indx);
+		val = std::move(b.val);
+	}
 
 #if 0
 	// These don't make sense for VectorSparseVector!!!
@@ -96,7 +102,6 @@ public:
 		{ std::stable_sort(vals.begin(), vals.end()); }
 
 	void consolidate(DuplicatePolicy dups = DuplicatePolicy::ADD);
-
 };
 
 template<class SparseVectorT, class ValT>
@@ -120,6 +125,56 @@ void to_parallel_arrays(SparseVectorT const &mat,
 
 
 // ---------------------------------------------------
+
+struct CmpIndex2 {
+	int *index1;
+	int *index2;
+public:
+	void init(int *_index1, int *_index2) {
+		index1 = _index1;
+		index2 = _index2;
+	}
+	bool operator()(int i, int j)
+	{
+		if (index1[i] < index1[j]) return true;
+		if (index1[i] > index1[j]) return false;
+		return (index2[i] < index2[j]);
+	}
+};
+
+void VectorSparseMatrix::sort(SparseMatrix::SortOrder sort_order)
+{
+	// Decide on how we'll sort
+	CmpIndex2 cmp;
+	switch(sort_order) {
+		case SparseMatrix::SortOrder::COLUMN_MAJOR :
+			cmp.init(&jndx[0], &indx[0]);
+		break;
+		default :
+			cmp.init(&indx[0], &jndx[0]);
+		break;
+	}
+
+	// Generate a permuatation
+	int n = size();
+	std::vector<int> perm; perm.reserve(n);
+	for (int i=0; i<n; ++i) perm.push_back(i);
+	std::sort(perm.begin(), perm.end(), cmp);
+
+	// Apply permutation to val
+	std::vector<double> dtmp; dtmp.reserve(n);
+	for (int i=0; i<n; ++i) dtmp.push_back(val[perm[i]]);
+	val = std::move(dtmp);
+
+	// Apply permutation to indx
+	std::vector<int> itmp; itmp.reserve(n);
+	for (int i=0; i<n; ++i) itmp.push_back(indx[perm[i]]);
+	std::swap(itmp, indx);
+
+}
+
+
+
 template<class IndexT, class ValT>
 void VectorSparseVector<IndexT,ValT>::consolidate(DuplicatePolicy dups)
 {
