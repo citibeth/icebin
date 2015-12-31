@@ -299,7 +299,7 @@ public:
 		RegridMatrix R("G<-Ap");	// Ap->G
 		sheet->iceexch_xx_projatm(R("Ap<-G"), R.weight("Ap"), R.weight("G"), IceExch::EXCH);
 		RegridMatrix X("G<-I");
-		sheet->ice_xx_exch(X("G<-E"), X.weight("I"), R.weight("G"));
+		sheet->ice_xx_exch(X("G<-I"), X.weight("I"), R.weight("G"));
 
 		// Base projection matrices
 		ProjMatrix ProjE("Ep<-E");
