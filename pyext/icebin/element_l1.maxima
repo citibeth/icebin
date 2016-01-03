@@ -26,7 +26,7 @@ FF_xy(x,y) := [
 FF(xy) := FF_xy(xy[1], xy[2]);
 
 /* To meet the conditions of Green's Theorem:
-Verify that dF2/dx - dF1/dy = A + Bx + Cy = A + B xx[1] + C xx[2] */
+Verify that dF2/dx - dF1/dy = A + Bx + Cy = A xx[1] + B xx[2] + C */
 print("Should be zero: ",
 	diff(FF([x,y])[2], x) - diff(FF([x,y])[1], y)
 	- (A*x + B*y + C))$
