@@ -1,5 +1,11 @@
-from distutils.core import setup
+# WARNING: This setup.py is not working
+# It is being kept for posterity.  We use the native CMake-based build
+
+from distutils.core import setup, Extension
 from Cython.Build import cythonize
+import numpy
+
+include_path = [numpy.get_include()]
 
 # http://docs.cython.org/src/userguide/wrapping_CPlusPlus.html
 setup(ext_modules = cythonize(Extension(
@@ -13,7 +19,13 @@ setup(ext_modules = cythonize(Extension(
 
 	# We're wrapping the IceBin C++ library
 	# http://docs.cython.org/src/tutorial/clibraries.html
-	libraries="icebin"
+#	libraries="icebin",
+	libraries="/Users/rpfische/git/icebin/build/slib/libicebin.dylib",
+
+	library_dirs = [],				# -L options
+	runtime_library_dirs = [],		# -rpath options
+
+	include_dirs = [],
 )))
 
 
