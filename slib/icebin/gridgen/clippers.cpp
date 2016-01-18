@@ -16,10 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <glint2/clippers.hpp>
-#include <giss/geodesy.hpp>
+#include <icebin/gridgen/clippers.hpp>
+#include <ibmisc/geodesy.hpp>
 
-namespace glint2 {
+namespace icebin {
 
 // We use lon0...lat1 as a poor man's substute for real CG on a spherical surface
 
@@ -29,14 +29,14 @@ double lon0, double lat0, double lon1, double lat1)
 {
 
 
-//printf("distance=%g, clip_distance=%g\n", giss::haversine_distance(center_lon, center_lat, lon0, lat0), clip_distance_deg);
+//printf("distance=%g, clip_distance=%g\n", ibmisc::haversine_distance(center_lon, center_lat, lon0, lat0), clip_distance_deg);
 
 	// This avoids projection-caused grid cell degeneracy
 	// far away from the central area we're interested in
-	if (giss::haversine_distance(center_lon, center_lat, lon0, lat0) <= clip_distance_deg) return true;
-	if (giss::haversine_distance(center_lon, center_lat, lon1, lat0) <= clip_distance_deg) return true;
-	if (giss::haversine_distance(center_lon, center_lat, lon1, lat1) <= clip_distance_deg) return true;
-	if (giss::haversine_distance(center_lon, center_lat, lon0, lat1) <= clip_distance_deg) return true;
+	if (ibmisc::haversine_distance(center_lon, center_lat, lon0, lat0) <= clip_distance_deg) return true;
+	if (ibmisc::haversine_distance(center_lon, center_lat, lon1, lat0) <= clip_distance_deg) return true;
+	if (ibmisc::haversine_distance(center_lon, center_lat, lon1, lat1) <= clip_distance_deg) return true;
+	if (ibmisc::haversine_distance(center_lon, center_lat, lon0, lat1) <= clip_distance_deg) return true;
 	return false;
 }
 

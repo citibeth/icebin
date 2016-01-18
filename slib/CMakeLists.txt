@@ -27,6 +27,15 @@ set(icebin_SOURCES
 	icebin/Grid.cpp
 )
 
+if (BUILD_GRIDGEN)
+	list(APPEND icebin_SOURCES
+		icebin/gridgen/gridutil.cpp
+		icebin/gridgen/clippers.cpp
+		icebin/gridgen/GridSpec_LonLat.cpp
+		icebin/gridgen/GridSpec_XY.cpp
+	)
+endif()
+
 
 # set(icebin_SOURCES 
 # 	libicebin_refaddr.cpp

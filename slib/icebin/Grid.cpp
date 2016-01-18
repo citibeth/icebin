@@ -155,6 +155,7 @@ void Grid::nc_write(netCDF::NcGroup *nc, std::string const &vname) const
 			{
 				cells_vertex_refs_v.putVar(ivref, countp, &vertex->index);
 			}
+
 		}
 
 		// Write out a sentinel for polygon index bounds
@@ -329,7 +330,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 				"index to each grid cell.  If grid.info:type = EXCHANGE, then i and "
 				"j correspond to grid.vertices.index of the two overlapping source cells.");
 
-		get_or_add_var(ncio, vname + ".cells.native_area", ncInt, {cells_nrealized_d})
+		get_or_add_var(ncio, vname + ".cells.native_area", ncDouble, {cells_nrealized_d})
 			.putAtt("comment",
 				"Area of each cell in its native (non-projected) coordinate system.  "
 				"We can compute the projected area on the fly.");

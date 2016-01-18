@@ -171,8 +171,8 @@ TEST_F(GridTest, create_grid)
 	EXPECT_EQ(2., cells.at(0)->native_area);
 	EXPECT_EQ(3., cells.at(1)->native_area);
 
-	EXPECT_DOUBLE_EQ(1., cells.at(0)->proj_area());
-	EXPECT_DOUBLE_EQ(1., cells.at(1)->proj_area());
+	EXPECT_DOUBLE_EQ(1., cells.at(0)->proj_area(NULL));
+	EXPECT_DOUBLE_EQ(1., cells.at(1)->proj_area(NULL));
 
 	expect_eq(grid, grid);
 

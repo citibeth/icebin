@@ -21,10 +21,12 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
-#include <ibmisc/Proj2.hpp>
+
 #include <ibmisc/enum.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/iter.hpp>
+#include <ibmisc/Proj2.hpp>
+
 #include <icebin/error.hpp>
 
 namespace icebin {
@@ -37,6 +39,8 @@ struct Vertex {
 	long index;
 	double const x;
 	double const y;
+
+	Vertex() : x(0), y(0), index(-1) {}
 
 	Vertex(double _x, double _y, int _index=-1) :
 		x(_x), y(_y), index(_index) {}
@@ -72,6 +76,10 @@ public:
 		_vertices(std::move(vertices)),
 		index(-1), i(-1), j(-1), k(-1), native_area(0) {}
 
+	Cell(std::vector<Vertex *> &vertices) : 
+		_vertices(vertices),
+		index(-1), i(-1), j(-1), k(-1), native_area(0) {}
+
 	bool operator<(Cell const &rhs) const
 		{ return index < rhs.index; }
 
@@ -101,7 +109,7 @@ public:
 	void reserve(size_t n) { _vertices.reserve(n); }
 	void add_vertex(Vertex *vertex) { _vertices.push_back(vertex); }
 
-	double proj_area(ibmisc::Proj_LL2XY const *proj = 0);	// OPTIONAL
+	double proj_area(ibmisc::Proj_LL2XY const *proj);	// OPTIONAL
 
 };		// class Cell
 // ----------------------------------------------------
@@ -149,12 +157,6 @@ public:
 	iterator erase(iterator const &ii)
 		{ return iterator(_cells.erase(ii.wrapped)); }
 
-protected:
-
-public:
-
-
-
 	void clear() { _cells.clear(); }
 
 	CellT *at(long index) { return &*_cells.at(index); }
@@ -164,6 +166,10 @@ public:
 
 	CellT *add(CellT &&cell);
 
+
+	/** Adds the item to our collection, then deletes the pointer.
+	This is for use with Cython, which doesn't like RValue references. */
+	CellT *add_claim(CellT *cell);
 
 private :
 	struct CmpPointers {
@@ -192,7 +198,8 @@ std::vector<CellT const *> GridMap<CellT>::sorted() const
 
 
 template<class CellT>
-CellT *GridMap<CellT>::add(CellT &&cell) {
+CellT *GridMap<CellT>::add(CellT &&cell)
+{
 	// If we never specify our indices, things will "just work"
 	if (cell.index < 0) cell.index = _cells.size();
 	_max_realized_index = std::max(_max_realized_index, cell.index);
@@ -208,6 +215,15 @@ CellT *GridMap<CellT>::add(CellT &&cell) {
 	}
 	return valp;
 }
+
+template<class CellT>
+CellT *GridMap<CellT>::add_claim(CellT *cell)
+{
+	// Make sure we get deleted, even in face of exceptions
+	std::unique_ptr<CellT> pcell(cell);
+	return add(std::move(*pcell));
+}
+
 
 // ----------------------------------------------------
 class Grid {
@@ -241,10 +257,10 @@ public:
 
 	std::string name;
 
-protected :
 	long _ncells_full;		// Maximum possible index (+1)
 	long _nvertices_full;	// Maximum possible index (+1)
 
+protected :
 	// These are kept in line, with add_cell() and add_vertex()
 	long _max_realized_cell_index;		// Maximum index of realized cells
 	long _max_realized_vertex_index;
@@ -260,12 +276,6 @@ public:
 	size_t ndata() const;
 
 	void clear();
-
-	// ========================================
-
-	std::vector<double> get_proj_areas(std::string const &sproj) const;
-	std::vector<double> get_native_areas() const;
-
 
 protected:
 	void nc_read(netCDF::NcGroup *nc, std::string const &vname);

@@ -1,33 +1,34 @@
+# Get definitions of C++ classes in the cpp namespace.
+#cimport cpp
+cimport namespace_std as cstd
+cimport namespace_icebin as cicebin
+from cython.operator cimport dereference as deref, preincrement as inc
 
-# This will make the C++ class def for Rectangle available..
-cdef extern from "icebin/Grid.hpp" namespace "icebin":
+cpdef test_icebin():
+	cdef cicebin.Grid grid
+	cdef cicebin.Vertex *vertex
+	cstd.vector[cicebin.Vertex *] vertices	# For one cell
 
-	# Now, let’s add the Rectangle class to this extern from block -
-    # just copy the class name from Rectangle.h and adjust for Cython
-    # syntax, so now it becomes:
-	cdef cppclass Vertex:
-		# We now need to declare the attributes and methods for use on Cython:
-		Vertex(double, double, int) except +
-		long index
-		const double x
-		const double y
+	vcache = dict()
+	for i in range(0,2):
+		x = i*2.
+		for j in range(0,2):
+			j*1.
 
-cdef class PyVertex:
-	cdef Vertex *thisptr
-	def __cinit__(self, double x, double y, int index):
-		self.thisptr = new Vertex(x,y,index)
-	def __dealloc__(self):
-		del self.thisptr
+			vertices.clear()
+			
 
-	@property
-	def x(self):
-		return self.thisptr.x
+			vertex = vcache[(i,j)] if (i,j) in vcache else 
+			if (i,j) in vcache:
 
-	@property
-	def y(self):
-		return self.thisptr.y
 
-	@property
-	def index(self):
-		return self.thisptr.index
+	cdef cicebin.Vertex *vertex;
+	vertex = grid.vertices.add_claim(new cicebin.Vertex(1.,2.,-1))
+	print(vertex.x)
 
+#	cdef cicebin.Vertex vertex(1.,2.,-1)
+#	vertex.x = 1.
+#	vertex.y = 2.
+#	grid.vertices.add(vertex)
+#	grid.vertices.add(cicebin.Vertex(1.,2.,-1))
+#	cdef cicebin.Vertex *vertex = grid.vertices.at(0)

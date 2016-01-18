@@ -5,7 +5,11 @@ find_package(numpy)
 
 add_custom_command(OUTPUT _icebin.cpp
 	MAIN_DEPENDENCY ${PROJECT_SOURCE_DIR}/pyext/_icebin.pyx
-	COMMAND ${CYTHON_EXECUTABLE} --cplus ${PROJECT_SOURCE_DIR}/pyext/_icebin.pyx -o _icebin.cpp)
+	DEPENDS cpp.pxd
+	COMMAND ${CYTHON_EXECUTABLE} --cplus
+		--include-dir ${PROJECT_SOURCE_DIR}/pyext
+		${PROJECT_SOURCE_DIR}/pyext/_icebin.pyx
+		-o _icebin.cpp)
 
 
 include_directories(${PROJECT_SOURCE_DIR}/slib)

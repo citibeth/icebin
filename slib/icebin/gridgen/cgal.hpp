@@ -21,10 +21,10 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Boolean_set_operations_2.h>
 #include <CGAL/bounding_box.h>
-#include <giss/exit.hpp>
+#include <icebin/error.hpp>
+#include <icebin/Grid.hpp>
 
-
-namespace glint2 {
+namespace icebin {
 
 /** (Internal Use Only).  GLINT2-specific instatiations of CGAL templates.  These are used
 internally by GLINT2 when interacting with the CGAL library, should
@@ -78,14 +78,16 @@ poly_overlap(const CGAL::Polygon_2<Kernel, Container> &P,
 
 	if (ii1 != overlap.end()) {
 		// More than one Polygon here --- complain
-		fprintf(stderr, "ERROR: Overlap expects only simple polygons.  If this is not a bug, you must upgrade your non-CGAL overlap data structures.");
-		giss::exit(1);
+		(*icebin_error)(-1,
+			"ERROR: Overlap expects only simple polygons.  If this is not "
+			"a bug, you must upgrade your non-CGAL overlap data structures.");
 	}
 
 	if (ii0->holes_begin() != ii0->holes_end()) {
 		// Polygon has holes --- again, our format doesn't support it.
-		fprintf(stderr, "ERROR: Overlap expects only simple polygons.  If this is not a bug, you must upgrade your non-CGAL overlap data structures.");
-		giss::exit(1);
+		(*icebin_error)(-1,
+			"ERROR: Overlap expects only simple polygons.  If this is not "
+			"a bug, you must upgrade your non-CGAL overlap data structures.");
 	}
 
 	// We have a nice, clean overlap.  Return it!
@@ -104,4 +106,4 @@ inline std::unique_ptr<gc::Polygon_2> Cell_to_Polygon_2(Cell const &cell)
 }
 
 
-}	// namespace glint2
+}	// namespace icebin

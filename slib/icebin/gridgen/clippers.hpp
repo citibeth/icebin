@@ -18,11 +18,9 @@
 
 #pragma once
 
-//#include <giss/geometry.hpp>
-#include <glint2/Grid.hpp>
-#include <glint2/cgal.hpp>
+#include <icebin/gridgen/cgal.hpp>
 
-namespace glint2 {
+namespace icebin {
 
 /** A set of clipping functions to clip on the surface of a sphere.
 Clipping is used to decide which grid cells in a Grid should not be realized.

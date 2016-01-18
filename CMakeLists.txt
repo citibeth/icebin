@@ -8,28 +8,6 @@ include (setup_rpath)
 include_directories($ENV{EB_INCLUDE_PATH})
 
 # ------- Process Configure Options
-if (NOT DEFINED USE_PISM)
-	set(USE_PISM NO)
-endif()
-if(USE_PISM)
-	find_package(PISM)
-	find_package(PETSC)
-	include_directories(
-		${PISM_INCLUDE_DIRS}
-		${PETSC_INCLUDES}
-	)
-	list(APPEND EXTERNAL_LIBS ${PETSC_LIBRARIES} ${PISM_LIBRARIES})
-
-	add_definitions(-DUSE_PISM)
-endif()
-
-if (NOT DEFINED USE_PYTHON)
-	set(USE_PYTHON NO)
-endif()
-if (USE_PYTHON)
-	find_package(Python REQUIRED)
-	find_package(Numpy REQUIRED)
-endif()
 
 if (NOT DEFINED USE_EVERYTRACE)
 	set(USE_EVERYTRACE NO)
@@ -37,6 +15,57 @@ endif()
 if (USE_EVERYTRACE)
 	find_package(Everytrace)
 endif()
+
+
+if (NOT DEFINED BUILD_PYTHON)
+	set(BUILD_PYTHON NO)
+endif()
+if (BUILD_PYTHON)
+	find_package(Python REQUIRED)
+	find_package(Numpy REQUIRED)
+endif()
+
+
+
+if (NOT DEFINED BUILD_GRIDGEN)
+	set(BUILD_GRIDGEN YES)
+endif()
+if (BUILD_GRIDGEN)
+	find_package(CGAL REQUIRED)
+	find_package(GMP REQUIRED)
+	find_package(MPFR REQUIRED)
+
+	list(APPEND EXTERNAL_LIBS ${CGAL_LIBRARY} ${GMP_LIBRARY} ${MPFR_LIBRARIES})
+	list(APPEND Boost_COMPONENTS thread system program_options)
+	include_directories(${CGAL_INCLUDE_DIR} ${GMP_INCLUDE_DIR} ${MPFR_INCLUDES})
+	add_definitions(-DBUILD_GRIDGEN)
+endif()
+
+if (NOT DEFINED BUILD_COUPLER)
+	set(BUILD_COUPLER YES)
+endif()
+if (BUILD_COUPLER)
+	if (NOT DEFINED USE_PISM)
+		set(USE_PISM NO)
+	endif()
+	if(USE_PISM)
+		find_package(PISM)
+		find_package(PETSC)
+		include_directories(
+			${PISM_INCLUDE_DIRS}
+			${PETSC_INCLUDES}
+		)
+		list(APPEND EXTERNAL_LIBS ${PETSC_LIBRARIES} ${PISM_LIBRARIES})
+
+		add_definitions(-DUSE_PISM)
+	endif()
+	add_definitions(-DBUILD_COUPLER)
+endif()
+
+find_package(Boost REQUIRED COMPONENTS ${Boost_COMPONENTS} filesystem date_time)
+#find_package(Boost REQUIRED thread system log filesystem date_time)
+include_directories(${Boost_INCLUDE_DIRS})
+list(APPEND EXTERNAL_LIBS ${Boost_LIBRARIES})
 
 # -------- Find Dependencies
 
@@ -56,6 +85,7 @@ list(APPEND EXTERNAL_LIBS ${NETCDF4_CXX_LIBRARY})
 # --- IBMisc
 find_library(IBMISC_LIBRARY ibmisc)
 list(APPEND EXTERNAL_LIBS ${IBMISC_LIBRARY})
+include_directories(${IBMISC_INCLUDE_DIR})
 
 
 
@@ -127,10 +157,12 @@ list(APPEND EXTERNAL_LIBS ${IBMISC_LIBRARY})
 # -------- Process subdirectories of the build
 add_subdirectory(slib)
 #add_subdirectory(sbin)
-add_subdirectory(pyext)
 add_subdirectory(test)
+if (BUILD_GRIDGEN)
+	add_subdirectory(grids)
+endif()
 
-if(${USE_PYTHON})
+if(${BUILD_PYTHON})
 	add_subdirectory(pyext)
 endif()
 
