@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <memory>
-#include <icebin/Indexing.hpp>
+#include <ibmisc/indexing.hpp>
 
 namespace icebin {
 
@@ -14,7 +14,7 @@ struct GridSpec_LonLat {
 
 	std::string name;
 	std::function<bool(double, double, double, double)> spherical_clip;
-	std::unique_ptr<icebin::Indexing> indexing;
+	std::unique_ptr<ibmisc::Indexing<int,2,long>> indexing;
 
 	/** Longitude of cell boundaries (degrees), sorted low to high.
 	<b>NOTE:</b> lon_boundares.last() = 360.0 + lonb.first() */
@@ -63,8 +63,7 @@ struct GridSpec_LonLat {
 
 	// ------------------------------------------------------
 
-	void make_grid(Grid &grid);
-	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+	void make_grid(Grid_LonLat &grid);
 };
 
 

@@ -26,8 +26,10 @@
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/iter.hpp>
 #include <ibmisc/Proj2.hpp>
+#include <ibmisc/indexing.hpp>
 
 #include <icebin/error.hpp>
+#include <icebin/sparse.hpp>
 
 namespace icebin {
 
@@ -272,10 +274,14 @@ public:
 
 	Grid();
 
-	/** @return cells.nfull() (for L0) or cells.nvertices() (for L1) */
+	/** The size of the vector space defined by this grid.
+	@return cells.nfull() (for L0) or cells.nvertices() (for L1) */
 	size_t ndata() const;
 
 	void clear();
+
+	/** Puts the area of each cell into the weight vector w */
+	void areas(SparseVector &w);
 
 protected:
 	void nc_read(netCDF::NcGroup *nc, std::string const &vname);
@@ -290,9 +296,77 @@ public:
 
 };
 
-std::unique_ptr<Grid> read_grid(netCDF::NcFile &nc, std::string const &vname);
+class Grid_XY : public Grid
+{
+public:
+	/** Translate between 2-D and 1-D indexing */
+	std::unique_ptr<ibmisc::Indexing<int, 2, long>> indexing;
+
+	/** Cell boundaries in the x direction.
+	Sorted low to high.
+	Number of grid cells in the x direction = x_boundaries.size() - 1. */
+	std::vector<double> xb;
+
+	/** Cell boundaries in the y direction.
+	Sorted low to high.
+	Number of grid cells in the y direction = y_boundaries.size() - 1. */
+	std::vector<double> yb;
+
+	int nx() const { return xb.size() - 1; }
+	int ny() const { return yb.size() - 1; }
+
+	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+};
+
+class Grid_LonLat : public Grid
+{
+public:
+	/** Translate between 2-D and 1-D indexing */
+	std::unique_ptr<ibmisc::Indexing<int, 2, long>> indexing;
+
+	/** Longitude of cell boundaries (degrees), sorted low to high.
+	<b>NOTE:</b> lon_boundares.last() = 360.0 + lonb.first() */
+	std::vector<double> lonb;
+
+	/** Latitude of cell boundaries (degrees), sorted low to high.
+	Does NOT include the polar "cap" cells.
+	90 = north pole, -90 = south pole. */
+	std::vector<double> latb;
+
+	/** True if this grid contains a circular cap on the south pole.
+	If not, then many triangular grid cells will meet at the south pole. */
+	bool south_pole;
+
+	/** True if this grid contains a circular cap on the north pole.
+	If not, then many triangular grid cells will meet at the north pole. */
+	bool north_pole;
+
+	/** Number of segments used to represent each side of a grid cell
+	with a polygonal approximation.  Increasing this number will
+	decrease geometric error at the expense of computation time for
+	the overlap matrix. */
+	int points_in_side;
+
+	/** Radius of Earth (m), or whatever planet you're looking at.
+	Used to compute theoretical exact areas of graticules. That's different
+	from the radius (or elliptical shape) used in the projection. */
+	double eq_rad;
+
+	/** Number of grid cell indices in longitude dimension */
+	int nlon() const { return lonb.size() - 1; }
+
+	/** Number of grid cell indices in latitude dimension */
+	int nlat() const {
+		const int south_pole_offset = (south_pole ? 1 : 0);
+		const int north_pole_offset = (north_pole ? 1 : 0);
+		return latb.size() - 1 + south_pole_offset + north_pole_offset;
+	}
+
+	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+};	// class
 
 }	// namespace
 
 std::ostream &operator<<(std::ostream &out, icebin::Cell const &cell);
 std::ostream &operator<<(std::ostream &out, icebin::Vertex const &vertex);
+

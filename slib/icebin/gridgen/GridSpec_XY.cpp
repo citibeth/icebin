@@ -20,7 +20,6 @@
 #include <cmath>
 #include <ibmisc/netcdf.hpp>
 
-#include <icebin/Indexing.hpp>
 #include <icebin/gridgen/GridSpec_XY.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 
@@ -64,7 +63,7 @@ void set_xy_centers(GridSpec_XY &spec,
 }
 
 
-void GridSpec_XY::make_grid(Grid &grid)
+void GridSpec_XY::make_grid(Grid_XY &grid)
 {
 	grid.type = Grid::Type::XY;
 	grid.coordinates = Grid::Coordinates::XY;
@@ -82,7 +81,7 @@ void GridSpec_XY::make_grid(Grid &grid)
 		double y1 = yb[iy+1];
 
 		for (int ix = 0; ix < xb.size()-1; ++ix) {		// i
-			long index = indexing->ij_to_index(ix, iy);
+			long index = indexing->tuple_to_index({ix, iy});
 
 			double x0 = xb[ix];
 			double x1 = xb[ix+1];
@@ -104,32 +103,12 @@ void GridSpec_XY::make_grid(Grid &grid)
 			grid.cells.add(std::move(cell));
 		}
 	}
+
+	grid.indexing = std::move(indexing);
+	grid.xb = std::move(xb);
+	grid.yb = std::move(yb);
 }
 
-// ---------------------------------------------------------
-void GridSpec_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
-{
-
-	auto xb_d = get_or_add_dim(ncio,
-		vname + ".x_boundaries.length", this->xb.size());
-	ncio_vector(ncio, this->xb, true,
-		vname + ".x_boundaries", ncDouble, {xb_d});
-
-	auto yb_d = get_or_add_dim(ncio,
-		vname + ".y_boundaries.length", this->yb.size());
-	ncio_vector(ncio, this->yb, true,
-		vname + ".y_boundaries", ncDouble, {yb_d});
-
-	NcVar info_v = get_or_add_var(ncio, vname + ".info", ncInt, {});
-	if (ncio.rw == 'w') {
-		int n;
-		n = nx();
-		get_or_put_att(info_v, ncio.rw, "nx", ncInt, n);
-		n = ny();
-		get_or_put_att(info_v, ncio.rw, "ny", ncInt, n);
-	}
-
-}
 // ---------------------------------------------------------
 
 

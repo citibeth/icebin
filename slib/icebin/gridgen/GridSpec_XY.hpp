@@ -22,10 +22,9 @@
 #include <functional>
 #include <ibmisc/blitz.hpp>
 #include <icebin/Grid.hpp>
-#include <icebin/Indexing.hpp>
+#include <ibmisc/indexing.hpp>
 
 namespace icebin {
-
 
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
 struct GridSpec_XY {
@@ -33,7 +32,7 @@ struct GridSpec_XY {
 	std::string name;
 	std::string sproj;
 	std::function<bool(Cell const &)> euclidian_clip;
-	std::unique_ptr<icebin::Indexing> indexing;
+	std::unique_ptr<ibmisc::Indexing<int,2,long>> indexing;
 
 	/** Cell boundaries in the x direction.
 	Sorted low to high.
@@ -48,12 +47,12 @@ struct GridSpec_XY {
 	int nx() const { return xb.size() - 1; }
 	int ny() const { return yb.size() - 1; }
 
-	void make_grid(Grid &grid);
-	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+	void make_grid(Grid_XY &grid);
 
 };
 
 // -----------------------------------------------------------------
+
 
 
 // -----------------------------------------------------------------

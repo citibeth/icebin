@@ -73,7 +73,6 @@ double Cell::proj_area(
 Grid::Grid() :
 	type(Grid::Type::XY),
 	coordinates(Grid::Coordinates::XY),
-	parameterization(Grid::Parameterization::L0),
 	_max_realized_cell_index(0),
 	_max_realized_vertex_index(0) {}
 
@@ -253,12 +252,14 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 		"that this is different from grid.info.type.  A GENERIC grid, "
 		"for example, could be expressed in either XY or LONLAT coordinates.");
 
+#if 0
 	get_or_put_att_enum(info_v, ncio.rw, "parameterization", parameterization);
 	if (ncio.rw == 'w') info_v.putAtt("parameterization.comment",
 		"Indicates how values are interpolated between grid points "
 		"(See Grid::Parameterization in  slib/icebin/Grid.hpp).  Most "
 		"finite difference models will use L0, while finite element "
 		"models would use L1 or something else.");
+#endif
 
 
 	if (coordinates == Coordinates::XY) {
@@ -395,6 +396,60 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 	printf("END filter_cells(%s) %p\n", name.c_str(), this);
 }
 // ---------------------------------------------------------
+// ---------------------------------------------------------
+void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+{
+
+	auto xb_d = get_or_add_dim(ncio,
+		vname + ".x_boundaries.length", this->xb.size());
+	ncio_vector(ncio, this->xb, true,
+		vname + ".x_boundaries", ncDouble, {xb_d});
+
+	auto yb_d = get_or_add_dim(ncio,
+		vname + ".y_boundaries.length", this->yb.size());
+	ncio_vector(ncio, this->yb, true,
+		vname + ".y_boundaries", ncDouble, {yb_d});
+
+	NcVar info_v = get_or_add_var(ncio, vname + ".info", ncInt, {});
+	if (ncio.rw == 'w') {
+		int n;
+		n = nx();
+		get_or_put_att(info_v, ncio.rw, "nx", ncInt, n);
+		n = ny();
+		get_or_put_att(info_v, ncio.rw, "ny", ncInt, n);
+	}
+
+	Grid::ncio(ncio, vname);
+}
+// ---------------------------------------------------------
+void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+{
+
+	auto lonb_d = get_or_add_dim(ncio,
+		vname + ".lon_boundaries.length", this->lonb.size());
+	ncio_vector(ncio, this->lonb, true,
+		vname + ".lon_boundaries", ncDouble, {lonb_d});
+
+	auto latb_d = get_or_add_dim(ncio,
+		vname + ".lat_boundaries.length", this->latb.size());
+	ncio_vector(ncio, this->latb, true,
+		vname + ".lat_boundaries", ncDouble, {latb_d});
+
+	NcVar info_v = get_or_add_var(ncio, vname + ".info", ncInt, {});
+	get_or_put_att(info_v, ncio.rw, "north_pole_cap", north_pole);
+	get_or_put_att(info_v, ncio.rw, "south_pole_cap", south_pole);
+	get_or_put_att(info_v, ncio.rw, "points_in_side", ncInt, points_in_side);
+	if (ncio.rw == 'w') {
+		int n;
+		n = nlon();
+		get_or_put_att(info_v, ncio.rw, "nlon", ncInt, n);
+		n = nlat();
+		get_or_put_att(info_v, ncio.rw, "nlat", ncInt, n);
+	}
+
+	Grid::ncio(ncio, vname);
+}
+// ---------------------------------------------------------
 
 
 }	// namespace
@@ -416,3 +471,5 @@ std::ostream &operator<<(std::ostream &os, icebin::Cell const &cell)
 	os << "])";
 	return os;
 }
+
+// ----------------------------------------------------

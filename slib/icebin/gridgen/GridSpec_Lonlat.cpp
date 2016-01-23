@@ -106,7 +106,7 @@ double polar_graticule_area_exact(double eq_rad,
 @param spherical_clip Only realize grid cells that pass this test (before projection).
 @see EuclidianClip, SphericalClip
 */
-void GridSpec_LonLat::make_grid(Grid &grid)
+void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
 {
 	grid.clear();
 	grid.type = Grid::Type::LONLAT;
@@ -177,7 +177,7 @@ void GridSpec_LonLat::make_grid(Grid &grid)
 			// Figure out how to number this grid cell
 			cell.j = ilat + south_pole_offset;	// 0-based 2-D index
 			cell.i = ilon;
-			cell.index = indexing->ij_to_index(cell.i, cell.j);
+			cell.index = indexing->tuple_to_index({cell.i, cell.j});
 			cell.native_area = graticule_area_exact(this->eq_rad, lat0,lat1,lon0,lon1);
 
 //printf("Adding lon/lat cell %d (%d, %d) area=%f\n", cell.index, cell.i, cell.j, cell.area);
@@ -233,33 +233,6 @@ void GridSpec_LonLat::make_grid(Grid &grid)
 	}
 }
 
-// ---------------------------------------------------------
-void GridSpec_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
-{
-
-	auto lonb_d = get_or_add_dim(ncio,
-		vname + ".lon_boundaries.length", this->lonb.size());
-	ncio_vector(ncio, this->lonb, true,
-		vname + ".lon_boundaries", ncDouble, {lonb_d});
-
-	auto latb_d = get_or_add_dim(ncio,
-		vname + ".lat_boundaries.length", this->latb.size());
-	ncio_vector(ncio, this->latb, true,
-		vname + ".lat_boundaries", ncDouble, {latb_d});
-
-	NcVar info_v = get_or_add_var(ncio, vname + ".info", ncInt, {});
-	get_or_put_att(info_v, ncio.rw, "north_pole_cap", north_pole);
-	get_or_put_att(info_v, ncio.rw, "south_pole_cap", south_pole);
-	get_or_put_att(info_v, ncio.rw, "points_in_side", ncInt, points_in_side);
-	if (ncio.rw == 'w') {
-		int n;
-		n = nlon();
-		get_or_put_att(info_v, ncio.rw, "nlon", ncInt, n);
-		n = nlat();
-		get_or_put_att(info_v, ncio.rw, "nlat", ncInt, n);
-	}
-
-}
 // ---------------------------------------------------------
 
 
