@@ -14,9 +14,6 @@
 #include <icebin/gridgen/clippers.hpp>
 #include <icebin/gridgen/GridSpec_XY.hpp>
 
-#include <icebin/searise/Indexing.hpp>
-#include <icebin/pism/Indexing.hpp>
-
 using namespace std::placeholders;  // for _1, _2, _3...
 using namespace icebin;
 namespace po = boost::program_options;
@@ -102,17 +99,18 @@ int main(int argc, char **argv)
 
 
 	// ------------ Make the grid from the spec
-	Grid grid;
+	Grid_XY grid;
 	if (icemodel == IceModel::pism) {
-		spec.indexing.reset(new pism::Indexing(spec.nx(), spec.ny()));
-	} else {
-		spec.indexing.reset(new searise::Indexing(spec.nx(), spec.ny()));
+		spec.indexing.reset(new ibmisc::Indexing_ColMajor<int,2,long>
+			({spec.nx(), spec.ny()}));
+	} else {	// Native SeaRISE
+		spec.indexing.reset(new ibmisc::Indexing_RowMajor<int,2,long>
+			({spec.nx(), spec.ny()}));
 	}
 	spec.make_grid(grid);
 
 	// ------------- Write it out to NetCDF
 	ibmisc::NcIO ncio(spec.name + ".nc", netCDF::NcFile::replace);
-	spec.ncio(ncio, "grid");
 	grid.ncio(ncio, "grid");
 	ncio.close();
 }

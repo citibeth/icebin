@@ -30,7 +30,7 @@
 #include <icebin/gridgen/clippers.hpp>
 #include <icebin/gridgen/GridSpec_Lonlat.hpp>
 
-#include <icebin/modele/Indexing.hpp>
+#include <ibmisc/indexing.hpp>
 
 using namespace std::placeholders;  // for _1, _2, _3...
 using namespace icebin;
@@ -163,13 +163,13 @@ int main(int argc, char **argv)
 	
 
 	// ------------ Make the grid from the spec
-	Grid grid;
-	spec.indexing.reset(new modele::Indexing(spec.nlon(), spec.nlat()));
+	Grid_LonLat grid;
+	spec.indexing.reset(new ibmisc::Indexing_ColMajor<int,2,long>
+		({spec.nlon(), spec.nlat()}));
 	spec.make_grid(grid);
 
 	// ------------- Write it out to NetCDF
 	ibmisc::NcIO ncio(spec.name + ".nc", netCDF::NcFile::replace);
-	spec.ncio(ncio, "grid");
 	grid.ncio(ncio, "grid");
 	ncio.close();
 }
