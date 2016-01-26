@@ -25,14 +25,15 @@
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
+#include <ibmisc/indexing.hpp>
+
 #include <icebin/error.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 #include <icebin/gridgen/clippers.hpp>
 #include <icebin/gridgen/GridSpec_Lonlat.hpp>
 
-#include <ibmisc/indexing.hpp>
-
 using namespace std::placeholders;  // for _1, _2, _3...
+using namespace ibmisc;
 using namespace icebin;
 namespace po = boost::program_options;
 
@@ -164,8 +165,8 @@ int main(int argc, char **argv)
 
 	// ------------ Make the grid from the spec
 	Grid_LonLat grid;
-	spec.indexing.reset(new ibmisc::Indexing_ColMajor<int,2,long>
-		({spec.nlon(), spec.nlat()}));
+	spec.indexing = Indexing<int,long>(
+		{0,0}, {spec.nlon(), spec.nlat()}, {1,0});	// col major
 	spec.make_grid(grid);
 
 	// ------------- Write it out to NetCDF

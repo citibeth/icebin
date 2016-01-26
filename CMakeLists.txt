@@ -83,13 +83,21 @@ list(APPEND EXTERNAL_LIBS ${NETCDF4_CXX_LIBRARY})
 
 
 # --- IBMisc
-find_library(IBMISC_LIBRARY ibmisc)
+find_package(ibmisc REQUIRED)
 list(APPEND EXTERNAL_LIBS ${IBMISC_LIBRARY})
 include_directories(${IBMISC_INCLUDE_DIR})
 
+# --- SpSparse
+find_package(spsparse REQUIRED)
+list(APPEND EXTERNAL_LIBS ${SPSPARSE_LIBRARY})
+include_directories({$SPSPARSE_INCLUDE_DIR})
 
 
 # --- Proj.4
+find_package(PROJ4 REQUIRED)
+add_definitions(-DUSE_PROJ4)
+include_directories(${PROJ4_INCLUDES})
+list(APPEND EXTERNAL_LIBS ${PROJ4_LIBRARIES})
 
 #find_package(GALAHAD REQUIRED)		# This should be optional
 

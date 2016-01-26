@@ -2,6 +2,8 @@
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/IceRegridder_L0.hpp>
 
+using namespace ibmisc;
+
 namespace icebin {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
@@ -51,14 +53,13 @@ void IceRegridder_L0::GvEp_noweight(
 	// Handle Z_INTERP or ELEV_CLASS_INTERP
 
 	// Interpolate in the vertical
-	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
+	for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
 		long const iA = cell->i;		// GCM Atmosphere grid
-		tuple[0] = iA;
 		long const iI = cell->j;		// Ice Grid
 		long const iX = cell->index;	// X=Exchange Grid
 		long const iG = (dest == IceExch::ICE ? iI : iX);	// G=Interpolation Grid
-		auto ii = elevI.find(iI);
-		if (ii != elevI.end()) {
+		auto ii = elevIh.find(iI);
+		if (ii != elevIh.end()) {
 			double const elev = ii->second;
 
 			// This cell not masked: look up elevation point as usual
@@ -70,37 +71,39 @@ void IceRegridder_L0::GvEp_noweight(
 					int ihps[2];
 					double whps[2];
 					linterp_1d(gcm->hpdefs, elevation, ihps, whps);
-					ret.add({iG, gcm->indexing_hp->tuple_to_index<2>({iA, ihps[0]})},
+					ret.add({iG, gcm->indexingHP.tuple_to_index<2>({iA, ihps[0]})},
 						cell->native_area * whps[0]);
-					ret.add({iG, gcm->indexing_hp->tuple_to_index<2>({iA, ihps[1]})},
+					ret.add({iG, gcm->indexingHP.tuple_to_index<2>({iA, ihps[1]})},
 						cell->native_area * whps[1]);
 				} break;
 				case InterpStyle::ELEV_CLASS_INTERP : {
 					int ihps0 = nearest_1d(gcm->hpdefs, elevation);
-					ret.add(iG, gcm->indexing_hp->tuple_to_index<2>({iA, ihps0}),
+					ret.add({iG, gcm->indexingHP.tuple_to_index<2>({iA, ihps0})},
 						cell->native_area);
 				} break;
 			}
 		}
 	}
-
-	return ret;
 }
 // --------------------------------------------------------
-IceRegridder_L0::GvI_noweight(std::unordered_map<long,double> const &elevIh) const
+void IceRegridder_L0::GvI_noweight(
+	SparseMatrix &ret,
+	std::unordered_map<long,double> const &elevIh) const
 {
 	if (interp_grid == IceExch::ICE) {
 		// Ice <- Ice = Indentity Matrix
-		for (auto cell=gridI.cells.begin(); cell != gridI.cells.end(); ++cell) {
+		for (auto cell=gridI->cells.begin(); cell != gridI->cells.end(); ++cell) {
 			long iI = cell->index;
-			ret.add({iI, iI}, cell->native_area);
+
+			if (elevIh.find(iI) != elevIh.end())
+				ret.add({iI, iI}, cell->native_area);
 		}
 	} else {
 		// Exchange <- Ice
-		for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
+		for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
 			// cell->i = index in atmosphere grid
-			int const iI = cell->j;		// index in ice grid
-			int const iX = cell->index; 	// index in exchange grid
+			long const iI = cell->j;		// index in ice grid
+			long const iX = cell->index; 	// index in exchange grid
 
 			if (elevIh.find(iI) != elevIh.end())
 				ret.add({iX,iI}, cell->native_area);
@@ -108,9 +111,9 @@ IceRegridder_L0::GvI_noweight(std::unordered_map<long,double> const &elevIh) con
 	}
 }
 // --------------------------------------------------------
-IceRegridder_L0::GvAp_noweight(SparseMatrix &ret)
+void IceRegridder_L0::GvAp_noweight(SparseMatrix &ret)
 {
-	for (auto cell = exgrid->cells_begin(); cell != exgrid->cells_end(); ++cell) {
+	for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
 		int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
 		int iA = cell->i;
 		ret.add({iG,iA}, cell->native_area);

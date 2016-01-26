@@ -25,6 +25,8 @@ include_directories(${PROJECT_SOURCE_DIR}/slib)
 set(icebin_SOURCES
 	icebin/error.cpp
 	icebin/Grid.cpp
+	icebin/GCMRegridder.cpp
+	icebin/IceRegridder_L0.cpp
 )
 
 if (BUILD_GRIDGEN)

@@ -87,7 +87,14 @@ public:
 	NOTE: wAvAp == sApvA */
 	void wEvEp(SparseVector &w);
 
-	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+	virtual void GvEp_noweight(
+		SparseMatrix &ret,
+		std::unordered_map<long,double> const &elevIh) const = 0;
+
+	virtual void GvI_noweight(SparseMatrix &ret, std::unordered_map<long,double> const &elevIh) const = 0;
+	virtual void GvAp_noweight(SparseMatrix &ret) = 0;
+
+	virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };	// class IceRegridder
 

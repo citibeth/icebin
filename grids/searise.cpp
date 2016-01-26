@@ -15,6 +15,7 @@
 #include <icebin/gridgen/GridSpec_XY.hpp>
 
 using namespace std::placeholders;  // for _1, _2, _3...
+using namespace ibmisc;
 using namespace icebin;
 namespace po = boost::program_options;
 
@@ -101,11 +102,9 @@ int main(int argc, char **argv)
 	// ------------ Make the grid from the spec
 	Grid_XY grid;
 	if (icemodel == IceModel::pism) {
-		spec.indexing.reset(new ibmisc::Indexing_ColMajor<int,2,long>
-			({spec.nx(), spec.ny()}));
+		spec.indexing = Indexing<int,long>({0,0}, {spec.nx(), spec.ny()}, {1,0});	// col major
 	} else {	// Native SeaRISE
-		spec.indexing.reset(new ibmisc::Indexing_RowMajor<int,2,long>
-			({spec.nx(), spec.ny()}));
+		spec.indexing = Indexing<int,long>({0,0}, {spec.nx(), spec.ny()}, {0,1});	// row major
 	}
 	spec.make_grid(grid);
 
