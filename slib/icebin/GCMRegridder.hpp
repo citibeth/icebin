@@ -52,11 +52,11 @@ protected:
 
 	// Functions used by corresponding functions in GCMRegridder
 	/** Remove unnecessary GCM grid cells. */
-	void filter_cellsA(boost::function<bool (long)> const &useA);
+	void filter_cellsA(std::function<bool(long)> const &keepA);
 
 public:
-	IceRegridder() {}
-
+	IceRegridder();
+	void clear();
 	void init(
 		std::string const &_name,
 		std::unique_ptr<Grid> &&_gridI,
@@ -65,7 +65,7 @@ public:
 		SparseVector &&elevI);
 
 	virtual ~IceRegridder();
-	std::unordered_map<long,double> IceRegridder::elevI_hash();
+	std::unordered_map<long,double> elevI_hash();
 
 #if 0
 	// ------------------------------------------------
@@ -105,34 +105,41 @@ class GCMRegridder
 public:
 	std::unique_ptr<Grid> gridA;
 
+	ibmisc::Indexing<int,long> indexingA;
+	ibmisc::Domain<long> domainA;				// What's in our MPI halo?
+	bool correctA;		/// Should we correct for projection and geometric error?
+
+
 	/** Convert between (iA, iHP) <--> (iE) */
-	std::unique_ptr<ibmisc::Indexing<long,long>> indexingHP;
+	ibmisc::Indexing<long,long> indexingHP;
 	/** Position of height points in elevation space (same for all GCM
 	grid cells) */
 	std::vector<double> hpdefs;	// [nhp]
 
-	Domain domainA;				// What's in our MPI halo?
-	bool const correctA;		/// Should we correct for projection and geometric error?
 
 	typedef std::map<std::string, std::unique_ptr<IceRegridder>> SheetsT;
 	SheetsT sheets;
 
 public:
 	GCMRegridder() {}
-	init(
+
+	void clear();
+	void init(
 		std::unique_ptr<Grid> &&_gridA,
-		ibmisc::Indexing<long,long>> &&_indexingA,
-		Domain &&_domain<long>,		// Tells us which cells in gridA to keep...
-		ibmisc::Indexing<long,long>> &&_indexingHP,
+		ibmisc::Indexing<int,long> &&_indexingA,
+		ibmisc::Domain<long> &&_domainA,		// Tells us which cells in gridA to keep...
+		ibmisc::Indexing<long,long> &&_indexingHP,
 		bool _correctA);
 
 	// -----------------------------------------
 
-	void GCMRegridder::add_sheet(std::unique_ptr<IceRegridder> &&sheet)
+	void add_sheet(std::unique_ptr<IceRegridder> &&sheet)
 	{
 		sheet->gcm = this;
 		sheets.insert(std::make_pair(sheet->name, std::move(sheet)));
 	}
+
+	void filter_cellsA(std::function<bool(long)> const &keepA);
 
 
 	// typedef ibmisc::DerefSecondIter<std::string, IceRegridder, typename SheetsT::iterator> iterator;
@@ -153,7 +160,7 @@ public:
 	const_iterator end() const
 		{ return const_iterator(sheets.cend()); }
 
-	IceSheet const &at(std::string const &name)
+	IceRegridder const &at(std::string const &name)
 		{ return *sheets.at(name); }
 
 	// -----------------------------------------
@@ -163,7 +170,7 @@ public:
 
 	/** @return Number of elevation points for a given grid cell */
 	int nhp(int i1) const { return hpdefs.size(); }
-	int nA() const { return grid1->ndata(); }
+	int nA() const { return gridA->ndata(); }
 	int nE() const { return nA() * nhp(-1); }
 
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);

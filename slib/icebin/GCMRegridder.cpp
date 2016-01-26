@@ -1,15 +1,13 @@
 #include <cstdio>
 #include <unordered_set>
 
-#include <icebin/IceRegridder.hpp>
+#include <spsparse/netcdf.hpp>
+#include <icebin/GCMRegridder.hpp>
+#include <icebin/IceRegridder_L0.hpp>
 
-//#include <glint2/MatrixMaker.hpp>
-//#include <glint2/IceRegridder.hpp>
-//#include <giss/memory.hpp>
-//#include <giss/enum.hpp>
-//#include <glint2/util.hpp>
-
-
+using namespace netCDF;
+using namespace ibmisc;
+using namespace std::placeholders;  // for _1, _2, _3...
 
 namespace icebin {
 
@@ -34,23 +32,23 @@ std::unordered_map<long,double> IceRegridder::elevI_hash()
 // -------------------------------------------------------------
 /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 NOTE: wAvAp == sApvA */
-void IceRegridder::wAvAp(CooVector &w)
+void IceRegridder::wAvAp(SparseVector &w)
 {
-	giss::Proj_LL2XY proj(grid2->sproj);
-	for (auto cell=gridA.cells.begin(); cell != gridA.cells.end(); ++cell) {
+	ibmisc::Proj_LL2XY proj(gridI->sproj);
+	for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
 		w.add({cell->index}, cell->native_area / cell->proj_area(&proj));
 	}
 }
 
 /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 NOTE: wAvAp == sApvA */
-void IceRegridder::wEvEp(CooVector &w)
+void IceRegridder::wEvEp(SparseVector &w)
 {
-	giss::Proj_LL2XY proj(grid2->sproj);
-	for (auto cell=gridA.cells.begin(); cell != gridA.cells.end(); ++cell) {
-		int nhp = gcm->nhp(cell->index);
+	ibmisc::Proj_LL2XY proj(gridI->sproj);
+	for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
+		long nhp = gcm->nhp(cell->index);
 		long tuple[2] = {cell->index, 0};
-		long &ihp(tuple[1])
+		long &ihp(tuple[1]);
 		for (ihp=0; ihp<nhp; ++ihp) {
 			long indexE = gcm->indexingHP.tuple_to_index(tuple);
 			w.add({indexE}, cell->native_area / cell->proj_area(&proj));
@@ -73,16 +71,16 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 	get_or_put_att(info_v, ncio.rw, "name", name);
 	get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 
-	gridI.ncio(vname + "gridI");
-	exgrid.ncio(vname + "exgrid");
-	ncio_spsparse(ncio, elevI, true, vname + "elevI");
+	gridI->ncio(ncio, vname + ".gridI");
+	exgrid->ncio(ncio, vname + ".exgrid");
+	ncio_spsparse(ncio, elevI, true, vname + ".elevI");
 }
 // ========================================================
 void GCMRegridder::init(
 	std::unique_ptr<Grid> &&_gridA,
-	ibmisc::Indexing<long,long>> &&_indexingA,
-	Domain &&_domain<long>,		// Tells us which cells in gridA to keep...
-	ibmisc::Indexing<long,long>> &&_indexingHP,
+	ibmisc::Indexing<int,long> &&_indexingA,
+	ibmisc::Domain<long> &&_domainA,		// Tells us which cells in gridA to keep...
+	ibmisc::Indexing<long,long> &&_indexingHP,
 	bool _correctA)
 {
 	gridA = std::move(_gridA);
@@ -109,19 +107,25 @@ std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
 }
 // -------------------------------------------------------------
 // ==============================================================
-// Write out the parts that this class computed --- so we can test/check them
 
-void GCMRegridder::ncio(NCIo &ncio, std::string const &vname)
+void GCMRegridder::clear()
+{
+	gridA.reset();
+	hpdefs.clear();
+	sheets.clear();
+}
+
+void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 {
 	if (ncio.rw == 'r') clear();
 	auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
-	get_or_put_att_enum(info_v, ncio.rw, "type", type);
+	// get_or_put_att_enum(info_v, ncio.rw, "type", type);
 
 	gridA->ncio(ncio, vname + ".gridA");
-	indexingHP->ncio(ncio, vname + ".indexingHP");
-	ncio_vector(ncio, hpdefs, true, vname + ".hpdefs",
-		get_or_add_dims(ncio.nc, hpdefs, {vname + ".nhp"}));
-	domainA.ncio(ncio, vname + ".domainA");
+	indexingHP.ncio(ncio, ncInt, vname + ".indexingHP");
+	ncio_vector(ncio, hpdefs, true, vname + ".hpdefs", ncDouble,
+		get_or_add_dims(ncio, {vname + ".nhp"}, {hpdefs.size()} ));
+	domainA.ncio(ncio, ncInt, vname + ".domainA");
 	get_or_put_att(info_v, ncio.rw, vname + ".correctA", &correctA, 1);
 
 
@@ -131,8 +135,8 @@ void GCMRegridder::ncio(NCIo &ncio, std::string const &vname)
 		get_or_put_att(info_v, ncio.rw, vname + ".sheets", ncString, sheet_names);
 
 		for (auto sheet_name : sheet_names) {
-			sheet_vname = vname + "." + sheet_name;
-			IceRegridder::type sheet_type;
+			std::string sheet_vname = vname + "." + sheet_name;
+			IceRegridder::Type sheet_type;
 			auto sheet_info_v = get_or_add_var(ncio, sheet_vname + ".info", netCDF::ncInt64, {});
 
 			get_or_put_att_enum(sheet_info_v, ncio.rw, "type", sheet_type);
@@ -142,7 +146,8 @@ void GCMRegridder::ncio(NCIo &ncio, std::string const &vname)
 		}
 	} else {	// Write
 		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii) {
-			sheet->ncio(ncio, vname + "." + sheet_name);
+			IceRegridder *sheet = &*(ii->second);
+			sheet->ncio(ncio, vname + "." + sheet->name);
 		}
 	}
 }
@@ -155,40 +160,40 @@ static bool in_good(std::unordered_set<long> const *set, long index_c)
 	return (set->find(index_c) != set->end());
 }
 
-void IceRegridder::filter_cellsA(boost::function<bool (long)> const &useA)
+void IceRegridder::filter_cellsA(std::function<bool (long)> const &useA)
 {
 
   // Figure out which cells to keep
 
-	// List of cells in grid2 / exgrid that overlap a cell we want to keep
-	std::unordered_set<long> good_index_grid2;
+	// List of cells in gridI / exgrid that overlap a cell we want to keep
+	std::unordered_set<long> good_index_gridI;
 	std::unordered_set<long> good_index_exgrid;
 
 
 	std::unordered_set<int> good_j;
-	for (auto excell = exgrid->cells_begin(); excell != exgrid->cells_end(); ++excell) {
+	for (auto excell = exgrid->cells.begin(); excell != exgrid->cells.end(); ++excell) {
 		int index1 = excell->i;
 		if (useA(index1)) {
-			good_index_grid2.insert(excell->j);
+			good_index_gridI.insert(excell->j);
 			good_index_exgrid.insert(excell->index);
 		}
 	}
 
-	// Remove unneeded cells from grid2
-	grid2->filter_cells(std::bind(&in_good, &good_index_grid2, _1));
+	// Remove unneeded cells from gridI
+	gridI->filter_cells(std::bind(&in_good, &good_index_gridI, _1));
 	exgrid->filter_cells(std::bind(&in_good, &good_index_exgrid, _1));
 }
 
-GCMRegridder::filter_cellsA(std::function<bool(long)> keepI)
+void GCMRegridder::filter_cellsA(std::function<bool(long)> const &keepA)
 {
 
-	// Now remove cells from the exgrids and grid2s that
+	// Now remove cells from the exgrids and gridIs that
 	// do not interact with the cells we've kept in grid1.
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
-		sheet->filter_cells1(keepI);
+		sheet->second->filter_cellsA(keepA);
 	}
 
-	grid1->filter_cells(keepI);
+	gridA->filter_cells(keepA);
 }
 // ---------------------------------------------------------------------
 void IceRegridder::init(
@@ -198,12 +203,11 @@ void IceRegridder::init(
 	InterpStyle _interp_style,
 	SparseVector &&elevI)
 {
-	sheet->gcm = this;
-	sheet->name = (_name != "" ? _name : gridI->name);
-	sheet->gridI = std::move(_gridI);
-	sheet->exgrid = std::move(_exgrid);
-	sheet->interp_style = _interp_style;
-	sheet->elevI = std::move(elevI);
+	name = (_name != "" ? _name : gridI->name);
+	gridI = std::move(_gridI);
+	exgrid = std::move(_exgrid);
+	interp_style = _interp_style;
+	elevI = std::move(elevI);
 }
 // ==============================================================
 /** Gives weights for linear interpolation with a bunch of points.

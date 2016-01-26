@@ -298,7 +298,7 @@ public:
 
 	/** Remove cells and vertices not relevant to us --- for example, not in our MPI domain.
 	This will be done AFTER we read it in.  It's an optimization. */
-	void filter_cells(std::function<bool (Cell *)> const &include_cell);
+	void filter_cells(std::function<bool (long)> const &keep_fn);
 
 };
 
@@ -322,6 +322,10 @@ public:
 
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };
+
+extern std::unique_ptr<Grid> new_grid(Grid::Type type);
+extern std::unique_ptr<Grid> read_grid(ibmisc::NcIO &ncio, std::string const &vname);
+
 
 class Grid_LonLat : public Grid
 {

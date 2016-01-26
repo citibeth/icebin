@@ -14,7 +14,7 @@ struct GridSpec_LonLat {
 
 	std::string name;
 	std::function<bool(double, double, double, double)> spherical_clip;
-	ibmisc::Indexing<int,2,long> indexing;
+	ibmisc::Indexing<int,long> indexing;
 
 	/** Longitude of cell boundaries (degrees), sorted low to high.
 	<b>NOTE:</b> lon_boundares.last() = 360.0 + lonb.first() */

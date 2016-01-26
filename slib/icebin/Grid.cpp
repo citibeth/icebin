@@ -187,38 +187,39 @@ std::string const &vname)
 
 	// ---------- Read the Cells
 	{
-	auto cells_index(nc_read_blitz
-		<long, 1>(nc, vname + ".cells.index"));
-	auto cells_ijk(nc_read_blitz
-		<long, 2>(nc, vname + ".cells.ijk"));
-	auto native_area(nc_read_blitz
-		<long, 1>(nc, vname + ".cells.native_area"));
+		auto cells_index(nc_read_blitz
+			<long, 1>(nc, vname + ".cells.index"));
+		auto cells_ijk(nc_read_blitz
+			<long, 2>(nc, vname + ".cells.ijk"));
+		auto native_area(nc_read_blitz
+			<long, 1>(nc, vname + ".cells.native_area"));
 
-	// std::vector<double> cells_area(giss::read_double_vector(nc, vname + ".cells.area"));
-	auto vrefs(nc_read_blitz
-		<long, 1>(nc, vname + ".cells.vertex_refs"));
-	auto vrefs_start(nc_read_blitz
-		<long, 1>(nc, vname + ".cells.vertex_refs_start"));
+		// std::vector<double> cells_area(giss::read_double_vector(nc, vname + ".cells.area"));
+		auto vrefs(nc_read_blitz
+			<long, 1>(nc, vname + ".cells.vertex_refs"));
+		auto vrefs_start(nc_read_blitz
+			<long, 1>(nc, vname + ".cells.vertex_refs_start"));
 
 
-	// Assemble into Cells
-	for (int i=0; i < cells_index.size(); ++i) {
-		long index = cells_index(i);
+		// Assemble into Cells
+		for (int i=0; i < cells_index.size(); ++i) {
+			long index = cells_index(i);
 
-		Cell cell;
-		cell.index = cells_index(i);
-		cell.i = cells_ijk(i,0);
-		cell.j = cells_ijk(i,1);
-		cell.k = cells_ijk(i,2);
-		cell.native_area = native_area(i);
+			Cell cell;
+			cell.index = cells_index(i);
+			cell.i = cells_ijk(i,0);
+			cell.j = cells_ijk(i,1);
+			cell.k = cells_ijk(i,2);
+			cell.native_area = native_area(i);
 
-		// Add the vertices
-		cell.reserve(vrefs_start(i+1) - vrefs_start(i));
-		for (int j = vrefs_start(i); j < vrefs_start(i+1); ++j)
-			cell.add_vertex(vertices.at(vrefs(j)));
+			// Add the vertices
+			cell.reserve(vrefs_start(i+1) - vrefs_start(i));
+			for (int j = vrefs_start(i); j < vrefs_start(i+1); ++j)
+				cell.add_vertex(vertices.at(vrefs(j)));
 
-		// Add the cell to the grid
-		cells.add(std::move(cell));
+			// Add the cell to the grid
+			cells.add(std::move(cell));
+		}
 	}
 }
 
@@ -240,19 +241,16 @@ std::unique_ptr<Grid> new_grid(Grid::Type type)
 				"Unrecognized Grid::Type: %s", type.str());
 		break;
 	}
-	return grid;
 }
 
 
 std::unique_ptr<Grid> read_grid(NcIO &ncio, std::string const &vname)
 {
-	std::unique_ptr<Grid> grid;
 	Grid::Type type;
-
 	auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
 	get_or_put_att_enum(info_v, ncio.rw, "type", type);
 
-	auto grid(new_grid(type);
+	auto grid(new_grid(type));
 	grid->ncio(ncio, vname);
 
 	return grid;
@@ -266,7 +264,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 	get_or_put_att(info_v, ncio.rw, "name", name);
 
 	int version = 2;
-	get_or_put_att(info_v, ncio.rw, "version", ncInt, version);
+	get_or_put_att(info_v, ncio.rw, "version", ncInt, &version, 1);
 	if (ncio.rw == 'r' && version != 2) {
 		(*icebin_error)(-1, "Trying to read version %d, I only know how to read version 2 grids from NetCDF", version);
 	}
@@ -291,7 +289,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 		"finite difference models will use L0, while finite element "
 		"models would use L1 or something else.");
 
-	ibmisc::ncio(indexing, vname + ".indexing");
+	indexing.ncio(ncio, ncInt, vname + ".indexing");
 
 	if (coordinates == Coordinates::XY) {
 		get_or_put_att(info_v, ncio.rw, "projection", sproj);
@@ -302,14 +300,14 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 			"for format of these strings.");
 	}
 
-	get_or_put_att(info_v, ncio.rw, "cells.nfull", ncInt64, cells._nfull);
+	get_or_put_att(info_v, ncio.rw, "cells.nfull", ncInt64, &cells._nfull, 1);
 	if (ncio.rw == 'w') info_v.putAtt("cells.nfull.comment",
 		"The total theoretical number of grid cells (polygons) in this "
 		"grid.  Depending on grid.info:parameterization, either cells or "
 		"vertices will correspond to the dimensionality of the grid's "
 		"vector space.");
 
-	get_or_put_att(info_v, ncio.rw, "vertices.nfull", ncInt64, vertices._nfull);
+	get_or_put_att(info_v, ncio.rw, "vertices.nfull", ncInt64, &vertices._nfull, 1);
 	if (ncio.rw == 'w') info_v.putAtt("vertices.nfull.comment",
 		"The total theoretical of vertices (of polygons) on this grid.");
 
@@ -385,7 +383,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 
 /** Creates a new grid with just the cells we want to keep in it.
 This is used to remove cells that don't fit our MPI domain. */
-void filter_cells(Grid &out, std::function<bool(Cell *)> const &keep_fn)
+void Grid::filter_cells(std::function<bool(long)> const &keep_fn)
 {
 	std::set<int> good_vertices;	// Remove vertices that do NOT end up in this set.
 
@@ -398,7 +396,7 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 	// Remove cells that don't fit our filter
 	_max_realized_cell_index = -1;
 	for (auto cell = cells.begin(); cell != cells.end(); ) { //++cell) {
-		if (keep_fn(&*cell)) {
+		if (keep_fn(cell->index)) {
 			_max_realized_cell_index = std::max(_max_realized_cell_index, cell->index);
 
 			// Make sure we don't delete this cell's vertices
@@ -445,9 +443,9 @@ void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 	if (ncio.rw == 'w') {
 		int n;
 		n = nx();
-		get_or_put_att(info_v, ncio.rw, "nx", ncInt, n);
+		get_or_put_att(info_v, ncio.rw, "nx", ncInt, &n, 1);
 		n = ny();
-		get_or_put_att(info_v, ncio.rw, "ny", ncInt, n);
+		get_or_put_att(info_v, ncio.rw, "ny", ncInt, &n, 1);
 	}
 
 	Grid::ncio(ncio, vname);
@@ -469,13 +467,13 @@ void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 	NcVar info_v = get_or_add_var(ncio, vname + ".info", ncInt, {});
 	get_or_put_att(info_v, ncio.rw, "north_pole_cap", north_pole);
 	get_or_put_att(info_v, ncio.rw, "south_pole_cap", south_pole);
-	get_or_put_att(info_v, ncio.rw, "points_in_side", ncInt, points_in_side);
+	get_or_put_att(info_v, ncio.rw, "points_in_side", ncInt, &points_in_side, 1);
 	if (ncio.rw == 'w') {
 		int n;
 		n = nlon();
-		get_or_put_att(info_v, ncio.rw, "nlon", ncInt, n);
+		get_or_put_att(info_v, ncio.rw, "nlon", ncInt, &n, 1);
 		n = nlat();
-		get_or_put_att(info_v, ncio.rw, "nlat", ncInt, n);
+		get_or_put_att(info_v, ncio.rw, "nlat", ncInt, &n, 1);
 	}
 
 	Grid::ncio(ncio, vname);
