@@ -1,19 +1,10 @@
-enum class WeightType {
-	NONE,			// Do not divide by area; result is in [kg] instead of [kg m-2]
 
-	/** Divide by area of just portions of the cell overlapping with
-	other relevant grids (eg: ice-covered portions).  Gives result in [kg m-2] */
-	PARTIAL_CELL,
+namespace icebin {
 
-	WHOLE_CELL		// Divide by area of the ENTIRE cell, giving result in [kg m-2]
-}
-
-typedef spsparse::VectorCooArray<long, double, 2> CooMatrix;
-typedef spsparse::VectorCooArray<long, double, 1> CooVector;
 
 struct RegridMatrix {
-	std::string A, B;	// String tags for A and B vector spaces.
 	CooMatrix M;		// B<-A; transpose for A<-B
+	CooVector weightA, weightB;
 }
 
 struct WeightVector {
@@ -58,7 +49,7 @@ class Invert {
 	TypeT *operator->() { return M.operator->(); }
 };
 template<class TypeT>
-Invert<TypeT> invert(TypeT const &M, bool inv)
+Invert<TypeT> invert(TypeT const *M, bool inv)
 	{ return Invertible<TypeT>(M, inv); }
 
 template<class TypeT>
@@ -94,28 +85,63 @@ class InvertMatrix :
 typedef std::pair<CooMatrix const *, bool> MatrixPtr;
 
 
-class IceSheetUrMatrices {
+class UrMatrices {
 	std::map<std::string, std::pair<CooMatrix const *, bool>> regrids;
 	std::map<std::string, std::pair<CooVector const *, bool>> diags;
 
-	RegridMatrix GvEp;		// Exchange <-- Elevation (Projected)
-	RegridMatrix GvAp;		// Exchange <-- Atmosphere (Projected)
-	RegridMatrix GvI;		// Exchange <-- Ice
-	WeightMatrix wEvX;		// Inverse of scale matrix
-	WeightMatrix wAvX;
+	// Hold ur matrices here.
+	std::vector<std::unique_ptr<SparseMatrix>> mem_matrix;
+	std::vector<std::unique_ptr<SparseVector>> mem_vector;
 
+	/** Adds a regrid matrix and its variants.
 
-	void add_regrids(RegridMatrix &BvA)
+	@param G The destination vector space of the matrix.  This must always be "G".
+	@param X The source vectors space of the matrix.
+	@param m_GvX Memory where to store the underlying matrix. */
+	void add_regrids(std::string const &G, std::string const &X,
+		std::function<void(SparseMatrix &)> const &regrid_fn)
 	{
-		std::string BvA = B+"v"+A;
-		std::string AvB = A+"v"+B;
+		// Make sure destination space is G
+		if (G != "G") (*icebin_error)(-1,
+			"Destination vector space for add_GvX must be \"G\" (exchnage grid)!");
 
-		regrids[BvA] = invert(BvA.M, false);
-		regrids[AvB] = invert(BvA.M, true);			// true --> transpose
-		diags["w"+BvA] = invert(BvA.weightB, false);
-		diags["w"+AvB] = invert(BvA.weightA, false);
-		diags["s"+BvA] = invert(BvA.weightB, true);	// true --> divide by this
-		diags["s"+AvB] = invert(BvA.weightA, true);
+		// Get the main matrix
+		std::unique_ptr<SparseMatrix> M(new SparseMatrix());
+		regrid_fn(*M);
+
+		/* Since all raw matrices going into this have a destination G
+		(exchange grid), they must all be sorted row-major.  The
+		transpose matrices all go FROM G, so they must be sorted
+		column-major.  But sorting the transpose of a matrix
+		column-major is the same as sorting the original matrix row
+		major.  So... all matrices must be sorted the same way
+		(row-major) */
+		M->consolidate({0,1});
+
+		// Create the weight matrices
+		std::unique_ptr<SparseVector> weightG(new SparseVector());
+		std::unique_ptr<SparseVector> weightX(new SparseVector());
+		for (auto ii=M->begin(); ii != M->end(); ++ii) {
+			weightG->add({cell.index(0)}, cell.val());
+			weightX->add({cell.index(1)}, cell.val());
+		}
+		weightG->consolidate({0});
+		weightX->consolidate({0});
+
+		std::string GvX = G+"v"+X;
+		std::string XvG = X+"v"+G;
+
+		regrids[GvX] = invert(&*M, false);
+		regrids[XvG] = invert(&*M, true);			// true --> transpose
+		diags["w"+GvX] = invert(&*weightG, false);
+		diags["w"+XvG] = invert(&*weightX, false);
+		diags["s"+GvX] = invert(&*weightG, true);	// true --> divide by this
+		diags["s"+XvG] = invert(&*weightX, true);
+
+		// Keep these matrices around before we go out of scope
+		mem_matrix.push_back(std::move(M));
+		mem_matrix.push_back(std::move(weightG));
+		mem_matrix.push_back(std::move(weightX));
 	}
 
 	void add_weight(WeightVector &scale)
@@ -129,12 +155,12 @@ class IceSheetUrMatrices {
 
 	}
 
-	void IceSheetUrMatrices(IceSheet &sheet)
+	void IceSheetUrMatrices(IceRegridder &sheet)
 	{
 		// Set up original matrices
-		add_regrids(GvEp = sheet->projelev_xx_iceexch(IceExch::EXCH));
-		add_regrids(GvAp = sheet->projatm_xx_iceexch(IceExch::EXCH));
-		add_regrids(GvI = sheet->GvI(IceExch::EXCH));
+		add_regrids("G", "Ep", std::bind(&IceRegridder::GvEp_noweight, _1));
+		add_regrids("G", "Ap", std::bind(&IceRegridder::GvAp_noweight, _1));
+		add_regrids("G", "I", std::bind(&IceRegridder::GvI_noweight, _1));
 
 		CooVector wEvEp(...);
 		add_weight("E", "X", wEvX = product_ele(wEvEp, ur.diags["wEpvG"]);
@@ -180,14 +206,14 @@ class IceSheetMatrices {
 	}
 
 
-	CooMatrix AvI() {
+	CooMatrix AvI_noweight() {
 		return prod(
 			NO_VECTOR,
 			ur.regrids["ApvG"],  ur.diags["sGvI"], ur.regrids["GvI"],
 			NO_VECTOR);
 	}
 
-	CooMatrix EvI() {
+	CooMatrix EvI_noweight() {
 		return prod(
 			NO_VECTOR,
 			ur.regrids["EpvG"],  ur.diags["sGvI"], ur.regrids["GvI"],
@@ -219,7 +245,7 @@ class IceSheetMatrices {
 	CooMatrix EvA_noweight(CooMatrix &EvA_global)
 	{
 		multiply(EvA_global,
-			ur.diags["sAwX"],
+			NO_VECTOR,
 			ur.regrids["ApvG"], ur.diags["sGvEp"], ur.regrids["GvEp"],
 			ur.diags["sEpvE"]);
 	}
@@ -227,7 +253,7 @@ class IceSheetMatrices {
 	CooMatrix AvE_noweight(CooMatrix &AvE_global)
 	{
 		multiply(AvE_global,
-			ur.diags["sEwX"],
+			NO_VECTOR,
 			ur.regrids["EpvG"], ur.diags["sGvAp"], ur.regrids["GvAp"],
 			ur.diags["sApvE"]);
 	}

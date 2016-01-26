@@ -177,7 +177,7 @@ void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
 			// Figure out how to number this grid cell
 			cell.j = ilat + south_pole_offset;	// 0-based 2-D index
 			cell.i = ilon;
-			cell.index = indexing->tuple_to_index({cell.i, cell.j});
+			cell.index = indexing.tuple_to_index<2>({cell.i, cell.j});
 			cell.native_area = graticule_area_exact(this->eq_rad, lat0,lat1,lon0,lon1);
 
 //printf("Adding lon/lat cell %d (%d, %d) area=%f\n", cell.index, cell.i, cell.j, cell.area);

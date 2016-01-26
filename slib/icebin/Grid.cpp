@@ -162,7 +162,6 @@ void Grid::nc_write(netCDF::NcGroup *nc, std::string const &vname) const
 	}
 }
 
-
 /** @param fname Name of file to load from (eg, an overlap matrix file)
 @param vname Eg: "grid1" or "grid2" */
 void Grid::nc_read(
@@ -213,18 +212,51 @@ std::string const &vname)
 		cell.k = cells_ijk(i,2);
 		cell.native_area = native_area(i);
 
-		// cell.area = cells_area[i];
-
 		// Add the vertices
 		cell.reserve(vrefs_start(i+1) - vrefs_start(i));
 		for (int j = vrefs_start(i); j < vrefs_start(i+1); ++j)
 			cell.add_vertex(vertices.at(vrefs(j)));
 
-		// Add thecell to the grid
+		// Add the cell to the grid
 		cells.add(std::move(cell));
-	}}
+	}
 }
 
+std::unique_ptr<Grid> new_grid(Grid::Type type)
+{
+	switch(type.index()) {
+		case Grid::Type::GENERIC :
+		case Grid::Type::EXCHANGE :
+			return std::unique_ptr<Grid>(new Grid());
+		break;
+		case Grid::Type::XY :
+			return std::unique_ptr<Grid>(new Grid_XY());
+		break;
+		case Grid::Type::LONLAT :
+			return std::unique_ptr<Grid>(new Grid_LonLat());
+		break;
+		default :
+			(*icebin_error)(-1,
+				"Unrecognized Grid::Type: %s", type.str());
+		break;
+	}
+	return grid;
+}
+
+
+std::unique_ptr<Grid> read_grid(NcIO &ncio, std::string const &vname)
+{
+	std::unique_ptr<Grid> grid;
+	Grid::Type type;
+
+	auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
+	get_or_put_att_enum(info_v, ncio.rw, "type", type);
+
+	auto grid(new_grid(type);
+	grid->ncio(ncio, vname);
+
+	return grid;
+}
 
 void Grid::ncio(NcIO &ncio, std::string const &vname)
 {
@@ -252,15 +284,14 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 		"that this is different from grid.info.type.  A GENERIC grid, "
 		"for example, could be expressed in either XY or LONLAT coordinates.");
 
-#if 0
 	get_or_put_att_enum(info_v, ncio.rw, "parameterization", parameterization);
 	if (ncio.rw == 'w') info_v.putAtt("parameterization.comment",
 		"Indicates how values are interpolated between grid points "
 		"(See Grid::Parameterization in  slib/icebin/Grid.hpp).  Most "
 		"finite difference models will use L0, while finite element "
 		"models would use L1 or something else.");
-#endif
 
+	ibmisc::ncio(indexing, vname + ".indexing");
 
 	if (coordinates == Coordinates::XY) {
 		get_or_put_att(info_v, ncio.rw, "projection", sproj);
@@ -352,8 +383,9 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 
 // ============================================================
 
-/** Remove cells and vertices not relevant to us --- for example, not in our MPI domain. */
-void Grid::filter_cells(std::function<bool (Cell *)> const &include_cell)
+/** Creates a new grid with just the cells we want to keep in it.
+This is used to remove cells that don't fit our MPI domain. */
+void filter_cells(Grid &out, std::function<bool(Cell *)> const &keep_fn)
 {
 	std::set<int> good_vertices;	// Remove vertices that do NOT end up in this set.
 
@@ -366,8 +398,7 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 	// Remove cells that don't fit our filter
 	_max_realized_cell_index = -1;
 	for (auto cell = cells.begin(); cell != cells.end(); ) { //++cell) {
-		bool keep = include_cell(&*cell);
-		if (keep) {
+		if (keep_fn(&*cell)) {
 			_max_realized_cell_index = std::max(_max_realized_cell_index, cell->index);
 
 			// Make sure we don't delete this cell's vertices

@@ -166,6 +166,7 @@ public:
 	size_t nrealized() const { return _cells.size(); }
 	size_t nfull() const { return _nfull >=0 ? _nfull : _max_realized_index+1; }
 
+	/** Adds a cell and owns it. */
 	CellT *add(CellT &&cell);
 
 
@@ -197,7 +198,6 @@ std::vector<CellT const *> GridMap<CellT>::sorted() const
 
 	return ret;
 }	
-
 
 template<class CellT>
 CellT *GridMap<CellT>::add(CellT &&cell)
@@ -257,6 +257,10 @@ public:
 	Coordinates coordinates;
 	Parameterization parameterization;
 
+	/** Conversion between n-dimensional indexing used natively on the
+	grid, and 1-D indexing used in IceBin. */
+	ibmisc::Indexing<int, long> indexing;
+
 	std::string name;
 
 	long _ncells_full;		// Maximum possible index (+1)
@@ -273,6 +277,7 @@ public:
 	std::string sproj;
 
 	Grid();
+	virtual ~Grid() {}
 
 	/** The size of the vector space defined by this grid.
 	@return cells.nfull() (for L0) or cells.nvertices() (for L1) */
@@ -281,13 +286,14 @@ public:
 	void clear();
 
 	/** Puts the area of each cell into the weight vector w */
-	void areas(SparseVector &w);
+	void native_areas(SparseVector &w);
+
 
 protected:
 	void nc_read(netCDF::NcGroup *nc, std::string const &vname);
 	void nc_write(netCDF::NcGroup *nc, std::string const &vname) const;
 public:
-	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+	virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 
 	/** Remove cells and vertices not relevant to us --- for example, not in our MPI domain.
@@ -299,8 +305,7 @@ public:
 class Grid_XY : public Grid
 {
 public:
-	/** Translate between 2-D and 1-D indexing */
-	std::unique_ptr<ibmisc::Indexing<int, 2, long>> indexing;
+	~Grid_XY() {}
 
 	/** Cell boundaries in the x direction.
 	Sorted low to high.
@@ -321,8 +326,7 @@ public:
 class Grid_LonLat : public Grid
 {
 public:
-	/** Translate between 2-D and 1-D indexing */
-	std::unique_ptr<ibmisc::Indexing<int, 2, long>> indexing;
+	~Grid_LonLat() {}
 
 	/** Longitude of cell boundaries (degrees), sorted low to high.
 	<b>NOTE:</b> lon_boundares.last() = 360.0 + lonb.first() */
