@@ -27,7 +27,7 @@
 namespace icebin {
 
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
-struct GridSpec_XY {
+struct GridSpec_XY : public GridSpec {
 
 	std::string name;
 	std::string sproj;

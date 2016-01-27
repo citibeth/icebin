@@ -169,13 +169,13 @@ void OGrid::realize_rtree() {
 /**
 @param exgrid The Exchange Grid we're creating.  Even for L1 grids, we
 	don't need to positively associate vertices in exgrid with
-	vertices in grid1 or grid2.  No more than a "best effort" is
+	vertices in gridA or gridI.  No more than a "best effort" is
 	needed to eliminate duplicate vertices.
 @return Always returns true (tells RTree search algorithm to keep going) */
-static bool overlap_callback(VertexCache *exvcache, long grid2_ndata,
+static bool overlap_callback(VertexCache *exvcache, long gridI_ndata,
 	OCell const **ocell1p, OCell const *ocell2)
 {
-	// Enable using same std::function callback for many values of grid1
+	// Enable using same std::function callback for many values of gridA
 	OCell const *ocell1 = *ocell1p;
 
 	// Compute the overlap polygon (CGAL)
@@ -186,7 +186,7 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_ndata,
 	Cell excell;	// Exchange Cell
 	excell.i = ocell1->cell->index;
 	excell.j = ocell2->cell->index;
-//	excell.index = excell.i * grid2_ndata + excell.j;	// guarantee unique (but sparse)
+//	excell.index = excell.i * gridI_ndata + excell.j;	// guarantee unique (but sparse)
 	excell.index = -1;		// Get an index assigned (but dense)...
 
 	// Add the vertices of the polygon outline
@@ -206,7 +206,7 @@ static bool overlap_callback(VertexCache *exvcache, long grid2_ndata,
 }
 // --------------------------------------------------------------------
 
-/** @param grid2 Put in an RTree */
+/** @param gridI Put in an RTree */
 void GridSpec_Exchange::make_grid(Grid &exgrid)
 {
 	exgrid.coordinates = Grid::Coordinates::XY;
@@ -214,22 +214,22 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
 
 	// Determine compatibility and projections between the two grids
 	std::unique_ptr<Proj2> proj1, proj2;
-	if (grid1->coordinates == Grid::Coordinates::XY) {
-		if (grid2->coordinates == Grid::Coordinates::XY) {
+	if (gridA->coordinates == Grid::Coordinates::XY) {
+		if (gridI->coordinates == Grid::Coordinates::XY) {
 			// No projections needed
-			if (grid1->sproj != grid2->sproj) {
+			if (gridA->sproj != gridI->sproj) {
 				(*icebin_error)(-1, "Two XY grids must have the same projection\n");
 			}
 		} else {
-			// grid1=xy, grid2=ll: Project from grid 2 to grid1's xy
-			proj2.reset(new Proj2(grid1->sproj, Proj2::Direction::LL2XY));
-			if (sproj == "") sproj = std::string(grid1->sproj.c_str());
+			// gridA=xy, gridI=ll: Project from grid 2 to gridA's xy
+			proj2.reset(new Proj2(gridA->sproj, Proj2::Direction::LL2XY));
+			if (sproj == "") sproj = std::string(gridA->sproj.c_str());
 		}
 	} else {
-		if (grid2->coordinates == Grid::Coordinates::XY) {
-			// grid1=ll, grid2=xy: Project from grid 1 to grid2's xy
-			proj1.reset(new Proj2(grid2->sproj, Proj2::Direction::LL2XY));
-			if (sproj == "") sproj = std::string(grid2->sproj.c_str());
+		if (gridI->coordinates == Grid::Coordinates::XY) {
+			// gridA=ll, gridI=xy: Project from grid 1 to gridI's xy
+			proj1.reset(new Proj2(gridI->sproj, Proj2::Direction::LL2XY));
+			if (sproj == "") sproj = std::string(gridI->sproj.c_str());
 		} else {
 			// Both in Lat/Lon: Project them both to XY for overlap computation
 			// BUT... since we don't have a projection, we must throw
@@ -239,46 +239,46 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
 	}
 
 	/** Initialize the new grid */
-	exgrid.name = grid1->name + '-' + grid2->name;
-	grid1_cells_nfull = grid1->cells.nfull();
-	grid2_cells_nfull = grid2->cells.nfull();
+	exgrid.name = gridA->name + '-' + gridI->name;
+	gridA_cells_nfull = gridA->cells.nfull();
+	gridI_cells_nfull = gridI->cells.nfull();
 	exgrid.cells._nfull = -1;		// Not specified
 	exgrid.vertices._nfull = -1;	// Not specified
 	VertexCache exvcache(&exgrid);
 
-	OGrid ogrid1(grid1, &*proj1);
-	OGrid ogrid2(grid2, &*proj2);
-	ogrid2.realize_rtree();
+	OGrid ogridA(gridA, &*proj1);
+	OGrid ogridI(gridI, &*proj2);
+	ogridI.realize_rtree();
 
 	OCell const *ocell1;
 	auto callback(std::bind(&overlap_callback, &exvcache,
-		grid2->ndata(), &ocell1, _1));
+		gridI->ndata(), &ocell1, _1));
 
 	int nprocessed=0;
-	for (auto ii1 = ogrid1.ocells.begin(); ii1 != ogrid1.ocells.end(); ++ii1) {
+	for (auto ii1 = ogridA.ocells.begin(); ii1 != ogridA.ocells.end(); ++ii1) {
 		ocell1 = &ii1->second;		// Set parameter for the callback
 
 		double min[2];
 		double max[2];
 
-//printf("grid1[%d]: x in (%f - %f), y in (%f - %f)\n", ocell1->cell->index, min[0], max[0], min[1], max[1]);
+//printf("gridA[%d]: x in (%f - %f), y in (%f - %f)\n", ocell1->cell->index, min[0], max[0], min[1], max[1]);
 
 		min[0] = CGAL::to_double(ocell1->bounding_box.xmin());
 		min[1] = CGAL::to_double(ocell1->bounding_box.ymin());
 		max[0] = CGAL::to_double(ocell1->bounding_box.xmax());
 		max[1] = CGAL::to_double(ocell1->bounding_box.ymax());
 
-		int nfound = ogrid2.rtree->Search(min, max, callback);
+		int nfound = ogridI.rtree->Search(min, max, callback);
 
 		// Logging
 		++nprocessed;
 		if (nprocessed % 10 == 0) {
-			printf("Processed %d of %d from grid1, total overlaps = %d\n",
-				nprocessed+1, ogrid1.ocells.size(), exgrid.cells.nrealized());
+			printf("Processed %d of %d from gridA, total overlaps = %d\n",
+				nprocessed+1, ogridA.ocells.size(), exgrid.cells.nrealized());
 		}
 	}
 
-	exgrid.indexing = Indexing({0}, {ogrid.cells.nfull()}, {0});	// No n-D indexing available.
+	exgrid.indexing = Indexing<int, long>({0}, {exgrid.cells.nfull()}, {0});	// No n-D indexing available.
 
 }
 

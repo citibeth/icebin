@@ -117,10 +117,15 @@ public:
 // ----------------------------------------------------
 class Grid;
 
+class GridSpec {};	// Tagging class
+
 /** Specialized dict-like structure used for cells and vertices in a grid. */
 template<class CellT>
 class GridMap {
 	friend class Grid;
+	friend class GridSpec_XY;
+	friend class GridSpec_LonLat;
+	friend class GridSpec_Exchange;
 protected:
 	typedef std::unordered_map<long, std::unique_ptr<CellT>> MapT;
 	MapT _cells;
@@ -323,6 +328,7 @@ public:
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };
 
+extern void sort_renumber_vertices(Grid &grid);
 extern std::unique_ptr<Grid> new_grid(Grid::Type type);
 extern std::unique_ptr<Grid> read_grid(ibmisc::NcIO &ncio, std::string const &vname);
 
@@ -364,11 +370,7 @@ public:
 	int nlon() const { return lonb.size() - 1; }
 
 	/** Number of grid cell indices in latitude dimension */
-	int nlat() const {
-		const int south_pole_offset = (south_pole ? 1 : 0);
-		const int north_pole_offset = (north_pole ? 1 : 0);
-		return latb.size() - 1 + south_pole_offset + north_pole_offset;
-	}
+	int nlat() const;
 
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };	// class

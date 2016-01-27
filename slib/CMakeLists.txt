@@ -35,6 +35,7 @@ if (BUILD_GRIDGEN)
 		icebin/gridgen/clippers.cpp
 		icebin/gridgen/GridSpec_LonLat.cpp
 		icebin/gridgen/GridSpec_XY.cpp
+		icebin/gridgen/GridSpec_Exchange.cpp
 	)
 endif()
 

@@ -101,6 +101,22 @@ struct CmpVertexXY {
 	}
 };
 
+void sort_renumber_vertices(Grid &grid)
+{
+	// Construct array of Vertex pointers
+	std::vector<Vertex *> vertices;
+	for (auto vertex = grid.vertices.begin(); vertex != grid.vertices.end(); ++vertex)
+		vertices.push_back(&*vertex);
+
+	// Sort it by x and y!
+	std::sort(vertices.begin(), vertices.end(), CmpVertexXY());
+
+	// Renumber vertices
+	long i=0;
+	for (auto vertex = vertices.begin(); vertex != vertices.end(); ++vertex)
+		(*vertex)->index = i++;
+}
+
 // ------------------------------------------------------------
 void Grid::nc_write(netCDF::NcGroup *nc, std::string const &vname) const
 {
@@ -163,7 +179,7 @@ void Grid::nc_write(netCDF::NcGroup *nc, std::string const &vname) const
 }
 
 /** @param fname Name of file to load from (eg, an overlap matrix file)
-@param vname Eg: "grid1" or "grid2" */
+@param vname Eg: "gridA" or "gridI" */
 void Grid::nc_read(
 NcGroup *nc,
 std::string const &vname)
@@ -479,6 +495,25 @@ void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 	Grid::ncio(ncio, vname);
 }
 // ---------------------------------------------------------
+
+int Grid_LonLat::nlat() const {
+	int south_pole_offset, north_pole_offset;
+
+printf("poles = %d %d\n", south_pole, north_pole);
+
+	// Get around GCC bug when converting uninitialized bools
+	south_pole_offset = (south_pole ? 2 : 0);
+	north_pole_offset = (north_pole ? 2 : 0);
+
+	south_pole_offset >>= 1;
+	north_pole_offset >>= 1;
+
+printf("Offsets = %d %d\n", south_pole_offset, north_pole_offset);
+	return latb.size() - 1 + south_pole_offset + north_pole_offset;
+}
+
+
+
 
 
 }	// namespace

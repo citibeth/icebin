@@ -24,19 +24,19 @@
 
 namespace icebin {
 
-class GridSpec_Exchange : public Grid {
+class GridSpec_Exchange : public GridSpec {
 public :
-	Grid const *grid1;
-	Grid const *grid2;
+	Grid const *gridA;
+	Grid const *gridI;
 
 	/** Transformation to get from local Grid coords to Exchange Grid coords */
 	std::string sproj;
 
 	/** Keep track of the "full" indexing space for the Overlap Matrix. */
-	long grid1_cells_nfull;
-	long grid2_cells_nfull;
+	long gridA_cells_nfull;
+	long gridI_cells_nfull;
 
-	GridSpec_Exchange() : grid1(0), grid2(0), grid1_cells_nfull(-1), grid2_cells_nfull(-1) {}
+	GridSpec_Exchange() : gridA(0), gridI(0), gridA_cells_nfull(-1), gridI_cells_nfull(-1) {}
 
 	void make_grid(Grid &grid);
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);

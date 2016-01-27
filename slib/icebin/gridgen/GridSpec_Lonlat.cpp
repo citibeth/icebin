@@ -113,6 +113,7 @@ void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
 	grid.coordinates = Grid::Coordinates::LONLAT;
 	grid.parameterization = Grid::Parameterization::L0;
 	grid.name = this->name;
+	grid.points_in_side = points_in_side;
 
 	// Error-check the input parameters
 	if (this->south_pole && this->latb[0] == -90.0) {
@@ -231,6 +232,12 @@ void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
 
 		grid.cells.add(std::move(pole));
 	}
+
+	grid.lonb = std::move(lonb);
+	grid.latb = std::move(latb);
+	grid.south_pole = south_pole;
+	grid.north_pole = north_pole;
+	grid.indexing = indexing;
 }
 
 // ---------------------------------------------------------
