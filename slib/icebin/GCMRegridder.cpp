@@ -78,14 +78,14 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 // ========================================================
 void GCMRegridder::init(
 	std::unique_ptr<Grid> &&_gridA,
-	ibmisc::Indexing<int,long> &&_indexingA,
-	ibmisc::Domain<long> &&_domainA,		// Tells us which cells in gridA to keep...
+	ibmisc::Domain<int> &&_domainA,		// Tells us which cells in gridA to keep...
+	std::vector<double> &&_hpdefs,	// [nhp]
 	ibmisc::Indexing<long,long> &&_indexingHP,
 	bool _correctA)
 {
 	gridA = std::move(_gridA);
-	indexingA = std::move(_indexingA);
 	domainA = std::move(_domainA);
+	hpdefs = std::move(_hpdefs);
 	indexingHP = std::move(_indexingHP);
 	correctA = _correctA;
 

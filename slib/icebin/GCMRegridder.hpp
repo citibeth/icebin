@@ -112,8 +112,7 @@ class GCMRegridder
 public:
 	std::unique_ptr<Grid> gridA;
 
-	ibmisc::Indexing<int,long> indexingA;
-	ibmisc::Domain<long> domainA;				// What's in our MPI halo?
+	ibmisc::Domain<int> domainA;				// What's in our MPI halo?
 	bool correctA;		/// Should we correct for projection and geometric error?
 
 
@@ -133,8 +132,8 @@ public:
 	void clear();
 	void init(
 		std::unique_ptr<Grid> &&_gridA,
-		ibmisc::Indexing<int,long> &&_indexingA,
-		ibmisc::Domain<long> &&_domainA,		// Tells us which cells in gridA to keep...
+		ibmisc::Domain<int> &&_domainA,		// Tells us which cells in gridA to keep...
+		std::vector<double> &&_hpdefs,
 		ibmisc::Indexing<long,long> &&_indexingHP,
 		bool _correctA);
 
