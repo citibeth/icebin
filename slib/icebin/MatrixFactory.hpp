@@ -85,13 +85,27 @@ class InvertMatrix :
 typedef std::pair<CooMatrix const *, bool> MatrixPtr;
 
 
-class UrMatrices {
-	std::map<std::string, std::pair<CooMatrix const *, bool>> regrids;
-	std::map<std::string, std::pair<CooVector const *, bool>> diags;
+template<TypeT>
+class VectorAllocator {
+	std::vector<std::unique_ptr<TypeT>> mem;
+public:
+	TypeT *alloc() {
+		std::unique_ptr<TypeT> M(new TypeT());
+		TypeT *ret = M.get();
+		mem_matrix.push_back(std::move(M));
+		return ret;
+	}
+}
 
-	// Hold ur matrices here.
-	std::vector<std::unique_ptr<SparseMatrix>> mem_matrix;
-	std::vector<std::unique_ptr<SparseVector>> mem_vector;
+
+
+class UrMatrices {
+	VectorAllocator<SparseMatrix> matrix_mem;
+	VectorAllocator<SparseVector> vector_mem;
+
+	std::map<std::string, std::pair<SparseMatrix const *, bool>> regrids;
+	std::map<std::string, std::pair<SparseVector const *, bool>> diags;
+
 
 	/** Adds a regrid matrix and its variants.
 
@@ -106,6 +120,7 @@ class UrMatrices {
 			"Destination vector space for add_GvX must be \"G\" (exchnage grid)!");
 
 		// Get the main matrix
+		Sparse
 		std::unique_ptr<SparseMatrix> M(new SparseMatrix());
 		regrid_fn(*M);
 
@@ -162,23 +177,23 @@ class UrMatrices {
 		add_regrids("G", "Ap", std::bind(&IceRegridder::GvAp_noweight, _1));
 		add_regrids("G", "I", std::bind(&IceRegridder::GvI_noweight, _1));
 
-		CooVector wEvEp(...);
+		SparseVector wEvEp(...);
 		add_weight("E", "X", wEvX = product_ele(wEvEp, ur.diags["wEpvG"]);
 
-		CooVector wAvAp(...);
+		SparseVector wAvAp(...);
 		add_weight("A", "X", wAvX = product_ele(wAvAp, ur.diags["wApvG"]);
 	}
 		
 };
 
-CooMatrix prod(
-	Invert<CooVector> scalei,
-	Invert<CooMatrix> A,
-	Invert<CooVector> scalej,
-	Invert<CooMatrix> B,
-	Invert<CooVector> scalek)
+SparseMatrix prod(
+	Invert<SparseVector> scalei,
+	Invert<SparseMatrix> A,
+	Invert<SparseVector> scalej,
+	Invert<SparseMatrix> B,
+	Invert<SparseVector> scalek)
 {
-	CooMatrix ret;
+	SparseMatrix ret;
 	spsparse::multiply(ret, 1.0,
 		&*scalei,
 		*A, A.invert,
@@ -190,14 +205,14 @@ CooMatrix prod(
 	return ret;
 }
 
-Invert<CooVector> NO_VECTOR
+Invert<SparseVector> NO_VECTOR
 
 class IceSheetMatrices {
 	IceSheetUrMatrices ur;
 
-	CooMatrix EvI, IvE;
-	CooMatrix AvI, IvA;
-	CooMatrix EvA, AvE;
+	SparseMatrix EvI, IvE;
+	SparseMatrix AvI, IvA;
+	SparseMatrix EvA, AvE;
 
 
 	IceSheetMatrices(IceSheetUrMatrices &ur)
@@ -206,28 +221,28 @@ class IceSheetMatrices {
 	}
 
 
-	CooMatrix AvI_noweight() {
+	SparseMatrix AvI_noweight() {
 		return prod(
 			NO_VECTOR,
 			ur.regrids["ApvG"],  ur.diags["sGvI"], ur.regrids["GvI"],
 			NO_VECTOR);
 	}
 
-	CooMatrix EvI_noweight() {
+	SparseMatrix EvI_noweight() {
 		return prod(
 			NO_VECTOR,
 			ur.regrids["EpvG"],  ur.diags["sGvI"], ur.regrids["GvI"],
 			NO_VECTOR);
 	}
 
-	CooMatrix IvA_noweight() {
+	SparseMatrix IvA() {
 		return prod(
 			ur.diags["sIvG"],
 			ur.regrids["IvG"], ur.diags["sGvAp"], ur.regrids["GvAp"],
 			ur.diags["sApvA"]);
 	}
 
-	CooMatrix IvE_noweight() {
+	SparseMatrix IvE() {
 		return prod(
 			ur.diags["sIvG"],
 			ur.regrids["IvG"], ur.diags["sGvEp"], ur.regrids["GvEp"],
@@ -237,12 +252,12 @@ class IceSheetMatrices {
 
 	/** Add to global inter-sheet weight vector, to be used for
 	anything ending in A grid. */
-	void wAvX(CooVector &partial_cell_w)
+	void wAvX(SparseVector &partial_cell_w)
 		{ copy(partial_cell_w, ur.diags["wAvX"]); }
-	void wEvX(CooVector &partial_cell_w)
+	void wEvX(SparseVector &partial_cell_w)
 		{ copy(partial_cell_w, ur.diags["wEvX"]); }
 
-	CooMatrix EvA_noweight(CooMatrix &EvA_global)
+	SparseMatrix EvA_noweight(SparseMatrix &EvA_global)
 	{
 		multiply(EvA_global,
 			NO_VECTOR,
@@ -250,7 +265,7 @@ class IceSheetMatrices {
 			ur.diags["sEpvE"]);
 	}
 
-	CooMatrix AvE_noweight(CooMatrix &AvE_global)
+	SparseMatrix AvE_noweight(SparseMatrix &AvE_global)
 	{
 		multiply(AvE_global,
 			NO_VECTOR,
