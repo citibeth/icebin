@@ -30,10 +30,7 @@ class GCMRegridder;
 /** Creates regridding matrices for a single ice sheet. */
 class IceRegridder {
 public:
-	BOOST_ENUM_VALUES(Type, int,
-		(L0)	(0)
-		(L1)	(1)
-	)
+	typedef Grid::Parameterization Type;
 
 protected:
 	friend class GCMRegridder;
@@ -97,6 +94,9 @@ public:
 	virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };	// class IceRegridder
+
+std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type);
+
 
 // ----------------------------------------------------
 
@@ -181,5 +181,90 @@ public:
 
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };	// class GCMRegridder
+// ===========================================================
+template<class TypeT>
+struct Transpose {
+	TypeT * const M;
+	bool const transpose;
+
+	Transpose(TypeT const *_M, bool _transpose) : M(_M), transpose(_transpose) {}
+};
+// -----------------------------------------------------------
+/** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
+class RegridMatrices {
+protected:
+	IceRegridder *sheet;
+
+	VectorAllocator<SparseMatrix> matrix_mem;
+	VectorAllocator<SparseVector> vector_mem;
+
+	std::map<std::string, Transpose<SparseMatrix>> regrids;
+	std::map<std::string, SparseVector const *> diags;
+
+	SparseVector *invert(SparseVector *v);
+
+	/** Adds a regrid matrix and its variants.
+	@param G The destination vector space of the matrix.  This must always be "G".
+	@param Z The source vectors space of the matrix.
+	@param m_GvZ Memory where to store the underlying matrix. */
+	void add_regrid(
+		std::string const &G,
+		std::string const &Z,
+		std::function<void(SparseMatrix &)> const &GvZ_fn);
+
+
+	void add_weight(
+		std::string const &B,
+		std::string const &A,
+		std::function<void(SparseVector &)> const &scale_fn);
+
+
+	/** Definitions of the Ur regridding and scaling matrices that
+	must be multiplied together to obtain the final regridding
+	matrices. */
+	static std::map<std::string, std::array<std::string, 5>> regrid_specs = {
+		{"AvI_noweight", {"", "ApvG", "sGvI", "GvI", ""}},
+		{"EvI_noweight", {"", "EpvG", "sGvI", "GvI", ""}},
+		{"IvA", {"sIvG", "IvG", "sGvAp", "GvAp", "sApvA"}},
+		{"IvE", {"sIvG", "IvG", "sGvEp", "GvEp", "sEpvE"}},
+		{"AvE_noweight", {"", "EpvG", "sGvAp", "GvAp", "sApvA"}},
+		{"EvA_noweight", {"", "ApvG", "sGvEp", "GvEp", "sEpvE"}}
+	};
+
+
+	// ----------------------------------------------------------
+	void wAvG(SparseVector &ret);
+	void wEvG(SparseVector &ret);
+	void wA(SparseVector &ret);
+	void wE(SparseVector &ret);
+
+	static std::map<std::string, std::function<void(RegridMatrices *, SparseVector &)>> weight_specs = {
+		{"wAvG", std::bind(&RegridMatrices::wAvG, _1, _2)},
+		{"wEvG", std::bind(&RegridMatrices::wEvG, _1, _2)},
+		{"wA", std::bind(&RegridMatrices::wA, _1, _2)},
+		{"wE", std::bind(&RegridMatrices::wE, _1, _2)}
+	};
+	// ----------------------------------------------------------
+		
+
+public:
+
+	void RegridMatrices(IceRegridder *sheet);
+
+	/** Retrieves a final regrid matrix. */
+	void regrid(SparseMatrix &ret, std::string const &spec_name);
+
+	/** Retrieves a weight or scale vector.  Options are:
+		w/sAvG		Partial cell weighting for A
+		w/sEvG		Partial cell weighting for E
+		w/sA		Whole cell weighting for A
+		w/sG		Whole cell weighting for E
+	*/
+	void weight(SparseVector &ret, std::string const &spec_name);
+
+};
+
+
+
 
 }	// namespace

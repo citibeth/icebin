@@ -236,6 +236,149 @@ extern void linterp_1d(
 	weights[0] = (1.0 - ratio);
 	weights[1] = ratio;
 }
+// ================================================================
+SparseVector *RegridMatrices::invert(SparseVector *v)
+{
+	SparseVector *ret = vector_mem.alloc();
+	for (auto ii=v->begin(); ii != v->end(); ++ii)
+		ret->add(*ii, ii.val());
+	return ret;
+}
+
+/** Adds a regrid matrix and its variants.
+@param G The destination vector space of the matrix.  This must always be "G".
+@param Z The source vectors space of the matrix.
+@param m_GvZ Memory where to store the underlying matrix. */
+void RegridMatrices::add_regrid(
+	std::string const &G,
+	std::string const &Z,
+	std::function<void(SparseMatrix &)> const &GvZ_fn)
+{
+	// Make sure destination space is G
+	if (G != "G") (*icebin_error)(-1,
+		"Destination vector space for add_GvZ must be \"G\" (exchnage grid)!");
+
+	// Get the main matrix
+	Sparsematrix *mGvZ = matrix_mem.alloc();
+	GvZ_fn(*mGvZ);
+
+	/* Since all raw matrices going into this have a destination G
+	(exchange grid), they must all be sorted row-major.  The
+	transpose matrices all go FROM G, so they must be sorted
+	column-major.  But sorting the transpose of a matrix
+	column-major is the same as sorting the original matrix row
+	major.  So... all matrices must be sorted the same way
+	(row-major) */
+	mGvZ->consolidate({0,1});
+
+	// Create the weight matrices
+	SparseVector *weightG = vector_mem.alloc();
+	SparseVector *weightZ = vector_mem.alloc();
+	for (auto ii=mGvZ->begin(); ii != mGvZ->end(); ++ii) {
+		weightG->add({cell.index(0)}, cell.val());
+		weightZ->add({cell.index(1)}, cell.val());
+	}
+	weightG->consolidate({0});
+	weightZ->consolidate({0});
+
+	std::string GvZ = G+"v"+Z;
+	std::string ZvG = Z+"v"+G;
+
+	regrids[GvZ] = Transpose(mGvZ, false);
+	regrids[ZvG] = Transpose(mGvZ, true);			// true --> transpose
+	diags["w"+GvZ] = weightG;
+	diags["s"+GvZ] = invert(weightG);	// true --> divide by this
+	diags["w"+ZvG] = weightZ;
+	diags["s"+ZvG] = invert(weightZ);
+}
+
+void RegridMatrices::add_weight(
+	std::string const &B,
+	std::string const &A,
+	std::function<void(SparseVector &)> const &scale_fn)
+{
+	SparseVector *scale = vector_mem.alloc();
+	scale_fn(*scale);
+
+	std::string BvA = B+"v"+A;
+	std::string AvB = A+"v"+B;
+	diags["s"+BvA] = scale;
+	diags["s"+AvB] = invert(scale);
+	diags["w"+BvA] = invert(scale);
+	diags["w"+AvB] = scale;
+
+}
+
+
+void RegridMatrices::RegridMatrices(IceRegridder *_sheet)
+{
+	sheet = _sheet;
+
+	std::unordered_map<long,double> elevIh(sheet->elevI_hash());
+
+	// Set up original matrices
+	{SparseMatrix *M = matrix_mem.alloc();
+		sheet->GvEp_noweight(*M, elevIh);
+		add_regrids("G", "Ep", M);
+	}
+
+	{SparseMatrix *M = matrix_mem.alloc();
+		sheet->GvI_noweight(*M, elevIh);
+		add_regrids("G", "I", M);
+	}
+
+
+	{SparseMatrix *M = matrix_mem.alloc();
+		sheet->GvAp_noweight(*M);
+		add_regrids("G", "Ap", M);
+	}
+}
+
+void RegridMatrices::wAvG(SparseVector &ret) {
+	SparseVector wAvAp;
+	sheet->wAvAp(wAvAp);
+	multiply_ele(ret, wAvAp, diags["wApvG"]);
+}
+void RegridMatrices::wEvG(SparseVector &ret) {
+	SparseVector wEvEp;
+	sheet->wEvEp(wEvEp);
+	multiply_ele(ret, wEvEp, diags["wEpvG"]);
+}
+
+void RegridMatrices::wA(SparseVector &ret)
+	{ sheet->gcm->wA(ret); }
+void RegridMatrices::wE(SparseVector &ret)
+	{ sheet->gcm->wE(ret); }
+
+
+void RegridMatrices::regrid(SparseMatrix &ret, std::string spec_name)
+{
+	std::array<std::string, 5> const &spec(regrid_specs.at(spec_name));
+
+	Transpose<SparseMatrix> const &A = ur.regrid(spec[1]);
+	Transpose<SparseMatrix> const &B = ur.regrid(spec[2]);
+
+	multiply(ret, 1.0,
+		spec[0] == "" ? NULL : ur.diags(spec[0]),
+		*A.M, A.transpose,
+		spec[2] == "" ? NULL : ur.diags(spec[2]),
+		*B.M, B.transpose,
+		spec[4] == "" ? NULL : ur.diags(spec[2]));
+}
+
+void RegridMatrices::weight(SparseVector &ret, std::string const &spec_name)
+{
+	if (spec_name[0] == 's') {
+		std::string wspec = spec_name;
+		wspec[0] = 'w';
+		SparseVector w;
+		weight_specs.at(wspec)(this, w);
+		for (auto ii = w.begin(); ii != ww.end(); ++ii)
+			ret.add(*ii, ii.val());
+	} else {
+		weight_specs.at(spec_name)(this, ret);
+	}
+}
 
 
 
