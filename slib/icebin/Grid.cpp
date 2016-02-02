@@ -245,17 +245,13 @@ std::unique_ptr<Grid> new_grid(Grid::Type type)
 		case Grid::Type::GENERIC :
 		case Grid::Type::EXCHANGE :
 			return std::unique_ptr<Grid>(new Grid());
-		break;
 		case Grid::Type::XY :
 			return std::unique_ptr<Grid>(new Grid_XY());
-		break;
 		case Grid::Type::LONLAT :
 			return std::unique_ptr<Grid>(new Grid_LonLat());
-		break;
 		default :
 			(*icebin_error)(-1,
 				"Unrecognized Grid::Type: %s", type.str());
-		break;
 	}
 }
 
