@@ -2,12 +2,15 @@
 #include <unordered_set>
 
 #include <spsparse/netcdf.hpp>
+#include <spsparse/multiply_sparse.hpp>
+
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/IceRegridder_L0.hpp>
 
 using namespace netCDF;
 using namespace ibmisc;
 using namespace std::placeholders;  // for _1, _2, _3...
+using namespace spsparse;
 
 namespace icebin {
 
@@ -195,6 +198,12 @@ void GCMRegridder::filter_cellsA(std::function<bool(long)> const &keepA)
 
 	gridA->filter_cells(keepA);
 }
+
+void GCMRegridder::wA(SparseVector &w) const
+{
+	for (auto cell=gridA->cells.begin(); cell != gridA->cells.end(); ++cell)
+		w.add({cell->index}, cell->native_area);
+}
 // ---------------------------------------------------------------------
 void IceRegridder::init(
 	std::string const &_name,
@@ -237,6 +246,21 @@ extern void linterp_1d(
 	weights[1] = ratio;
 }
 // ================================================================
+std::map<std::string, std::array<std::string, 5>> RegridMatrices::regrid_specs = {
+	{"AvI_noweight", {"",     "ApvG", "sGvI",  "GvI",  ""}},
+	{"EvI_noweight", {"",     "EpvG", "sGvI",  "GvI",  ""}},
+	{"IvA",          {"sIvG", "IvG",  "sGvAp", "GvAp", "sApvA"}},
+	{"IvE",          {"sIvG", "IvG",  "sGvEp", "GvEp", "sEpvE"}},
+	{"AvE_noweight", {"",     "EpvG", "sGvAp", "GvAp", "sApvA"}},
+	{"EvA_noweight", {"",     "ApvG", "sGvEp", "GvEp", "sEpvE"}}
+};
+
+std::map<std::string, std::function<void(RegridMatrices const *, SparseVector &)>> RegridMatrices::weight_specs = {
+	{"wAvG", std::bind(&RegridMatrices::wAvG, _1, _2)},
+	{"wEvG", std::bind(&RegridMatrices::wEvG, _1, _2)},
+	{"wA", std::bind(&RegridMatrices::wA, _1, _2)},
+};
+
 SparseVector *RegridMatrices::invert(SparseVector *v)
 {
 	SparseVector *ret = vector_mem.alloc();
@@ -252,15 +276,11 @@ SparseVector *RegridMatrices::invert(SparseVector *v)
 void RegridMatrices::add_regrid(
 	std::string const &G,
 	std::string const &Z,
-	std::function<void(SparseMatrix &)> const &GvZ_fn)
+	SparseMatrix *mGvZ)
 {
 	// Make sure destination space is G
 	if (G != "G") (*icebin_error)(-1,
 		"Destination vector space for add_GvZ must be \"G\" (exchnage grid)!");
-
-	// Get the main matrix
-	Sparsematrix *mGvZ = matrix_mem.alloc();
-	GvZ_fn(*mGvZ);
 
 	/* Since all raw matrices going into this have a destination G
 	(exchange grid), they must all be sorted row-major.  The
@@ -275,8 +295,8 @@ void RegridMatrices::add_regrid(
 	SparseVector *weightG = vector_mem.alloc();
 	SparseVector *weightZ = vector_mem.alloc();
 	for (auto ii=mGvZ->begin(); ii != mGvZ->end(); ++ii) {
-		weightG->add({cell.index(0)}, cell.val());
-		weightZ->add({cell.index(1)}, cell.val());
+		weightG->add({ii.index(0)}, ii.val());
+		weightZ->add({ii.index(1)}, ii.val());
 	}
 	weightG->consolidate({0});
 	weightZ->consolidate({0});
@@ -284,8 +304,8 @@ void RegridMatrices::add_regrid(
 	std::string GvZ = G+"v"+Z;
 	std::string ZvG = Z+"v"+G;
 
-	regrids[GvZ] = Transpose(mGvZ, false);
-	regrids[ZvG] = Transpose(mGvZ, true);			// true --> transpose
+	regrids.insert(std::make_pair(GvZ, Transpose<SparseMatrix>(mGvZ, false)));
+	regrids.insert(std::make_pair(ZvG, Transpose<SparseMatrix>(mGvZ, true)));			// true --> transpose
 	diags["w"+GvZ] = weightG;
 	diags["s"+GvZ] = invert(weightG);	// true --> divide by this
 	diags["w"+ZvG] = weightZ;
@@ -299,6 +319,7 @@ void RegridMatrices::add_weight(
 {
 	SparseVector *scale = vector_mem.alloc();
 	scale_fn(*scale);
+	scale->consolidate({0});
 
 	std::string BvA = B+"v"+A;
 	std::string AvB = A+"v"+B;
@@ -310,7 +331,7 @@ void RegridMatrices::add_weight(
 }
 
 
-void RegridMatrices::RegridMatrices(IceRegridder *_sheet)
+RegridMatrices::RegridMatrices(IceRegridder *_sheet)
 {
 	sheet = _sheet;
 
@@ -319,61 +340,56 @@ void RegridMatrices::RegridMatrices(IceRegridder *_sheet)
 	// Set up original matrices
 	{SparseMatrix *M = matrix_mem.alloc();
 		sheet->GvEp_noweight(*M, elevIh);
-		add_regrids("G", "Ep", M);
+		add_regrid("G", "Ep", M);
 	}
 
 	{SparseMatrix *M = matrix_mem.alloc();
 		sheet->GvI_noweight(*M, elevIh);
-		add_regrids("G", "I", M);
+		add_regrid("G", "I", M);
 	}
 
 
 	{SparseMatrix *M = matrix_mem.alloc();
 		sheet->GvAp_noweight(*M);
-		add_regrids("G", "Ap", M);
+		add_regrid("G", "Ap", M);
 	}
 }
 
-void RegridMatrices::wAvG(SparseVector &ret) {
+void RegridMatrices::wAvG(SparseVector &ret) const {
 	SparseVector wAvAp;
 	sheet->wAvAp(wAvAp);
-	multiply_ele(ret, wAvAp, diags["wApvG"]);
+	multiply_ele(ret, wAvAp, *diags.at("wApvG"));
 }
-void RegridMatrices::wEvG(SparseVector &ret) {
+void RegridMatrices::wEvG(SparseVector &ret) const {
 	SparseVector wEvEp;
 	sheet->wEvEp(wEvEp);
-	multiply_ele(ret, wEvEp, diags["wEpvG"]);
+	multiply_ele(ret, wEvEp, *diags.at("wEpvG"));
 }
 
-void RegridMatrices::wA(SparseVector &ret)
-	{ sheet->gcm->wA(ret); }
-void RegridMatrices::wE(SparseVector &ret)
-	{ sheet->gcm->wE(ret); }
 
-
-void RegridMatrices::regrid(SparseMatrix &ret, std::string spec_name)
+void RegridMatrices::regrid(SparseMatrix &ret, std::string const &spec_name) const
 {
 	std::array<std::string, 5> const &spec(regrid_specs.at(spec_name));
 
-	Transpose<SparseMatrix> const &A = ur.regrid(spec[1]);
-	Transpose<SparseMatrix> const &B = ur.regrid(spec[2]);
+	Transpose<SparseMatrix> const &A = regrids.at(spec[1]);
+	Transpose<SparseMatrix> const &B = regrids.at(spec[3]);
 
 	multiply(ret, 1.0,
-		spec[0] == "" ? NULL : ur.diags(spec[0]),
+		spec[0] == "" ? NULL : diags.at(spec[0]),
 		*A.M, A.transpose,
-		spec[2] == "" ? NULL : ur.diags(spec[2]),
+		spec[2] == "" ? NULL : diags.at(spec[2]),
 		*B.M, B.transpose,
-		spec[4] == "" ? NULL : ur.diags(spec[2]));
+		spec[4] == "" ? NULL : diags.at(spec[4]));
 }
 
-void RegridMatrices::weight(SparseVector &ret, std::string const &spec_name)
+void RegridMatrices::weight(SparseVector &ret, std::string const &spec_name) const
 {
 	if (spec_name[0] == 's') {
 		std::string wspec = spec_name;
 		wspec[0] = 'w';
 		SparseVector w;
 		weight_specs.at(wspec)(this, w);
-		for (auto ii = w.begin(); ii != ww.end(); ++ii)
+		for (auto ii = w.begin(); ii != w.end(); ++ii)
 			ret.add(*ii, ii.val());
 	} else {
 		weight_specs.at(spec_name)(this, ret);

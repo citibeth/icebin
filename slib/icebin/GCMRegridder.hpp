@@ -32,11 +32,11 @@ class IceRegridder {
 public:
 	typedef Grid::Parameterization Type;
 
-protected:
 	friend class GCMRegridder;
+	GCMRegridder const *gcm;	/// Parent pointer
+protected:
 
 	Type type;
-	GCMRegridder const *gcm;	/// Parent pointer
 	std::string name;	/// "greenland", "antarctica", etc.
 	std::unique_ptr<Grid> gridI;			/// Ice grid outlines
 	std::unique_ptr<Grid> exgrid;		/// Exchange grid outlines (between GCM and Ice)
@@ -172,7 +172,7 @@ public:
 	// -----------------------------------------
 
 	/** Adds the weight (native area) of each cell of the Atmosphere grid (A) */
-	void wA(SparseVector &w) { gridA->native_areas(w); }
+	void wA(SparseVector &w) const;
 
 	/** @return Number of elevation points for a given grid cell */
 	int nhp(int i1) const { return hpdefs.size(); }
@@ -183,11 +183,32 @@ public:
 };	// class GCMRegridder
 // ===========================================================
 template<class TypeT>
-struct Transpose {
-	TypeT * const M;
+class Transpose {
+public:
+	TypeT const * const M;
 	bool const transpose;
 
 	Transpose(TypeT const *_M, bool _transpose) : M(_M), transpose(_transpose) {}
+#if 0
+	Transpose(Transpose<TypeT> &&rhs) : M(rhs.M), transpose(rhs.transpose) {}
+	void operator=(Transpose<TypeT> &&rhs) {
+		M = rhs.M;
+		transpose = rhs.transpose;
+	}
+#endif
+};
+// -----------------------------------------------------------
+/** Helper class... */
+template<class TypeT>
+class VectorAllocator {
+	std::vector<std::unique_ptr<TypeT>> mem;
+public:
+	TypeT *alloc() {
+		std::unique_ptr<TypeT> M(new TypeT());
+		TypeT *ret = M.get();
+		mem.push_back(std::move(M));
+		return ret;
+	}
 };
 // -----------------------------------------------------------
 /** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
@@ -210,7 +231,7 @@ protected:
 	void add_regrid(
 		std::string const &G,
 		std::string const &Z,
-		std::function<void(SparseMatrix &)> const &GvZ_fn);
+		SparseMatrix *GvZ);
 
 
 	void add_weight(
@@ -222,37 +243,25 @@ protected:
 	/** Definitions of the Ur regridding and scaling matrices that
 	must be multiplied together to obtain the final regridding
 	matrices. */
-	static std::map<std::string, std::array<std::string, 5>> regrid_specs = {
-		{"AvI_noweight", {"", "ApvG", "sGvI", "GvI", ""}},
-		{"EvI_noweight", {"", "EpvG", "sGvI", "GvI", ""}},
-		{"IvA", {"sIvG", "IvG", "sGvAp", "GvAp", "sApvA"}},
-		{"IvE", {"sIvG", "IvG", "sGvEp", "GvEp", "sEpvE"}},
-		{"AvE_noweight", {"", "EpvG", "sGvAp", "GvAp", "sApvA"}},
-		{"EvA_noweight", {"", "ApvG", "sGvEp", "GvEp", "sEpvE"}}
-	};
-
+	static std::map<std::string, std::array<std::string, 5>> regrid_specs;
 
 	// ----------------------------------------------------------
-	void wAvG(SparseVector &ret);
-	void wEvG(SparseVector &ret);
-	void wA(SparseVector &ret);
-	void wE(SparseVector &ret);
+	void wAvG(SparseVector &ret) const;
+	void wEvG(SparseVector &ret) const;
+	void wA(SparseVector &ret) const
+		{ sheet->gcm->wA(ret); }
 
-	static std::map<std::string, std::function<void(RegridMatrices *, SparseVector &)>> weight_specs = {
-		{"wAvG", std::bind(&RegridMatrices::wAvG, _1, _2)},
-		{"wEvG", std::bind(&RegridMatrices::wEvG, _1, _2)},
-		{"wA", std::bind(&RegridMatrices::wA, _1, _2)},
-		{"wE", std::bind(&RegridMatrices::wE, _1, _2)}
-	};
+	// using namespace std::placeholders;
+	static std::map<std::string, std::function<void(RegridMatrices const *, SparseVector &)>> weight_specs;
 	// ----------------------------------------------------------
 		
 
 public:
 
-	void RegridMatrices(IceRegridder *sheet);
+	RegridMatrices(IceRegridder *sheet);
 
 	/** Retrieves a final regrid matrix. */
-	void regrid(SparseMatrix &ret, std::string const &spec_name);
+	void regrid(SparseMatrix &ret, std::string const &spec_name) const;
 
 	/** Retrieves a weight or scale vector.  Options are:
 		w/sAvG		Partial cell weighting for A
@@ -260,7 +269,7 @@ public:
 		w/sA		Whole cell weighting for A
 		w/sG		Whole cell weighting for E
 	*/
-	void weight(SparseVector &ret, std::string const &spec_name);
+	void weight(SparseVector &ret, std::string const &spec_name) const;
 
 };
 

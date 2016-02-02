@@ -290,10 +290,6 @@ public:
 
 	void clear();
 
-	/** Puts the area of each cell into the weight vector w */
-	void native_areas(SparseVector &w);
-
-
 protected:
 	void nc_read(netCDF::NcGroup *nc, std::string const &vname);
 	void nc_write(netCDF::NcGroup *nc, std::string const &vname) const;
