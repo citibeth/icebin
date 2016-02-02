@@ -1,8 +1,8 @@
+from cpython.object cimport *	# PyObject
 from libcpp cimport bool
 from libcpp.string cimport string
 from libcpp.vector cimport vector
-cimport namespace_std as cstd
-cimport namespace_ibmisc as cibmisc
+cimport cibmisc
 
 # This will make the C++ class def for Rectangle available..
 cdef extern from "icebin/Grid.hpp" namespace "icebin":
@@ -16,7 +16,7 @@ cdef extern from "icebin/Grid.hpp" namespace "icebin":
 
 
 	cdef cppclass Cell:
-		Cell(cstd.vector[Vertex *]) except +
+		Cell(vector[Vertex *]) except +
 
 	cdef cppclass GridMap[T]:
 		cppclass iterator:
@@ -39,13 +39,19 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
 
 	cdef cppclass GCMRegridder:
 		GCMRegridder() except +
-		void ncio(cibmisc.NcIO &, string vname)
+		void ncio(cibmisc.NcIO &, string vname) except +
 
-cdef extern from "icebin_cython.hpp" namespace "icebin":
+cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 	cdef void GCMRegridder_init(
 		GCMRegridder *self,
 		string &gridA_fname,
 		string &gridA_vname,
 		vector[double] &hpdefs,
-		bool correctA)
+		bool correctA) except +
 
+	cdef void GCMRegridder_add_sheet(
+		GCMRegridder *self,
+		string &gridI_fname, string &gridI_vname,
+		string &exgrid_fname, string &exgrid_vname,
+		string sinterp_style,
+		PyObject *elevI_py) except +
