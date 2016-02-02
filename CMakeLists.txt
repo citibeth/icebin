@@ -90,7 +90,7 @@ include_directories(${IBMISC_INCLUDE_DIR})
 # --- SpSparse
 find_package(spsparse REQUIRED)
 list(APPEND EXTERNAL_LIBS ${SPSPARSE_LIBRARY})
-include_directories({$SPSPARSE_INCLUDE_DIR})
+include_directories(${SPSPARSE_INCLUDE_DIR})
 
 
 # --- Proj.4
@@ -165,12 +165,12 @@ list(APPEND EXTERNAL_LIBS ${PROJ4_LIBRARIES})
 # -------- Process subdirectories of the build
 add_subdirectory(slib)
 #add_subdirectory(sbin)
-add_subdirectory(test)
+add_subdirectory(tests)
 if (BUILD_GRIDGEN)
 	add_subdirectory(grids)
 endif()
 
 if(${BUILD_PYTHON})
-	add_subdirectory(pyext)
+	add_subdirectory(pylib)
 endif()
 
