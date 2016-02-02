@@ -13,9 +13,9 @@ import os
 import os.path
 
 
-def make_icebin_in_base(grid_dir, gridA_name, grid2_name, pism_spinup_fname, ofname):
+def make_icebin_in_base(grid_dir, gridA_name, gridI_name, pism_spinup_fname, ofname):
 	# gridA_name = 'modele_ll_g2x2_5'
-	# grid2_name = 'searise_g%d' % ice_dx
+	# gridI_name = 'searise_g%d' % ice_dx
 	# DATA_PATH = os.environ['DATA_PATH']
 	# 	pism_spinup_fname = os.path.join(DATA_PATH, 'searise/Greenland_5km_v1.1.nc')
 
@@ -43,19 +43,18 @@ def make_icebin_in_base(grid_dir, gridA_name, grid2_name, pism_spinup_fname, ofn
 	mm = icebin.GCMRegridder(gridA_fname, 'grid', hpdefs, True)
 
 
-	# ========= Add each grid2
-	if False:
+	# ========= Add each gridI
 		# --- Greenland
 		# pism_spinup_fname = os.path.join(DATA_PATH, 'searise/Greenland_5km_v1.1.nc')
-		print('PISM spinup file: {}'.format(pism_spinup_fname))
-		(elev2, mask2) = giss.pism.read_elevation2_mask2(pism_spinup_fname)
+	print('PISM spinup file: {}'.format(pism_spinup_fname))
+	(elevI, maskI) = giss.pism.read_elevI_maskI(pism_spinup_fname)
 	
-		grid2_fname = os.path.join(grid_dir, '%s.nc' % grid2_name)
-		overlap_fname = os.path.join(grid_dir, '%s-%s.nc' % (gridA_name, grid2_name))
+	gridI_fname = os.path.join(grid_dir, '%s.nc' % gridI_name)
+	overlap_fname = os.path.join(grid_dir, '%s-%s.nc' % (gridA_name, gridI_name))
 	
-		print('mask2',mask2.shape)
-		greenland_id = mm.add_ice_sheet(grid2_fname, overlap_fname,
-		        elev2, mask2=mask2, name='greenland')
+	print('maskI',maskI.shape)
+	greenland_id = mm.add_ice_sheet(gridI_fname, overlap_fname,
+	        elevI, maskI=maskI, name='greenland')
 
 	# ========== Finish up and write out
 	print('Writing: {}'.format(ofname))
