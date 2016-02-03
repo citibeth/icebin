@@ -37,9 +37,17 @@ cdef extern from "icebin/Grid.hpp" namespace "icebin":
 cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
 	pass
 
+	cdef cppclass IceRegridder:
+		pass
+
 	cdef cppclass GCMRegridder:
 		GCMRegridder() except +
 		void ncio(cibmisc.NcIO &, string vname) except +
+		IceRegridder *sheet(string name) except +
+
+
+	cdef cppclass RegridMatrices:
+
 
 cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 	cdef void GCMRegridder_init(
@@ -55,3 +63,5 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 		string &exgrid_fname, string &exgrid_vname,
 		string sinterp_style,
 		PyObject *elevI_py) except +
+
+	cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name) except +
