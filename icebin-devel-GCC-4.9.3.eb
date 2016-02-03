@@ -17,7 +17,6 @@ configopts = '-DUSE_FORTRAN=YES'
 dependencies = [
 	('everytrace', 'devel', '', ('mpgompi', '4.9.3')),
 	('ibmisc', 'devel', '', ('GCC', '4.9.3')),
-	('spsparse', 'devel', '', ('GCC', '4.9.3')),
 	('netCDF-C++4', 'ecdf914', '', ('mpgompi', '4.9.3')),
 	('blitz', '0.10', '', ('GCC', '4.9.3')),
 	('CGAL', '4.7', '', ('GCC', '4.9.3')),

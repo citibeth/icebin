@@ -87,11 +87,6 @@ find_package(ibmisc REQUIRED)
 list(APPEND EXTERNAL_LIBS ${IBMISC_LIBRARY})
 include_directories(${IBMISC_INCLUDE_DIR})
 
-# --- SpSparse
-find_package(spsparse REQUIRED)
-list(APPEND EXTERNAL_LIBS ${SPSPARSE_LIBRARY})
-include_directories(${SPSPARSE_INCLUDE_DIR})
-
 
 # --- Proj.4
 find_package(PROJ4 REQUIRED)
