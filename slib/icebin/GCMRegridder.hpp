@@ -145,6 +145,9 @@ public:
 		sheets.insert(std::make_pair(sheet->name, std::move(sheet)));
 	}
 
+	IceRegridder *sheet(std::string const &name)
+		{ return sheets.at(name).get(); }
+
 	void filter_cellsA(std::function<bool(long)> const &keepA);
 
 

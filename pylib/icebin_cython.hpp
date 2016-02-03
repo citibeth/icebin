@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Python.h>
+#include <ibmisc/cython.hpp>
 #include <icebin/GCMRegridder.hpp>
 
 namespace icebin {
@@ -19,19 +20,19 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
 	std::string const &sinterp_style,
 	PyObject *elevI_py);
 
-inline Pyobject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name)
+inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name)
 {
 	SparseMatrix M;
 	cself->regrid(M, spec_name);
-	return spsparse_to_tuple(M);
+	return ibmisc::cython::spsparse_to_tuple(M);
 }
 
-inline Pyobject *RegridMatrices_weight(RegridMatrices *cself, std::string const &spec_name, double fill_value)
+inline PyObject *RegridMatrices_weight(RegridMatrices *cself, std::string const &spec_name, double fill_value)
 {
 	SparseVector w;
 	cself->weight(w, spec_name);
 	// TODO: Copy only once instead of twice.  Don't bother for now...
-	return blitz_to_np(w.to_dense(fill_value))
+	return ibmisc::cython::blitz_to_np(w.to_dense(fill_value));
 }
 
 

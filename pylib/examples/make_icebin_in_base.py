@@ -66,5 +66,5 @@ make_icebin_in_base(
 	'/Users/rpfische/git/icebin/build/grids',
 	'modele_ll_g2x2_5',
 	'sr_g20_pism',
-	'pism_spinup.nc',
+	'/Users/rpfische/exp/151014-integrate/build/std-greenland/g20km_10ka.nc',
 	'x.nc')

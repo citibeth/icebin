@@ -2,6 +2,7 @@ cimport cicebin
 cimport cibmisc		# C++ stuff in ibmisc
 cimport ibmisc		# Cython stuff in ibmisc
 import numpy as np
+import scipy.sparse
 
 from cython.operator cimport dereference as deref, preincrement as inc
 
@@ -9,20 +10,18 @@ cdef class IceRegridder:
 	pass
 
 cdef class RegridMatrices:
-	cicebin.RegridMatrices *cself
+	cdef cicebin.RegridMatrices *cself
 
-	def __cinit__(self, cicebin.IceRegridder *sheet):
-		self.cself = new cicebin.RegridMatrices(sheet)
 	def __dealloc__(self):
 		del self.cself
 
 	def regrid(self, spec_name):
-		data,shape = RegridMatrices_regrid(self.cself, spec_name.encode())
+		data,shape = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode())
 		# scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
 		return scipy.sparse.coo_matrix(data, shape)
 
 	def weight(self, spec_name, fill_value=0):
-		data,shape = RegridMatrices_weight(self.cself, spec_name.encode())
+		data,shape = cicebin.RegridMatrices_weight(self.cself, spec_name.encode(), fill_value)
 		ret = np.zeros((shape[0],))
 		ret[:] = fill_value
 		cdef int ix
@@ -48,5 +47,9 @@ cdef class GCMRegridder:
 		pass
 
 	def regrid_matrices(self, str sheet_name):
-		return RegridMatrices(self.cself.sheet(name.encode()))
+		cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
+			self.cself.sheet(sheet_name.encode()))
+		rm = RegridMatrices()
+		rm.cself = crm
+		return rm
 

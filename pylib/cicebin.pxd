@@ -47,6 +47,7 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
 
 
 	cdef cppclass RegridMatrices:
+		RegridMatrices(IceRegridder *) except +
 
 
 cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
@@ -65,3 +66,5 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 		PyObject *elevI_py) except +
 
 	cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name) except +
+
+	cdef object RegridMatrices_weight(RegridMatrices *self, string spec_name, double fill_value) except +
