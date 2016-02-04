@@ -129,7 +129,7 @@ class GridMap {
 protected:
 	typedef std::unordered_map<long, std::unique_ptr<CellT>> MapT;
 	MapT _cells;
-	size_t _nfull = -1;
+	long _nfull = -1;
 	long _max_realized_index = -1;
 
 #if 0
@@ -267,9 +267,6 @@ public:
 	ibmisc::Indexing<int, long> indexing;
 
 	std::string name;
-
-	long _ncells_full;		// Maximum possible index (+1)
-	long _nvertices_full;	// Maximum possible index (+1)
 
 protected :
 	// These are kept in line, with add_cell() and add_vertex()
