@@ -133,7 +133,7 @@ void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
 	const int south_pole_offset = (this->south_pole ? 1 : 0);
 	const int north_pole_offset = (this->north_pole ? 1 : 0);
 
-	grid._ncells_full = this->nlon() * this->nlat();
+	grid.cells._nfull = this->nlon() * this->nlat();
 
 	// Get a bunch of points.  (i,j) is gridcell's index in canonical grid
 	for (int ilat=0; ilat < this->latb.size()-1; ++ilat) {

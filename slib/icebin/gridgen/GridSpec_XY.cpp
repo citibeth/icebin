@@ -71,8 +71,8 @@ void GridSpec_XY::make_grid(Grid_XY &grid)
 	grid.name = this->name;
 	grid.sproj = this->sproj;
 
-	grid._ncells_full = nx() * ny();
-	grid._nvertices_full = xb.size() * yb.size();
+	grid.cells._nfull = nx() * ny();
+	grid.vertices._nfull = xb.size() * yb.size();
 
 	// Set up the main grid
 	VertexCache vcache(&grid);
