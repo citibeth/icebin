@@ -59,11 +59,12 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 		bool correctA) except +
 
 	cdef void GCMRegridder_add_sheet(
-		GCMRegridder *self,
+		GCMRegridder *cself,
+		string &name,
 		string &gridI_fname, string &gridI_vname,
 		string &exgrid_fname, string &exgrid_vname,
-		string sinterp_style,
-		PyObject *elevI_py) except +
+		string &sinterp_style,
+		PyObject *elevI_py, PyObject *maskI_py) except +		# PyObject=Borrowed reference, object = owned reference
 
 	cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name) except +
 

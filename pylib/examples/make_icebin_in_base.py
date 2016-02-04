@@ -53,8 +53,11 @@ def make_icebin_in_base(grid_dir, gridA_name, gridI_name, pism_spinup_fname, ofn
 	overlap_fname = os.path.join(grid_dir, '%s-%s.nc' % (gridA_name, gridI_name))
 	
 	print('maskI',maskI.shape)
-	greenland_id = mm.add_ice_sheet(gridI_fname, overlap_fname,
-	        elevI, maskI=maskI, name='greenland')
+	mm.add_sheet('greenland',
+		gridI_fname, 'grid',
+		overlap_fname, 'exgrid',
+		'Z_INTERP',
+		elevI, maskI)
 
 	# ========== Finish up and write out
 	print('Writing: {}'.format(ofname))

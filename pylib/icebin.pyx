@@ -1,9 +1,14 @@
+# On reference counting...
+# https://groups.google.com/forum/#!topic/cython-users/pZFurj3rUyg
+
+from cpython.object cimport *		# PyObject
 cimport cicebin
 cimport cibmisc		# C++ stuff in ibmisc
 cimport ibmisc		# Cython stuff in ibmisc
 import numpy as np
+cimport numpy as np
+np.import_array()
 import scipy.sparse
-
 from cython.operator cimport dereference as deref, preincrement as inc
 
 cdef class IceRegridder:
@@ -43,8 +48,16 @@ cdef class GCMRegridder:
 		gridI_fname, gridI_vname,
 		exgrid_fname, exgrid_vname,
 		interp_style,
-		elevI):
-		pass
+		elevI, maskI):
+
+		elevI = elevI.reshape(-1)
+		maskI = maskI.reshape(-1)
+		cicebin.GCMRegridder_add_sheet(&self.cself,
+			name.encode(),
+			gridI_fname.encode(), gridI_vname.encode(),
+			exgrid_fname.encode(), exgrid_vname.encode(),
+			interp_style.encode(),
+			<PyObject *>elevI, <PyObject *>maskI)	# Borrowed references
 
 	def regrid_matrices(self, str sheet_name):
 		cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
