@@ -71,7 +71,7 @@ double Cell::proj_area(
 
 // ------------------------------------------------------------
 Grid::Grid() :
-	type(Grid::Type::XY),
+	type(Grid::Type::GENERIC),
 	coordinates(Grid::Coordinates::XY),
 	_max_realized_cell_index(0),
 	_max_realized_vertex_index(0) {}
@@ -81,7 +81,7 @@ size_t Grid::ndata() const
 	if (parameterization == Parameterization::L1)
 		return vertices.nfull();
 	else
-		cells.nfull();
+		return cells.nfull();
 }
 
 void Grid::clear()
