@@ -36,15 +36,6 @@ int main(int argc, char **argv)
 	std::string fname1(argv[1]);
 	std::string fname2(argv[2]);
 
-	printf("------------- Set up the projection\n");
-	double proj_lon_0 = -39;
-	double proj_lat_0 = 90;
-	char sproj[100];
-	sprintf(sproj,
-		"+proj=stere +lon_0=%f +lat_0=%f +lat_ts=71.0 +ellps=WGS84",
-		proj_lon_0, proj_lat_0);
-
-
 	printf("------------- Read gridA (GCM Grid)\n");
 	NcIO ncio1(fname1);
 	Grid gridA;
