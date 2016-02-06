@@ -20,10 +20,11 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
 	std::string const &sinterp_style,
 	PyObject *elevI_py, PyObject *maskI_py);
 
-inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name)
+inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, std::string const &sweighting)
 {
+	auto weighting(ibmisc::parse_enum<Weighting>(sweighting));
 	SparseMatrix M;
-	cself->regrid(M, spec_name);
+	cself->regrid(M, spec_name, weighting);
 	return ibmisc::cython::spsparse_to_tuple(M);
 }
 

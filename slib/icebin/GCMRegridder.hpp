@@ -11,17 +11,16 @@
 
 namespace icebin {
 
-/** For subroutines that can do things to/from either the ice grid or
-the interpolation grid */
-BOOST_ENUM_VALUES( IceInterp, int,
-	(ICE)		(0)
-	(INTERP)	(1)
-)
-
 /** Controls how we interpolate from elevation class space to the ice grid */
 BOOST_ENUM_VALUES( InterpStyle, int,
 	(Z_INTERP)			(0)
 	(ELEV_CLASS_INTERP)	(1)
+)
+
+BOOST_ENUM_VALUES( Weighting, int,
+	(NONE)	(0)
+	(WHOLE_CELL)	(1)
+	(PARTIAL_CELL)	(2)
 )
 
 
@@ -64,17 +63,14 @@ public:
 	virtual ~IceRegridder();
 	std::unordered_map<long,double> elevI_hash();
 
-#if 0
 	// ------------------------------------------------
 	/** Number of dimensions of ice vector space */
 	virtual long nI() const = 0;
 
 	/** Number of dimensions of interpolation grid vector space. */
-	virtual long nG() const
-		{ return nI(); }
+	virtual long nG() const = 0;
 
 	// ------------------------------------------------
-#endif
 
 	/** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 	NOTE: wAvAp == sApvA */
@@ -178,9 +174,9 @@ public:
 	void wA(SparseVector &w) const;
 
 	/** @return Number of elevation points for a given grid cell */
-	int nhp(int i1) const { return hpdefs.size(); }
-	int nA() const { return gridA->ndata(); }
-	int nE() const { return nA() * nhp(-1); }
+	unsigned int nhp(int i1) const { return hpdefs.size(); }
+	unsigned long nA() const { return gridA->ndata(); }
+	unsigned long nE() const { return nA() * nhp(-1); }
 
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };	// class GCMRegridder
@@ -188,30 +184,44 @@ public:
 template<class TypeT>
 class Transpose {
 public:
-	TypeT const * const M;
+	TypeT M;
 	bool const transpose;
 
-	Transpose(TypeT const *_M, bool _transpose) : M(_M), transpose(_transpose) {}
-#if 0
-	Transpose(Transpose<TypeT> &&rhs) : M(rhs.M), transpose(rhs.transpose) {}
-	void operator=(Transpose<TypeT> &&rhs) {
-		M = rhs.M;
-		transpose = rhs.transpose;
-	}
-#endif
+	Transpose(TypeT const &&_M, bool _transpose) : M(std::move(_M)), transpose(_transpose) {}
 };
 // -----------------------------------------------------------
-/** Helper class... */
 template<class TypeT>
-class VectorAllocator {
-	std::vector<std::unique_ptr<TypeT>> mem;
+class LazyPtr {
+	TypeT *_ptr;						// Borrowed reference
+	std::unique_ptr<TypeT> _uptr;	// Owned reference
+	std::function<std::unique_ptr<TypeT> ()> _compute_owned;
+	std::function<TypeT *()> _compute_borrowed;
 public:
-	TypeT *alloc() {
-		std::unique_ptr<TypeT> M(new TypeT());
-		TypeT *ret = M.get();
-		mem.push_back(std::move(M));
-		return ret;
+	LazyPtr() {}
+
+	LazyPtr(std::unique_ptr<TypeT> &&ptr) : _uptr(std::move(ptr)) {}
+
+	LazyPtr(std::function<std::unique_ptr<TypeT> ()> &&compute_owned)
+		: _compute_owned(std::move(compute_owned)) {}
+
+	LazyPtr(std::function<TypeT *()> &&compute_borrowed)
+		: _compute_borrowed(std::move(compute_borrowed)) {}
+
+	LazyPtr(TypeT *ptr) : _ptr(ptr) {}
+
+	TypeT &operator*() const {
+		if (!_ptr) {
+			if (_compute_borrowed) {
+				const_cast<TypeT *>(_ptr) = _compute_borrowed();
+			} else {
+				const_cast<std::unique_ptr<TypeT>>(_uptr) = _compute_owned();
+				const_cast<TypeT *>(_ptr) = &*_uptr;
+			}
+		}
+		return *ptr;
 	}
+	TypeT *operator->() const
+		{ return &operator*(); }
 };
 // -----------------------------------------------------------
 /** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
@@ -219,11 +229,8 @@ class RegridMatrices {
 protected:
 	IceRegridder *sheet;
 
-	VectorAllocator<SparseMatrix> matrix_mem;
-	VectorAllocator<SparseVector> vector_mem;
-
-	std::map<std::string, Transpose<SparseMatrix>> regrids;
-	std::map<std::string, SparseVector const *> diags;
+	std::map<std::string, Transpose<LazyPtr<SparseMatrix>>> regrids;
+	std::map<std::string, LazyPtr<SparseVector>> diags;
 
 	SparseVector *invert(SparseVector *v);
 
@@ -264,7 +271,7 @@ public:
 	RegridMatrices(IceRegridder *sheet);
 
 	/** Retrieves a final regrid matrix. */
-	void regrid(SparseMatrix &ret, std::string const &spec_name) const;
+	void regrid(SparseMatrix &ret, std::string const &spec_name, Weighting weighting) const;
 
 	/** Retrieves a weight or scale vector.  Options are:
 		w/sAvG		Partial cell weighting for A

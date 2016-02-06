@@ -59,6 +59,10 @@ def make_icebin_in_base(grid_dir, gridA_name, gridI_name, pism_spinup_fname, ofn
 		'Z_INTERP',
 		elevI, maskI)
 
+	rm = mm.regrid_matrices('greenland')
+	print(rm.regrid('AvI', 'WHOLE_CELL'))
+
+
 	# ========== Finish up and write out
 	print('Writing: {}'.format(ofname))
 	ncio = ibmisc.NcIO(ofname, 'replace')

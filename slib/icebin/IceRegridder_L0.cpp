@@ -113,11 +113,13 @@ void IceRegridder_L0::GvI_noweight(
 // --------------------------------------------------------
 void IceRegridder_L0::GvAp_noweight(SparseMatrix &ret)
 {
+printf("BB1\n");
 	for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
 		int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
 		int iA = cell->i;
 		ret.add({iG,iA}, cell->native_area);
 	}
+printf("BB2\n");
 }
 // --------------------------------------------------------
 void IceRegridder_L0::ncio(NcIO &ncio, std::string const &vname)

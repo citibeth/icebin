@@ -96,8 +96,6 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
 	std::unique_ptr<Grid> exgrid(read_grid(ncio_exgrid, exgrid_vname));
 	ncio_exgrid.close();
 
-printf("gridI->nfull %d %d\n", gridI->cells.nfull(), gridI->ndata());
-
 	auto interp_style(parse_enum<InterpStyle>(sinterp_style));
 	auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {gridI->ndata()}));
 	auto maskI(np_to_blitz<int,1>(maskI_py, "maskI", {gridI->ndata()}));
@@ -106,14 +104,10 @@ printf("gridI->nfull %d %d\n", gridI->cells.nfull(), gridI->ndata());
 	for (int i=0; i<elevI.extent(0); ++i)
 		if (maskI(i)) elevI_sp.add({i}, elevI(i));
 
-printf("AA5\n");
 	auto sheet(new_ice_regridder(gridI->parameterization));
-printf("AA6\n");
 	sheet->init(name, std::move(gridI), std::move(exgrid),
 		interp_style, std::move(elevI_sp));
-printf("AA7\n");
 	cself->add_sheet(std::move(sheet));
-printf("AA8\n");
 }
 
 

@@ -245,42 +245,56 @@ extern void linterp_1d(
 	weights[0] = (1.0 - ratio);
 	weights[1] = ratio;
 }
-// ================================================================
-std::map<std::string, std::array<std::string, 5>> RegridMatrices::regrid_specs = {
-	{"AvI_noweight", {"",     "ApvG", "sGvI",  "GvI",  ""}},
-	{"EvI_noweight", {"",     "EpvG", "sGvI",  "GvI",  ""}},
-	{"IvA",          {"sIvG", "IvG",  "sGvAp", "GvAp", "sApvA"}},
-	{"IvE",          {"sIvG", "IvG",  "sGvEp", "GvEp", "sEpvE"}},
-	{"AvE_noweight", {"",     "EpvG", "sGvAp", "GvAp", "sApvA"}},
-	{"EvA_noweight", {"",     "ApvG", "sGvEp", "GvEp", "sEpvE"}}
-};
 
-std::map<std::string, std::function<void(RegridMatrices const *, SparseVector &)>> RegridMatrices::weight_specs = {
-	{"wAvG", std::bind(&RegridMatrices::wAvG, _1, _2)},
-	{"wEvG", std::bind(&RegridMatrices::wEvG, _1, _2)},
-	{"wA", std::bind(&RegridMatrices::wA, _1, _2)},
-};
+// =================================================================
 
-SparseVector *RegridMatrices::invert(SparseVector *v)
+
+
+
+
+// ----------------------------------------------------------------
+std::unique_ptr<SparseMatrix> new_regrid(
+	std::array<int, SparseMatrix::rank> shape,
+	std::function<void(SparseMatrix &)> const &fill_regrid)
 {
-	SparseVector *ret = vector_mem.alloc();
-	for (auto ii=v->begin(); ii != v->end(); ++ii)
-		ret->add(*ii, ii.val());
-	return ret;
+	std::unique_ptr<SparseMatrix> M(new SparseMatrix);
+	M->set_shape(shape);
+	fill_regrid(*M);
+
+	/* Since all raw matrices going into this have a destination G
+	(exchange grid), they must all be sorted row-major.  The
+	transpose matrices all go FROM G, so they must be sorted
+	column-major.  But sorting the transpose of a matrix
+	column-major is the same as sorting the original matrix row
+	major.  So... all matrices must be sorted the same way
+	(row-major) */
+	M->consolidate({0,1});
+
+	return M;
 }
 
-/** Adds a regrid matrix and its variants.
-@param G The destination vector space of the matrix.  This must always be "G".
-@param Z The source vectors space of the matrix.
-@param m_GvZ Memory where to store the underlying matrix. */
-void RegridMatrices::add_regrid(
-	std::string const &G,
-	std::string const &Z,
-	SparseMatrix *mGvZ)
+std::unique_ptr<SparseVector> new_diag(
+	std::array<int, SparseVector::rank> shape,
+	std::function<void(SparseVector &)> const &fill_diag)
 {
-	// Make sure destination space is G
-	if (G != "G") (*icebin_error)(-1,
-		"Destination vector space for add_GvZ must be \"G\" (exchnage grid)!");
+	std::unique_ptr<SparseVector> M(new SparseVector);
+	M->set_shape(shape);
+	fill_diag(*M);
+	M->consolidate({0});
+	return M;
+}
+
+
+std::unique_ptr<SparseMatrix> new_regrid_with_elevI(
+	IceRegridder *sheet,
+	std::array<int, SparseMatrix::rank> shape,
+	std::function<void(SparseMatrix &, std::unordered_map<long,double> const &elevIh)> const &fill_regrid)
+{
+	std::unordered_map<long,double> elevIh(sheet->elevI_hash());
+
+	std::unique_ptr<SparseMatrix> M(new SparseMatrix);
+	M->set_shape(shape);
+	fill_regrid(*M, elevIh);
 
 	/* Since all raw matrices going into this have a destination G
 	(exchange grid), they must all be sorted row-major.  The
@@ -291,111 +305,207 @@ void RegridMatrices::add_regrid(
 	(row-major) */
 	mGvZ->consolidate({0,1});
 
-	// Create the weight matrices
-	SparseVector *weightG = vector_mem.alloc();
-	SparseVector *weightZ = vector_mem.alloc();
-	for (auto ii=mGvZ->begin(); ii != mGvZ->end(); ++ii) {
-		weightG->add({ii.index(0)}, ii.val());
-		weightZ->add({ii.index(1)}, ii.val());
+	return M;
+}
+
+
+
+SparseMatrix *get_regrid(
+	RegridMatrices *rm,
+	std::string const &urname)
+{ return &*(rm->regrids.at(urname).M); }
+
+SparseVector *get_diag(
+	RegridMatrices *rm,
+	std::string const &urname)
+{ return &*(rm->diags.at(urname)); }
+
+
+std::unique_ptr<SparseVector> new_weight(
+	RegridMatrices *rm,
+	std::string const &urname,
+	int dim)	// Dimension to sum over
+{
+	SparseMatrix *M = get_regrid(rm, urname);
+
+	std::unique_ptr<SparseVector> weight(new SparseVector);
+	weight.set_shape({M->shape[dim]});
+
+	for (auto ii=M->begin(); ii != M->end(); ++ii) {
+		weight->add({ii.index(dim)}, ii.val());
 	}
-	weightG->consolidate({0});
-	weightZ->consolidate({0});
+	weight->consolidate({0});
+}
+
+std::unique_ptr<SparseVector> new_invert(
+	RegridMatrices *rm,
+	std::string const &urname)
+{
+	SparseVector *V = get_diag(rm, urname);
+
+	std::unique_ptr<SparseVector> scale(new SparseVector);
+	scale.set_shape({V->shape[0]});
+
+	for (auto ii=M->begin(); ii != M->end(); ++ii) {
+		scale->add({ii.index(dim)}, 1./ii.val());
+	}
+	return scale;
+}
+
+void RegridMatrices::add_regrid(
+	std::string const &G,
+	std::string const &Z,
+	std::function<std::unique_ptr<SparseMatrix>()> const &new_GvZ)
+{
+	// Make sure destination space is G
+	if (G != "G") (*icebin_error)(-1,
+		"Destination vector space for add_GvZ must be \"G\" (exchnage grid)!");
 
 	std::string GvZ = G+"v"+Z;
 	std::string ZvG = Z+"v"+G;
+	regrids[GvZ] = make_transpose(LazyPtr<SparseMatrix>(new_GvZ), false);
+	regrids[ZvG] = make_transpose(
+		LazyPtr<SparseMatrix>(std::bind(&get_regrid, this, GvZ)), true);
 
-	regrids.insert(std::make_pair(GvZ, Transpose<SparseMatrix>(mGvZ, false)));
-	regrids.insert(std::make_pair(ZvG, Transpose<SparseMatrix>(mGvZ, true)));			// true --> transpose
-	diags["w"+GvZ] = weightG;
-	diags["s"+GvZ] = invert(weightG);	// true --> divide by this
-	diags["w"+ZvG] = weightZ;
-	diags["s"+ZvG] = invert(weightZ);
+	diags["w"+GvZ] = LazyPtr<SparseVector>(std::bind(&new_weight, this, GvZ, 0));
+	diags["w"+ZvG] = LazyPtr<SparseVector>(std::bind(&new_weight, this, GvZ, 1));
+	diags["s"+GvZ] = LazyPtr<SparseVector>(std::bind(&new_invert, this, "w"+GvZ));
+	diags["s"+ZvG] = LazyPtr<SparseVector>(std::bind(&new_invert, this, "w"+ZvG));
 }
-
-void RegridMatrices::add_weight(
+// ----------------------------------------------------------------
+void RegridMatrices::add_scale(
 	std::string const &B,
 	std::string const &A,
-	std::function<void(SparseVector &)> const &scale_fn)
+	std::function<std::unique_ptr<SparseVector>()> const &scale_fn)
 {
-	SparseVector *scale = vector_mem.alloc();
-	scale_fn(*scale);
-	scale->consolidate({0});
-
 	std::string BvA = B+"v"+A;
 	std::string AvB = A+"v"+B;
-	diags["s"+BvA] = scale;
-	diags["s"+AvB] = invert(scale);
-	diags["w"+BvA] = invert(scale);
-	diags["w"+AvB] = scale;
+	diags["s"+BvA] = LazyPtr<SparseVector>(scale_fn);
+	diags["w"+BvA] = LazyPtr<SparseVector>(std::bind(&new_invert, "s"+BvA));
 
+	diags["w"+AvB] = LazyPtr<SparseVector>(std::bind(&get_diag, "s"+BvA));
+	diags["s"+AvB] = LazyPtr<SparseVector>(std::bind(&get_diag, "w"+BvA));
+}
+// ----------------------------------------------------------------
+std::unique_ptr<SparseMatrix> compose_regrid(
+	RegridMatrices *rm,
+	std::array<std::string, 5> const &spec)
+{
+	Transpose<LazyPtr<SparseMatrix>> const &A = rm->regrids.at(spec[1]);
+	Transpose<LazyPtr<SparseMatrix>> const &B = rm->regrids.at(spec[3]);
+
+	SparseVector *scalei = spec[0] == "" ? NULL : &*rm->diags.at(spec[0]);
+	SparseVector *scalej = spec[2] == "" ? NULL : &*rm->diags.at(spec[2]);
+	SparseVector *scalek = spec[4] == "" ? NULL : &*rm->diags.at(spec[4]);
+
+	std::unique_ptr<SparseMatrix> M(new SparseMatrix);
+	M->set_shape({A.M->shape[0], B.M->shape[1]});
+	multiply(*M, 1.0,
+		scalei,
+		*A.M, A.transpose,
+		scalej,
+		*B.M, B.transpose,
+		scakek);
+	return M;
 }
 
+Transpose<LazyPtr<SparseMatrix>> RegridMatrix::add_compose(
+	std::string const &spec_basename,
+	std::vector<std::array<std::string, 2>> const &scale_variants,
+	std::array<std::string, 5> spec)
+{
+	for (auto &variant : variants) {
+		std::string spec_name = spec_basename + "(" + variant[0] + ")";
+		spec[0] = variant[1];
 
+		regrids[spec_name] = make_transpose(
+			LazyPtr<SparseMatrix>(std::bind(&compose_regrid, this, spec)),
+			false);
+	}
+}
+
+RegridMatrices::add_weight(
+	std::string const &wName,
+	std::array<int, 1> shape,
+	std::function<void(SparseVector &)> const &fill_diag)
+{
+	std::string sName = wName;
+	sName[0] = "s";
+
+	diags[wName] = LazyPtr<SparseVector>(std::bind(&new_diag, shape, fill_diag));
+	diags[sName] = LazyPtr<SparseVector>(std::bind(&new_invert, this, wName));
+}
+
+// ----------------------------------------------------------------
 RegridMatrices::RegridMatrices(IceRegridder *_sheet)
 {
 	sheet = _sheet;
 
 	std::unordered_map<long,double> elevIh(sheet->elevI_hash());
 
-	// Set up original matrices
-	{SparseMatrix *M = matrix_mem.alloc();
-		sheet->GvEp_noweight(*M, elevIh);
-		add_regrid("G", "Ep", M);
-	}
+	// ----- Set up Ur matrices
+	add_regrid("G", "Ep", 
+		std::bind(&new_regrid_with_elevI, sheet, {sheet->nG(), sheet->gcm->nE()},
+			std::bind(&IceRegridder::GvEp_noweight, sheet, _1, _2)));
+		
+	add_regrid("G", "I", 
+		std::bind(&new_regrid_with_elevI, sheet, {sheet->nG(), sheet->nI()},
+			std::bind(&IceRegridder::GvI_noweight, sheet, _1, _2)));
 
-	{SparseMatrix *M = matrix_mem.alloc();
-		sheet->GvI_noweight(*M, elevIh);
-		add_regrid("G", "I", M);
-	}
+	add_regrid("G", "Ap",
+		std::bind(&new_regrid, {sheet->nG(), sheet->gcm->nA()},
+			std::bind(&IceRegridder::GvAp_noweight, sheet, _1)));
+
+	// ----- Set up computed scaling matrices
+	add_weight("wAvG", std::bind(&IceRegridder::wAvG, sheet, _1));
+	add_weight("wEvG", std::bind(&IceRegridder::wAvG, sheet, _1));
+	add_weight("wA", std::bind(GCMRegridder::wA, sheet->gcm->wA, _1));
+
+	// ----- Set up computed regrid matrices
+	std::vector<std::array<std::string,2>> A_variants =
+		{{"NONE", ""}, {"PARTIAL_CELL", "sAvG"}, {"FULL_CELL", "sA"}};
+	std::vector<std::array<std::string,2>> E_variants =
+		{{"NONE", ""}, {"PARTIAL_CELL", "sEvG"}};
+	std::vector<std::array<std::string,2>> I_variants =
+		{{"NONE", ""}, {"PARTIAL_CELL", "sIvG"}};
+
+	add_compose("AvI", A_variants, {"", "ApvG", "sGvI",  "GvI",  ""});
+	add_compose("EvI", E_variants, {"", "EpvG", "sGvI",  "GvI",  ""});
+	add_compose("IvA", I_variants, {"", "IvG",  "sGvAp", "GvAp", "sApvA"});
+	add_compose("IvE", I_variants, {"", "IvG",  "sGvEp", "GvEp", "sEpvE"});
+
+	add_compose("AvE", A_variants, {"", "EpvG", "sGvAp", "GvAp", "sApvA"});
+	add_compose("EvA", E_variatns, {"",     "ApvG", "sGvEp", "GvEp", "sEpvE"});
 
 
-	{SparseMatrix *M = matrix_mem.alloc();
-		sheet->GvAp_noweight(*M);
-		add_regrid("G", "Ap", M);
+
+	// ----- Show what we have!
+	printf("Regrids:");
+	for (auto ii = regrids.begin(); ii != regrids.end(); ++ii) {
+		printf(" %s", ii->first.c_str());
 	}
+	printf("\n");
+
+	printf("Diags:");
+	for (auto ii = diags.begin(); ii != diags.end(); ++ii) {
+		printf(" %s", ii->first.c_str());
+	}
+	printf("\n");
+
 }
 
 void RegridMatrices::wAvG(SparseVector &ret) const {
 	SparseVector wAvAp;
+	wAvAp.set_shape({sheet->gcm->nA()});
 	sheet->wAvAp(wAvAp);
 	multiply_ele(ret, wAvAp, *diags.at("wApvG"));
 }
 void RegridMatrices::wEvG(SparseVector &ret) const {
 	SparseVector wEvEp;
+	wEvEp.set_shape({sheet->gcm->nE()});
 	sheet->wEvEp(wEvEp);
 	multiply_ele(ret, wEvEp, *diags.at("wEpvG"));
 }
-
-
-void RegridMatrices::regrid(SparseMatrix &ret, std::string const &spec_name) const
-{
-	std::array<std::string, 5> const &spec(regrid_specs.at(spec_name));
-
-	Transpose<SparseMatrix> const &A = regrids.at(spec[1]);
-	Transpose<SparseMatrix> const &B = regrids.at(spec[3]);
-
-	multiply(ret, 1.0,
-		spec[0] == "" ? NULL : diags.at(spec[0]),
-		*A.M, A.transpose,
-		spec[2] == "" ? NULL : diags.at(spec[2]),
-		*B.M, B.transpose,
-		spec[4] == "" ? NULL : diags.at(spec[4]));
-}
-
-void RegridMatrices::weight(SparseVector &ret, std::string const &spec_name) const
-{
-	if (spec_name[0] == 's') {
-		std::string wspec = spec_name;
-		wspec[0] = 'w';
-		SparseVector w;
-		weight_specs.at(wspec)(this, w);
-		for (auto ii = w.begin(); ii != w.end(); ++ii)
-			ret.add(*ii, ii.val());
-	} else {
-		weight_specs.at(spec_name)(this, ret);
-	}
-}
-
 
 
 

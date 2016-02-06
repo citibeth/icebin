@@ -20,8 +20,8 @@ cdef class RegridMatrices:
 	def __dealloc__(self):
 		del self.cself
 
-	def regrid(self, spec_name):
-		data,shape = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode())
+	def regrid(self, str spec_name, str sweighting='PARTIAL_CELL'):
+		data,shape = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), sweighting.encode())
 		# scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
 		return scipy.sparse.coo_matrix(data, shape)
 
