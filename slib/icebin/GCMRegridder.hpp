@@ -1,10 +1,10 @@
 #pragma once
 
 #include <unordered_set>
-#include <memory>
 #include <blitz/array.h>
 
 #include <ibmisc/netcdf.hpp>
+#include <ibmisc/memory.hpp>
 
 #include <icebin/Grid.hpp>
 #include <icebin/sparse.hpp>
@@ -61,14 +61,14 @@ public:
 		SparseVector &&elevI);
 
 	virtual ~IceRegridder();
-	std::unordered_map<long,double> elevI_hash();
+	std::unordered_map<long,double> elevI_hash() const;
 
 	// ------------------------------------------------
 	/** Number of dimensions of ice vector space */
-	virtual long nI() const = 0;
+	virtual size_t nI() const = 0;
 
 	/** Number of dimensions of interpolation grid vector space. */
-	virtual long nG() const = 0;
+	virtual size_t nG() const = 0;
 
 	// ------------------------------------------------
 
@@ -181,88 +181,42 @@ public:
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };	// class GCMRegridder
 // ===========================================================
+/** Stores a (Matrix, bool) pair, which represents either M or M^T */
 template<class TypeT>
 class Transpose {
 public:
 	TypeT M;
 	bool const transpose;
 
-	Transpose(TypeT const &&_M, bool _transpose) : M(std::move(_M)), transpose(_transpose) {}
+	Transpose() : transpose(false) {}
+	Transpose(TypeT &&_M, bool _transpose) : M(std::move(_M)), transpose(_transpose) {}
+
+	Transpose(Transpose &&rhs) : M(std::move(rhs.M)), transpose(rhs.transpose) {}
 };
-// -----------------------------------------------------------
+
 template<class TypeT>
-class LazyPtr {
-	TypeT *_ptr;						// Borrowed reference
-	std::unique_ptr<TypeT> _uptr;	// Owned reference
-	std::function<std::unique_ptr<TypeT> ()> _compute_owned;
-	std::function<TypeT *()> _compute_borrowed;
-public:
-	LazyPtr() {}
-
-	LazyPtr(std::unique_ptr<TypeT> &&ptr) : _uptr(std::move(ptr)) {}
-
-	LazyPtr(std::function<std::unique_ptr<TypeT> ()> &&compute_owned)
-		: _compute_owned(std::move(compute_owned)) {}
-
-	LazyPtr(std::function<TypeT *()> &&compute_borrowed)
-		: _compute_borrowed(std::move(compute_borrowed)) {}
-
-	LazyPtr(TypeT *ptr) : _ptr(ptr) {}
-
-	TypeT &operator*() const {
-		if (!_ptr) {
-			if (_compute_borrowed) {
-				const_cast<TypeT *>(_ptr) = _compute_borrowed();
-			} else {
-				const_cast<std::unique_ptr<TypeT>>(_uptr) = _compute_owned();
-				const_cast<TypeT *>(_ptr) = &*_uptr;
-			}
-		}
-		return *ptr;
-	}
-	TypeT *operator->() const
-		{ return &operator*(); }
-};
+Transpose<TypeT> make_transpose(TypeT &&_M, bool _transpose)
+	{ return Transpose<TypeT>(std::move(_M), _transpose); }
+// -----------------------------------------------------------
 // -----------------------------------------------------------
 /** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
 class RegridMatrices {
 protected:
 	IceRegridder *sheet;
 
-	std::map<std::string, Transpose<LazyPtr<SparseMatrix>>> regrids;
-	std::map<std::string, LazyPtr<SparseVector>> diags;
+	typedef ibmisc::LazyPtr<SparseMatrix> LPMatrix;
+	typedef ibmisc::LazyPtr<SparseVector> LPVector;
 
+public:
+	std::map<std::string, Transpose<LPMatrix>> regrids;
+	std::map<std::string, LPVector> diags;
+
+protected:
 	SparseVector *invert(SparseVector *v);
-
-	/** Adds a regrid matrix and its variants.
-	@param G The destination vector space of the matrix.  This must always be "G".
-	@param Z The source vectors space of the matrix.
-	@param m_GvZ Memory where to store the underlying matrix. */
-	void add_regrid(
-		std::string const &G,
-		std::string const &Z,
-		SparseMatrix *GvZ);
-
-
-	void add_weight(
-		std::string const &B,
-		std::string const &A,
-		std::function<void(SparseVector &)> const &scale_fn);
-
-
-	/** Definitions of the Ur regridding and scaling matrices that
-	must be multiplied together to obtain the final regridding
-	matrices. */
-	static std::map<std::string, std::array<std::string, 5>> regrid_specs;
 
 	// ----------------------------------------------------------
 	void wAvG(SparseVector &ret) const;
 	void wEvG(SparseVector &ret) const;
-	void wA(SparseVector &ret) const
-		{ sheet->gcm->wA(ret); }
-
-	// using namespace std::placeholders;
-	static std::map<std::string, std::function<void(RegridMatrices const *, SparseVector &)>> weight_specs;
 	// ----------------------------------------------------------
 		
 
@@ -271,7 +225,17 @@ public:
 	RegridMatrices(IceRegridder *sheet);
 
 	/** Retrieves a final regrid matrix. */
-	void regrid(SparseMatrix &ret, std::string const &spec_name, Weighting weighting) const;
+	SparseMatrix const &regrid(std::string const &spec_name) const
+	{
+		auto &TrM(regrids.at(spec_name));
+		if (TrM.transpose) {
+			(*icebin_error)(-1,
+				"regrid(%s) is transposed; currently, you can only retrieve non-transposed matrices.",
+				spec_name.c_str());
+		}
+		return *TrM.M;
+	}
+
 
 	/** Retrieves a weight or scale vector.  Options are:
 		w/sAvG		Partial cell weighting for A
@@ -279,7 +243,8 @@ public:
 		w/sA		Whole cell weighting for A
 		w/sG		Whole cell weighting for E
 	*/
-	void weight(SparseVector &ret, std::string const &spec_name) const;
+	SparseVector const &scale(std::string const &spec_name) const
+		{ return *diags.at(spec_name); }
 
 };
 

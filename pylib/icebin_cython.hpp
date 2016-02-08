@@ -20,18 +20,15 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
 	std::string const &sinterp_style,
 	PyObject *elevI_py, PyObject *maskI_py);
 
-inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, std::string const &sweighting)
+inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name)
 {
-	auto weighting(ibmisc::parse_enum<Weighting>(sweighting));
-	SparseMatrix M;
-	cself->regrid(M, spec_name, weighting);
+	SparseMatrix M(cself->regrid(spec_name));
 	return ibmisc::cython::spsparse_to_tuple(M);
 }
 
-inline PyObject *RegridMatrices_weight(RegridMatrices *cself, std::string const &spec_name, double fill_value)
+inline PyObject *RegridMatrices_scale(RegridMatrices *cself, std::string const &spec_name, double fill_value)
 {
-	SparseVector w;
-	cself->weight(w, spec_name);
+	SparseVector w(cself->scale(spec_name));
 	// TODO: Copy only once instead of twice.  Don't bother for now...
 	return ibmisc::cython::blitz_to_np(w.to_dense(fill_value));
 }

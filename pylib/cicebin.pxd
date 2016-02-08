@@ -66,6 +66,6 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 		string &sinterp_style,
 		PyObject *elevI_py, PyObject *maskI_py) except +		# PyObject=Borrowed reference, object = owned reference
 
-	cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name, string sweighting) except +
+	cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name) except +
 
-	cdef object RegridMatrices_weight(RegridMatrices *self, string spec_name, double fill_value) except +
+	cdef object RegridMatrices_scale(RegridMatrices *self, string spec_name, double fill_value) except +
