@@ -17,7 +17,8 @@ void GCMRegridder_init(GCMRegridder *cself,
 {
 	// Read gridA
 	NcIO ncio(gridA_fname, netCDF::NcFile::read);
-	std::unique_ptr<Grid> gridA = read_grid(ncio, gridA_vname);
+	std::unique_ptr<Grid> gridA = new_grid(ncio, gridA_vname);
+	gridA->ncio(ncio, gridA_vname);
 	ncio.close();
 
 	// Construct a domain to be the full extent of indexing.
@@ -38,7 +39,6 @@ void GCMRegridder_init(GCMRegridder *cself,
 			{0,0}, {gridA->ndata(), nhp}, {1,0}),
 		_correctA);
 
-	cself->hpdefs = hpdefs;
 }
 
 
@@ -89,11 +89,13 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
 	PyObject *elevI_py, PyObject *maskI_py)
 {
 	NcIO ncio_I(gridI_fname, netCDF::NcFile::read);
-	std::unique_ptr<Grid> gridI(read_grid(ncio_I, "grid"));
+	std::unique_ptr<Grid> gridI(new_grid(ncio_I, "grid"));
+	gridI->ncio(ncio_I, "grid");
 	ncio_I.close();
 
 	NcIO ncio_exgrid(exgrid_fname, netCDF::NcFile::read);
-	std::unique_ptr<Grid> exgrid(read_grid(ncio_exgrid, exgrid_vname));
+	std::unique_ptr<Grid> exgrid(new_grid(ncio_exgrid, exgrid_vname));
+	exgrid->ncio(ncio_exgrid, exgrid_vname);
 	ncio_exgrid.close();
 
 	auto interp_style(parse_enum<InterpStyle>(sinterp_style));
@@ -102,7 +104,7 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
 
 	SparseVector elevI_sp({elevI.extent(0)});
 	for (int i=0; i<elevI.extent(0); ++i)
-		if (maskI(i)) elevI_sp.add({i}, elevI(i));
+		if (!maskI(i)) elevI_sp.add({i}, elevI(i));
 
 	auto sheet(new_ice_regridder(gridI->parameterization));
 	sheet->init(name, std::move(gridI), std::move(exgrid),
@@ -110,6 +112,41 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
 	cself->add_sheet(std::move(sheet));
 }
 
+/** Computes yy = M xx.  yy is allocated, not necessarily set. */
+void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
+	size_t M_nrow, size_t M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py)
+{
+	auto xx(np_to_blitz<double,1>(xx_py, "xx", {M_ncol}));
+	auto yy(np_to_blitz<double,1>(yy_py, "yy", {M_nrow}));
+	auto M_row(np_to_blitz<int,1>(M_row_py, "M_row_py", {-1}));
+	auto M_col(np_to_blitz<int,1>(M_col_py, "M_col_py", {-1}));
+	auto M_data(np_to_blitz<double,1>(M_data_py, "M_data_py", {-1}));
+
+	// Keep track of which items we've written to.
+	std::vector<bool> written(M_nrow, false);
+
+	// Do the multiplication, and we're done!
+	int nnz = M_data.size();
+	for (int n=0; n<nnz; ++n) {
+		size_t row = M_row(n);
+		size_t col = M_col(n);
+		double data = M_data(n);
+
+		// Ignore NaN in input vector
+		if (ignore_nan && std::isnan(xx(col))) continue;
+
+		// Just do Snowdrift-style "REPLACE".  "MERGE" was never used.
+		double old_yy;
+		if (written[row]) {
+			old_yy = yy(row);
+		} else {
+			old_yy = 0;
+			written[row] = true;
+		}
+		yy(row) = old_yy + data * xx(col);
+	}
+
+}
 
 
 }}

@@ -33,6 +33,9 @@ inline PyObject *RegridMatrices_scale(RegridMatrices *cself, std::string const &
 	return ibmisc::cython::blitz_to_np(w.to_dense(fill_value));
 }
 
+void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
+	size_t M_nrow, size_t M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py);
+
 
 }}
 
