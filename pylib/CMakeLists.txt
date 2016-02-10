@@ -36,7 +36,7 @@ foreach (DIR ${CYTHON_INCLUDE_DIRECTORIES})
 	list(APPEND CYTHON_INCLUDE_FLAGS -I${DIR})
 endforeach()
 
-foreach (CYTHON_MODULE icebin)
+foreach (CYTHON_MODULE _icebin)
 
 	add_custom_command(OUTPUT ${CYTHON_MODULE}.cpp
 		MAIN_DEPENDENCY ${PROJECT_SOURCE_DIR}/pylib/${CYTHON_MODULE}.pyx
