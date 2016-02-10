@@ -36,7 +36,7 @@ std::unordered_map<long,double> IceRegridder::elevI_hash() const
 // -------------------------------------------------------------
 /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 NOTE: wAvAp == sApvA */
-void IceRegridder::wAvAp(SparseVector &w)
+void IceRegridder::sApvA(SparseVector &w)
 {
 	ibmisc::Proj_LL2XY proj(gridI->sproj);
 	for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
@@ -46,7 +46,7 @@ void IceRegridder::wAvAp(SparseVector &w)
 
 /** Produces the diagonal matrix [Elevation projected] <-- [Elevation]
 NOTE: wAvAp == sApvA */
-void IceRegridder::wEvEp(SparseVector &w)
+void IceRegridder::sEpvE(SparseVector &w)
 {
 	ibmisc::Proj_LL2XY proj(gridI->sproj);
 	for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
@@ -69,7 +69,11 @@ void IceRegridder::clear()
 // -------------------------------------------------------------
 void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 {
-	if (ncio.rw == 'r') clear();
+	if (ncio.rw == 'r') {
+		clear();
+		gridI = new_grid(ncio, vname + ".gridI");
+		exgrid = new_grid(ncio, vname + ".exgrid");
+	}
 
 	auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
 	get_or_put_att(info_v, ncio.rw, "name", name);
@@ -109,6 +113,17 @@ std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
 		break;
 	}
 }
+
+std::unique_ptr<IceRegridder> new_ice_regridder(NcIO &ncio, std::string vname)
+{
+	std::string vn(vname + ".gridI.info");
+	auto gridI_info_v = get_or_add_var(ncio, vn, netCDF::ncInt64, {});
+
+	Grid::Parameterization parameterization;
+	get_or_put_att_enum(gridI_info_v, ncio.rw, "parameterization", parameterization);
+	return new_ice_regridder(parameterization);
+}
+
 // -------------------------------------------------------------
 // ==============================================================
 
@@ -121,10 +136,14 @@ void GCMRegridder::clear()
 
 void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 {
-	if (ncio.rw == 'r') clear();
 	auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
-	// get_or_put_att_enum(info_v, ncio.rw, "type", type);
 
+	if (ncio.rw == 'r') {
+		clear();
+		gridA = new_grid(ncio, vname + ".gridA");	// Instantiates but does not read/write
+	}
+
+	// Read/Write gridA and other global stuff
 	gridA->ncio(ncio, vname + ".gridA");
 	indexingHP.ncio(ncio, ncInt, vname + ".indexingHP");
 	ncio_vector(ncio, hpdefs, true, vname + ".hpdefs", ncDouble,
@@ -132,27 +151,25 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 	domainA.ncio(ncio, ncInt, vname + ".domainA");
 	get_or_put_att(info_v, ncio.rw, vname + ".correctA", &correctA, 1);
 
+	// Read/write list of sheet names
+	std::vector<std::string> sheet_names;
+	if (ncio.rw == 'w') {
+		// Copy sheet names to a std::vector
+		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
+			sheet_names.push_back(ii->first);
+	}
+	get_or_put_att(info_v, ncio.rw, vname + ".sheets", sheet_names);
 
-	// Read/Write the Main Sheets
-	if (ncio.rw == 'r') {
-		std::vector<std::string> sheet_names;
-		get_or_put_att(info_v, ncio.rw, vname + ".sheets", ncString, sheet_names);
-
-		for (auto sheet_name : sheet_names) {
-			std::string sheet_vname = vname + "." + sheet_name;
-			IceRegridder::Type sheet_type;
-			auto sheet_info_v = get_or_add_var(ncio, sheet_vname + ".info", netCDF::ncInt64, {});
-
-			get_or_put_att_enum(sheet_info_v, ncio.rw, "type", sheet_type);
-			std::unique_ptr<IceRegridder> sheet(new_ice_regridder(sheet_type));
-			sheet->ncio(ncio, vname + "." + sheet_name);
-			add_sheet(std::move(sheet));
+	// Read/write the regridder for each ice sheet
+	if (ncio.rw == 'r') {	// Instantiate
+		for (auto sheet_name = sheet_names.begin(); sheet_name != sheet_names.end(); ++sheet_name) {
+			std::string vn(vname + "." + *sheet_name);
+			add_sheet(*sheet_name, new_ice_regridder(ncio, vn));
 		}
-	} else {	// Write
-		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii) {
-			IceRegridder *sheet = &*(ii->second);
-			sheet->ncio(ncio, vname + "." + sheet->name);
-		}
+	}
+	for (auto ii=sheets.begin(); ii != sheets.end(); ++ii) {
+		IceRegridder *sheet = &*(ii->second);
+		sheet->ncio(ncio, vname + "." + sheet->name);
 	}
 }
 // -------------------------------------------------------------
@@ -211,13 +228,13 @@ void IceRegridder::init(
 	std::unique_ptr<Grid> &&_gridI,
 	std::unique_ptr<Grid> &&_exgrid,
 	InterpStyle _interp_style,
-	SparseVector &&elevI)
+	SparseVector &&_elevI)
 {
 	name = (_name != "" ? _name : gridI->name);
 	gridI = std::move(_gridI);
 	exgrid = std::move(_exgrid);
 	interp_style = _interp_style;
-	elevI = std::move(elevI);
+	elevI = std::move(_elevI);
 }
 // ==============================================================
 /** Gives weights for linear interpolation with a bunch of points.
@@ -230,6 +247,7 @@ extern void linterp_1d(
 	int *indices, double *weights)  // Size-2 arrays
 {
 	int n = xpoints.size();
+
 
 	// This is the point ABOVE our value.
 	// (i0 = i1 - 1, xpoints[i0] < xx <= xpoints[i1])
@@ -336,7 +354,7 @@ static std::unique_ptr<SparseVector> new_weight(
 	int dim)	// Dimension to sum over
 {
 	Transpose<LazyPtr<SparseMatrix>> const &TrM(rm->regrids.at(matrix_urname));
-	if (TrM.transpose) dim = 1-dim;		// Reverse dimensions
+	if (TrM.transpose == 'T') dim = 1-dim;		// Reverse dimensions
 	SparseMatrix *M = &*TrM.M;
 
 	std::unique_ptr<SparseVector> weight(new SparseVector);
@@ -386,9 +404,9 @@ void add_regrid(
 	std::string GvZ = G+"v"+Z;
 	std::string ZvG = Z+"v"+G;
 	rm->regrids.insert(make_pair(
-		GvZ, make_transpose(LazyPtr<SparseMatrix>(std::move(new_GvZ)), false)));
+		GvZ, make_transpose(LazyPtr<SparseMatrix>(std::move(new_GvZ)), '.')));
 	rm->regrids.insert(make_pair(
-		ZvG, make_transpose(LazyPtr<SparseMatrix>(std::bind(&get_regrid, rm, GvZ)), true)));
+		ZvG, make_transpose(LazyPtr<SparseMatrix>(std::bind(&get_regrid, rm, GvZ)), 'T')));
 
 	rm->diags.insert(make_pair("w"+GvZ,
 		 LazyPtr<SparseVector>(std::bind(&new_weight, rm, GvZ, 0))));
@@ -400,32 +418,34 @@ void add_regrid(
 		LazyPtr<SparseVector>(std::bind(&new_invert, rm, "w"+ZvG))));
 }
 // ----------------------------------------------------------------
-#if 0
-void RegridMatrices::add_scale(
-	std::string const &B,
-	std::string const &A,
-	std::function<std::unique_ptr<SparseVector>()> const &scale_fn)
-{
-	std::string BvA = B+"v"+A;
-	std::string AvB = A+"v"+B;
-	diags["s"+BvA] = LazyPtr<SparseVector>(scale_fn);
-	diags["w"+BvA] = LazyPtr<SparseVector>(std::bind(&new_invert, "s"+BvA));
-
-	diags["w"+AvB] = LazyPtr<SparseVector>(std::bind(&get_diag, "s"+BvA));
-	diags["s"+AvB] = LazyPtr<SparseVector>(std::bind(&get_diag, "w"+BvA));
-}
-#endif
-// ----------------------------------------------------------------
 std::unique_ptr<SparseMatrix> compose_regrid(
+	std::string const &spec_name,
 	RegridMatrices *rm,
 	std::array<std::string, 5> const &spec)
 {
-	Transpose<LazyPtr<SparseMatrix>> const &A = rm->regrids.at(spec[1]);
-	Transpose<LazyPtr<SparseMatrix>> const &B = rm->regrids.at(spec[3]);
+	for (int i=0; i<5; ++i) printf(" %s", spec[i].c_str());
+	printf("\n");
 
+	// -------- Compute scalei
 	SparseVector *scalei = spec[0] == "" ? NULL : &*rm->diags.at(spec[0]);
+	if (scalei) printf("    ** %s: [%d] nnz=%d\n", spec[0].c_str(), scalei->shape[0], scalei->size());
+
+	// -------- Compute A
+	Transpose<LazyPtr<SparseMatrix>> const &A = rm->regrids.at(spec[1]);
+	printf("    ** %s: [%d, %d]%c nnz=%d\n", spec[1].c_str(), A.M->shape[0], A.M->shape[1], A.transpose, A.M->size());
+
+	// -------- Compute scalej
 	SparseVector *scalej = spec[2] == "" ? NULL : &*rm->diags.at(spec[2]);
+	if (scalej) printf("    ** %s: [%d] nnz=%d\n", spec[2].c_str(), scalej->shape[0], scalej->size());
+
+	// -------- Compute B
+	Transpose<LazyPtr<SparseMatrix>> const &B = rm->regrids.at(spec[3]);
+	printf("    ** %s: [%d, %d]%c nnz=%d\n", spec[3].c_str(), B.M->shape[0], B.M->shape[1], B.transpose, B.M->size());
+
+	// -------- Compute scakek
 	SparseVector *scalek = spec[4] == "" ? NULL : &*rm->diags.at(spec[4]);
+	if (scalek) printf("    ** %s: [%d] nnz=%d\n", spec[4].c_str(), scalek->shape[0], scalek->size());
+
 
 	std::unique_ptr<SparseMatrix> M(new SparseMatrix);
 	M->set_shape({A.M->shape[0], B.M->shape[1]});
@@ -435,6 +455,9 @@ std::unique_ptr<SparseMatrix> compose_regrid(
 		scalej,
 		*B.M, B.transpose,
 		scalek);
+
+	printf("    ** => %s: [%d, %d] nnz=%d\n", spec_name.c_str(), M->shape[0], M->shape[1], M->size());
+
 	return M;
 }
 
@@ -451,8 +474,8 @@ void add_compose(
 		rm->regrids.insert(make_pair(
 			spec_name,
 			make_transpose(
-				LazyPtr<SparseMatrix>(std::bind(&compose_regrid, rm, spec)),
-				false)));
+				LazyPtr<SparseMatrix>(std::bind(&compose_regrid, spec_name, rm, spec)),
+				'.')));
 	}
 }
 
@@ -460,16 +483,72 @@ void add_weight(
 	RegridMatrices *rm,
 	std::string const &wName,
 	std::array<size_t, 1> shape,
-	std::function<void(SparseVector &)> const &fill_diag)
+	std::function<std::unique_ptr<SparseVector>()> const &weight_fn)
 {
 	std::string sName = wName;
 	sName[0] = 's';
 
 	rm->diags.insert(make_pair(wName,
-		LazyPtr<SparseVector>(std::bind(&new_diag, shape, fill_diag))));
+		LazyPtr<SparseVector>(std::move(weight_fn))));
 	rm->diags.insert(make_pair(sName,
 		LazyPtr<SparseVector>(std::bind(&new_invert, rm, wName))));
 }
+
+inline void add_weight_fill(
+	RegridMatrices *rm,
+	std::string const &wName,
+	std::array<size_t, 1> shape,
+	std::function<void(SparseVector &)> const &fill_diag)
+{
+	add_weight(rm, wName, shape,
+		std::bind(&new_diag, shape, std::move(fill_diag)));
+}
+
+
+
+
+/** Adds a projection scaling (diagonal) transformation. */
+void add_scale(
+	RegridMatrices *rm,
+	std::string const &B,
+	std::string const &A,
+	std::array<size_t, 1> shape,
+	std::function<void(SparseVector &)> const &sBvA_fill)
+{
+	std::string BvA = B+"v"+A;
+	std::string AvB = A+"v"+B;
+
+	rm->diags.insert(make_pair("s"+BvA,
+		LazyPtr<SparseVector>(std::bind(&new_diag, shape, sBvA_fill))));
+
+	rm->diags.insert(make_pair("w"+BvA,
+		LazyPtr<SparseVector>(std::bind(&new_invert, rm, "s"+BvA))));
+
+	rm->diags.insert(make_pair("w"+AvB,
+		LazyPtr<SparseVector>(std::bind(&get_diag, rm, "s"+BvA))));
+
+	rm->diags.insert(make_pair("s"+AvB,
+		LazyPtr<SparseVector>(std::bind(&get_diag, rm, "w"+BvA))));
+}
+// ----------------------------------------------------------------
+std::unique_ptr<SparseVector> compose_diags(
+	RegridMatrices const *rm,
+	std::string const &spec_name,
+	std::array<std::string, 2> const &spec)
+{
+	SparseVector &A = *rm->diags.at(spec[0]);
+	SparseVector &B = *rm->diags.at(spec[1]);
+
+	if (A.shape[0] != B.shape[0]) (*ibmisc_error)(-1,
+		"compose_diags %s: Shape of %s[%d] and %s[%d] must match!",
+		spec_name.c_str(), spec[0].c_str(), A.shape[0], spec[1].c_str(), B.shape[0]);
+
+	std::unique_ptr<SparseVector> ret(new SparseVector);
+	ret->set_shape(A.shape);
+	multiply_ele(*ret, A, B);
+	return ret;
+}
+
 
 // ----------------------------------------------------------------
 RegridMatrices::RegridMatrices(IceRegridder *_sheet)
@@ -478,29 +557,16 @@ RegridMatrices::RegridMatrices(IceRegridder *_sheet)
 
 	std::unordered_map<long,double> elevIh(sheet->elevI_hash());
 
-#if 0
-	// ----- Set up Ur matrices
-auto xx(std::bind(&IceRegridder::GvEp_noweight, sheet, _1, _2));
-std::function<void(
-		SparseMatrix &M,
-		std::unordered_map<long,double> const &elevIh)
-		> x1 = xx;
-
-//std::array<size_t, 2> shape = {sheet->nG(), sheet->gcm->nE()};
-//auto yy(std::bind(&new_regrid_with_elevI, sheet, shape, std::move(x1)));
-
-	shape = {sheet->nG(), sheet->gcm->nE()};
-
-std::function<std::unique_ptr<SparseMatrix>()> fn = 
-	std::bind(&new_regrid_with_elevI, sheet, shape,
-	std::bind(&IceRegridder::GvEp_noweight, sheet, _1, _2));
-#endif
-
+	printf("===== RegridMatrices Grid geometries:\n");
+	printf("    nA = %d\n", sheet->gcm->nA());
+	printf("    nhp = %d\n", sheet->gcm->nhp());
+	printf("    nE = %d\n", sheet->gcm->nE());
+	printf("    nI = %d (%d used)\n", sheet->nI(), sheet->elevI_hash().size());
+	printf("    nG = %d\n", sheet->nG());
 
 	std::array<size_t, 2> shape;
 	ElevIFillFn elevi_fill_fn;
 	FillFn fill_fn;
-	function<std::unique_ptr<SparseMatrix>()> mat_fn;
 
 	shape = {sheet->nG(), sheet->gcm->nE()};
 	elevi_fill_fn = std::bind(&IceRegridder::GvEp_noweight, sheet, _1, _2);
@@ -517,13 +583,21 @@ std::function<std::unique_ptr<SparseMatrix>()> fn =
 	add_regrid(this, "G", "Ap",
 		std::bind(&new_regrid, shape, fill_fn));
 
-	// ----- Set up computed scaling matrices
-	auto xyz(std::bind(&RegridMatrices::wAvG, this, _1));
-	add_weight(this, "wAvG", {sheet->gcm->nA()}, std::bind(&RegridMatrices::wAvG, this, _1));
-	add_weight(this, "wEvG", {sheet->gcm->nE()}, std::bind(&RegridMatrices::wAvG, this, _1));
-	add_weight(this, "wA", {sheet->gcm->nA()}, std::bind(&GCMRegridder::wA, sheet->gcm, _1));
+	// ----- Set up Ur scaling matrices
+	add_weight_fill(this, "wA", {sheet->gcm->nA()}, std::bind(&GCMRegridder::wA, sheet->gcm, _1));
+	add_scale(this, "Ap", "A", {sheet->gcm->nA()}, std::bind(&IceRegridder::sApvA, sheet, _1));
+	add_scale(this, "Ep", "E", {sheet->gcm->nE()}, std::bind(&IceRegridder::sEpvE, sheet, _1));
 
-	// ----- Set up computed regrid matrices
+	// ----- Set up composed scaling matrices
+	function<std::unique_ptr<SparseVector>()> vec_fn;
+	vec_fn = std::bind(&compose_diags, this, "wAvG", array<string,2>({"wAvAp", "wApvG"}));
+	add_weight(this, "wAvG", {sheet->gcm->nA()}, vec_fn);
+
+	vec_fn = std::bind(&compose_diags, this, "wEvG", array<string,2>({"wEvEp", "wEpvG"}));
+	add_weight(this, "wEvG", {sheet->gcm->nE()}, vec_fn);
+		
+
+	// ----- Set up composed regrid matrices
 	std::vector<std::array<std::string,2>> A_variants =
 		{{"NONE", ""}, {"PARTIAL_CELL", "sAvG"}, {"FULL_CELL", "sA"}};
 	std::vector<std::array<std::string,2>> E_variants =
@@ -536,41 +610,22 @@ std::function<std::unique_ptr<SparseMatrix>()> fn =
 	add_compose(this, "IvA", I_variants, {"", "IvG",  "sGvAp", "GvAp", "sApvA"});
 	add_compose(this, "IvE", I_variants, {"", "IvG",  "sGvEp", "GvEp", "sEpvE"});
 
-	add_compose(this, "AvE", A_variants, {"", "EpvG", "sGvAp", "GvAp", "sApvA"});
-	add_compose(this, "EvA", E_variants, {"",     "ApvG", "sGvEp", "GvEp", "sEpvE"});
-
-
+	add_compose(this, "AvE", A_variants, {"", "ApvG", "sGvEp", "GvEp", "sEpvE"});
+	add_compose(this, "EvA", E_variants, {"", "EpvG", "sGvAp", "GvAp", "sApvA"});
 
 	// ----- Show what we have!
-	printf("Regrids:");
+	printf("Available Regrids:");
 	for (auto ii = regrids.begin(); ii != regrids.end(); ++ii) {
 		printf(" %s", ii->first.c_str());
 	}
 	printf("\n");
 
-	printf("Diags:");
+	printf("Available Diags:");
 	for (auto ii = diags.begin(); ii != diags.end(); ++ii) {
 		printf(" %s", ii->first.c_str());
 	}
 	printf("\n");
 
 }
-
-
-
-void RegridMatrices::wAvG(SparseVector &ret) const {
-	SparseVector wAvAp;
-	wAvAp.set_shape({sheet->gcm->nA()});
-	sheet->wAvAp(wAvAp);
-	multiply_ele(ret, wAvAp, *diags.at("wApvG"));
-}
-void RegridMatrices::wEvG(SparseVector &ret) const {
-	SparseVector wEvEp;
-	wEvEp.set_shape({sheet->gcm->nE()});
-	sheet->wEvEp(wEvEp);
-	multiply_ele(ret, wEvEp, *diags.at("wEpvG"));
-}
-
-
 
 }	// namespace icebin

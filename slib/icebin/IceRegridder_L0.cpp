@@ -49,6 +49,9 @@ void IceRegridder_L0::GvEp_noweight(
 {
 	IceExch dest = interp_grid;
 
+	if (gcm->hpdefs.size() == 0) (*icebin_error)(-1,
+		"IceRegridder_L0::GvEp_noweight(): hpdefs is zero-length!");
+
 	// ---------------------------------------
 	// Handle Z_INTERP or ELEV_CLASS_INTERP
 
@@ -105,21 +108,20 @@ void IceRegridder_L0::GvI_noweight(
 			long const iI = cell->j;		// index in ice grid
 			long const iX = cell->index; 	// index in exchange grid
 
-			if (elevIh.find(iI) != elevIh.end())
+			if (elevIh.find(iI) != elevIh.end()) {
 				ret.add({iX,iI}, cell->native_area);
+			}
 		}
 	}
 }
 // --------------------------------------------------------
 void IceRegridder_L0::GvAp_noweight(SparseMatrix &ret)
 {
-printf("BB1\n");
 	for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
 		int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
 		int iA = cell->i;
-		ret.add({iG,iA}, cell->native_area);
+		if (cell->native_area > 0) ret.add({iG,iA}, cell->native_area);
 	}
-printf("BB2\n");
 }
 // --------------------------------------------------------
 void IceRegridder_L0::ncio(NcIO &ncio, std::string const &vname)

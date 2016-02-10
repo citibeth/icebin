@@ -323,7 +323,7 @@ public:
 
 extern void sort_renumber_vertices(Grid &grid);
 extern std::unique_ptr<Grid> new_grid(Grid::Type type);
-extern std::unique_ptr<Grid> read_grid(ibmisc::NcIO &ncio, std::string const &vname);
+extern std::unique_ptr<Grid> new_grid(ibmisc::NcIO &ncio, std::string const &vname);
 
 
 class Grid_LonLat : public Grid

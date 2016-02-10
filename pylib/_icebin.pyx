@@ -38,8 +38,20 @@ cdef class RegridMatrices:
 cdef class GCMRegridder:
 	cdef cicebin.GCMRegridder cself
 
-	def __init__(self, gridA_fname, gridA_vname, hpdefs, correctA):
-		cicebin.GCMRegridder_init(&self.cself, gridA_fname.encode(), gridA_vname.encode(), hpdefs, correctA)
+	def __init__(self, *args):
+		cdef ibmisc.NcIO ncio
+
+		try:
+			gridA_fname, gridA_vname, hpdefs, correctA = args
+			cicebin.GCMRegridder_init(&self.cself, gridA_fname.encode(), gridA_vname.encode(), hpdefs, correctA)
+			return
+		except:
+			pass
+
+		(regridder_fname,) = args
+		ncio = ibmisc.NcIO(regridder_fname, 'read')
+		self.ncio(ncio, str('m'))
+		ncio.close()
 
 	def ncio(self, ibmisc.NcIO ncio, vname):
 		self.cself.ncio(deref(ncio.cself), vname.encode())
@@ -66,3 +78,13 @@ cdef class GCMRegridder:
 		rm.cself = crm
 		return rm
 
+def coo_multiply(M, xx, double fill=np.nan, ignore_nan=False):
+	xx = xx.reshape(-1)
+	yy = np.zeros(M._shape[0])
+	yy[:] = fill
+
+	cicebin.coo_matvec(<PyObject *>yy, <PyObject *>xx, ignore_nan,
+		M._shape[0], M._shape[1],
+		<PyObject *>M.row, <PyObject *>M.col, <PyObject *>M.data)
+
+	return yy

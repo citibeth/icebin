@@ -240,6 +240,7 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
 
 	/** Initialize the new grid */
 	exgrid.name = gridA->name + '-' + gridI->name;
+	exgrid.sproj = sproj;
 	gridA_cells_nfull = gridA->cells.nfull();
 	gridI_cells_nfull = gridI->cells.nfull();
 	exgrid.cells._nfull = -1;		// Not specified

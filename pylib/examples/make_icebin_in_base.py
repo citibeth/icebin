@@ -11,7 +11,8 @@ import giss.ncutil
 import netCDF4
 import os
 import os.path
-
+import sys
+import pickle
 
 def make_icebin_in_base(grid_dir, gridA_name, gridI_name, pism_spinup_fname, ofname):
 	# gridA_name = 'modele_ll_g2x2_5'
@@ -43,9 +44,9 @@ def make_icebin_in_base(grid_dir, gridA_name, gridI_name, pism_spinup_fname, ofn
 	mm = icebin.GCMRegridder(gridA_fname, 'grid', hpdefs, True)
 
 
-	# ========= Add each gridI
-		# --- Greenland
-		# pism_spinup_fname = os.path.join(DATA_PATH, 'searise/Greenland_5km_v1.1.nc')
+	# ========= Add each Ice Sheet
+
+	# --- Greenland
 	print('PISM spinup file: {}'.format(pism_spinup_fname))
 	(elevI, maskI) = giss.pism.read_elevI_maskI(pism_spinup_fname)
 	
@@ -59,8 +60,23 @@ def make_icebin_in_base(grid_dir, gridA_name, gridI_name, pism_spinup_fname, ofn
 		'Z_INTERP',
 		elevI, maskI)
 
-	rm = mm.regrid_matrices('greenland')
-	print(rm.regrid('AvI(FULL_CELL)'))
+	# ========= Compute all regridding matrices for Python use
+	matrices = dict()
+	for sheet_name in ('greenland',):
+		rm = mm.regrid_matrices(sheet_name)
+		for mat_base in ('EvI', 'AvI', 'IvA', 'IvE', 'EvA', 'AvE'):
+			for variant in ('PARTIAL_CELL',):
+				key = (sheet_name, mat_base, variant)
+				print('-------- Computing', key)
+				sys.stdout.flush()
+				matrix = rm.regrid(mat_base + '(' + variant + ')')
+				matrices[key] = matrix
+
+	with open('matrices.pik', 'wb') as fout:
+		pickle.dump(matrices, fout)
+
+
+	sys.exit(0)
 
 
 	# ========== Finish up and write out

@@ -74,11 +74,11 @@ public:
 
 	/** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 	NOTE: wAvAp == sApvA */
-	void wAvAp(SparseVector &w);
+	void sApvA(SparseVector &w);
 
 	/** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 	NOTE: wAvAp == sApvA */
-	void wEvEp(SparseVector &w);
+	void sEpvE(SparseVector &w);
 
 	virtual void GvEp_noweight(
 		SparseMatrix &ret,
@@ -137,8 +137,15 @@ public:
 
 	void add_sheet(std::unique_ptr<IceRegridder> &&sheet)
 	{
+		printf("Adding IceRegridder: '%s'\n", sheet->name.c_str());
 		sheet->gcm = this;
 		sheets.insert(std::make_pair(sheet->name, std::move(sheet)));
+	}
+
+	void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&sheet)
+	{
+		sheet->name = name;
+		add_sheet(std::move(sheet));
 	}
 
 	IceRegridder *sheet(std::string const &name)
@@ -175,6 +182,7 @@ public:
 
 	/** @return Number of elevation points for a given grid cell */
 	unsigned int nhp(int i1) const { return hpdefs.size(); }
+	unsigned int nhp() const { return nhp(-1); }
 	unsigned long nA() const { return gridA->ndata(); }
 	unsigned long nE() const { return nA() * nhp(-1); }
 
@@ -186,16 +194,16 @@ template<class TypeT>
 class Transpose {
 public:
 	TypeT M;
-	bool const transpose;
+	char const transpose;
 
 	Transpose() : transpose(false) {}
-	Transpose(TypeT &&_M, bool _transpose) : M(std::move(_M)), transpose(_transpose) {}
+	Transpose(TypeT &&_M, char _transpose) : M(std::move(_M)), transpose(_transpose) {}
 
 	Transpose(Transpose &&rhs) : M(std::move(rhs.M)), transpose(rhs.transpose) {}
 };
 
 template<class TypeT>
-Transpose<TypeT> make_transpose(TypeT &&_M, bool _transpose)
+Transpose<TypeT> make_transpose(TypeT &&_M, char _transpose)
 	{ return Transpose<TypeT>(std::move(_M), _transpose); }
 // -----------------------------------------------------------
 // -----------------------------------------------------------
@@ -214,11 +222,6 @@ public:
 protected:
 	SparseVector *invert(SparseVector *v);
 
-	// ----------------------------------------------------------
-	void wAvG(SparseVector &ret) const;
-	void wEvG(SparseVector &ret) const;
-	// ----------------------------------------------------------
-		
 
 public:
 
@@ -228,7 +231,7 @@ public:
 	SparseMatrix const &regrid(std::string const &spec_name) const
 	{
 		auto &TrM(regrids.at(spec_name));
-		if (TrM.transpose) {
+		if (TrM.transpose == 'T') {
 			(*icebin_error)(-1,
 				"regrid(%s) is transposed; currently, you can only retrieve non-transposed matrices.",
 				spec_name.c_str());
