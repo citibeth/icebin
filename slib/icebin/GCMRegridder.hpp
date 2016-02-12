@@ -247,7 +247,10 @@ public:
 		w/sG		Whole cell weighting for E
 	*/
 	SparseVector const &scale(std::string const &spec_name) const
-		{ return *diags.at(spec_name); }
+	{
+		SparseVector const &ret = *diags.at(spec_name);
+		return ret;
+	}
 
 };
 

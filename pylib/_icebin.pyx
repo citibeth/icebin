@@ -25,15 +25,8 @@ cdef class RegridMatrices:
 		# scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
 		return scipy.sparse.coo_matrix(data, shape)
 
-	def weight(self, spec_name, fill_value=0):
-		data,shape = cicebin.RegridMatrices_scale(self.cself, spec_name.encode(), fill_value)
-		ret = np.zeros((shape[0],))
-		ret[:] = fill_value
-		cdef int ix
-		cdef double val
-		for ix,val in zip(data[1][0], data[0]):
-			ret[ix] = val
-		return ret
+	def scale(self, spec_name, fill_value=0):
+		return cicebin.RegridMatrices_scale(self.cself, spec_name.encode(), fill_value)
 
 cdef class GCMRegridder:
 	cdef cicebin.GCMRegridder cself

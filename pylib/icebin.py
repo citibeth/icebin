@@ -18,16 +18,17 @@ class Indexing(object):
 		self.base = ncvar.base
 		self.extent = ncvar.extent
 		self.indices = ncvar.indices
+
+		if not isinstance(self.base, np.ndarray):
+			self.base = np.ndarray([self.base])
+		if not isinstance(self.extent, np.ndarray):
+			self.extent = np.ndarray([self.extent])
+		if not isinstance(self.indices, np.ndarray):
+			self.indices = np.ndarray([self.indices])
+
 		self.size = 1
 		for ex in self.extent:
 			self.size *= ex
-
-		if not isinstance(self.base, tuple):
-			self.base = (self.base,)
-		if not isinstance(self.extent, tuple):
-			self.extent = (self.extent,)
-		if not isinstance(self.indices, tuple):
-			self.indices = (self.indices,)
 
 		# Shape of a row-major array in memory
 		# Row-order ordered indices
@@ -155,17 +156,17 @@ class Grid(object):
 def _Grid_XY_read_plotter(nc, vname) :
 	"""Reads an plotter out of a netCDF file for a simple Cartesian grid"""
 
-	# ======= Read our own grid2 info from the overlap file
-	# Assumes an XY grid for grid2
+	sproj = nc.variables[vname + '.info'].projection
 	xb2 = nc.variables[vname + '.x_boundaries'][:]
 	yb2 = nc.variables[vname + '.y_boundaries'][:]
-	indexing = Indexing(vname + '.indexing')
-	return giss.plot.ProjXYPlotter(xb2, yb2, sproj, indexing[0] == 1)
+	indexing = Indexing(nc, vname + '.indexing')
+	return giss.plot.ProjXYPlotter(xb2, yb2, sproj, indexing.indices[0] == 0)
 
 def _Grid_LonLat_read_plotter(nc, vname) :
 	lonb2 = nc.variables[vname + '.lon_boundaries'][:]
 	latb2 = nc.variables[vname + '.lat_boundaries'][:]
-	return giss.plot.LonLatPlotter(lonb2, latb2, indexing[0] == 1)
+	indexing = Indexing(nc, vname + '.indexing')
+	return giss.plot.LonLatPlotter(lonb2, latb2, transpose=(indexing.indices[0] == 0), boundaries=True)
 
 # -------------------------------
 read_plotter_fn = {'XY' : _Grid_XY_read_plotter,
@@ -175,14 +176,10 @@ read_plotter_fn = {'XY' : _Grid_XY_read_plotter,
 # @param grid_nc Open netCDF file that has the ice grid
 # @param vname Name of variable inside the netCDF file
 # @param ice_sheet Name of ice sheet (works if variables follow std convention)
-def PlotterI(nc=None, vname=None, fname=None) :
-	if fname is not None :
-		nc = netCDF4.Dataset(fname)
+def read_plotter(nc=None, vname=None) :
 	stype = nc.variables[vname + '.info'].__dict__['type']
 	read_fn = read_plotter_fn[stype]
 	ret = read_fn(nc, vname)
-	if fname is not None :
-		nc.close()
 	return ret
 
 # ---------------------------------------------------
@@ -199,7 +196,7 @@ class PlotterE(giss.plot.Plotter):
 		self.IvE = IvE
 
 		with netCDF4.Dataset(glint2_config) as nc:
-			self.plotterI = PlotterI(nc=nc, vname='m.' + ice_sheet + '.gridI')
+			self.plotterI = read_plotter(nc=nc, vname='m.' + ice_sheet + '.gridI')
 
 			# Create a plotterA, to help determine coords when user clicks
 			self.plotterA = _Grid_LonLat_read_plotter(nc, 'm.gridA')
@@ -250,6 +247,6 @@ class PlotterE(giss.plot.Plotter):
 		ihp = ihp0 if (delta0 <= delta1) else ihp0+1
 
 		# Find enclosing grid cell on the GCM grid
-		coords1 = self.plotter1.coords(lon_d, lat_d)
+		coords1 = self.plotterA.coords(lon_d, lat_d)
 
 		return (ihp, coords1[0], coords1[1]), valI
