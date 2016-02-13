@@ -463,20 +463,33 @@ std::unique_ptr<SparseMatrix> compose_regrid(
 
 void add_compose(
 	RegridMatrices *rm,
-	std::string const &spec_basename,
+	std::string const &BvA,
 	std::vector<std::array<std::string, 2>> const &scale_variants,
 	std::array<std::string, 5> spec)
 {
+	// Insert composite BvA (unscaled)
+	rm->regrids.insert(make_pair(
+		BvA,
+		make_transpose(
+			LazyPtr<SparseMatrix>(std::bind(&compose_regrid, spec_name, rm, spec)),
+			'.')));
+
+	// Scaling for BvA
+	rm->diags.insert(make_pair("w"+BvA,
+		 LazyPtr<SparseVector>(std::bind(&new_weight, rm, BvA, 0))));
+	rm->diags.insert(make_pair("s"+BvA,
+		LazyPtr<SparseVector>(std::bind(&new_invert, rm, "w"+BvA))));
+
+	// Scaled BvA
+	spec[0] = "s" + BvA;
+
+
 	for (auto &variant : scale_variants) {
 		std::string spec_name = spec_basename + "(" + variant[0] + ")";
 		spec[0] = variant[1];
 
-		rm->regrids.insert(make_pair(
-			spec_name,
-			make_transpose(
-				LazyPtr<SparseMatrix>(std::bind(&compose_regrid, spec_name, rm, spec)),
-				'.')));
 	}
+	
 }
 
 void add_weight(

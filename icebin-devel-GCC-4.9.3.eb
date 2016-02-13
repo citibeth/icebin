@@ -21,6 +21,7 @@ dependencies = [
 	('blitz', '0.10', '', ('GCC', '4.9.3')),
 	('CGAL', '4.7', '', ('GCC', '4.9.3')),
 	('gtest', '1.7.0', '', ('GCC', '4.9.3')),
+	('Eigen', '3.2.7', '', ('GCC', '4.9.3')),
 ]
 
 builddependencies = [

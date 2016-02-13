@@ -94,6 +94,10 @@ add_definitions(-DUSE_PROJ4)
 include_directories(${PROJ4_INCLUDES})
 list(APPEND EXTERNAL_LIBS ${PROJ4_LIBRARIES})
 
+# --- Eigen
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIR})
+
 #find_package(GALAHAD REQUIRED)		# This should be optional
 
 #find_package(CGAL REQUIRED)
