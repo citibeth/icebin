@@ -36,17 +36,19 @@ std::unordered_map<long,double> IceRegridder::elevI_hash() const
 // -------------------------------------------------------------
 /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 NOTE: wAvAp == sApvA */
-void IceRegridder::sApvA(SparseVector &w)
+void IceRegridder::sApvA(SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn)
 {
 	ibmisc::Proj_LL2XY proj(gridI->sproj);
 	for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
-		w.add({cell->index}, cell->native_area / cell->proj_area(&proj));
+		if (!filter_fn(cell->index)) continue;
+
+		w.add({cell->index, cell->index}, cell->native_area / cell->proj_area(&proj));
 	}
 }
 
 /** Produces the diagonal matrix [Elevation projected] <-- [Elevation]
 NOTE: wAvAp == sApvA */
-void IceRegridder::sEpvE(SparseVector &w)
+void IceRegridder::sEpvE(SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn)
 {
 	ibmisc::Proj_LL2XY proj(gridI->sproj);
 	for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
@@ -55,7 +57,8 @@ void IceRegridder::sEpvE(SparseVector &w)
 		long &ihp(tuple[1]);
 		for (ihp=0; ihp<nhp; ++ihp) {
 			long indexE = gcm->indexingHP.tuple_to_index(tuple);
-			w.add({indexE}, cell->native_area / cell->proj_area(&proj));
+			if (!filter_fn(indexE)) continue;
+			w.add({indexE, indexE}, cell->native_area / cell->proj_area(&proj));
 		}
 	}
 }
@@ -265,6 +268,170 @@ extern void linterp_1d(
 	weights[1] = ratio;
 }
 
+
+/** Used to generate Ur matrices for Atm or Elevation grids.
+This allows us to exploit an algebraic symmetry between A and E. */
+struct UrAE {
+	const long nfull;
+
+	typedef std::function<void(spsparse::SparseTriplets<SparseMatrix> &)> GvAp_fn;
+	const GvAp_fn GvAp;
+
+	typedef const std::function<void(
+		spsparse::SparseTriplets<SparseMatrix> &w,
+		std::function<bool(long)>
+	)> sApvA_fn;
+	const sApvA_fn sApvA;
+
+	UrAE(long _nfull, GvAp_fn _GvAp, sApvA_fn _sApvA) : nfull(_nfull), GvAp(_GvAp), sApvA(_sApvA) {}
+};
+
+
+typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrixT;
+typedef SparseSet<long,int> SparseSetT;
+
+static std::unique_ptr<SparseMatrix> compute_AEvI(RegridMatrices *rm, bool scaled, UrAE const &AE)
+{
+	SparseSetT dimA, dimG, dimI;
+
+	// ----- Get the Ur matrices (which determines our dense dimensions)
+	// GvI
+	SparseTriplets<SparseMatrix> GvI({&dimG, &dimI});
+	GvI.set_shape({rm->sheet->nG(), rm->sheet->nI()});
+	rm->sheet->GvI(GvI);
+
+	// ApvG
+	SparseTriplets<SparseMatrix> GvAp({&dimG, &dimA});
+	GvAp.set_shape({rm->sheet->nG(), AE.nfull});
+	AE.GvAp(GvAp);
+
+	// ----- Convert to Eigen and multiply
+	auto GvI_e(GvI.to_eigen());
+	auto sGvI_e(GvI.eigen_scale_matrix(0));
+	auto ApvG_e(GvAp.to_eigen('T'));
+	EigenSparseMatrixT ApvI_e(ApvG_e * sGvI_e * GvI_e);
+
+	// ----- Apply final scaling, and convert back to sparse dimension
+	std::unique_ptr<SparseMatrix> ret(new SparseMatrix);
+	if (scaled) {
+		auto sApvI_e(scale_matrix(ApvI_e, 0));
+
+		SparseTriplets<SparseMatrix> sApvA({&dimA, &dimA});
+		sApvA.set_shape({AE.nfull, AE.nfull});
+
+		std::function<bool(long)> filter_fn(std::bind(&SparseSetT::in_sparse, dimA, _1));
+		AE.sApvA(sApvA, filter_fn);	// Filter to avoid adding more items to dimA
+		auto sAvAp_e(sApvA.to_eigen('.', true));		// Invert it...
+
+		EigenSparseMatrixT AvI_scaled_e(sAvAp_e * sApvI_e * ApvI_e);
+		eigen_to_sparse(*ret, AvI_scaled_e, {&dimA, &dimI});
+	} else {
+		eigen_to_sparse(*ret, ApvI_e, {&dimA, &dimI});
+	}
+
+	return ret;
+}
+
+static std::unique_ptr<SparseMatrix> compute_IvAE(RegridMatrices *rm, bool scaled, UrAE const &AE)
+{
+	SparseSetT dimA, dimG, dimI;
+
+	// ----- Get the Ur matrices (which determines our dense dimensions)
+
+	// ApvG
+	SparseTriplets<SparseMatrix> GvAp({&dimG, &dimA});
+	GvAp.set_shape({rm->sheet->nG(), AE.nfull});
+	AE.GvAp(GvAp);
+
+	// sApvA
+	SparseTriplets<SparseMatrix> sApvA({&dimA, &dimA});
+	std::function<bool(long)> filter_fn(std::bind(&SparseSetT::in_sparse, dimA, _1));
+	sApvA.set_shape({AE.nfull, AE.nfull});
+	AE.sApvA(sApvA, filter_fn);	// Filter to avoid adding more items to dimA
+
+	// GvI
+	SparseTriplets<SparseMatrix> GvI({&dimG, &dimI});
+	GvI.set_shape({rm->sheet->nG(), rm->sheet->nI()});
+	rm->sheet->GvI(GvI);
+
+
+	// ----- Convert to Eigen and multiply
+	auto sApvA_e(sApvA.to_eigen('.', false));		// Don't invert it...
+	auto GvAp_e(GvAp.to_eigen('.'));
+	auto sGvAp_e(GvAp.eigen_scale_matrix(0));
+	auto IvG_e(GvI.to_eigen('T'));
+
+	// ----- Apply final scaling, and convert back to sparse dimension
+	std::unique_ptr<SparseMatrix> ret(new SparseMatrix);
+	if (scaled) {
+		EigenSparseMatrixT IvAp_e(IvG_e * sGvAp_e * GvAp_e);
+		auto sIvAp_e(scale_matrix(IvAp_e, 0));
+
+		EigenSparseMatrixT IvA_scaled_e(sIvAp_e * IvAp_e * sApvA_e);
+		eigen_to_sparse(*ret, IvA_scaled_e, {&dimI, &dimA});
+	} else {
+		EigenSparseMatrixT IvA_e(IvG_e * sGvAp_e * GvAp_e * sApvA_e);
+		eigen_to_sparse(*ret, IvA_e, {&dimI, &dimA});
+	}
+
+	return ret;
+}
+
+static std::unique_ptr<SparseMatrix> compute_EvA(RegridMatrices *rm, bool scaled, UrAE const &E, UrAE const &A)
+{
+
+	SparseSetT dimA, dimG, dimE;
+
+	// ----- Get the Ur matrices (which determines our dense dimensions)
+
+	// ApvG
+	SparseTriplets<SparseMatrix> GvAp({&dimG, &dimA});
+	GvAp.set_shape({rm->sheet->nG(), A.nfull});
+	A.GvAp(GvAp);
+
+	// sApvA
+		SparseTriplets<SparseMatrix> sApvA({&dimA, &dimA});
+	std::function<bool(long)> filter_fn(std::bind(&SparseSetT::in_sparse, dimA, _1));
+	sApvA.set_shape({A.nfull, A.nfull});
+	A.sApvA(sApvA, filter_fn);	// Filter to avoid adding more items to dimA
+
+	// GvEp
+	SparseTriplets<SparseMatrix> GvEp({&dimG, &dimE});
+	GvEp.set_shape({rm->sheet->nG(), E.nfull});
+	E.GvAp(GvEp);
+
+
+	// ----- Convert to Eigen and multiply
+	auto sApvA_e(sApvA.to_eigen('.', false));		// Don't invert it...
+	auto GvAp_e(GvAp.to_eigen('.'));
+	auto sGvAp_e(GvAp.eigen_scale_matrix(0));
+	auto EpvG_e(GvEp.to_eigen('T'));
+
+	// ----- Apply final scaling, and convert back to sparse dimension
+	std::unique_ptr<SparseMatrix> ret(new SparseMatrix);
+	if (scaled) {
+		EigenSparseMatrixT EpvAp_e(EpvG_e * sGvAp_e * GvAp_e);
+		auto sEpvAp_e(scale_matrix(EpvAp_e, 0));
+
+		// ---- Obtain sEvEp_e
+		SparseTriplets<SparseMatrix> sEpvE({&dimE, &dimE});
+		sEpvE.set_shape({E.nfull, E.nfull});
+		std::function<bool(long)> filter_fn(std::bind(&SparseSetT::in_sparse, dimE, _1));
+		E.sApvA(sEpvE, filter_fn);	// Filter to avoid adding more items to dimE
+		auto sEvEp_e(sEpvE.to_eigen('.', true));		// Invert it...
+
+		EigenSparseMatrixT EvA_scaled_e(sEvEp_e * sEpvAp_e * EpvAp_e * sApvA_e);
+		eigen_to_sparse(*ret, EvA_scaled_e, {&dimE, &dimA});
+	} else {
+		EigenSparseMatrixT EpvA_e(EpvG_e * sGvAp_e * GvAp_e * sApvA_e);
+		eigen_to_sparse(*ret, EpvA_e, {&dimE, &dimA});
+	}
+	return ret;
+
+}
+
+
+
 // =================================================================
 // Helper routines for assembling regridding transformations.
 // These functions get bound and placed into a LazyPtr.
@@ -471,7 +638,7 @@ void add_compose(
 	rm->regrids.insert(make_pair(
 		BvA,
 		make_transpose(
-			LazyPtr<SparseMatrix>(std::bind(&compose_regrid, spec_name, rm, spec)),
+			LazyPtr<SparseMatrix>(std::bind(&compose_regrid,  BvA, rm, spec)),
 			'.')));
 
 	// Scaling for BvA
@@ -479,16 +646,23 @@ void add_compose(
 		 LazyPtr<SparseVector>(std::bind(&new_weight, rm, BvA, 0))));
 	rm->diags.insert(make_pair("s"+BvA,
 		LazyPtr<SparseVector>(std::bind(&new_invert, rm, "w"+BvA))));
+#if 0
 
 	// Scaled BvA
+	rm->regrids.insert(make_pair(
+		BvA + "(S)",
+		make_transpose(
+			LazyPtr<SparseMatrix>(std::bind(&compose_scale, rm, {
+
 	spec[0] = "s" + BvA;
 
 
 	for (auto &variant : scale_variants) {
-		std::string spec_name = spec_basename + "(" + variant[0] + ")";
+		std::string spec_name = BvA + "(" + variant[0] + ")";
 		spec[0] = variant[1];
 
 	}
+#endif
 	
 }
 
@@ -577,22 +751,76 @@ RegridMatrices::RegridMatrices(IceRegridder *_sheet)
 	printf("    nI = %d (%d used)\n", sheet->nI(), sheet->elevI_hash().size());
 	printf("    nG = %d\n", sheet->nG());
 
+	UrAE urA(sheet->gcm->nA(),
+		std::bind(&IceRegridder::GvAp, sheet, _1),
+		std::bind(&IceRegridder::sApvA, sheet, _1, _2));
+
+	UrAE urE(sheet->gcm->nE(),
+		std::bind(&IceRegridder::GvEp, sheet, _1),
+		std::bind(&IceRegridder::sEpvE, sheet, _1, _2));
+
+	// ------- AvI, IvA
+	regrids.insert(make_pair("AvI(S)",
+		make_transpose(LazyPtr<SparseMatrix>(
+			std::bind(&compute_AEvI, this, true, urA)
+		), '.')));
+
+	regrids.insert(make_pair("IvA(S)",
+		make_transpose(LazyPtr<SparseMatrix>(
+			std::bind(&compute_IvAE, this, true, urA)
+		), '.')));
+
+	// ------- EvI, IvE
+	regrids.insert(make_pair("EvI(S)",
+		make_transpose(LazyPtr<SparseMatrix>(
+			std::bind(&compute_AEvI, this, true, urE)
+		), '.')));
+
+	regrids.insert(make_pair("IvE(S)",
+		make_transpose(LazyPtr<SparseMatrix>(
+			std::bind(&compute_IvAE, this, true, urE)
+		), '.')));
+
+
+	// ------- EvA, AvE
+	regrids.insert(make_pair("EvA(S)",
+		make_transpose(LazyPtr<SparseMatrix>(
+			std::bind(&compute_EvA, this, true, urE, urA)
+		), '.')));
+
+	regrids.insert(make_pair("AvE(S)",
+		make_transpose(LazyPtr<SparseMatrix>(
+			std::bind(&compute_EvA, this, true, urA, urE)
+		), '.')));
+
+
+
+
+
+
+
+
+
+
+
+
+#if 0
 	std::array<size_t, 2> shape;
 	ElevIFillFn elevi_fill_fn;
 	FillFn fill_fn;
 
 	shape = {sheet->nG(), sheet->gcm->nE()};
-	elevi_fill_fn = std::bind(&IceRegridder::GvEp_noweight, sheet, _1, _2);
+	elevi_fill_fn = std::bind(&IceRegridder::GvEp, sheet, _1, _2);
 	add_regrid(this, "G", "Ep",
 		std::bind(&new_regrid_with_elevI, sheet, shape, elevi_fill_fn));
 
 	shape = {sheet->nG(), sheet->nI()};
-	elevi_fill_fn = std::bind(&IceRegridder::GvI_noweight, sheet, _1, _2);
+	elevi_fill_fn = std::bind(&IceRegridder::GvI, sheet, _1, _2);
 	add_regrid(this, "G", "I",
 		std::bind(&new_regrid_with_elevI, sheet, shape, elevi_fill_fn));
 
 	shape = {sheet->nG(), sheet->gcm->nA()};
-	fill_fn = std::bind(&IceRegridder::GvAp_noweight, sheet, _1);
+	fill_fn = std::bind(&IceRegridder::GvAp, sheet, _1);
 	add_regrid(this, "G", "Ap",
 		std::bind(&new_regrid, shape, fill_fn));
 
@@ -618,13 +846,16 @@ RegridMatrices::RegridMatrices(IceRegridder *_sheet)
 	std::vector<std::array<std::string,2>> I_variants =
 		{{"NONE", ""}, {"PARTIAL_CELL", "sIvG"}};
 
-	add_compose(this, "AvI", A_variants, {"", "ApvG", "sGvI",  "GvI",  ""});
+//	add_compose(this, "AvI", A_variants, {"", "ApvG", "sGvI",  "GvI",  ""});
 	add_compose(this, "EvI", E_variants, {"", "EpvG", "sGvI",  "GvI",  ""});
 	add_compose(this, "IvA", I_variants, {"", "IvG",  "sGvAp", "GvAp", "sApvA"});
 	add_compose(this, "IvE", I_variants, {"", "IvG",  "sGvEp", "GvEp", "sEpvE"});
 
 	add_compose(this, "AvE", A_variants, {"", "ApvG", "sGvEp", "GvEp", "sEpvE"});
 	add_compose(this, "EvA", E_variants, {"", "EpvG", "sGvAp", "GvAp", "sApvA"});
+
+#endif
+
 
 	// ----- Show what we have!
 	printf("Available Regrids:");

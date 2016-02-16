@@ -43,14 +43,14 @@ static int nearest_1d(
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
 @param ret Put the regrid matrix here.
 @param elevIh Must be the result of this->elevI_hash() */
-void IceRegridder_L0::GvEp_noweight(
-	SparseMatrix &ret,
-	std::unordered_map<long,double> const &elevIh) const
+void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
 {
 	IceExch dest = interp_grid;
+	std::unordered_map<long,double> const elevIh(elevI_hash());
+
 
 	if (gcm->hpdefs.size() == 0) (*icebin_error)(-1,
-		"IceRegridder_L0::GvEp_noweight(): hpdefs is zero-length!");
+		"IceRegridder_L0::GvEp(): hpdefs is zero-length!");
 
 	// ---------------------------------------
 	// Handle Z_INTERP or ELEV_CLASS_INTERP
@@ -89,10 +89,11 @@ void IceRegridder_L0::GvEp_noweight(
 	}
 }
 // --------------------------------------------------------
-void IceRegridder_L0::GvI_noweight(
-	SparseMatrix &ret,
-	std::unordered_map<long,double> const &elevIh) const
+void IceRegridder_L0::GvI(
+	spsparse::SparseTriplets<SparseMatrix> &ret) const
 {
+	std::unordered_map<long,double> const elevIh(elevI_hash());
+
 	if (interp_grid == IceExch::ICE) {
 		// Ice <- Ice = Indentity Matrix
 		for (auto cell=gridI->cells.begin(); cell != gridI->cells.end(); ++cell) {
@@ -115,12 +116,12 @@ void IceRegridder_L0::GvI_noweight(
 	}
 }
 // --------------------------------------------------------
-void IceRegridder_L0::GvAp_noweight(SparseMatrix &ret)
+void IceRegridder_L0::GvAp(spsparse::SparseTriplets<SparseMatrix> &ret) const
 {
 	for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
 		int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
 		int iA = cell->i;
-		if (cell->native_area > 0) ret.add({iG,iA}, cell->native_area);
+		if (cell->native_area > 0) ret.add({iG, iA}, cell->native_area);
 	}
 }
 // --------------------------------------------------------

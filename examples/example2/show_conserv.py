@@ -8,6 +8,7 @@ import sys
 import giss.basemap
 import giss.modele
 import giss.plot
+import giss.pism
 
 ice_sheet = 'greenland'
 ICEBIN_IN = sys.argv[1]
@@ -22,6 +23,8 @@ with netCDF4.Dataset(ICEBIN_IN) as nc:
 	plotterA = icebin.read_plotter(nc, 'm.gridA')
 
 # -----------------------------------
+
+
 
 def exampleI():
 	shapeI = indexingI.shape
@@ -68,42 +71,92 @@ def plot_IG():
 
 def conserv_IvA():
 	valI = exampleI()
+	valI[:]=1
 
-	wI = rm.scale('wIvG')
-	wA = rm.scale('wAvG')
-	wE = rm.scale('wEvG')
+#	wI = rm.scale('wIvG')
+#	wA = rm.scale('wAvG')
+#	wE = rm.scale('wEvG')
 #	wA = rm.scale('wA')
-	print('wA', wA.shape, wA, wA[10698])
-	print('wI', wI.shape, wI)
-	IvA = rm.regrid('IvA(PARTIAL_CELL)')
+#	print('wA', wA.shape, wA, wA[10698])
+#	print('wI', wI.shape, wI)
 
-	AvI = rm.regrid('AvI(PARTIAL_CELL)')
-	print('AvI', AvI.shape, AvI.nnz)
-	valA = icebin.coo_multiply(AvI, valI, fill=np.nan)
-	#valA = AvI * valI
-	print('valA', valA.shape, valA)
+	# ------ I->A
+	AvI = rm.regrid('AvI(S)')
+	valIA = icebin.coo_multiply(AvI, valI, fill=np.nan)
 
 	# Plot our value
-	figure = matplotlib.pyplot.figure(figsize=(11,8.5))
-	ax = figure.add_subplot(121)
+	figure = matplotlib.pyplot.figure(figsize=(17,33))
+	ax = figure.add_subplot(321)
 	basemap = giss.basemap.greenland_laea(ax=ax)
-	pp = giss.modele.plot_params('valA', val=valA, plotter=plotterA)
+	pp = giss.modele.plot_params('I->A', val=valIA, plotter=plotterA)
 	print(pp)
 	giss.plot.plot_var(ax=ax, basemap=basemap, **pp)
 
-	valI2 = icebin.coo_multiply(IvA, valA, fill=np.nan)
-	valI[np.isnan(valI2)] = np.nan
 
-	print('sum', np.nansum(valI), np.nansum(valI2))
+	# ----- I->A->I
+	IvA = rm.regrid('IvA(S)')
+	print('IvA', IvA.shape, IvA.nnz)
+	valIAI = icebin.coo_multiply(IvA, valIA, fill=np.nan)
+	valI[np.isnan(valIAI)] = np.nan
 
 	# Plot our value
-	ax = figure.add_subplot(122)
+	ax = figure.add_subplot(322)
 	basemap = giss.basemap.greenland_laea(ax=ax)
-	pp = giss.modele.plot_params('valI', val=valI2, plotter=plotterI)
+	pp = giss.modele.plot_params('I->A->I', val=valIAI, plotter=plotterI)
 	print(pp)
 	giss.plot.plot_var(ax=ax, basemap=basemap, **pp)
+
+
+
+	# ----- I->E
+	pism_spinup_fname = 'elev_mask.nc'
+	(elevI, maskI) = giss.pism.read_elevI_maskI(pism_spinup_fname)
+
+	valI = elevI
+	valI[valI<0] = 0
+	valI[:]=1
+	EvI = rm.regrid('EvI(S)')
+	valIE = icebin.coo_multiply(EvI, valI, fill=np.nan)
+
+	AvE = rm.regrid('AvE(S)')
+	valIEA = icebin.coo_multiply(AvE, valIE, fill=np.nan)
+
+	IvE = rm.regrid('IvE(S)')
+	valIEI = icebin.coo_multiply(IvE, valIE, fill=np.nan)
+
+	# Plot our value
+	ax = figure.add_subplot(323)
+	basemap = giss.basemap.greenland_laea(ax=ax)
+	pp = giss.modele.plot_params('I->E->A', val=valIEA, plotter=plotterA)
+	print(pp)
+	giss.plot.plot_var(ax=ax, basemap=basemap, **pp)
+
+	# Plot our value
+	ax = figure.add_subplot(324)
+	basemap = giss.basemap.greenland_laea(ax=ax)
+	pp = giss.modele.plot_params('I->E->I', val=valIEI, plotter=plotterI)
+	print(pp)
+	giss.plot.plot_var(ax=ax, basemap=basemap, **pp)
+
+
+	# ------- A-->E
+	EvA = rm.regrid('EvA(S)')
+	valIEAE = icebin.coo_multiply(EvA, valIEA, fill=np.nan)
+	valIEAEI = icebin.coo_multiply(IvE, valIEAE, fill=np.nan)
+
+	# Plot our value
+	ax = figure.add_subplot(325)
+	basemap = giss.basemap.greenland_laea(ax=ax)
+	pp = giss.modele.plot_params('I->E->A->E->I', val=valIEAEI, plotter=plotterI)
+	print(pp)
+	giss.plot.plot_var(ax=ax, basemap=basemap, **pp)
+
+
+
+
+
 
 	figure.savefig('AxI.png', dpi=100, transparent=False)
 
-plot_IG()
+#plot_IG()
 conserv_IvA()

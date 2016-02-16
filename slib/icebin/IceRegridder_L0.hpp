@@ -45,12 +45,15 @@ public:
 
 public:
 
-	void GvEp_noweight(
-		SparseMatrix &ret,
-		std::unordered_map<long,double> const &elevIh) const;
+	void GvEp(
+		spsparse::SparseTriplets<SparseMatrix> &ret) const;
 
-	void GvI_noweight(SparseMatrix &ret, std::unordered_map<long,double> const &elevIh) const;
-	void GvAp_noweight(SparseMatrix &ret);
+	void GvI(
+		spsparse::SparseTriplets<SparseMatrix> &ret) const;
+
+	void GvAp(
+		spsparse::SparseTriplets<SparseMatrix> &ret) const;
+
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };

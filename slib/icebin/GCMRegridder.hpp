@@ -5,6 +5,7 @@
 
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/memory.hpp>
+#include <spsparse/eigen.hpp>
 
 #include <icebin/Grid.hpp>
 #include <icebin/sparse.hpp>
@@ -25,6 +26,7 @@ BOOST_ENUM_VALUES( Weighting, int,
 
 
 class GCMRegridder;
+class IceRegridder;
 
 /** Creates regridding matrices for a single ice sheet. */
 class IceRegridder {
@@ -32,6 +34,8 @@ public:
 	typedef Grid::Parameterization Type;
 
 	friend class GCMRegridder;
+	friend class UrA;
+	friend class UrE;
 	GCMRegridder const *gcm;	/// Parent pointer
 protected:
 
@@ -74,18 +78,20 @@ public:
 
 	/** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 	NOTE: wAvAp == sApvA */
-	void sApvA(SparseVector &w);
+	void sApvA(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
 
 	/** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 	NOTE: wAvAp == sApvA */
-	void sEpvE(SparseVector &w);
+	void sEpvE(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
 
-	virtual void GvEp_noweight(
-		SparseMatrix &ret,
-		std::unordered_map<long,double> const &elevIh) const = 0;
+	virtual void GvEp(
+		spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
 
-	virtual void GvI_noweight(SparseMatrix &ret, std::unordered_map<long,double> const &elevIh) const = 0;
-	virtual void GvAp_noweight(SparseMatrix &ret) = 0;
+	virtual void GvI(
+		spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
+
+	virtual void GvAp(
+		spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
 
 	virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
@@ -187,6 +193,10 @@ public:
 	unsigned long nE() const { return nA() * nhp(-1); }
 
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+
+
+	std::unique_ptr<SparseMatrix> AvI(IceRegridder *sheet, bool scaled=true);
+
 };	// class GCMRegridder
 // ===========================================================
 /** Stores a (Matrix, bool) pair, which represents either M or M^T */
@@ -209,7 +219,7 @@ Transpose<TypeT> make_transpose(TypeT &&_M, char _transpose)
 // -----------------------------------------------------------
 /** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
 class RegridMatrices {
-protected:
+public:
 	IceRegridder *sheet;
 
 	typedef ibmisc::LazyPtr<SparseMatrix> LPMatrix;
