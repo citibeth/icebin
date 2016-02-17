@@ -4,6 +4,13 @@ PYLIB_BUILD = ../../build/pylib
 ENV = $(PYLIB_BUILD)/env
 PYTHON = $(ENV) python
 
+# Run the main test.
+all:
+	$(PYTHON) test_conserv.py
+
+clean:
+	rm *.nc *.pdf *.png
+
 # =========== To generate stuff we check into git
 git_files : elev_mask.cdl
 
@@ -33,9 +40,6 @@ modele_ll_g2x2_5-sr_g20_pism.nc : modele_ll_g2x2_5.nc sr_g20_pism.nc
 icebin_in.nc : modele_ll_g2x2_5-sr_g20_pism.nc elev_mask.nc
 	$(PYTHON) write_icebin_in_base.py
 
-conserv_IvE.pik : icebin_in.nc
-	$(PYTHON) show_conserv.py icebin_in.nc IvE
-
 #matrices.pik : modele_ll_g2x2_5-sr_g20_pism-base.nc
 #	$(PYTHON) write_matrices.py modele_ll_g2x2_5-sr_g20_pism-base.nc
 
@@ -50,8 +54,5 @@ modele_ll_g2x2_5.png : modele_ll_g2x2_5.nc
 
 modele_ll_g2x2_5-sr_g20_pism.png : modele_ll_g2x2_5-sr_g20_pism.nc
 	$(PYTHON) plot_grid_outlines.py modele_ll_g2x2_5-sr_g20_pism exgrid
-
-conservation : matrices.pik
-	$(PYTHON) show_conservation.py
 
 
