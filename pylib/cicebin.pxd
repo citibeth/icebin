@@ -66,9 +66,7 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 		string &sinterp_style,
 		PyObject *elevI_py, PyObject *maskI_py) except +		# PyObject=Borrowed reference, object = owned reference
 
-	cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name) except +
-
-	cdef object RegridMatrices_scale(RegridMatrices *self, string spec_name, double fill_value) except +
+	cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name, bool scale) except +
 
 	cdef void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 		int M_nrow, int M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py) except +

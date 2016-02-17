@@ -11,6 +11,8 @@ import giss.proj
 import netCDF4
 import bisect
 import sys
+import functools
+import operator
 
 class Indexing(object):
 	def __init__(self, nc, vname):
@@ -37,6 +39,8 @@ class Indexing(object):
 		else:
 			self.shape = (self.extent[1], self.extent[0])
 
+	def __len__(self):
+		return functools.reduce(operator.mul, self.extent)
 
 
 class Grid(object):

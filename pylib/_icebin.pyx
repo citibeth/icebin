@@ -20,13 +20,10 @@ cdef class RegridMatrices:
 	def __dealloc__(self):
 		del self.cself
 
-	def regrid(self, str spec_name):
-		data,shape = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode())
+	def regrid(self, str spec_name, scale=True):
+		(data,shape), weight = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale)
 		# scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
-		return scipy.sparse.coo_matrix(data, shape)
-
-	def scale(self, spec_name, fill_value=0):
-		return cicebin.RegridMatrices_scale(self.cself, spec_name.encode(), fill_value)
+		return scipy.sparse.coo_matrix(data, shape), weight
 
 cdef class GCMRegridder:
 	cdef cicebin.GCMRegridder cself

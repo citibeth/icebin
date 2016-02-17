@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <unordered_set>
 #include <blitz/array.h>
 
@@ -217,50 +218,18 @@ Transpose<TypeT> make_transpose(TypeT &&_M, char _transpose)
 	{ return Transpose<TypeT>(std::move(_M), _transpose); }
 // -----------------------------------------------------------
 // -----------------------------------------------------------
+typedef std::function<std::unique_ptr<WeightedSparse>(bool scale)> RegridFunction;
+
 /** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
 class RegridMatrices {
 public:
-	IceRegridder *sheet;
-
-	typedef ibmisc::LazyPtr<SparseMatrix> LPMatrix;
-	typedef ibmisc::LazyPtr<SparseVector> LPVector;
-
-public:
-	std::map<std::string, Transpose<LPMatrix>> regrids;
-	std::map<std::string, LPVector> diags;
-
-protected:
-	SparseVector *invert(SparseVector *v);
-
-
-public:
+	std::map<std::string, RegridFunction> regrids;
 
 	RegridMatrices(IceRegridder *sheet);
 
 	/** Retrieves a final regrid matrix. */
-	SparseMatrix const &regrid(std::string const &spec_name) const
-	{
-		auto &TrM(regrids.at(spec_name));
-		if (TrM.transpose == 'T') {
-			(*icebin_error)(-1,
-				"regrid(%s) is transposed; currently, you can only retrieve non-transposed matrices.",
-				spec_name.c_str());
-		}
-		return *TrM.M;
-	}
-
-
-	/** Retrieves a weight or scale vector.  Options are:
-		w/sAvG		Partial cell weighting for A
-		w/sEvG		Partial cell weighting for E
-		w/sA		Whole cell weighting for A
-		w/sG		Whole cell weighting for E
-	*/
-	SparseVector const &scale(std::string const &spec_name) const
-	{
-		SparseVector const &ret = *diags.at(spec_name);
-		return ret;
-	}
+	std::unique_ptr<WeightedSparse> regrid(std::string const &spec_name, bool scale) const
+		{ return (regrids.at(spec_name))(scale); }
 
 };
 

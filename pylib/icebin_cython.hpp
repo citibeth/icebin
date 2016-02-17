@@ -20,17 +20,13 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
 	std::string const &sinterp_style,
 	PyObject *elevI_py, PyObject *maskI_py);
 
-inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name)
+inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale)
 {
-	SparseMatrix M(cself->regrid(spec_name));
-	return ibmisc::cython::spsparse_to_tuple(M);
-}
+	std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name, scale));
 
-inline PyObject *RegridMatrices_scale(RegridMatrices *cself, std::string const &spec_name, double fill_value)
-{
-	SparseVector w(cself->scale(spec_name));
-	// TODO: Copy only once instead of twice.  Don't bother for now...
-	return ibmisc::cython::blitz_to_np(w.to_dense(fill_value));
+	PyObject *weight_py = ibmisc::cython::blitz_to_np(Mw->weight.to_dense(0));
+	PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw->M);
+	return Py_BuildValue("OO", M_py, weight_py);
 }
 
 void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
