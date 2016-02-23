@@ -89,13 +89,13 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 // ========================================================
 void GCMRegridder::init(
 	std::unique_ptr<Grid> &&_gridA,
-	ibmisc::Domain<int> &&_domainA,		// Tells us which cells in gridA to keep...
+//	ibmisc::Domain<int> &&_domainA,		// Tells us which cells in gridA to keep...
 	std::vector<double> &&_hpdefs,	// [nhp]
 	ibmisc::Indexing<long,long> &&_indexingHP,
 	bool _correctA)
 {
 	gridA = std::move(_gridA);
-	domainA = std::move(_domainA);
+//	domainA = std::move(_domainA);
 	hpdefs = std::move(_hpdefs);
 	indexingHP = std::move(_indexingHP);
 	correctA = _correctA;
@@ -134,6 +134,7 @@ void GCMRegridder::clear()
 {
 	gridA.reset();
 	hpdefs.clear();
+	sheets_index.clear();
 	sheets.clear();
 }
 
@@ -151,7 +152,7 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 	indexingHP.ncio(ncio, ncInt, vname + ".indexingHP");
 	ncio_vector(ncio, hpdefs, true, vname + ".hpdefs", ncDouble,
 		get_or_add_dims(ncio, {vname + ".nhp"}, {hpdefs.size()} ));
-	domainA.ncio(ncio, ncInt, vname + ".domainA");
+//	domainA.ncio(ncio, ncInt, vname + ".domainA");
 	get_or_put_att(info_v, ncio.rw, vname + ".correctA", &correctA, 1);
 
 	// Read/write list of sheet names
@@ -214,10 +215,28 @@ void GCMRegridder::filter_cellsA(std::function<bool(long)> const &keepA)
 	// Now remove cells from the exgrids and gridIs that
 	// do not interact with the cells we've kept in grid1.
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
-		sheet->second->filter_cellsA(keepA);
+		sheet->filter_cellsA(keepA);
 	}
 
 	gridA->filter_cells(keepA);
+}
+
+void GCMRegridder::filter_cellsA(std::function<bool(long)> const &keepA)
+{
+
+	// Now remove cells from the exgrids and gridIs that
+	// do not interact with the cells we've kept in grid1.
+	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
+		sheet->filter_cellsA(keepA);
+	}
+
+	gridA->filter_cells(keepA);
+}
+
+void GCMRegridder::filter_cellsA(ibmisc::Domain<int> const &domainA)
+{
+	filter_cellsA(std::bind(&ibmisc::in_domain<int, long>,
+		&domainA, &gridA->indexing, _1));
 }
 
 void GCMRegridder::wA(SparseVector &w) const

@@ -27,7 +27,6 @@ BOOST_ENUM_VALUES( Weighting, int,
 
 
 class GCMRegridder;
-class IceRegridder;
 
 /** Creates regridding matrices for a single ice sheet. */
 class IceRegridder {
@@ -115,7 +114,7 @@ class GCMRegridder
 public:
 	std::unique_ptr<Grid> gridA;
 
-	ibmisc::Domain<int> domainA;				// What's in our MPI halo?
+//	ibmisc::Domain<int> domainA;				// What's in our MPI halo?
 	bool correctA;		/// Should we correct for projection and geometric error?
 
 
@@ -125,8 +124,8 @@ public:
 	grid cells) */
 	std::vector<double> hpdefs;	// [nhp]
 
-
-	typedef std::map<std::string, std::unique_ptr<IceRegridder>> SheetsT;
+	IndexSet<std::string> sheets_index;
+	typedef std::vector<std::unique_ptr<IceRegridder>> SheetsT;
 	SheetsT sheets;
 
 public:
@@ -135,7 +134,7 @@ public:
 	void clear();
 	void init(
 		std::unique_ptr<Grid> &&_gridA,
-		ibmisc::Domain<int> &&_domainA,		// Tells us which cells in gridA to keep...
+//		ibmisc::Domain<int> &&_domainA,		// Tells us which cells in gridA to keep...
 		std::vector<double> &&_hpdefs,
 		ibmisc::Indexing<long,long> &&_indexingHP,
 		bool _correctA);
@@ -146,7 +145,8 @@ public:
 	{
 		printf("Adding IceRegridder: '%s'\n", sheet->name.c_str());
 		sheet->gcm = this;
-		sheets.insert(std::make_pair(sheet->name, std::move(sheet)));
+		size_t ix = sheets_index.add(sheet->name);
+		sheets.push_back(std::move(sheet)));
 	}
 
 	void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&sheet)
@@ -156,31 +156,18 @@ public:
 	}
 
 	IceRegridder *sheet(std::string const &name)
-		{ return sheets.at(name).get(); }
+		{ return sheets[sheets_index.at(name)].get(); }
 
 	void filter_cellsA(std::function<bool(long)> const &keepA);
 
+	void filter_cellsA(ibmisc::Domain<int> const &domainA);
 
-	// typedef ibmisc::DerefSecondIter<std::string, IceRegridder, typename SheetsT::iterator> iterator;
-	typedef ibmisc::DerefSecondIter<std::string, const IceRegridder, typename SheetsT::const_iterator> const_iterator;
+	typedef ibmisc::DerefRandomAccessIter<const IceRegridder, typename SheetsT::const_iterator> const_iterator;
 
-#if 0
-	iterator begin()
-		{ return iterator(sheets.begin()); }
-	iterator end()
-		{ return iterator(sheets.end()); }
-	const_iterator cbegin() const
-		{ return const_iterator(sheets.cbegin()); }
-	const_iterator cend() const
-		{ return const_iterator(sheets.cend()); }
-#endif
 	const_iterator begin() const
 		{ return const_iterator(sheets.cbegin()); }
 	const_iterator end() const
 		{ return const_iterator(sheets.cend()); }
-
-	IceRegridder const &at(std::string const &name)
-		{ return *sheets.at(name); }
 
 	// -----------------------------------------
 
@@ -195,28 +182,8 @@ public:
 
 	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
-
-	std::unique_ptr<SparseMatrix> AvI(IceRegridder *sheet, bool scaled=true);
-
 };	// class GCMRegridder
 // ===========================================================
-/** Stores a (Matrix, bool) pair, which represents either M or M^T */
-template<class TypeT>
-class Transpose {
-public:
-	TypeT M;
-	char const transpose;
-
-	Transpose() : transpose(false) {}
-	Transpose(TypeT &&_M, char _transpose) : M(std::move(_M)), transpose(_transpose) {}
-
-	Transpose(Transpose &&rhs) : M(std::move(rhs.M)), transpose(rhs.transpose) {}
-};
-
-template<class TypeT>
-Transpose<TypeT> make_transpose(TypeT &&_M, char _transpose)
-	{ return Transpose<TypeT>(std::move(_M), _transpose); }
-// -----------------------------------------------------------
 // -----------------------------------------------------------
 typedef std::function<std::unique_ptr<WeightedSparse>(bool scale)> RegridFunction;
 
