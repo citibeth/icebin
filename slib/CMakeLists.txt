@@ -29,6 +29,18 @@ set(icebin_SOURCES
 	icebin/IceRegridder_L0.cpp
 )
 
+if (BUILD_COUPLER)
+	list(APPEND icebin_SOURCES
+		# Coupler...
+		icebin/GCMParams.cpp
+		icebin/GCMCoupler.cpp
+		icebin/IceModel_Writer.cpp
+		icebin/IceModel_Decode.cpp
+		icebin/IceModel_DISMAL.cpp
+	)
+endif()
+
+
 if (BUILD_GRIDGEN)
 	list(APPEND icebin_SOURCES
 		icebin/gridgen/gridutil.cpp

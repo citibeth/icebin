@@ -56,19 +56,27 @@ std::vector<NcDim const *> IceModel_Writer::get_dims(NcFile &nc)
 
 
 /** Specialized init signature for IceModel_Writer */
+void IceModel_Writer::init(IO _io, IceModel const &_main_model)
+{
+	io = _io;
+	main_model = _main_model;
+	output_file_initialized = false;
+}
+
 void IceModel_Writer::init(
-	std::shared_ptr<glint2::Grid> const &grid2,
-	IceModel const *model)
+	IceModel::IO _io,
+	IceModel const *_main_model)
 
 {
 	printf("BEGIN IceModel_Writer::init(%s)\n", name.c_str());
 
-	IceModel::init(grid2);
-
-	main_model = model;
+	main_model = _main_model;
+	io = _io;
 
 	// Try to be clever about making multi-dimensional arrays
 	// in the output according to the grid the user expects.
+	Grid const *gridI = &*sheet->gridI;
+
 	switch(grid2->type.index()) {
 		case Grid::Type::XY : {
 			Grid_XY const *grid2_xy = dynamic_cast<Grid_XY const *>(&*grid2);

@@ -6,6 +6,7 @@
 
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/memory.hpp>
+#include <ibmisc/IndexSet.hpp>
 #include <spsparse/eigen.hpp>
 
 #include <icebin/Grid.hpp>
@@ -27,9 +28,12 @@ BOOST_ENUM_VALUES( Weighting, int,
 
 
 class GCMRegridder;
+class IceModel;
 
 /** Creates regridding matrices for a single ice sheet. */
 class IceRegridder {
+	friend class IceModel;
+
 public:
 	typedef Grid::Parameterization Type;
 
@@ -124,7 +128,7 @@ public:
 	grid cells) */
 	std::vector<double> hpdefs;	// [nhp]
 
-	IndexSet<std::string> sheets_index;
+	ibmisc::IndexSet<std::string> sheets_index;
 	typedef std::vector<std::unique_ptr<IceRegridder>> SheetsT;
 	SheetsT sheets;
 
@@ -145,8 +149,8 @@ public:
 	{
 		printf("Adding IceRegridder: '%s'\n", sheet->name.c_str());
 		sheet->gcm = this;
-		size_t ix = sheets_index.add(sheet->name);
-		sheets.push_back(std::move(sheet)));
+		size_t ix = sheets_index.insert(sheet->name);
+		sheets.push_back(std::move(sheet));
 	}
 
 	void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&sheet)

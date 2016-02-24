@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <ibmisc/IndexSet.hpp>
 
 namespace icebin {
 
@@ -22,7 +23,7 @@ class VarSet
 {
 public:
 
-	IndexSet<std::string> index;	// Densely ordered set of constant names
+	ibmisc::IndexSet<std::string> index;	// Densely ordered set of constant names
 	std::vector<VarMeta> data;	// Meta-data and value data
 
 	int add(
@@ -31,7 +32,7 @@ public:
 		unsigned flags = 0,
 		std::string const &description = "<no description>")
 	{
-		size_t ix = index.add(name);
+		size_t ix = index.insert(name);
 
 		VarMeta datum;
 		datum.name = name;

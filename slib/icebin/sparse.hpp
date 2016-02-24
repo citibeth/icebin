@@ -18,5 +18,6 @@ struct WeightedSparse {
 	WeightedSparse(std::array<size_t, 2> const &shape) : M(shape), weight({shape[0]}) {}
 };
 
+
 }
 #endif

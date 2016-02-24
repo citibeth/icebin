@@ -1,17 +1,16 @@
 #pragma once
 
 #include <cstdlib>
+
+#include <ibmisc/VarTransformer.hpp>
 #include <ibmisc/DynArray.hpp>
-#include <ibmisc/Dict.hpp>
 #include <ibmisc/udunits2.hpp>
-#include <icebin/IceModel.hpp>
-#include <icebin/IceModel_Writer.hpp>
 #include <ibmisc/ConstantSet.hpp>
+
 #include <icebin/GCMParams.hpp>
 #include <icebin/GCMPerIceSheetParams.hpp>
-#include <icebin/GridDomain.hpp>
-#include <icebin/MatrixMaker.hpp>
-#include <icebin/VarMeta.hpp>
+#include <icebin/GCMRegridder.hpp>
+#include <icebin/VarSet.hpp>
 
 namespace icebin {
 
@@ -19,7 +18,6 @@ class GCMCoupler;
 class IceModel_Writer;
 
 class IceModel {
-
 public:
 	BOOST_ENUM_VALUES( Type, int,
 		(DISMAL)		(0)		// Demo Ice Sheet Model and LandIce
@@ -29,9 +27,13 @@ public:
 	);
 	const IceModel::Type type;
 
+	friend class GCMCoupler;
+	friend std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
+		GCMCoupler const *_coupler, IceRegridder const *_sheet);
+
 protected:
-	GCMCoupler * const coupler;		// parent back-pointer
-	IceRegridder * const sheet;
+	GCMCoupler const * coupler;		// parent back-pointer
+	IceRegridder const * sheet;
 
 	/** Ordered specification of the variables (w/ units)
 	to be passed IceBin->IceModel and IceModel->IceBin */
@@ -94,12 +96,12 @@ public:
 
 	// --------------------------------------------
 	/** Allocate a new giss::CouplingContract, with the same lifetime as this IceModel. */
-	giss::CouplingContract *new_CouplingContract();
+	VarSet *new_VarSet();
 
-	IceModel(IceModel::Type _type, std::string const &_name, GCMCoupler const *_coupler);
+	IceModel(IceModel::Type _type) : type(_type) {}
 	virtual ~IceModel();
 
-	long ndata() const { return grid2->ndata(); }
+	long ndata() const { return sheet->gridI->ndata(); }
 
 	// --------------------------------------------------
 
@@ -107,14 +109,7 @@ public:
 
 	/** Initialize any grid information, etc. from the IceSheet struct.
 	@param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
-	virtual void init(
-		IceRegridder *_sheet,
-		NcFile &nc,
-		std::string const &vname_base)
-	{
-		(*icebin_error)(-1, "init() not implemented");
-	}
-
+	virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet);
 
 	/** Event handler to let IceModels know the start time is (finally) set */
 	virtual void start_time_set() {}
@@ -146,12 +141,96 @@ public:
 	elev2 and mask2 consistent with an existing ice model (eg, PISM).
 	It is called after init().
 	Default implementation is to do nothing. */
-	virtual void update_ice_sheet(NcFile &nc, std::string const &vname,
-		IceRegridder *sheet) {}
+	virtual void update_ice_sheet(ibmisc::NcIO &ncio, std::string const &vname) {}
 
 };		// class IceModel
 // =========================================================
+/** Serves as a base class for practical IceModels.  The
+run_timestep() method is implemented, requiring subclasses to
+implement the new method run_decoded().  Decoding converts a set of
+(index, value) pairs into normal arrays (with NaN where no value was
+given. */
+class IceModel_Decode : public IceModel {
+public :
+
+	IceModel_Decode(IceModel::Type _type)
+		: IceModel(_type) {}
+
+	~IceModel_Decode() {}
+
+	/** @param index Index of each grid value.
+	@param vals The values themselves -- could be SMB, Energy, something else...
+	TODO: More params need to be added.  Time, return values, etc.
+	@param time_s Time since start of simulation, in seconds */
+	virtual void run_timestep(double time_s,
+		blitz::Array<int,1> const &indices,
+		std::vector<blitz::Array<double,1>> const &ivalsI);
+
+	/** Runs a timestep after fields have been decoded.  This is what
+	one will normally want to override, unless you wish to decode
+	yourself. */
+	virtual void run_decoded(double time_s,
+		std::vector<blitz::Array<double,1>> const &ivalsI) = 0;
+};
+
 // =========================================================
+class IceModel_DISMAL : public IceModel_Decode
+{
+
+public:
+	IceModel_DISMAL() : IceModel_Decode(IceModel::Type::DISMAL) {}
+
+	/** @param index Index of each grid value.
+	@param vals The values themselves -- could be SMB, Energy, something else...
+	TODO: More params need to be added.  Time, return values, etc. */
+	void run_decoded(double time_s,
+		std::vector<blitz::Array<double,1>> const &valsI) {}
+};
+// =========================================================
+class IceModel_Writer : public IceModel_Decode
+{
+	/** The IceModel we're affiliated with */
+	IceModel const *main_model;
+
+	/** Tells whether we are planning on writing the INPUT or OUTPUT fields */
+	IceModel::IO io;
+
+	// Dimensions to use when writing to netCDF
+	std::vector<std::string> dim_names;
+	std::vector<long> cur;		// Base index to write in netCDF
+	std::vector<long> counts;
+
+	// The output file we are writing to...
+	std::string output_fname;
+
+public:
+	void init(IO _io, IceModel const *main_model);
+
+	IceModel_Writer() :
+		IceModel_Decode(IceModel::Type::WRITER) {}
+
+	void start_time_set();
+
+protected:
+	bool output_file_initialized;
+	/** This is called on-demand, the first time through run_decoded(). */
+	void init_output_file();
+
+public:
+	/** @param index Index of each grid value.
+	@param vals The values themselves -- could be SMB, Energy, something else...
+	TODO: More params need to be added.  Time, return values, etc. */
+	void run_decoded(double time_s,
+		std::vector<blitz::Array<double,1>> const &ivals2);
+
+#if 0
+protected:
+
+	std::vector<NcDim const *> add_dims(NcFile &nc);
+	std::vector<NcDim const *> get_dims(NcFile &nc);
+#endif
+
+};
 
 
 // ----------------------------------------------------------
@@ -204,20 +283,21 @@ public:
 	/** See regridder.sheets_index */
 	std::vector<std::unique_ptr<IceModel>> ice_models;
 
+
 	ibmisc::UTSystem ut_system;		//!< Unit system for ConstantSets and CouplingContracts
 	ibmisc::ConstantSet gcm_constants;		//!< Constants provided by the GCM
 
 	/** Fields we receive from the GCM */
-	ibmisc::VarSet gcm_outputs;
+	VarSet gcm_outputs;
 
 	/** Fields to send back to the GCM */
-	ibmisc::VarSet gcm_inputs;
+	VarSet gcm_inputs;
 
 
 	/** Names of items used in the SCALARS dimension of VarTranslator.
 	Used for ice_input and gcm_inputs.
 	Scalars could be (eg) a timestep dt that is not known until runtime. */
-	ibmisc::VarSet scalars;
+	VarSet scalars;
 
 	// Fields we read from the config file...
 
@@ -230,10 +310,9 @@ public:
 
 	GCMCoupler(Type _type) :
 		type(_type),
-		sheets_index(regridder.sheets_index),
-		ut_system(""),
-		gcm_constants(&ut_system)
+		ut_system("")
 	{
+		gcm_constants.init(&ut_system);
 
 		// Icebin requires orography on the ice grid, in order to
 		// regrid in elevation space when things change.  Therefore, this
@@ -252,10 +331,10 @@ public:
 	/** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
 	virtual std::unique_ptr<GCMPerIceSheetParams>
 	read_gcm_per_ice_sheet_params(
-		NcFile &nc,
+		ibmisc::NcIO &ncio,
 		std::string const &sheet_vname) = 0;
 
-	virtual void read_from_netcdf(
+	virtual void ncread(
 		std::string const &fname,
 		std::string const &vname,
 		ibmisc::Domain<int> &&domainA);
@@ -294,18 +373,23 @@ public:
 	void couple_to_ice(double time_s,
 		int nfields,
 		ibmisc::DynArray<SMBMsg> &sbuf,
-		std::vector<ibmisc::VectorSparseVector<int,double>> &gcm_ivals);
+		std::vector<SparseVector> &gcm_ivals);
 
 	/** Follows the pattern of couple_to_ice()
 	@param sbuf the (filled) array of ice grid values for this MPI node. */
 	void get_initial_state(
 	double time_s,
-	std::vector<ibmisc::VectorSparseVector<int,double>> &gcm_ivals);	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+	std::vector<SparseVector> &gcm_ivals);	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 
 protected:
+	void scaled_regrids(
+		std::string const regrid_spec,
+		std::vector<SparseMatrix> AvIs,
+		SparseVector scaleA);
+
 	void regrid_gcm_inputs_onroot(
 		double time_s,
-		std::vector<ibmisc::VectorSparseVector<int,double>> &gcm_ivals,	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
+		std::vector<SparseVector> &gcm_ivals,	// Root node only: Already-allocated space to put output values.  Members as defined by the CouplingContract GCMCoupler::gcm_inputs
 		unsigned int mask);
 
 };

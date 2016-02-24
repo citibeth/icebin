@@ -159,8 +159,8 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 	std::vector<std::string> sheet_names;
 	if (ncio.rw == 'w') {
 		// Copy sheet names to a std::vector
-		for (auto ii=sheets.begin(); ii != sheets.end(); ++ii)
-			sheet_names.push_back(ii->first);
+		for (auto ii=sheets_index.begin(); ii != sheets_index.end(); ++ii)
+			sheet_names.push_back(*ii);
 	}
 	get_or_put_att(info_v, ncio.rw, vname + ".sheets", sheet_names);
 
@@ -171,9 +171,8 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 			add_sheet(*sheet_name, new_ice_regridder(ncio, vn));
 		}
 	}
-	for (auto ii=sheets.begin(); ii != sheets.end(); ++ii) {
-		IceRegridder *sheet = &*(ii->second);
-		sheet->ncio(ncio, vname + "." + sheet->name);
+	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
+		(*sheet)->ncio(ncio, vname + "." + (*sheet)->name);
 	}
 }
 // -------------------------------------------------------------
@@ -215,19 +214,7 @@ void GCMRegridder::filter_cellsA(std::function<bool(long)> const &keepA)
 	// Now remove cells from the exgrids and gridIs that
 	// do not interact with the cells we've kept in grid1.
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
-		sheet->filter_cellsA(keepA);
-	}
-
-	gridA->filter_cells(keepA);
-}
-
-void GCMRegridder::filter_cellsA(std::function<bool(long)> const &keepA)
-{
-
-	// Now remove cells from the exgrids and gridIs that
-	// do not interact with the cells we've kept in grid1.
-	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
-		sheet->filter_cellsA(keepA);
+		(*sheet)->filter_cellsA(keepA);
 	}
 
 	gridA->filter_cells(keepA);

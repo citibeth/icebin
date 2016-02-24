@@ -45,6 +45,10 @@ if (NOT DEFINED BUILD_COUPLER)
 	set(BUILD_COUPLER YES)
 endif()
 if (BUILD_COUPLER)
+	find_package(MPI REQUIRED)
+	include_directories(${MPI_C_INCLUDE_PATH})
+	list(APPEND EXTERNAL_LIBS ${MPI_C_LIBRARIES})
+
 	if (NOT DEFINED USE_PISM)
 		set(USE_PISM NO)
 	endif()
@@ -102,7 +106,6 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 #find_package(CGAL REQUIRED)
 #find_package(MPFR REQUIRED)		# Used by CGAL
-#find_package(MPI REQUIRED)
 
 
 #find_package(PROJ4)
