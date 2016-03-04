@@ -11,7 +11,9 @@
 #endif()
 
 message(PYTHON_EXECUTABLE ${PYTHON_EXECUTABLE})
-find_program(PYTHON_EXECUTABLE python DOC "python interpreter")
+find_program(PYTHON_EXECUTABLE python3 DOC "python interpreter")
+#find_program(PYTHON_CONFIG_EXE python3-config DOC "python configuration")
+
 
 if(PYTHON_EXECUTABLE)
     execute_process( COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print (sysconfig.get_path('include'))"
@@ -19,10 +21,11 @@ if(PYTHON_EXECUTABLE)
                      RESULT_VARIABLE PYTHON_INCLUDES_NOT_FOUND
                      OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-    execute_process( COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print (sysconfig.get_config_var('LIBPL'))"
-                     OUTPUT_VARIABLE PYTHON_LIBDIR
-                     RESULT_VARIABLE PYTHON_LIBDIR_NOT_FOUND
-                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+#    execute_process( COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print (sysconfig.get_config_var('LIBPL'))"
+#                     OUTPUT_VARIABLE PYTHON_LIBDIR
+#                     RESULT_VARIABLE PYTHON_LIBDIR_NOT_FOUND
+#                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+
     execute_process( COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print (sysconfig.get_python_version())"
                      OUTPUT_VARIABLE PYTHON_VERSION
                      RESULT_VARIABLE PYTHON_VERSION_NOT_FOUND
@@ -38,15 +41,26 @@ if(PYTHON_EXECUTABLE)
                      RESULT_VARIABLE PYTHON_MAJOR_VERSION_NOT_FOUND
                      OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-
-
+    # https://www.python.org/dev/peps/pep-3149/
+    execute_process( COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print (sysconfig.get_config_var('ABIFLAGS'))"
+                     OUTPUT_VARIABLE PYTHON_ABIFLAGS
+                     RESULT_VARIABLE PYTHON_ABIFLAGS_NOT_FOUND
+                     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 endif()
 
-if(PYTHON_LIBDIR)
-    find_library( PYTHON_LIBRARY "python${PYTHON_VERSION}" HINTS ${PYTHON_LIBDIR} NO_CMAKE_PATH NO_CMAKE_ENVIRONMENT_PATH NO_SYSTEM_ENVIRONMENT_PATH NO_DEFAULT_PATH)
-	message("python${PYTHON_VERSION}")
-endif()
+message('PYTHON_LIBDIR...........'${PYTHON_LIBDIR})
+message("PYTHON_VERSION = " ${PYTHON_VERSION})
+message("PYTHON_ABIFLAGS = " ${PYTHON_ABIFLAGS})
+message("Find Python Library python${PYTHON_VERSION}${PYTHON_ABIFLAGS}")
+
+find_library( PYTHON_LIBRARY NAMES "python${PYTHON_VERSION}${PYTHON_ABIFLAGS}"
+	HINTS ${PYTHON_LIBDIR})
+
+#if(PYTHON_LIBDIR)
+#    find_library( PYTHON_LIBRARY NAMES "python${PYTHON_VERSION}${PYTHON_ABIFLAGS}")
+## HINTS ${PYTHON_LIBDIR} NO_CMAKE_PATH NO_CMAKE_ENVIRONMENT_PATH NO_SYSTEM_ENVIRONMENT_PATH NO_DEFAULT_PATH)
+#endif()
 
 message("-- Found PYTHON_EXECUTABLE " ${PYTHON_EXECUTABLE})
 message("-- Found PYTHON_VERSION " ${PYTHON_VERSION})
