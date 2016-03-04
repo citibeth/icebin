@@ -1,6 +1,6 @@
-find_package(python)
-find_package(cython)
-find_package(numpy)
+find_package(Python)
+find_package(Cython)
+find_package(Numpy)
 
 
 # ----------Stuff to help with running Python before this project is installed.
@@ -66,11 +66,11 @@ foreach (CYTHON_MODULE _icebin)
 	set_target_properties(${CYTHON_MODULE}_so PROPERTIES
 		INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-	install(TARGETS ${CYTHON_MODULE}_so DESTINATION pylib)
+	install(TARGETS ${CYTHON_MODULE}_so DESTINATION lib/python${PYTHON_VERSION}/site-packages)
 
 endforeach()
 
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/pylib/ DESTINATION pylib
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/pylib/ DESTINATION lib/python${PYTHON_VERSION}/site-packages
           FILES_MATCHING PATTERN "*.py")
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/pylib/ DESTINATION pylib
           FILES_MATCHING PATTERN "*.pxd")

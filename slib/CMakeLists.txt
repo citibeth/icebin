@@ -35,8 +35,8 @@ if (BUILD_COUPLER)
 		icebin/GCMParams.cpp
 		icebin/GCMCoupler.cpp
 		icebin/IceModel_Writer.cpp
-		icebin/IceModel_Decode.cpp
-		icebin/IceModel_DISMAL.cpp
+#		icebin/IceModel_Decode.cpp
+#		icebin/IceModel_DISMAL.cpp
 	)
 endif()
 

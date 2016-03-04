@@ -74,7 +74,7 @@ list(APPEND EXTERNAL_LIBS ${Boost_LIBRARIES})
 # -------- Find Dependencies
 
 # --- Blitz
-find_package(blitz REQUIRED)
+find_package(Blitz REQUIRED)
 add_definitions(-DUSE_BLITZ)
 include_directories(${BLITZ_INCLUDE_DIR})
 list(APPEND EXTERNAL_LIBS ${BLITZ_LIBRARY})
@@ -87,7 +87,7 @@ list(APPEND EXTERNAL_LIBS ${NETCDF4_CXX_LIBRARY})
 
 
 # --- IBMisc
-find_package(ibmisc REQUIRED)
+find_package(Ibmisc REQUIRED)
 list(APPEND EXTERNAL_LIBS ${IBMISC_LIBRARY})
 include_directories(${IBMISC_INCLUDE_DIR})
 
