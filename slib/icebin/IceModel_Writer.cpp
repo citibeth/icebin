@@ -18,12 +18,12 @@
 
 #include <mpi.h>		// Must be first
 #include <boost/filesystem.hpp>
-#include <glint2/IceModel_Writer.hpp>
+#include <icebin/IceModel_Writer.hpp>
 #include <cstdio>
 #include <cmath>
 #include <cassert>
-#include <glint2/GCMParams.hpp>
-#include <glint2/GCMCoupler.hpp>
+#include <icebin/GCMParams.hpp>
+#include <icebin/GCMCoupler.hpp>
 
 namespace glint2 {
 
@@ -56,13 +56,6 @@ std::vector<NcDim const *> IceModel_Writer::get_dims(NcFile &nc)
 
 
 /** Specialized init signature for IceModel_Writer */
-void IceModel_Writer::init(IO _io, IceModel const &_main_model)
-{
-	io = _io;
-	main_model = _main_model;
-	output_file_initialized = false;
-}
-
 void IceModel_Writer::init(
 	IceModel::IO _io,
 	IceModel const *_main_model)
@@ -72,26 +65,24 @@ void IceModel_Writer::init(
 
 	main_model = _main_model;
 	io = _io;
+	output_file_initialized = false;
 
 	// Try to be clever about making multi-dimensional arrays
 	// in the output according to the grid the user expects.
 	Grid const *gridI = &*sheet->gridI;
 
-	switch(grid2->type.index()) {
-		case Grid::Type::XY : {
-			Grid_XY const *grid2_xy = dynamic_cast<Grid_XY const *>(&*grid2);
-			// First dimension will be unlimited
-			dim_names = {"time", "ny", "nx"};
-			counts = {1, grid2_xy->ny(), grid2_xy->nx()};
-			cur = {0, 0, 0};
-		} break;
-		default : {
-			// First dimension will be unlimited
-			dim_names = {"time", "n2"};
-			counts = {1, grid2->ndata()};
-			cur = {0, 0};
-		} break;
-	};
+
+	auto &indexing(gridI->indexing);
+	dim_names = {"time"};
+	counts = {1};
+	cur = {0};
+	for (size_t i=0; i<gridI->indexing.rank(); ++i) {
+		// ix goes 0...n-1 for row-major, n-1..0 for col-major
+		int ix = indexing.indices[i];
+		dim_names.push_back(string_printf("dim%d", ix));
+		counts.push_back(indexing.extent[ix]);
+		cur.push_back(0);
+	}
 
 	// Only need to run one copy of this
 	GCMParams const &gcm_params(coupler->gcm_params);

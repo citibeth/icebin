@@ -3,6 +3,7 @@
 #include <string>
 
 namespace icebin {
+namespace contracts {
 
 /** Indicates the grid this field is supposed to be on. */
 const unsigned GRID_BITS = 3;
@@ -19,13 +20,9 @@ extern std::string to_str(unsigned int flags);
 // =====================================================
 // Virtual Functions that dispatch on GCMCoupler and IceModel
 
-extern void setup_contracts(GCMCoupler &coupler, IceModel &model);
+extern void setup(GCMCoupler &coupler, IceModel &model);
 // ======================================================
 
 
 
-}
-
-
-
-
+}}		// namespace

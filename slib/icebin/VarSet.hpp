@@ -43,7 +43,7 @@ public:
 		data.push_back(std::move(datum));
 	}
 
-	size_t size() { return index.size(); }
+	size_t size() const { return index.size(); }
 
 	VarMeta const &operator[](size_t ix) const
 		{ return data[ix]; }

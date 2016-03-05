@@ -44,7 +44,7 @@ public:
 protected:
 
 	Type type;
-	std::string name;	/// "greenland", "antarctica", etc.
+	std::string _name;	/// "greenland", "antarctica", etc.
 	std::unique_ptr<Grid> gridI;			/// Ice grid outlines
 	std::unique_ptr<Grid> exgrid;		/// Exchange grid outlines (between GCM and Ice)
 	InterpStyle interp_style;	/// How we interpolate I<-E
@@ -59,6 +59,8 @@ protected:
 	void filter_cellsA(std::function<bool(long)> const &keepA);
 
 public:
+	std::string const &name() const { return _name; }
+
 	IceRegridder();
 	void clear();
 	void init(
@@ -147,15 +149,15 @@ public:
 
 	void add_sheet(std::unique_ptr<IceRegridder> &&sheet)
 	{
-		printf("Adding IceRegridder: '%s'\n", sheet->name.c_str());
+		printf("Adding IceRegridder: '%s'\n", sheet->name().c_str());
 		sheet->gcm = this;
-		size_t ix = sheets_index.insert(sheet->name);
+		size_t ix = sheets_index.insert(sheet->name());
 		sheets.push_back(std::move(sheet));
 	}
 
 	void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&sheet)
 	{
-		sheet->name = name;
+		sheet->_name = name;
 		add_sheet(std::move(sheet));
 	}
 

@@ -48,6 +48,7 @@ protected:
 	std::unique_ptr<IceModel_Writer> _iwriter, _owriter;
 
 public:
+	std::string const &name() { return sheet->name(); }
 
 	/** Constants obtained from the GCM */
 	ibmisc::ConstantSet ice_constants;
@@ -95,8 +96,10 @@ public:
 	void set_gcm_inputs(unsigned int mask);
 
 	// --------------------------------------------
+#if 0
 	/** Allocate a new giss::CouplingContract, with the same lifetime as this IceModel. */
 	VarSet *new_VarSet();
+#endif
 
 	IceModel(IceModel::Type _type) : type(_type) {}
 	virtual ~IceModel();
@@ -332,7 +335,7 @@ public:
 	virtual std::unique_ptr<GCMPerIceSheetParams>
 	read_gcm_per_ice_sheet_params(
 		ibmisc::NcIO &ncio,
-		std::string const &sheet_vname) = 0;
+		std::string const &sheet_vname) const = 0;
 
 	virtual void ncread(
 		std::string const &fname,

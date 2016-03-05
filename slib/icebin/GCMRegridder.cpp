@@ -16,7 +16,7 @@ using namespace spsparse;
 namespace icebin {
 
 // -----------------------------------------------------
-IceRegridder::IceRegridder() : interp_style(InterpStyle::Z_INTERP), name("icesheet") {}
+IceRegridder::IceRegridder() : interp_style(InterpStyle::Z_INTERP), _name("icesheet") {}
 
 IceRegridder::~IceRegridder() {}
 
@@ -79,7 +79,7 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 	}
 
 	auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
-	get_or_put_att(info_v, ncio.rw, "name", name);
+	get_or_put_att(info_v, ncio.rw, "name", _name);
 	get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 
 	gridI->ncio(ncio, vname + ".gridI");
@@ -172,7 +172,7 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 		}
 	}
 	for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
-		(*sheet)->ncio(ncio, vname + "." + (*sheet)->name);
+		(*sheet)->ncio(ncio, vname + "." + (*sheet)->name());
 	}
 }
 // -------------------------------------------------------------
@@ -233,13 +233,13 @@ void GCMRegridder::wA(SparseVector &w) const
 }
 // ---------------------------------------------------------------------
 void IceRegridder::init(
-	std::string const &_name,
+	std::string const &name,
 	std::unique_ptr<Grid> &&_gridI,
 	std::unique_ptr<Grid> &&_exgrid,
 	InterpStyle _interp_style,
 	SparseVector &&_elevI)
 {
-	name = (_name != "" ? _name : gridI->name);
+	_name = (name != "" ? name : gridI->name);
 	gridI = std::move(_gridI);
 	exgrid = std::move(_exgrid);
 	interp_style = _interp_style;

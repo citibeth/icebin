@@ -13,7 +13,7 @@ using namespace icebin::gpism;
 
 // --------------------------------------------------------
 namespace icebin {
-namespace contract {
+namespace contracts {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
