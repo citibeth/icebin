@@ -28,6 +28,7 @@ public:
 	const IceModel::Type type;
 
 	friend class GCMCoupler;
+    friend class IceModel_Writer;
 	friend std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
 		GCMCoupler const *_coupler, IceRegridder const *_sheet);
 
@@ -49,6 +50,7 @@ protected:
 
 public:
 	std::string const &name() { return sheet->name(); }
+    Grid const *gridI() { return &*sheet->gridI; }
 
 	/** Constants obtained from the GCM */
 	ibmisc::ConstantSet ice_constants;
@@ -119,15 +121,15 @@ public:
 
 	/** Run the ice model for one coupling timestep.
 	@param time_s Seconds since GCMParams::time_base.  Helps with debugging.
-	@param index Index of each input grid value in ivals2.
-	@param ivals2 The values themselves (sparse representation).
+	@param index Index of each input grid value in ivalsI.
+	@param ivalsI The values themselves (sparse representation).
            Their meaning (SMB, T, etc) is determined
            by the place in the array, as specified by the appropriate
            INPUT contract for this ice model.
 	*/
 	virtual void run_timestep(double time_s,
 		blitz::Array<int,1> const &indices,
-		std::vector<blitz::Array<double,1>> const &ivals2)
+		std::vector<blitz::Array<double,1>> const &ivalsI)
 	{
 		(*icebin_error)(-1, "run_timestep() not implemented");
 	}
@@ -177,6 +179,7 @@ public :
 };
 
 // =========================================================
+#if 0
 class IceModel_DISMAL : public IceModel_Decode
 {
 
@@ -189,6 +192,7 @@ public:
 	void run_decoded(double time_s,
 		std::vector<blitz::Array<double,1>> const &valsI) {}
 };
+#endif
 // =========================================================
 class IceModel_Writer : public IceModel_Decode
 {
@@ -200,8 +204,8 @@ class IceModel_Writer : public IceModel_Decode
 
 	// Dimensions to use when writing to netCDF
 	std::vector<std::string> dim_names;
-	std::vector<long> cur;		// Base index to write in netCDF
-	std::vector<long> counts;
+	std::vector<size_t> cur;		// Base index to write in netCDF
+	std::vector<size_t> counts;
 
 	// The output file we are writing to...
 	std::string output_fname;
@@ -224,13 +228,13 @@ public:
 	@param vals The values themselves -- could be SMB, Energy, something else...
 	TODO: More params need to be added.  Time, return values, etc. */
 	void run_decoded(double time_s,
-		std::vector<blitz::Array<double,1>> const &ivals2);
+		std::vector<blitz::Array<double,1>> const &ivalsI);
 
 #if 0
 protected:
 
-	std::vector<NcDim const *> add_dims(NcFile &nc);
-	std::vector<NcDim const *> get_dims(NcFile &nc);
+	std::vector<netCDF::NcDim> add_dims(NcFile &nc);
+	std::vector<netCDF::NcDim> get_dims(NcFile &nc);
 #endif
 
 };

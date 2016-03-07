@@ -3,11 +3,12 @@
 # https://github.com/snikulov/google-test-examples/blob/master/CMakeLists.txt
 
 enable_testing()
-find_package(GTest REQUIRED)
+find_package(Gtest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/slib)
 
+message("GTEST_LIBRARY " ${GTEST_LIBRARY})
 
-SET(ALL_LIBS ${GTEST_LIBRARY} ${EXTERNAL_LIBS} icebin)
+SET(ALL_LIBS icebin ${EXTERNAL_LIBS} ${GTEST_LIBRARY})
 
 
 foreach(TEST grid)

@@ -4,6 +4,7 @@
 #    GTEST_LIBRARY
 #    GTEST_INCLUDE_DIR
 
+message("GTEST libst listlist")
 
 FIND_PATH(GTEST_INCLUDE_DIR gtest
 	HINTS ${GTEST_ROOT}/include)

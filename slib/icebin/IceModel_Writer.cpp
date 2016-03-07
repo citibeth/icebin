@@ -1,202 +1,157 @@
-/*
- * GLINT2: A Coupling Library for Ice Models and GCMs
- * Copyright (c) 2013, 2014 by Robert Fischer
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include <mpi.h>		// Must be first
+#include <mpi.h>        // Must be first
 #include <boost/filesystem.hpp>
-#include <icebin/IceModel_Writer.hpp>
 #include <cstdio>
 #include <cmath>
 #include <cassert>
 #include <icebin/GCMParams.hpp>
 #include <icebin/GCMCoupler.hpp>
+#include <ibmisc/string.hpp>
 
-namespace glint2 {
+using namespace ibmisc;
+using namespace netCDF;
 
-
-std::vector<NcDim const *> IceModel_Writer::add_dims(NcFile &nc)
-{
-//	printf("BEGIN add_dims()\n");
-
-	std::vector<NcDim const *> ret;
-	unsigned int ndim = dim_names.size();
-	ret.reserve(ndim);
-	ret.push_back(nc.add_dim(dim_names[0].c_str()));	// No dimsize --> unlimited
-	for (unsigned int i=1; i < ndim; ++i) {
-		ret.push_back(nc.add_dim(dim_names[i].c_str(), counts[i]));
-	}
-
-//	printf("END add_dims()\n");
-	return ret;
-}
-
-std::vector<NcDim const *> IceModel_Writer::get_dims(NcFile &nc)
-{
-	std::vector<NcDim const *> ret;
-	unsigned int ndim = dim_names.size();
-	ret.reserve(ndim);
-	for (unsigned int i=0; i < ndim; ++i)
-		ret.push_back(nc.get_dim(dim_names[i].c_str()));
-	return ret;
-}
-
+namespace icebin {
 
 /** Specialized init signature for IceModel_Writer */
 void IceModel_Writer::init(
-	IceModel::IO _io,
-	IceModel const *_main_model)
+    IceModel::IO _io,   // Ic
+    IceModel const *_main_model)
 
 {
-	printf("BEGIN IceModel_Writer::init(%s)\n", name.c_str());
+    printf("BEGIN IceModel_Writer::init(%s)\n", name().c_str());
 
-	main_model = _main_model;
-	io = _io;
-	output_file_initialized = false;
+    main_model = _main_model;
+    io = _io;
+    output_file_initialized = false;
 
-	// Try to be clever about making multi-dimensional arrays
-	// in the output according to the grid the user expects.
-	Grid const *gridI = &*sheet->gridI;
+    // Try to be clever about making multi-dimensional arrays
+    // in the output according to the grid the user expects.
+    auto &indexing(gridI()->indexing);
+    dim_names = {"time"};
+    counts = {1};
+    cur = {0};
+    for (size_t i=0; i<gridI()->indexing.rank(); ++i) {
+        // ix goes 0...n-1 for row-major, n-1..0 for col-major
+        int ix = indexing.indices[i];
+        dim_names.push_back(string_printf("dim%d", ix));
+        counts.push_back(indexing.extent[ix]);
+        cur.push_back(0);
+    }
 
+    // Only need to run one copy of this
+    GCMParams const &gcm_params(coupler->gcm_params);
+    if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
 
-	auto &indexing(gridI->indexing);
-	dim_names = {"time"};
-	counts = {1};
-	cur = {0};
-	for (size_t i=0; i<gridI->indexing.rank(); ++i) {
-		// ix goes 0...n-1 for row-major, n-1..0 for col-major
-		int ix = indexing.indices[i];
-		dim_names.push_back(string_printf("dim%d", ix));
-		counts.push_back(indexing.extent[ix]);
-		cur.push_back(0);
-	}
+    // Put our output files in this directory, one named per ice sheet.
+    auto output_dir = boost::filesystem::absolute(
+        boost::filesystem::path(
+            (io == IceModel::INPUT ? "ice_model_in" : "ice_model_out")),
+        coupler->gcm_params.run_dir);
+    boost::filesystem::create_directory(output_dir);    // Make sure it exists
 
-	// Only need to run one copy of this
-	GCMParams const &gcm_params(coupler->gcm_params);
-	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
+    // Set up the output file
+    // Create netCDF variables based on details of the coupling contract.xs
+    output_fname = (output_dir / (name() + ".nc")).string();
+    printf("IceModel_Writer opening file %s\n", output_fname.c_str());
 
-	// Put our output files in this directory, one named per ice sheet.
-	auto output_dir = boost::filesystem::absolute(
-		boost::filesystem::path(
-			(io == IceModel::INPUT ? "ice_model_in" : "ice_model_out")),
-		coupler->gcm_params.run_dir);
-	boost::filesystem::create_directory(output_dir);	// Make sure it exists
-
-	// Set up the output file
-	// Create netCDF variables based on details of the coupling contract.xs
-	output_fname = (output_dir / (name + ".nc")).string();
-	printf("IceModel_Writer opening file %s\n", output_fname.c_str());
-
-	printf("END IceModel_Writer::init_from_ice_model(%s)\n", name.c_str());
+    printf("END IceModel_Writer::init_from_ice_model(%s)\n", name().c_str());
 }
 
 void IceModel_Writer::start_time_set()
 {
-	// We just need the input (or output) coupling contract
-	contract[io] = main_model->contract[io];
+    // We just need the input (or output) coupling contract
+    contract[io] = main_model->contract[io];
 }
 
 void IceModel_Writer::init_output_file()
 {
-	GCMParams const &gcm_params(coupler->gcm_params);
+    GCMParams const &gcm_params(coupler->gcm_params);
 
-	printf("BEGIN IceModel_Writer::init_output_file(%s)\n", output_fname.c_str());
+    printf("BEGIN IceModel_Writer::init_output_file(%s)\n", output_fname.c_str());
 
-	NcFile nc(output_fname.c_str(), NcFile::Replace);
-	std::vector<const NcDim *> dims = add_dims(nc);
-	NcDim *one_dim = nc.add_dim("one", 1);
+    NcIO ncio(output_fname, NcFile::replace);
 
-	NcVar *info_var = nc.add_var("grid", giss::get_nc_type<double>(), one_dim);
+    auto dims(get_or_add_dims(ncio, dim_names, counts));
 
-	info_var->add_att("file", coupler->fname.c_str());
-	info_var->add_att("variable", coupler->vname.c_str());
-	info_var->add_att("ice_sheet", this->name.c_str());
+    NcDim one_dim = ncio.nc->addDim("one", 1);
+    NcVar info_var = ncio.nc->addVar("grid", ibmisc::get_nc_type<double>(), one_dim);
 
-	NcVar *time0_var = nc.add_var("time0", giss::get_nc_type<double>(), one_dim);
-	time0_var->add_att("units", gcm_params.time_units.c_str());
-	time0_var->add_att("calendar", "365_day");
-	time0_var->add_att("axis", "T");
-	time0_var->add_att("long_name", "Simulation start time");
+    info_var.putAtt("file", coupler->fname);
+    info_var.putAtt("variable", coupler->vname);
+    info_var.putAtt("ice_sheet", this->name());
 
-	NcVar *time_var = nc.add_var("time", giss::get_nc_type<double>(), dims[0]);
-	time_var->add_att("units", gcm_params.time_units.c_str());
-	time_var->add_att("calendar", "365_day");
-	time_var->add_att("axis", "T");
-	time_var->add_att("long_name", "Coupling times");
+    NcVar time0_var = ncio.nc->addVar("time0", ibmisc::get_nc_type<double>(), one_dim);
+    time0_var.putAtt("units", gcm_params.time_units);
+    time0_var.putAtt("calendar", "365_day");
+    time0_var.putAtt("axis", "T");
+    time0_var.putAtt("long_name", "Simulation start time");
+
+    NcVar time_var = ncio.nc->addVar("time", ibmisc::get_nc_type<double>(), dims[0]);
+    time_var.putAtt("units", gcm_params.time_units);
+    time_var.putAtt("calendar", "365_day");
+    time_var.putAtt("axis", "T");
+    time_var.putAtt("long_name", "Coupling times");
 
 
-	for (auto cf = contract[io].begin(); cf != contract[io].end(); ++cf) {
-		NcVar *var = nc.add_var(cf->name.c_str(), giss::get_nc_type<double>(),
-			dims.size(), &dims[0]);
-		var->add_att("units", cf->units.c_str());
-		var->add_att("description", cf->description.c_str());
-	}
+    for (size_t i=0; i < contract[io].index.size(); ++i) {
+        VarMeta &cf = contract[io].data[i];
+        NcVar var = ncio.nc->addVar(cf.name, ibmisc::get_nc_type<double>(), dims);
+        var.putAtt("units", cf.units);
+        var.putAtt("description", cf.description);
+    }
 
-	// Put initial time in it...
-	long cur_b[1]{0};
-	long counts_b[1]{1};
-	time0_var->set_cur(cur_b);
-	time0_var->put(&gcm_params.time_start_s, counts_b);
+    // Put initial time in it...
+    time0_var.putVar({0}, {1}, &gcm_params.time_start_s);
+#if 0
+    std::vector<size_t> cur_b {0};
+    std::vector<size_t> counts_b {1};
+    long cur_b[1]{0};
+    long counts_b[1]{1};
+    time0_var.set_cur(cur_b);
+    time0_var.put(&gcm_params.time_start_s, counts_b);
+#endif
+    ncio.close();
 
-	nc.close();
+    output_file_initialized = true;
 
-	output_file_initialized = true;
-
-	printf("END IceModelWriter::init_output_file(%s)\n", output_fname.c_str());
+    printf("END IceModelWriter::init_output_file(%s)\n", output_fname.c_str());
 }
 
 /** @param index Index of each grid value.
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
 void IceModel_Writer::run_decoded(double time_s,
-	std::vector<blitz::Array<double,1>> const &ivals2)
+    std::vector<blitz::Array<double,1>> const &ivalsI)
 {
-	// Only need to run one copy of this
-	GCMParams const &gcm_params(coupler->gcm_params);
-	if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
+    // Only need to run one copy of this
+    GCMParams const &gcm_params(coupler->gcm_params);
+    if (gcm_params.gcm_rank != gcm_params.gcm_root) return;
 
 printf("BEGIN IceModel_Writer::run_decoded\n");
-	if (!output_file_initialized) init_output_file();
-	NcFile nc(output_fname.c_str(), NcFile::Write);
+    if (!output_file_initialized) init_output_file();
+    NcFile nc(output_fname.c_str(), NcFile::write);
 
-	// Read index info
-	NcDim *time_dim = nc.get_dim("time");		// No dimsize --> unlimited
-	cur[0] = time_dim->size();
+    // Read index info
+    cur[0] = nc.getDim("time").getSize();
 
-	// Write the current time
-	NcVar *time_var = nc.get_var("time");
-	time_var->set_cur(&cur[0]);
-	time_var->put(&time_s, &counts[0]);
+    // Write the current time
+    NcVar time_var = nc.getVar("time");
+    time_var.putVar(cur, counts, &time_s);
 
 
-	// Write the other variables
-	int i = 0;
-	for (auto cf = contract[io].begin(); cf != contract[io].end(); ++cf, ++i) {
-		if (cf->name == "unit") continue;
+    // Write the other variables
+    for (size_t i=0; i < contract[io].index.size(); ++i) {
+        VarMeta &cf = contract[io].data[i];
 
-		NcVar *ncvar = nc.get_var(cf->name.c_str());
-		ncvar->set_cur(&cur[0]);
+        if (cf.name == "unit") continue;
 
-		double const *data = ivals2[i].data();
-		ncvar->put(data, &counts[0]);
-	}
+        NcVar ncvar = nc.getVar(cf.name.c_str());
+        ncvar.putVar(cur, counts, ivalsI[i].data());
+    }
 
-	nc.close();
+    nc.close();
 printf("END IceModel_Writer::run_decoded\n");
-	
+    
 }
 
 

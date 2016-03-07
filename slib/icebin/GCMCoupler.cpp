@@ -40,9 +40,11 @@ std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
 	std::unique_ptr<IceModel> ice_model;
 
 	switch(type.index()) {
+#if 0
 		case IceModel::Type::DISMAL :
 			ice_model.reset(new IceModel_DISMAL);
 		break;
+#endif
 		case IceModel::Type::WRITER :
 			ice_model.reset(new IceModel_Writer);
 		break;
