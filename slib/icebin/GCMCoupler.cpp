@@ -35,7 +35,7 @@ using namespace netCDF;
 namespace icebin {
 
 std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
-	GCMCoupler const *_coupler, IceRegridder const *_sheet)
+	GCMCoupler const *_coupler, IceRegridder *_sheet)
 {
 	std::unique_ptr<IceModel> ice_model;
 
@@ -49,8 +49,8 @@ std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
 			ice_model.reset(new IceModel_Writer);
 		break;
 #ifdef USE_PISM
-		case IceModel::Type::PSIM :
-			ice_model.reset(new IceModel_PSIM);
+		case IceModel::Type::PISM :
+			ice_model.reset(new gpism::IceModel_PISM);
 		break;
 #endif
 		default :
@@ -70,7 +70,7 @@ std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
 }
 
 std::unique_ptr<IceModel> new_ice_model(NcIO &ncio, std::string vname,
-	GCMCoupler const *_coupler, IceRegridder const *_sheet)
+	GCMCoupler const *_coupler, IceRegridder *_sheet)
 {
 	std::string vn(vname + ".info");
 	auto info_v = get_or_add_var(ncio, vn, netCDF::ncInt64, {});
@@ -269,7 +269,7 @@ void GCMCoupler::ncread(
 
 	ice_models.clear();
 	for (size_t i=0; i < regridder.sheets.size(); ++i) {
-		IceRegridder const *sheet = &*regridder.sheets[i];
+		IceRegridder *sheet = &*regridder.sheets[i];
 		std::string vname_sheet = vname + "." + sheet->name();
 
 		// Create an IceModel corresponding to this IceSheet.

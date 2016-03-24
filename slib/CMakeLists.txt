@@ -35,9 +35,17 @@ if (BUILD_COUPLER)
 		icebin/GCMParams.cpp
 		icebin/GCMCoupler.cpp
 		icebin/IceModel_Writer.cpp
-#		icebin/IceModel_Decode.cpp
+		icebin/IceModel_Decode.cpp
 #		icebin/IceModel_DISMAL.cpp
+        icebin/contracts/contracts.cpp
 	)
+endif()
+
+if (USE_PISM)
+    list(APPEND icebin_SOURCES
+        icebin/pism/IceModel_PISM.cpp
+        icebin/contracts/modele_pism.cpp
+    )
 endif()
 
 

@@ -1,36 +1,20 @@
-! GLINT2: A Coupling Library for Ice Models and GCMs
-! Copyright (c) 2013 by Robert Fischer
-! 
-! This program is free software: you can redistribute it and/or modify
-! it under the terms of the GNU General Public License as published by
-! the Free Software Foundation, either version 3 of the License, or
-! (at your option) any later version.
-! 
-! This program is distributed in the hope that it will be useful,
-! but WITHOUT ANY WARRANTY; without even the implied warranty of
-! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-! GNU General Public License for more details.
-! 
-! You should have received a copy of the GNU General Public License
-! along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-module glint2_modele
+module icebin_modele
 use f90blitz
 use iso_c_binding
 !use MpiSupport_mod
 implicit none
 
 ! ================================================
-! Stuff from glint2_modele.cpp
+! Stuff from icebin_modele.cpp
 
 INTERFACE
 
-	function new_glint2_modele_c() result(ret) bind(c)
+	function new_icebin_modele_c() result(ret) bind(c)
 	use iso_c_binding
 		type(c_ptr) :: ret
 	end function
 
-	subroutine glint2_modele_set_const(api, &
+	subroutine icebin_modele_set_const(api, &
 		name_f, name_len, &
 		val, &
 		units_f, units_len, &
@@ -46,7 +30,7 @@ INTERFACE
 		integer(c_int), value :: description_len
 	end subroutine
 
-	function glint2_modele_add_gcm_input(api, &
+	function icebin_modele_add_gcm_input(api, &
 		field_f, field_len, &
 		units_f, units_len, &
         grid_f, grid_len, &
@@ -63,22 +47,22 @@ INTERFACE
 		character(c_char) :: long_name_f(*)
         integer(c_int), value :: initial
 		integer(c_int), value :: long_name_len
-		integer(c_int) :: glint2_modele_add_gcm_input
+		integer(c_int) :: icebin_modele_add_gcm_input
 	end function
 
-	function glint2_modele_nhp_gcm(api) bind(c)
+	function icebin_modele_nhp_gcm(api) bind(c)
 	use iso_c_binding
 		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_nhp_gcm
-	end function glint2_modele_nhp_gcm
+		integer(c_int) :: icebin_modele_nhp_gcm
+	end function icebin_modele_nhp_gcm
 
-	function glint2_modele_gcm_inputs_nhp(api) bind(c)
+	function icebin_modele_gcm_inputs_nhp(api) bind(c)
 	use iso_c_binding
 		type(c_ptr), value :: api
-		integer(c_int) :: glint2_modele_gcm_inputs_nhp
-	end function glint2_modele_gcm_inputs_nhp
+		integer(c_int) :: icebin_modele_gcm_inputs_nhp
+	end function icebin_modele_gcm_inputs_nhp
 
-	subroutine glint2_modele_init0(api, &
+	subroutine icebin_modele_init0(api, &
 		run_dir_f, run_dir_len, &
 		maker_fname_f, maker_fname_len, &
 		maker_vname_f, maker_vname_len, &
@@ -104,13 +88,13 @@ INTERFACE
 		integer(c_int), value :: write_constants
 	end subroutine
 
-	subroutine glint2_modele_delete(api) bind(c)
+	subroutine icebin_modele_delete(api) bind(c)
 		use iso_c_binding
 		use f90blitz
 		type(c_ptr) :: api		! NOT VALUE here.
 	end subroutine
 
-	subroutine glint2_modele_set_start_time(api, iyear1, itimei, dtsrc) bind(c)
+	subroutine icebin_modele_set_start_time(api, iyear1, itimei, dtsrc) bind(c)
 		use iso_c_binding
 		type(c_ptr), value :: api
 		integer(c_int), value :: iyear1
@@ -119,35 +103,35 @@ INTERFACE
 	end subroutine
 
 	! -------------------------------------------
-	subroutine glint2_modele_get_flice_im_c(api, &
-		flice1_glint2_f) bind(c)
+	subroutine icebin_modele_get_flice_im_c(api, &
+		flice1_icebin_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
-		type(arr_spec_2) :: flice1_glint2_f
+		type(arr_spec_2) :: flice1_icebin_f
 	end subroutine
 
-	subroutine glint2_modele_get_fhc_im_c(api, fhc_im1h_f) bind(c)
+	subroutine icebin_modele_get_fhc_im_c(api, fhc_im1h_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
 		type(arr_spec_3) :: fhc_im1h_f
 	end subroutine
 
-	subroutine glint2_modele_get_elevhp_im_c(api, elevhp_im1h_f) bind(c)
+	subroutine icebin_modele_get_elevhp_im_c(api, elevhp_im1h_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
 		type(arr_spec_3) :: elevhp_im1h_f
 	end subroutine
 	! -------------------------------------------
-	subroutine glint2_modele_init_hp_to_ices(api) bind(c)
+	subroutine icebin_modele_init_hp_to_ices(api) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
 	end subroutine
 
-	subroutine glint2_modele_couple_to_ice_c(api, itime, &
+	subroutine icebin_modele_couple_to_ice_c(api, itime, &
 		gcm_inputs_d_f) bind(c)
 	use iso_c_binding
 	use f90blitz
@@ -157,7 +141,7 @@ INTERFACE
 		type(arr_spec_3) :: gcm_inputs_d_f
 	end subroutine
 
-	subroutine glint2_modele_get_initial_state_c(api, itime, gcm_inputs_d_f) bind(c)
+	subroutine icebin_modele_get_initial_state_c(api, itime, gcm_inputs_d_f) bind(c)
 	use iso_c_binding
 	use f90blitz
 		type(c_ptr), value :: api
@@ -165,7 +149,7 @@ INTERFACE
 		type(arr_spec_3) :: gcm_inputs_d_f
 	end subroutine
 
-	subroutine glint2_modele_set_gcm_output_c(api, &
+	subroutine icebin_modele_set_gcm_output_c(api, &
 		field_name_f, field_name_len, arr_f) bind(c)
 	use iso_c_binding
 	use f90blitz
@@ -185,7 +169,7 @@ END INTERFACE
 contains
 
 ! ---------------------------------------------------
-subroutine glint2_modele_set_gcm_output(api, field_name, arr, i0, j0, k0)
+subroutine icebin_modele_set_gcm_output(api, field_name, arr, i0, j0, k0)
 	type(c_ptr), value :: api
 	character(*) :: field_name
 	real*8, dimension(:,:,:), target :: arr
@@ -194,10 +178,10 @@ subroutine glint2_modele_set_gcm_output(api, field_name, arr, i0, j0, k0)
 	type(arr_spec_3) :: arr_f
 
 	call get_spec_double_3(arr, i0,j0,k0, arr_f)
-	call glint2_modele_set_gcm_output_c(api, &
+	call icebin_modele_set_gcm_output_c(api, &
 		field_name, len(field_name), arr_f)
 
-end subroutine glint2_modele_set_gcm_output
+end subroutine icebin_modele_set_gcm_output
 
 
 ! ! Go from a VectorSparseVector<int, double> output from GCMCoupler, to

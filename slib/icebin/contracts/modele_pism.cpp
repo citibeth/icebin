@@ -1,15 +1,9 @@
 #include <mpi.h>		// Must be first
-
-#include <glint2/pism/GLINT2EnthalpyConverter.hpp>
-
-#include <glint2/pism/IceModel_PISM.hpp>
-#include <glint2/modele/GCMCoupler_ModelE.hpp>
-#include <glint2/contracts/contracts.hpp>
-#include <giss/exit.hpp>
-
-using namespace giss;
-using namespace icebin::modele;
-using namespace icebin::gpism;
+#include <limits>
+#include <base/enthalpyConverter.hh>
+#include <icebin/contracts/contracts.hpp>
+#include <icebin/modele/GCMCoupler_ModelE.hpp>
+#include <icebin/pism/IceModel_PISM.hpp>
 
 // --------------------------------------------------------
 namespace icebin {
@@ -18,37 +12,36 @@ namespace contracts {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 /** GCM-specific contract */
-void modele_pism(GCMCoupler *coupler, IceModel *sheet)
+void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
 {
 	// Get arguments we need from coupler
-	auto coupler(dynamic_cast<GCMCoupler_ModelE const *>(this->coupler));
-	auto params(dynamic_cast<GCMPerIceSheetParams_ModelE const *>(this->gcm_per_ice_sheet_params.get()));
+	auto coupler(dynamic_cast<modele::GCMCoupler_ModelE const *>(_coupler));
+    auto model(dynamic_cast<icebin::gpism::IceModel_PISM *>(_model));
+    
 
+	printf("BEGIN setup_modele_pism()\n");
 
-	printf("BEGIN IceModel_PISM::setup_contracts_modele\n");
-	IceModel &model(*this);
-
-	// =========== Transfer  constants from Glint2's gcm_constants --> PISM
-	// transfer_constant(PISM_destionation, glint2_src, multiply_by)
+	// =========== Transfer  constants from Icebin's gcm_constants --> PISM
+	// model->transfer_constant(PISM_destionation, icebin_src, multiply_by)
 	// (see IceModel_PISM.cpp)
-	transfer_constant("standard_gravity", "constant::grav");
-	transfer_constant("beta_CC", "seaice::dtdp", -1.0);
-	transfer_constant("water_melting_point_temperature", "constant::tf");
-	transfer_constant("water_latent_heat_fusion", "constant::lhm");
-	transfer_constant("water_specific_heat_capacity", "constant::shw");
+	model->transfer_constant("standard_gravity", "constant::grav");
+	model->transfer_constant("beta_CC", "seaice::dtdp", -1.0);
+	model->transfer_constant("water_melting_point_temperature", "constant::tf");
+	model->transfer_constant("water_latent_heat_fusion", "constant::lhm");
+	model->transfer_constant("water_specific_heat_capacity", "constant::shw");
 
-	transfer_constant("ice_density", "constant::rhoi");
-	transfer_constant("ice_thermal_conductivity", "seaice::alami0");
-	transfer_constant("ice_specific_heat_capacity", "constant::shi");
-	transfer_constant("fresh_water_density", "constant::rhow");
-	transfer_constant("sea_water_density", "constant::rhows");
-	transfer_constant("standard_gravity", "constant::grav");
-	transfer_constant("ideal_gas_constant", "constant::gasc");
+	model->transfer_constant("ice_density", "constant::rhoi");
+	model->transfer_constant("ice_thermal_conductivity", "seaice::alami0");
+	model->transfer_constant("ice_specific_heat_capacity", "constant::shi");
+	model->transfer_constant("fresh_water_density", "constant::rhow");
+	model->transfer_constant("sea_water_density", "constant::rhows");
+	model->transfer_constant("standard_gravity", "constant::grav");
+	model->transfer_constant("ideal_gas_constant", "constant::gasc");
 
 	// To set this, see (in ModelE): Function SHCGS in ocnfuntab.f is
 	// used for the Russell ocean. I. The simple models use SHW=4185.
 	// This probably doesn't matter much at this point (May 2014)
-	//	    transfer_constant("sea_water_specific_heat_capacity", "");
+	//	    model->transfer_constant("sea_water_specific_heat_capacity", "");
 
 	/* The following constants were not transferred 
 	pism_config:fill_value = -2e9;
@@ -57,21 +50,21 @@ void modele_pism(GCMCoupler *coupler, IceModel *sheet)
 
 	// In PISM and ModelE Clausius-Clapeyron equation, surfce_pressure is the DIFFERENCE
 	// from 1atm.  Thus, surface_pressure=0 implies the ice sheet existing at 1atm
-	set_constant("surface_pressure", 0, "Pa");		// Match ModelE thermodynam
+	model->set_constant("surface_pressure", 0, "Pa");		// Match ModelE thermodynam
 
 	// No need to set enthalpy_reference_temperature.  pism::EnthalpyConverter is used (below)
 	// to convert enthalpy values between ModelE and PISM.
-	// transfer_constant("enthalpy_reference_temperature", "enthalpy_reference_temperature");
+	// model->transfer_constant("enthalpy_reference_temperature", "enthalpy_reference_temperature");
 
 
 	// ============ GCM -> Ice
-	CouplingContract &ice_input(contract[IceModel::INPUT]);
+	VarSet &ice_input(contract[IceModel::INPUT]);
 
 	// ------ Decide on the coupling contract for this ice sheet
 	ice_input.add_field("massxfer", 0., "kg m-2 s-1", contracts::ELEVATION,
-		"Mass of ice being transferred Stieglitz --> Glint2");
+		"Mass of ice being transferred Stieglitz --> Icebin");
 	ice_input.add_field("enthxfer", 0., "W m-2", contracts::ELEVATION,
-		"Enthalpy of ice being transferred Stieglitz --> Glint2");
+		"Enthalpy of ice being transferred Stieglitz --> Icebin");
 	ice_input.add_field("deltah", 0., "J m-2", contracts::ELEVATION,
 		"Change of enthalpy of top layer in PISM");
 
@@ -82,7 +75,7 @@ void modele_pism(GCMCoupler *coupler, IceModel *sheet)
 	// NOTE: Pressure in PISM is RELATIVE to atmospheric pressure.
 	//       Thus, p=0 is the correct to use at the top surface of
 	//       the ice sheet (where ModelE operates).
-	GLINT2EnthalpyConverter enth(*config);
+	pism::EnthalpyConverter enth(*config);
 	double const pressure = 0;
 	double E_s, E_l;
 	enth.getEnthalpyInterval(pressure, E_s, E_l);
@@ -111,7 +104,7 @@ void modele_pism(GCMCoupler *coupler, IceModel *sheet)
 	// ============== Ice -> GCM
 	CouplingContract &ice_output(contract[IceModel::OUTPUT]);
 
-	// Glint2 requires that all ice models return elev2, so that it can regrid in the vertical.
+	// Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
 
 	ice_output.add_field("ice_surface_elevation", nan, "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");
 	ice_output.add_field("ice_thickness", nan, "m", contracts::ICE|contracts::INITIAL, "thickness of ice");
@@ -134,8 +127,8 @@ void modele_pism(GCMCoupler *coupler, IceModel *sheet)
 
 	ice_output.add_field("calving.mass", nan, "kg m-2 s-1", contracts::ICE, "");
 	ice_output.add_field("calving.enth", nan, "W m-2", contracts::ICE, "");
-	ice_output.add_field("glint2_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-	ice_output.add_field("glint2_smb.enth", nan, "W m-2", contracts::ICE, "");
+	ice_output.add_field("icebin_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("icebin_smb.enth", nan, "W m-2", contracts::ICE, "");
 	ice_output.add_field("pism_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
 	ice_output.add_field("pism_smb.enth", nan, "W m-2", contracts::ICE, "");
 
@@ -152,7 +145,7 @@ void modele_pism(GCMCoupler *coupler, IceModel *sheet)
 
 	ice_output.add_field("unit", nan, "", 0, "Dimensionless identity");
 
-	std::cout << "========= Ice Model Outputs (" << model.name << ") modele_pism.cpp:" << std::endl;
+	std::cout << "========= Ice Model Outputs (" << sheet->name << ") modele_pism.cpp:" << std::endl;
 	std::cout << ice_output << std::endl;
 
 	// ------- Variable and unit conversions, Ice -> GCM
@@ -211,8 +204,9 @@ void modele_pism(GCMCoupler *coupler, IceModel *sheet)
 	}
 
 	// Catch all our errors at once
-	if (!ok) giss::exit(1);
-	printf("END IceModel_PISM::setup_contracts_modele\n");
+	if (!ok) (*ibmisc_error)(-1,
+        "Error(s) setting up contract modele_pism.");
+	printf("END setup_modele_pism()\n");
 }
 
 

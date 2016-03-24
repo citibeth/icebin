@@ -27,18 +27,19 @@ public:
 	);
 	const IceModel::Type type;
 
-	friend class GCMCoupler;
-    friend class IceModel_Writer;
-	friend std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
-		GCMCoupler const *_coupler, IceRegridder const *_sheet);
-
-protected:
-	GCMCoupler const * coupler;		// parent back-pointer
-	IceRegridder const * sheet;
-
 	/** Ordered specification of the variables (w/ units)
 	to be passed IceBin->IceModel and IceModel->IceBin */
 	enum IO {INPUT, OUTPUT};
+
+//	friend class GCMCoupler;
+//    friend class IceModel_Writer;
+//	friend std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
+//		GCMCoupler const *_coupler, IceRegridder const *_sheet);
+
+public:
+	GCMCoupler const *coupler;		// parent back-pointer
+	IceRegridder *sheet;   // This is not const; see IceModel::update_ice_sheet()
+
 	std::array<VarSet, 2> contract;		// [INPUT|OUTPUT]
 	std::array<ibmisc::VarTransformer, 2> var_transformer;
 

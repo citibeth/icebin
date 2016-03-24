@@ -41,6 +41,10 @@ public:
 	friend class UrA;
 	friend class UrE;
 	GCMRegridder const *gcm;	/// Parent pointer
+
+	/** Elevation of grid cells in ice grid (I).
+	This also implies a mask: cells not listed in this SparseVector are masked out. */
+	SparseVector elevI;
 protected:
 
 	Type type;
@@ -49,9 +53,6 @@ protected:
 	std::unique_ptr<Grid> exgrid;		/// Exchange grid outlines (between GCM and Ice)
 	InterpStyle interp_style;	/// How we interpolate I<-E
 
-	/** Elevation of grid cells in ice grid (I).
-	This also implies a mask: cells not listed in this SparseVector are masked out. */
-	SparseVector elevI;
 	// ---------------------------------
 
 	// Functions used by corresponding functions in GCMRegridder

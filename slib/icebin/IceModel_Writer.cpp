@@ -6,9 +6,11 @@
 #include <icebin/GCMParams.hpp>
 #include <icebin/GCMCoupler.hpp>
 #include <ibmisc/string.hpp>
+#include <ibmisc/netcdf.hpp>
 
 using namespace ibmisc;
 using namespace netCDF;
+
 
 namespace icebin {
 

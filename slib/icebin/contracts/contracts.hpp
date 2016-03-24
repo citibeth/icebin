@@ -1,8 +1,13 @@
 #pragma once
 
 #include <string>
+#include <map>
 
 namespace icebin {
+
+class GCMCoupler;
+class IceModel;
+
 namespace contracts {
 
 /** Indicates the grid this field is supposed to be on. */
@@ -20,7 +25,7 @@ extern std::string to_str(unsigned int flags);
 // =====================================================
 // Virtual Functions that dispatch on GCMCoupler and IceModel
 
-extern void setup(GCMCoupler &coupler, IceModel &model);
+extern void setup(GCMCoupler const &coupler, IceModel &model);
 // ======================================================
 
 

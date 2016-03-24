@@ -1,12 +1,15 @@
-#include <glint2/contracts/contracts.hpp>
+#include <mpi.h>        // Must be first
+
+#include <icebin/contracts/contracts.hpp>
+#include <icebin/GCMCoupler.hpp>
 #include <functional>
 
 namespace icebin {
-namespace contract{
+namespace contracts{
 
 // ======================================================
 struct VtableEntry {
-	std::function<void(GCMCoupler *, IceModel *)> setup;
+	std::function<void(GCMCoupler &, IceModel &)> setup;
 };
 struct Vtable : public std::map<
 	std::pair<GCMCoupler::Type, IceModel::Type>,
@@ -17,7 +20,7 @@ struct Vtable : public std::map<
 
 
 #if defined(USE_MODELE) && defined(USE_PISM)
-	extern setup_modele_pism(GCMCoupler *, IceModel *);
+	extern setup_modele_pism(GCMCoupler &, IceModel &);
 #endif
 
 Vtable::Vtable()
@@ -34,22 +37,19 @@ Vtable::Vtable()
 // -------------------------------------------
 static Vtable vtable;
 
-void setup(GCMCoupler *coupler, IceModel *model)
+void setup(GCMCoupler &coupler, IceModel &ice_model)
 {
-	vtable.at(coupler.type, model.type)
-		.setup(coupler, model);
+	vtable.at(std::make_pair(coupler.type, ice_model.type))
+		.setup(coupler, ice_model);
 
 
 	// Check the contract for errors
-	giss::CouplingContract const &ocontract(ice_model->contract[IceModel::OUTPUT]);
-	int nfields = ocontract.size_nounit();
-	for (int i=0; i<nfields; ++i) {
-		giss::CoupledField const &cf(ocontract.field(i));
+	VarSet const &ocontract(ice_model.contract[IceModel::OUTPUT]);
+    for (size_t i=0; i < ocontract.index.size(); ++i) {
+        VarMeta const &cf = ocontract.data[i];
 
-		if ((cf.flags & contracts::GRID_BITS) == contracts::ICE) {
-			fprintf(stderr, "ERROR: Ice model outputs must be all on the ice grid, field %s is not\n", cf.name.c_str());
-			giss::exit(1);
-		}
+		if ((cf.flags & contracts::GRID_BITS) == contracts::ICE) (*icebin_error)(-1,
+			"ERROR: Ice model outputs must be all on the ice grid, field %s is not", cf.name.c_str());
 	}
 
 

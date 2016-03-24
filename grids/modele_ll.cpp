@@ -30,7 +30,7 @@
 #include <icebin/error.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 #include <icebin/gridgen/clippers.hpp>
-#include <icebin/gridgen/GridSpec_Lonlat.hpp>
+#include <icebin/gridgen/GridSpec_LonLat.hpp>
 
 using namespace std::placeholders;  // for _1, _2, _3...
 using namespace ibmisc;

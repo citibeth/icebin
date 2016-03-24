@@ -1,13 +1,13 @@
 #include <mpi.h>		// Intel MPI wants to be first
 #include <giss/memory.hpp>
-#include <glint2/modele/GCMCoupler_ModelE.hpp>
-#include <glint2/contracts/contracts.hpp>
+#include <icebin/modele/GCMCoupler_ModelE.hpp>
+#include <icebin/contracts/contracts.hpp>
 
-namespace glint2 {
+namespace icebin {
 namespace modele {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
-using namespace glint2::contracts;
+using namespace icebin::contracts;
 
 GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	GCMCoupler(GCMCoupler::Type::MODELE)
@@ -26,14 +26,14 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 	gcm_outputs.add_field("deltah", nan, "J m-2", ELEVATION,
 		"Enthalpy change of 'borrowed' layer");
 	gcm_outputs.add_field("massxfer", nan, "kg m-2", ELEVATION,
-		"Mass of ice being transferred Stieglitz --> GLint2");
+		"Mass of ice being transferred Stieglitz --> Icebin");
 	gcm_outputs.add_field("enthxfer", nan, "J m-2", ELEVATION,
-		"Enthlpy of ice being transferred Stieglitz --> GLint2");
+		"Enthlpy of ice being transferred Stieglitz --> Icebin");
 #ifdef TRACERS_WATER
 	gcm_outputs.add_field("trxfer");
 #endif
 	gcm_outputs.add_field("volxfer", nan, "m^3 m-2", ELEVATION,
-		"Volume of ice being transferred Stieglitz --> GLint2");
+		"Volume of ice being transferred Stieglitz --> Icebin");
 
 	gcm_outputs.add_field("unit", nan, "", 0, "Dimensionless identity");
 
@@ -58,7 +58,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 
 std::unique_ptr<GCMPerIceSheetParams>
 GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
-	NcFile &nc,
+	ibmisc::NcIO &ncio,
 	std::string const &sheet_vname)
 {
 

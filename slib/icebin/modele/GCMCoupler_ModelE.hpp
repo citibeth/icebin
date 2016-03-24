@@ -1,8 +1,8 @@
 #pragma once
 
-#include <glint2/GCMCoupler.hpp>
+#include <icebin/GCMCoupler.hpp>
 
-namespace glint2 {
+namespace icebin {
 namespace modele {
 
 
@@ -17,7 +17,7 @@ BOOST_ENUM_VALUES( ModelE_CouplingType, int,
 );
 
 
-class GCMPerIceSheetParams_ModelE : public glint2::GCMPerIceSheetParams {
+class GCMPerIceSheetParams_ModelE : public icebin::GCMPerIceSheetParams {
 public:
 	ModelE_CouplingType coupling_type;
 };
@@ -30,7 +30,7 @@ public:
 	/** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
 	std::unique_ptr<GCMPerIceSheetParams>
 	read_gcm_per_ice_sheet_params(
-		NcFile &nc,
+	    ibmisc::NcIO &ncio,
 		std::string const &sheet_vname);
 
 	/** Does contract setup for ONE IceModel instance.
