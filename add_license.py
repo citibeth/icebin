@@ -1,5 +1,5 @@
-# GLINT2: A Coupling Library for Ice Models and GCMs
-# Copyright (c) 2013 by Robert Fischer
+# IceBin: A Coupling Library for Ice Models and GCMs
+# Copyright (c) 2013-2016 by Elizabeth Fischer
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@ import os.path
 import sys
 
 license = [
-"GLINT2: A Coupling Library for Ice Models and GCMs",
-"Copyright (c) 2013 by Robert Fischer",
+"IceBin: A Coupling Library for Ice Models and GCMs",
+"Copyright (c) 2013-2016 by Elizabeth Fischer",
 "",
 "This program is free software: you can redistribute it and/or modify",
 "it under the terms of the GNU General Public License as published by",
@@ -47,6 +47,7 @@ ret.append('\n')
 license_py = "".join(ret)
 re_py = re.compile(r".*?\n# along with this program.  If not, see <http://www.gnu.org/licenses/>.(\n\n)", re.MULTILINE|re.DOTALL)
 licenses['.py'] = (license_py, re_py)
+licenses['.pxd'] = (license_py, re_py)
 
 ret = []
 for line in license :

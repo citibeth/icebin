@@ -1,5 +1,5 @@
-# GLINT2: A Coupling Library for Ice Models and GCMs
-# Copyright (c) 2013 by Robert Fischer
+# IceBin: A Coupling Library for Ice Models and GCMs
+# Copyright (c) 2013-2016 by Elizabeth Fischer
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
