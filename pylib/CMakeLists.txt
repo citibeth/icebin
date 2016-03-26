@@ -5,11 +5,6 @@ find_package(Numpy)
 
 # ----------Stuff to help with running Python before this project is installed.
 
-# --- Set up PYTHONPATH to find stuff
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/env.in
-    ${CMAKE_CURRENT_BINARY_DIR}/env @ONLY)
-execute_process(COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/env)
-
 # --- Convenience link to Python source
 execute_process(COMMAND ln -s ${CMAKE_CURRENT_SOURCE_DIR} src
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
