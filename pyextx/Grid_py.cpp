@@ -20,7 +20,7 @@
 #include "_glint2_module.hpp"
 
 #include "Grid_py.hpp"
-#include <structmember.h>	// Also Python-related
+#include <structmember.h>   // Also Python-related
 #include <numpy/arrayobject.h>
 #include <math.h>
 #include <glint2/Grid.hpp>
@@ -29,27 +29,27 @@
 using namespace glint2;
 
 #define RETURN_INVALID_ARGUMENTS(fname) {\
-	fprintf(stderr, fname "(): invalid arguments.\n"); \
-	PyErr_SetString(PyExc_ValueError, fname "(): invalid arguments."); \
-	return NULL; }
+    fprintf(stderr, fname "(): invalid arguments.\n"); \
+    PyErr_SetString(PyExc_ValueError, fname "(): invalid arguments."); \
+    return NULL; }
 
 
 // ========================================================================
 
 void PyGrid::init(std::unique_ptr<glint2::Grid> &&_grid)
 {
-	grid = std::move(_grid);
-//	ncells_full = grid->ncells_full();
+    grid = std::move(_grid);
+//  ncells_full = grid->ncells_full();
 }
 
 // ========= class snowdrift.Grid :
 static PyObject *Grid_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	PyGrid *self;
+    PyGrid *self;
 
-	self = new (type->tp_alloc(type, 0)) PyGrid;
+    self = new (type->tp_alloc(type, 0)) PyGrid;
 
-//	Py_INCREF(self);
+//  Py_INCREF(self);
     return (PyObject *)self;
 }
 
@@ -58,30 +58,30 @@ static int Grid__init(PyGrid *self, PyObject *args, PyObject *kwds)
 {
 //printf("Grid__init() called\n");
 
-	// Get arguments
-	const char *fname;
-	const char *vname;
-	if (!PyArg_ParseTuple(args, "ss", &fname, &vname)) {
-		// Throw an exception...
-		PyErr_SetString(PyExc_ValueError,
-			"Grid__init() called without a valid string as argument.");
-		return 0;
-	}
+    // Get arguments
+    const char *fname;
+    const char *vname;
+    if (!PyArg_ParseTuple(args, "ss", &fname, &vname)) {
+        // Throw an exception...
+        PyErr_SetString(PyExc_ValueError,
+            "Grid__init() called without a valid string as argument.");
+        return 0;
+    }
 
-	// Instantiate pointer
-	NcFile nc(fname, NcFile::ReadOnly);
-//	std::unique_ptr<glint2::Grid> sptr(read_grid(nc, std::string(vname)).release());
-	self->init(read_grid(nc, std::string(vname)));
+    // Instantiate pointer
+    NcFile nc(fname, NcFile::ReadOnly);
+//  std::unique_ptr<glint2::Grid> sptr(read_grid(nc, std::string(vname)).release());
+    self->init(read_grid(nc, std::string(vname)));
 //fprintf(stderr, "Grid_new() returns %p\n", self->grid);
-	nc.close();
+    nc.close();
 
-	return 0;
+    return 0;
 }
 
 static void Grid_dealloc(PyGrid *self)
 {
-	self->~PyGrid();
-	self->ob_base.ob_type->tp_free((PyObject *)self);
+    self->~PyGrid();
+    self->ob_base.ob_type->tp_free((PyObject *)self);
 }
 
 //static PyMemberDef Grid_members[] = {{NULL}};
@@ -90,80 +90,80 @@ static void Grid_dealloc(PyGrid *self)
 
 static PyObject * Grid_get_proj_areas(PyGrid *self_py, PyObject *args)
 {
-	PyObject *ret_py = NULL;
-	try {
-		// Get Arguments
-		char *sproj_py;
-		if (!PyArg_ParseTuple(args, "s",
-			&sproj_py))
-		{
-			RETURN_INVALID_ARGUMENTS();
-		}
+    PyObject *ret_py = NULL;
+    try {
+        // Get Arguments
+        char *sproj_py;
+        if (!PyArg_ParseTuple(args, "s",
+            &sproj_py))
+        {
+            RETURN_INVALID_ARGUMENTS();
+        }
 
-		// Do the call
-		auto ret(self_py->grid->get_proj_areas(std::string(sproj_py)));
+        // Do the call
+        auto ret(self_py->grid->get_proj_areas(std::string(sproj_py)));
 
-		// Convert to Python format
-		ret_py = giss::vector_to_py(ret);
+        // Convert to Python format
+        ret_py = giss::vector_to_py(ret);
 //printf("Grid_get_proj_areas() finished OK, ret_py = %p\n", ret_py);
-		return ret_py;
-	} catch(...) {
-		printf("Grid_get_proj_areas() encountered an exception...\n");
-		if (ret_py) Py_DECREF(ret_py);
-		return NULL;
-	}
+        return ret_py;
+    } catch(...) {
+        printf("Grid_get_proj_areas() encountered an exception...\n");
+        if (ret_py) Py_DECREF(ret_py);
+        return NULL;
+    }
 }
 // -----------------------------------------------------------
 static PyObject * Grid_get_native_areas(PyGrid *self_py, PyObject *args)
 {
-	PyObject *ret_py = NULL;
-	try {
-		// Get Arguments
-		char *sproj_py;
-		if (!PyArg_ParseTuple(args, ""))	// No arguments
-		{ return NULL; }
+    PyObject *ret_py = NULL;
+    try {
+        // Get Arguments
+        char *sproj_py;
+        if (!PyArg_ParseTuple(args, ""))    // No arguments
+        { return NULL; }
 
-		// Do the call
-		auto ret(self_py->grid->get_native_areas());
+        // Do the call
+        auto ret(self_py->grid->get_native_areas());
 
-		// Convert to Python format
-		ret_py = giss::vector_to_py(ret);
-		return ret_py;
-	} catch(...) {
-		if (ret_py) Py_DECREF(ret_py);
-		return NULL;
-	}
+        // Convert to Python format
+        ret_py = giss::vector_to_py(ret);
+        return ret_py;
+    } catch(...) {
+        if (ret_py) Py_DECREF(ret_py);
+        return NULL;
+    }
 }
 // -----------------------------------------------------------
 
 static PyMethodDef Grid_methods[] = {
-	{"get_proj_areas", (PyCFunction)Grid_get_proj_areas, METH_VARARGS,
-		""},
-	{"get_native_areas", (PyCFunction)Grid_get_native_areas, METH_VARARGS,
-		""},
+    {"get_proj_areas", (PyCFunction)Grid_get_proj_areas, METH_VARARGS,
+        ""},
+    {"get_native_areas", (PyCFunction)Grid_get_native_areas, METH_VARARGS,
+        ""},
 
-	{NULL}     /* Sentinel - marks the end of this structure */
+    {NULL}     /* Sentinel - marks the end of this structure */
 };
 
 static PyMemberDef Grid_members[] = {
-//	{"ncells_full", T_INT, offsetof(PyGrid, ncells_full)},
-	{NULL}
+//  {"ncells_full", T_INT, offsetof(PyGrid, ncells_full)},
+    {NULL}
 };
 
 static char *Grid_doc =
-	"Encapsulates all information about a grid in Glint2.\n"
-	"Python wrapper of glint2::Grid.\n"
-	"\n"
-	"Constructor: Grid(fname, vname)\n"
-	"    Read from an existing Grid file.\n"
-	"    fname : str\n"
-	"        Name of Glint2 configuration file>\n"
-	"    vname (OPTIONAL):\n"
-	"        Name of variable to read in config file\n";
+    "Encapsulates all information about a grid in Glint2.\n"
+    "Python wrapper of glint2::Grid.\n"
+    "\n"
+    "Constructor: Grid(fname, vname)\n"
+    "    Read from an existing Grid file.\n"
+    "    fname : str\n"
+    "        Name of Glint2 configuration file>\n"
+    "    vname (OPTIONAL):\n"
+    "        Name of variable to read in config file\n";
 
 
 PyTypeObject GridType = {
-   PyVarObject_HEAD_INIT(NULL, 0)	// ob_size
+   PyVarObject_HEAD_INIT(NULL, 0)   // ob_size
    "Grid",               /* tp_name */
    sizeof(PyGrid),     /* tp_basicsize */
    0,                         /* tp_itemsize */
@@ -202,5 +202,5 @@ PyTypeObject GridType = {
    (initproc)Grid__init,  /* tp_init */
    0,                         /* tp_alloc */
    (newfunc)&Grid_new    /* tp_new */
-//   (freefunc)Grid_free	/* tp_free */
+//   (freefunc)Grid_free    /* tp_free */
 };

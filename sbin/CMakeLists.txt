@@ -64,7 +64,7 @@ target_link_libraries (hires glint2 ${EXTERNAL_LIBS})
 
 # --------- The PISM main program, but compiled from with Glint2.
 # If this works, it shows we've set up the build properly.
-#add_executable(pismr pismr.cpp)		# Doesn't currently compile
+#add_executable(pismr pismr.cpp)        # Doesn't currently compile
 #target_link_libraries (pismr glint2 ${EXTERNAL_LIBS})
 
 ## Unit test for sparse matrix multiplication
@@ -81,15 +81,15 @@ target_link_libraries (hires glint2 ${EXTERNAL_LIBS})
 # ================================================
 
 install(TARGETS
-#		apitest
-		desm
-		ga_2x2_5
-		modele_ll_g2x2_5
-		modele_ll_g4x5
-		hires
-		overlap
-#		pismr
-		searise_a
-		searise_g
-	DESTINATION bin)
+#       apitest
+        desm
+        ga_2x2_5
+        modele_ll_g2x2_5
+        modele_ll_g4x5
+        hires
+        overlap
+#       pismr
+        searise_a
+        searise_g
+    DESTINATION bin)
 

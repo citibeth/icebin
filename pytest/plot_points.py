@@ -32,8 +32,8 @@ csvin = csv.reader(open(fname, 'r'))
 xx = []
 yy = []
 for line in csvin :
-	xx.append(float(line[1]))
-	yy.append(float(line[2]))
+    xx.append(float(line[1]))
+    yy.append(float(line[2]))
 
 
 # Plot multiple plots on one page

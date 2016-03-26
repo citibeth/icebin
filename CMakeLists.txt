@@ -10,60 +10,60 @@ include_directories($ENV{CMAKE_TRANSITIVE_INCLUDE_PATH})
 # ------- Process Configure Options
 
 if (NOT DEFINED USE_EVERYTRACE)
-	set(USE_EVERYTRACE NO)
+    set(USE_EVERYTRACE NO)
 endif()
 if (USE_EVERYTRACE)
-	find_package(Everytrace)
+    find_package(Everytrace)
 endif()
 
 
 if (NOT DEFINED BUILD_PYTHON)
-	set(BUILD_PYTHON NO)
+    set(BUILD_PYTHON NO)
 endif()
 if (BUILD_PYTHON)
-	find_package(Python REQUIRED)
-	find_package(Numpy REQUIRED)
+    find_package(Python REQUIRED)
+    find_package(Numpy REQUIRED)
 endif()
 
 
 
 if (NOT DEFINED BUILD_GRIDGEN)
-	set(BUILD_GRIDGEN YES)
+    set(BUILD_GRIDGEN YES)
 endif()
 if (BUILD_GRIDGEN)
-	find_package(CGAL REQUIRED)
-	find_package(GMP REQUIRED)
-	find_package(MPFR REQUIRED)
+    find_package(CGAL REQUIRED)
+    find_package(GMP REQUIRED)
+    find_package(MPFR REQUIRED)
 
-	list(APPEND EXTERNAL_LIBS ${CGAL_LIBRARY} ${GMP_LIBRARY} ${MPFR_LIBRARIES})
-	list(APPEND Boost_COMPONENTS thread system program_options)
-	include_directories(${CGAL_INCLUDE_DIR} ${GMP_INCLUDE_DIR} ${MPFR_INCLUDES})
-	add_definitions(-DBUILD_GRIDGEN)
+    list(APPEND EXTERNAL_LIBS ${CGAL_LIBRARY} ${GMP_LIBRARY} ${MPFR_LIBRARIES})
+    list(APPEND Boost_COMPONENTS thread system program_options)
+    include_directories(${CGAL_INCLUDE_DIR} ${GMP_INCLUDE_DIR} ${MPFR_INCLUDES})
+    add_definitions(-DBUILD_GRIDGEN)
 endif()
 
 if (NOT DEFINED BUILD_COUPLER)
-	set(BUILD_COUPLER YES)
+    set(BUILD_COUPLER YES)
 endif()
 if (BUILD_COUPLER)
-	find_package(MPI REQUIRED)
-	include_directories(${MPI_CXX_INCLUDE_PATH})
-	list(APPEND EXTERNAL_LIBS ${MPI_CXX_LIBRARIES})
+    find_package(MPI REQUIRED)
+    include_directories(${MPI_CXX_INCLUDE_PATH})
+    list(APPEND EXTERNAL_LIBS ${MPI_CXX_LIBRARIES})
 
-	if (NOT DEFINED USE_PISM)
-		set(USE_PISM NO)
-	endif()
-	if(USE_PISM)
-		find_package(PISM)
-		find_package(PETSC)
-		include_directories(
-			${PISM_INCLUDE_DIRS}
-			${PETSC_INCLUDES}
-		)
-		list(APPEND EXTERNAL_LIBS ${PETSC_LIBRARIES} ${PISM_LIBRARIES})
+    if (NOT DEFINED USE_PISM)
+        set(USE_PISM NO)
+    endif()
+    if(USE_PISM)
+        find_package(PISM)
+        find_package(PETSC)
+        include_directories(
+            ${PISM_INCLUDE_DIRS}
+            ${PETSC_INCLUDES}
+        )
+        list(APPEND EXTERNAL_LIBS ${PETSC_LIBRARIES} ${PISM_LIBRARIES})
 
-		add_definitions(-DUSE_PISM)
-	endif()
-	add_definitions(-DBUILD_COUPLER)
+        add_definitions(-DUSE_PISM)
+    endif()
+    add_definitions(-DBUILD_COUPLER)
 endif()
 
 find_package(Boost REQUIRED COMPONENTS ${Boost_COMPONENTS} filesystem date_time)
@@ -102,10 +102,10 @@ list(APPEND EXTERNAL_LIBS ${PROJ4_LIBRARIES})
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-#find_package(GALAHAD REQUIRED)		# This should be optional
+#find_package(GALAHAD REQUIRED)     # This should be optional
 
 #find_package(CGAL REQUIRED)
-#find_package(MPFR REQUIRED)		# Used by CGAL
+#find_package(MPFR REQUIRED)        # Used by CGAL
 
 
 #find_package(PROJ4)
@@ -125,9 +125,9 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 ## Set Pism_EXTERNAL_LIBS and include directories.
 #include_directories (
-#	${EVERYTRACE_INCLUDE_DIR}
-#	${PROJECT_SOURCE_DIR}/slib
-#	${Boost_INCLUDE_DIRS}
+#   ${EVERYTRACE_INCLUDE_DIR}
+#   ${PROJECT_SOURCE_DIR}/slib
+#   ${Boost_INCLUDE_DIRS}
 #    ${NETCDF_INCLUDES} ${NETCDF_INCLUDES_CXX} ${NETCDF_INCLUDES_F77}
 #    ${BLITZ++_INCLUDE_DIR}
 #    ${GMP_INCLUDE_DIR}
@@ -138,30 +138,30 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 #    ${UDUNITS2_INCLUDES}
 #    ${MPI_C_INCLUDE_PATH}
 #
-#	${GALAHAD_INCLUDE_DIRS})     # This should be optional
+#   ${GALAHAD_INCLUDE_DIRS})     # This should be optional
 
 
 #list(APPEND EXTERNAL_LIBS
-#	${EVERYTRACE_CF_LIBRARY}
-#	${Boost_LIBRARIES}
+#   ${EVERYTRACE_CF_LIBRARY}
+#   ${Boost_LIBRARIES}
 #    ${UDUNITS2_LIBRARIES}
 #    ${FFTW_LIBRARIES}
 #    ${GSL_LIBRARIES}
 #
 #    ${NETCDF_LIBRARIES_F90} ${NETCDF_LIBRARIES_CXX} ${NETCDF_LIBRARIES_C}
 #    ${MPI_C_LIBRARIES}
-#	${GALAHAD_LIBRARIES}
-#	${PROJ4_LIBRARIES}
-#	${GMP_LIBRARY}
-#	${CGAL_LIBRARY}
-#	${MPFR_LIBRARIES}
+#   ${GALAHAD_LIBRARIES}
+#   ${PROJ4_LIBRARIES}
+#   ${GMP_LIBRARY}
+#   ${CGAL_LIBRARY}
+#   ${MPFR_LIBRARIES}
 #)
 #
 #if (${USE_PISM})
-#	list(APPEND EXTERNAL_LIBS
-#	    ${PETSC_LIBRARIES}
-#		${PISM_LIBRARIES}
-#	)
+#   list(APPEND EXTERNAL_LIBS
+#       ${PETSC_LIBRARIES}
+#       ${PISM_LIBRARIES}
+#   )
 #endif()
 
 # -------- Process subdirectories of the build
@@ -169,10 +169,10 @@ add_subdirectory(slib)
 #add_subdirectory(sbin)
 add_subdirectory(tests)
 if (BUILD_GRIDGEN)
-	add_subdirectory(grids)
+    add_subdirectory(grids)
 endif()
 
 if(${BUILD_PYTHON})
-	add_subdirectory(pylib)
+    add_subdirectory(pylib)
 endif()
 

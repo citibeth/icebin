@@ -25,18 +25,18 @@ import numpy as np
 import giss.plot
 
 def _default_plot_boundaries(basemap) :
-	"""Default function for 'plot_boundaries' output of plot_params()"""
+    """Default function for 'plot_boundaries' output of plot_params()"""
 
-	# ---------- Draw other stuff on the map
-	# draw line around map projection limb.
-	# color background of map projection region.
-	# missing values over land will show up this color.
-	basemap.drawmapboundary(fill_color='0.5')
-	basemap.drawcoastlines()
+    # ---------- Draw other stuff on the map
+    # draw line around map projection limb.
+    # color background of map projection region.
+    # missing values over land will show up this color.
+    basemap.drawmapboundary(fill_color='0.5')
+    basemap.drawcoastlines()
 
-	# draw parallels and meridians, but don't bother labelling them.
-	basemap.drawparallels(np.arange(-90.,120.,30.))
-	basemap.drawmeridians(np.arange(0.,420.,60.))
+    # draw parallels and meridians, but don't bother labelling them.
+    basemap.drawparallels(np.arange(-90.,120.,30.))
+    basemap.drawmeridians(np.arange(0.,420.,60.))
 # --------------------------------
 _reverse_scale = {'mass'}
 
@@ -69,10 +69,10 @@ plot_args['norm'] = giss.plot.AsymmetricNormalize()
 reverse = (var_name in _reverse_scale)
 plot_args['cmap'] = giss.plot.cpt('giss-cpt/BlRe.cpt', reverse=reverse).cmap
 
-giss.plot.plot_var(basemap=basemap, **pp)		# Plot, and show on screen
+giss.plot.plot_var(basemap=basemap, **pp)       # Plot, and show on screen
 
 # Slightly more complex alternatives:
 # Save figure:
-# 	giss.plot.plot_var(fname='plottest1.png', **pp)
+#   giss.plot.plot_var(fname='plottest1.png', **pp)
 # Save figure and snow on screen
-# 	giss.plot.plot_var(fname='plottest1.png', show=True, **pp)
+#   giss.plot.plot_var(fname='plottest1.png', show=True, **pp)

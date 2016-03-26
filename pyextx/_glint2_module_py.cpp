@@ -35,8 +35,8 @@ extern PyMethodDef matrix_ops_functions[];
 
 // All the functions for the entire module
 static PyMethodDef *glint2_function_sets[] = {
-	matrix_ops_functions,
-	NULL
+    matrix_ops_functions,
+    NULL
 };
 
 extern PyTypeObject NcFileType;
@@ -45,10 +45,10 @@ extern PyTypeObject MatrixMakerType;
 
 // All the classes (PyTypeObject) for the entire module
 static PyTypeObject *glint2_types[] = {
-	&NcFileType,
-	&GridType,
-	&MatrixMakerType,
-	NULL
+    &NcFileType,
+    &GridType,
+    &MatrixMakerType,
+    NULL
 };
 
 // ===========================================================================
@@ -72,15 +72,15 @@ static int glint2Clear(PyObject *m) {
 }
 
 static PyModuleDef glint2ModuleDef = {
-	PyModuleDef_HEAD_INIT,
-	"_glint2",
-	"Interface to C++ GLINT2 Library",
-	sizeof(struct module_state),
-	NULL,
-	NULL,
-	glint2Traverse,
-	glint2Clear,
-	NULL
+    PyModuleDef_HEAD_INIT,
+    "_glint2",
+    "Interface to C++ GLINT2 Library",
+    sizeof(struct module_state),
+    NULL,
+    NULL,
+    glint2Traverse,
+    glint2Clear,
+    NULL
 };
 
 // ===========================================================================
@@ -88,34 +88,34 @@ static PyModuleDef glint2ModuleDef = {
 /** Exit subroutine to use when we're running Python */
 static void python_exit(int i)
 {
-	everytrace_dump();
-	fprintf(stderr, "Returning to Python interpreter.\n");
-	throw std::exception();		// This will get caught, then go back to Python
+    everytrace_dump();
+    fprintf(stderr, "Returning to Python interpreter.\n");
+    throw std::exception();     // This will get caught, then go back to Python
 }
 
 
 extern "C"
 PyObject *PyInit__glint2(void)
 {
-//	libglint2_ncerror_segfault();
+//  libglint2_ncerror_segfault();
 
-	giss::exit = &python_exit;
+    giss::exit = &python_exit;
 
 
-	PyObject *mod = giss::init_module(glint2ModuleDef,
-		glint2_function_sets, glint2_types);
+    PyObject *mod = giss::init_module(glint2ModuleDef,
+        glint2_function_sets, glint2_types);
 
-	/* See http://dsnra.jpl.nasa.gov/software/Python/numpydoc/numpy-13.html
+    /* See http://dsnra.jpl.nasa.gov/software/Python/numpydoc/numpy-13.html
 
-	In addition to including arrayobject.h , the extension must call
-	import_array() in its initialization function, after the call to
-	Py_InitModule() . This call makes sure that the module that
-	implements the array type has been imported, and initializes a pointer
-	array through which the NumPy functions are called. If you forget this
-	call, your extension module will crash on the first call to a NumPy
-	function. */
-	import_array();
+    In addition to including arrayobject.h , the extension must call
+    import_array() in its initialization function, after the call to
+    Py_InitModule() . This call makes sure that the module that
+    implements the array type has been imported, and initializes a pointer
+    array through which the NumPy functions are called. If you forget this
+    call, your extension module will crash on the first call to a NumPy
+    function. */
+    import_array();
 
-	return (PyObject *)mod;
+    return (PyObject *)mod;
 }
 

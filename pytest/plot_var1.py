@@ -28,10 +28,10 @@ basemap = giss.basemap.greenland_laea()
 
 nc = netCDF4.Dataset(nc_name)
 pp = giss.modele.plot_params(var_name, nc=nc)
-giss.plot.plot_var(basemap=basemap, **pp)		# Plot, and show on screen
+giss.plot.plot_var(basemap=basemap, **pp)       # Plot, and show on screen
 
 # Slightly more complex alternatives:
 # Save figure:
-# 	giss.plot.plot_var(fname='plottest1.png', **pp)
+#   giss.plot.plot_var(fname='plottest1.png', **pp)
 # Save figure and snow on screen
-# 	giss.plot.plot_var(fname='plottest1.png', show=True, **pp)
+#   giss.plot.plot_var(fname='plottest1.png', show=True, **pp)

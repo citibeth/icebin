@@ -32,23 +32,23 @@ const double EQ_RAD = 6.371e6; /// Radius of the Earth (same as in ModelE)
 
 int main(int argc, char **argv)
 {
-	boost::filesystem::path exe_path(argv[0]);
-	printf("------------- Set up GCM Grid\n");
+    boost::filesystem::path exe_path(argv[0]);
+    printf("------------- Set up GCM Grid\n");
 
-	Grid_LonLat grid;
-	glint2::modele::set_lonlat_4x5(grid);
-	grid.name = exe_path.stem().string();
-	grid.points_in_side = 4;
-	grid.eq_rad = EQ_RAD;
-	grid.realize(boost::bind(
-		&SphericalClip::lonlat, -74., 59., -10., 87.5,
-		_1, _2, _3, _4));
+    Grid_LonLat grid;
+    glint2::modele::set_lonlat_4x5(grid);
+    grid.name = exe_path.stem().string();
+    grid.points_in_side = 4;
+    grid.eq_rad = EQ_RAD;
+    grid.realize(boost::bind(
+        &SphericalClip::lonlat, -74., 59., -10., 87.5,
+        _1, _2, _3, _4));
 
-//	grid.realize(boost::bind(&SphericalClip::keep_all, _1, _2, _3, _4));
+//  grid.realize(boost::bind(&SphericalClip::keep_all, _1, _2, _3, _4));
 
-	// ------------- Write it out to NetCDF
-	fflush(stdout);
-	printf("// ------------- Write it out to NetCDF\n");
-	grid.to_netcdf(grid.name + ".nc");
-//	grid.to_netcdf("greenland_4x5.nc");
+    // ------------- Write it out to NetCDF
+    fflush(stdout);
+    printf("// ------------- Write it out to NetCDF\n");
+    grid.to_netcdf(grid.name + ".nc");
+//  grid.to_netcdf("greenland_4x5.nc");
 }

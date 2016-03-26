@@ -27,9 +27,9 @@ import sys
 fname = sys.argv[1]
 
 if len(sys.argv) > 2 :
-	vname = sys.argv[2]
+    vname = sys.argv[2]
 else :
-	vname = 'grid'
+    vname = 'grid'
 
 nc = netCDF4.Dataset(fname)
 grid = glint2.pyGrid(nc, vname)

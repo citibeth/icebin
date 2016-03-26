@@ -19,15 +19,15 @@
 #define NO_IMPORT_ARRAY
 #include "_glint2_module.hpp"
 
-#include <structmember.h>	// Also Python-related
+#include <structmember.h>   // Also Python-related
 
 #include <netcdfcpp.h>
 #include "PyClass.hpp"
 
 #define RETURN_INVALID_ARGUMENTS(fname) {\
-	fprintf(stderr, fname "(): invalid arguments.\n"); \
-	PyErr_SetString(PyExc_ValueError, fname "(): invalid arguments."); \
-	return NULL; }
+    fprintf(stderr, fname "(): invalid arguments.\n"); \
+    PyErr_SetString(PyExc_ValueError, fname "(): invalid arguments."); \
+    return NULL; }
 
 
 // ========================================================================
@@ -36,51 +36,51 @@
 /** Read from a file */
 static int NcFile__init(PyClass<NcFile> *self, PyObject *args, PyObject *kwds)
 {
-	try {
-		// Get arguments
-		char *fname_py = NULL;
-		char *filemode_py = NULL;
-		if (!PyArg_ParseTuple(args, "ss", &fname_py, &filemode_py)) {
-			// Throw an exception...
-			PyErr_SetString(PyExc_ValueError,
-				"Bad arguments to NcFile_save().");
-			return 0;
-		}
+    try {
+        // Get arguments
+        char *fname_py = NULL;
+        char *filemode_py = NULL;
+        if (!PyArg_ParseTuple(args, "ss", &fname_py, &filemode_py)) {
+            // Throw an exception...
+            PyErr_SetString(PyExc_ValueError,
+                "Bad arguments to NcFile_save().");
+            return 0;
+        }
 
-		auto mode = ((strcmp(filemode_py, "w") == 0) ?
-			NcFile::Replace : NcFile::ReadOnly);
+        auto mode = ((strcmp(filemode_py, "w") == 0) ?
+            NcFile::Replace : NcFile::ReadOnly);
 
-		// Instantiate C++ NcFile
-		std::unique_ptr<NcFile> maker(new NcFile(fname_py, mode));
+        // Instantiate C++ NcFile
+        std::unique_ptr<NcFile> maker(new NcFile(fname_py, mode));
 
-		// Move it to Python NcFile object.
-		self->init(std::move(maker));
-		return 0;
-	} catch(...) {
-		PyErr_SetString(PyExc_ValueError, "Error in NcFile__init()");
-		return 0;
-	}
+        // Move it to Python NcFile object.
+        self->init(std::move(maker));
+        return 0;
+    } catch(...) {
+        PyErr_SetString(PyExc_ValueError, "Error in NcFile__init()");
+        return 0;
+    }
 }
 
 
 /** Read from a file */
 static PyObject *NcFile_close(PyClass<NcFile> *self, PyObject *args)
 {
-	try {
-		// Get arguments
-		if (!PyArg_ParseTuple(args, "")) {
-			// Throw an exception...
-			PyErr_SetString(PyExc_ValueError,
-				"NcFile_realize() takes no arguments.");
-			return 0;
-		}
-		self->ptr->close();
+    try {
+        // Get arguments
+        if (!PyArg_ParseTuple(args, "")) {
+            // Throw an exception...
+            PyErr_SetString(PyExc_ValueError,
+                "NcFile_realize() takes no arguments.");
+            return 0;
+        }
+        self->ptr->close();
 
-		return Py_None;
-	} catch(...) {
-		PyErr_SetString(PyExc_ValueError, "Error in NcFile_realize()");
-		return 0;
-	}
+        return Py_None;
+    } catch(...) {
+        PyErr_SetString(PyExc_ValueError, "Error in NcFile_realize()");
+        return 0;
+    }
 }
 
 
@@ -88,13 +88,13 @@ static PyObject *NcFile_close(PyClass<NcFile> *self, PyObject *args)
 
 static PyMethodDef NcFile_methods[] = {
 
-	{"close", (PyCFunction)NcFile_close, METH_VARARGS,
-		""},
-	{NULL}     /* Sentinel - marks the end of this structure */
+    {"close", (PyCFunction)NcFile_close, METH_VARARGS,
+        ""},
+    {NULL}     /* Sentinel - marks the end of this structure */
 };
 
 static PyMemberDef NcFile_members[] = {
-	{NULL}
+    {NULL}
 };
 
 PyTypeObject NcFileType = {
@@ -137,5 +137,5 @@ PyTypeObject NcFileType = {
    (initproc)NcFile__init,  /* tp_init */
    0,                         /* tp_alloc */
    (newfunc)&PyClass<NcFile>::new_instance    /* tp_new */
-//   (freefunc)NcFile_free	/* tp_free */
+//   (freefunc)NcFile_free  /* tp_free */
 };

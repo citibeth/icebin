@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     ierr = verbosityLevelFromOptions(); CHKERRQ(ierr);
 
     ierr = verbPrintf(2,com, "PISMR %s (basic evolution run mode)\n",
-		      PISM_Revision); CHKERRQ(ierr);
+              PISM_Revision); CHKERRQ(ierr);
     ierr = stop_on_version_option(); CHKERRQ(ierr);
 
     ierr = check_old_option_and_stop(com, "-boot_from", "-boot_file"); CHKERRQ(ierr); 
@@ -109,11 +109,11 @@ printf("end = %f\n", g.time->end());
 
 //3155692.597470          Natural timestep
 //m.grid.time->set_end(13155700.0);
-	printf("run_to time = %f\n", g.time->current());
+    printf("run_to time = %f\n", g.time->current());
     ierr = m.run_to(2e6); CHKERRQ(ierr);
-	printf("run_to time = %f\n", g.time->current());
+    printf("run_to time = %f\n", g.time->current());
     ierr = m.run_to(1e7); CHKERRQ(ierr);
-	printf("run_to time = %f\n", g.time->current());
+    printf("run_to time = %f\n", g.time->current());
 
     ierr = verbPrintf(2,com, "... done with run\n"); CHKERRQ(ierr);
     // provide a default output file name if no -o option is given.

@@ -33,35 +33,35 @@ using namespace netCDF;
 
 int main(int argc, char **argv)
 {
-	std::string fname1(argv[1]);
-	std::string fname2(argv[2]);
+    std::string fname1(argv[1]);
+    std::string fname2(argv[2]);
 
-	printf("------------- Read gridA (GCM Grid)\n");
-	NcIO ncio1(fname1);
-	Grid gridA;
-	gridA.ncio(ncio1, "grid");
-	ncio1.close();
+    printf("------------- Read gridA (GCM Grid)\n");
+    NcIO ncio1(fname1);
+    Grid gridA;
+    gridA.ncio(ncio1, "grid");
+    ncio1.close();
 
-	printf("------------- Read gridI (Ice Grid)\n");
-	NcIO ncio2(fname2);
-	Grid gridI;
-	gridI.ncio(ncio2, "grid");
-	ncio2.close();
+    printf("------------- Read gridI (Ice Grid)\n");
+    NcIO ncio2(fname2);
+    Grid gridI;
+    gridI.ncio(ncio2, "grid");
+    ncio2.close();
 
-	printf("--------------- Overlapping\n");
-	GridSpec_Exchange spec;
-	spec.gridA = &gridA;
-	spec.gridI = &gridI;
-	Grid exgrid;
-	spec.make_grid(exgrid);
-	sort_renumber_vertices(exgrid);
+    printf("--------------- Overlapping\n");
+    GridSpec_Exchange spec;
+    spec.gridA = &gridA;
+    spec.gridI = &gridI;
+    Grid exgrid;
+    spec.make_grid(exgrid);
+    sort_renumber_vertices(exgrid);
 
-	printf("--------------- Writing out\n");
-	std::string fname = exgrid.name + ".nc";
+    printf("--------------- Writing out\n");
+    std::string fname = exgrid.name + ".nc";
 
-	ibmisc::NcIO ncio(exgrid.name + ".nc", netCDF::NcFile::replace);
-	gridA.ncio(ncio, "gridA");
-	gridI.ncio(ncio, "gridI");
-	exgrid.ncio(ncio, "exgrid");
-	ncio.close();
+    ibmisc::NcIO ncio(exgrid.name + ".nc", netCDF::NcFile::replace);
+    gridA.ncio(ncio, "gridA");
+    gridI.ncio(ncio, "gridI");
+    exgrid.ncio(ncio, "exgrid");
+    ncio.close();
 }

@@ -22,7 +22,7 @@
 #include "_glint2_module.hpp"
 
 #include "IceSheet_py.hpp"
-#include <structmember.h>	// Also Python-related
+#include <structmember.h>   // Also Python-related
 #include <numpy/arrayobject.h>
 #include <math.h>
 #include <glint2/IceSheet.hpp>
@@ -31,26 +31,26 @@
 using namespace glint2;
 
 #define RETURN_INVALID_ARGUMENTS(fname) {\
-	fprintf(stderr, fname "(): invalid arguments.\n"); \
-	PyErr_SetString(PyExc_ValueError, fname "(): invalid arguments."); \
-	return NULL; }
+    fprintf(stderr, fname "(): invalid arguments.\n"); \
+    PyErr_SetString(PyExc_ValueError, fname "(): invalid arguments."); \
+    return NULL; }
 
 
 // ========================================================================
 
 void PyIceSheet::init(std::unique_ptr<glint2::IceSheet> &&_sheet)
 {
-	sheet = std::move(_sheet);
+    sheet = std::move(_sheet);
 }
 
 // ========= class snowdrift.IceSheet :
 static PyObject *IceSheet_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	PyIceSheet *self;
+    PyIceSheet *self;
 
-	self = new (type->tp_alloc(type, 0)) PyIceSheet;
+    self = new (type->tp_alloc(type, 0)) PyIceSheet;
 
-//	Py_INCREF(self);
+//  Py_INCREF(self);
     return (PyObject *)self;
 }
 
@@ -59,57 +59,57 @@ static int IceSheet__init(PyIceSheet *self, PyObject *args, PyObject *kwds)
 {
 //printf("IceSheet__init() called\n");
 
-	// Get arguments
-	const char *grid2_fname_py;
-	const char *exgrid_fname_py;
-	PyObject *elev2_py = NULL;
-	PyObject *mask2_py = NULL;
+    // Get arguments
+    const char *grid2_fname_py;
+    const char *exgrid_fname_py;
+    PyObject *elev2_py = NULL;
+    PyObject *mask2_py = NULL;
 
-	if (!PyArg_ParseTuple(args, "ssOO",
-	   &grid2_fname_py, &exgrid_fname_py, &elev2_py, &mask2_py))
-	{
-		// Throw an exception...
-		PyErr_SetString(PyExc_ValueError,
-			"IceSheet__init() called without valid arguments.");
-		return 0;
-	}
+    if (!PyArg_ParseTuple(args, "ssOO",
+       &grid2_fname_py, &exgrid_fname_py, &elev2_py, &mask2_py))
+    {
+        // Throw an exception...
+        PyErr_SetString(PyExc_ValueError,
+            "IceSheet__init() called without valid arguments.");
+        return 0;
+    }
 
 
-	blitz::Array<int,1> mask2;
-	blitz::Array<int,1> *mask2p = NULL;
-	if (mask2_py != Py_None) {
-		mask2.reference(giss::py_to_blitz<int,1>(mask2_py, "mask2", {overlap.ncol}));
-		mask2p = &mask2;
-	}
+    blitz::Array<int,1> mask2;
+    blitz::Array<int,1> *mask2p = NULL;
+    if (mask2_py != Py_None) {
+        mask2.reference(giss::py_to_blitz<int,1>(mask2_py, "mask2", {overlap.ncol}));
+        mask2p = &mask2;
+    }
 
-	// Instantiate C++ Ice Sheet
-	std::unique_ptr<glint2::IceSheet> sheet(new IceSheet);
+    // Instantiate C++ Ice Sheet
+    std::unique_ptr<glint2::IceSheet> sheet(new IceSheet);
 
-	// Fill it in...
-	sheet->grid2 = read_grid(NcFile(grid2_fname, NcFile::ReadOnly), "grid");
-	sheet->exgrid = read_grid(NcFile(exgrid_fname, NcFile::ReadOnly), "grid");
+    // Fill it in...
+    sheet->grid2 = read_grid(NcFile(grid2_fname, NcFile::ReadOnly), "grid");
+    sheet->exgrid = read_grid(NcFile(exgrid_fname, NcFile::ReadOnly), "grid");
 
-	int n2 = sheet->grid2->ndata();
-	if (mask2_py != Py_None) {
-		sheet->mask2.reset(
-			new blitz::Array<int,1>(
-				giss::py_to_blitz<int,1>(mask2_py, "mask2", {n2}).copy()
-			));
-	}
+    int n2 = sheet->grid2->ndata();
+    if (mask2_py != Py_None) {
+        sheet->mask2.reset(
+            new blitz::Array<int,1>(
+                giss::py_to_blitz<int,1>(mask2_py, "mask2", {n2}).copy()
+            ));
+    }
 
-	sheet->elev2 = giss::py_to_blitz<double,1>(
-		elev2_py, "elev2", {n2}).copy();
+    sheet->elev2 = giss::py_to_blitz<double,1>(
+        elev2_py, "elev2", {n2}).copy();
 
-	// Move it to Python IceSheet object.
-	self->init(std::move(sheet));
+    // Move it to Python IceSheet object.
+    self->init(std::move(sheet));
 
-	return 0;
+    return 0;
 }
 
 static void IceSheet_dealloc(PyIceSheet *self)
 {
-	self->~PyIceSheet();
-	self->ob_type->tp_free((PyObject *)self);
+    self->~PyIceSheet();
+    self->ob_type->tp_free((PyObject *)self);
 }
 
 //static PyMemberDef IceSheet_members[] = {{NULL}};
@@ -117,11 +117,11 @@ static void IceSheet_dealloc(PyIceSheet *self)
 // -----------------------------------------------------------
 
 static PyMethodDef IceSheet_methods[] = {
-	{NULL}     /* Sentinel - marks the end of this structure */
+    {NULL}     /* Sentinel - marks the end of this structure */
 };
 
 static PyMemberDef IceSheet_members[] = {
-	{NULL}
+    {NULL}
 };
 
 PyTypeObject IceSheetType = {
@@ -164,5 +164,5 @@ PyTypeObject IceSheetType = {
    (initproc)IceSheet__init,  /* tp_init */
    0,                         /* tp_alloc */
    (newfunc)&IceSheet_new    /* tp_new */
-//   (freefunc)IceSheet_free	/* tp_free */
+//   (freefunc)IceSheet_free    /* tp_free */
 };

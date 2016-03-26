@@ -12,7 +12,7 @@ SET(ALL_LIBS icebin ${EXTERNAL_LIBS} ${GTEST_LIBRARY})
 
 
 foreach(TEST grid)
-	add_executable(test_${TEST} test_${TEST}.cpp)
-	target_link_libraries(test_${TEST} ${ALL_LIBS})
-	add_test(AllTests test_${TEST})
+    add_executable(test_${TEST} test_${TEST}.cpp)
+    target_link_libraries(test_${TEST} ${ALL_LIBS})
+    add_test(AllTests test_${TEST})
 endforeach()

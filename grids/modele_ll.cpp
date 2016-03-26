@@ -53,124 +53,124 @@ const int ANTARCTICA = 2;
 /** Just initializes lonb and latb, doesn't do full set-up */
 void set_lonlat_4x5(GridSpec_LonLat &spec)
 {
-	spec.lonb = lonb_4x5;
-	spec.latb = latb_4x5;
-	spec.south_pole = true;
-	spec.north_pole = true;
+    spec.lonb = lonb_4x5;
+    spec.latb = latb_4x5;
+    spec.south_pole = true;
+    spec.north_pole = true;
 }
 
 void set_lonlat_2x2_5(GridSpec_LonLat &spec)
 {
-	// Create the 2x2.5 grid from the 4x5 grid.
-	spec.lonb.clear();
-	for (int i=0; i<lonb_4x5.size()-1; ++i) {
-		spec.lonb.push_back(lonb_4x5[i]);
-		spec.lonb.push_back(.5*(lonb_4x5[i] + lonb_4x5[i+1]));
-	}
-	spec.lonb.push_back(lonb_4x5.back());
+    // Create the 2x2.5 grid from the 4x5 grid.
+    spec.lonb.clear();
+    for (int i=0; i<lonb_4x5.size()-1; ++i) {
+        spec.lonb.push_back(lonb_4x5[i]);
+        spec.lonb.push_back(.5*(lonb_4x5[i] + lonb_4x5[i+1]));
+    }
+    spec.lonb.push_back(lonb_4x5.back());
 
-	spec.latb.clear();
-	for (int i=0; i<latb_4x5.size()-1; ++i) {
-		spec.latb.push_back(latb_4x5[i]);
-		spec.latb.push_back(.5*(latb_4x5[i] + latb_4x5[i+1]));
-	}
-	spec.latb.push_back(latb_4x5.back());
+    spec.latb.clear();
+    for (int i=0; i<latb_4x5.size()-1; ++i) {
+        spec.latb.push_back(latb_4x5[i]);
+        spec.latb.push_back(.5*(latb_4x5[i] + latb_4x5[i+1]));
+    }
+    spec.latb.push_back(latb_4x5.back());
 
-	spec.south_pole = true;
-	spec.north_pole = true;
+    spec.south_pole = true;
+    spec.north_pole = true;
 }
 
 bool clip(int zone, double lon0, double lat0, double lon1, double lat1)
 {
-	// Is it in Greenland range?
-	if (zone & GREENLAND)
-		if (SphericalClip::lonlat(-74., 59., -10., 87.5,
-			lon0, lat0, lon1, lat1)) return true;
+    // Is it in Greenland range?
+    if (zone & GREENLAND)
+        if (SphericalClip::lonlat(-74., 59., -10., 87.5,
+            lon0, lat0, lon1, lat1)) return true;
 
-	// Is it in Antarctica range?
-	if (zone & ANTARCTICA)
-		if (lat0 <= -60. || lat1 <= -60) return true;
+    // Is it in Antarctica range?
+    if (zone & ANTARCTICA)
+        if (lat0 <= -60. || lat1 <= -60) return true;
 
-	// Not in range of either ice sheet, discard
-	return false;
+    // Not in range of either ice sheet, discard
+    return false;
 }
 
 // http://stackoverflow.com/questions/313970/how-to-convert-stdstring-to-lower-case
 void tolower(std::string &data)
 {
-	for (auto ii(data.begin()); ii != data.end(); ++ii)
-		*ii = std::tolower(*ii);
+    for (auto ii(data.begin()); ii != data.end(); ++ii)
+        *ii = std::tolower(*ii);
 }
 
 int main(int argc, char **argv)
 {
-	ibmisc::netcdf_debug = true;
+    ibmisc::netcdf_debug = true;
 
-	// -------------------------------------------------------------
-	// Parse Command Line Args
+    // -------------------------------------------------------------
+    // Parse Command Line Args
 
-	// http://www.boost.org/doc/libs/1_60_0/doc/html/program_options/tutorial.html
-	// Declare the supported options.
-	po::options_description desc("Allowed options");
-	desc.add_options()
-		("help", "produce help message")
-		("zone", po::value<std::string>(), "Greenland, Antarctica or Both")
-		("grid", po::value<std::string>(), "4x5, 2x2.5");
-	po::variables_map vm;
-	po::store(po::parse_command_line(argc, argv, desc), vm);
-	po::notify(vm);
+    // http://www.boost.org/doc/libs/1_60_0/doc/html/program_options/tutorial.html
+    // Declare the supported options.
+    po::options_description desc("Allowed options");
+    desc.add_options()
+        ("help", "produce help message")
+        ("zone", po::value<std::string>(), "Greenland, Antarctica or Both")
+        ("grid", po::value<std::string>(), "4x5, 2x2.5");
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
 
-	if (argc == 0 || vm.count("help")) {
-		std::cout << desc << std::endl;
-		return 1;
-	}
+    if (argc == 0 || vm.count("help")) {
+        std::cout << desc << std::endl;
+        return 1;
+    }
 
-	int zone;
-	std::string szone = "ga";
-	if (vm.count("zone")) szone = vm["zone"].as<std::string>();
-	tolower(szone);
-	if (szone == "greenland" || szone == "g") {
-		zone = GREENLAND;
-		szone = "g";
-	} else if (szone == "antarctica" || szone == "a") {
-		zone = ANTARCTICA;
-		szone = "a";
-	} else if (szone == "both" || szone == "ga") {
-		zone = GREENLAND | ANTARCTICA;
-		szone = "ga";
-	} else {
-		(*icebin_error)(-1, "Unknown zone '%s'\n", szone.c_str());
-	}
+    int zone;
+    std::string szone = "ga";
+    if (vm.count("zone")) szone = vm["zone"].as<std::string>();
+    tolower(szone);
+    if (szone == "greenland" || szone == "g") {
+        zone = GREENLAND;
+        szone = "g";
+    } else if (szone == "antarctica" || szone == "a") {
+        zone = ANTARCTICA;
+        szone = "a";
+    } else if (szone == "both" || szone == "ga") {
+        zone = GREENLAND | ANTARCTICA;
+        szone = "ga";
+    } else {
+        (*icebin_error)(-1, "Unknown zone '%s'\n", szone.c_str());
+    }
 
-	std::string sgrid = "2x2_5";
-	if (vm.count("grid")) sgrid = vm["grid"].as<std::string>();
-	std::function<void (GridSpec_LonLat &)> spec_fn;
-	if (sgrid == "2x2_5") {
-		 spec_fn = &set_lonlat_2x2_5;
-	} else if (sgrid == "4x5") {
-		spec_fn = &set_lonlat_4x5;
-	} else {
-		(*icebin_error)(-1, "Unknown grid '%s'\n", sgrid.c_str());
-	}
+    std::string sgrid = "2x2_5";
+    if (vm.count("grid")) sgrid = vm["grid"].as<std::string>();
+    std::function<void (GridSpec_LonLat &)> spec_fn;
+    if (sgrid == "2x2_5") {
+         spec_fn = &set_lonlat_2x2_5;
+    } else if (sgrid == "4x5") {
+        spec_fn = &set_lonlat_4x5;
+    } else {
+        (*icebin_error)(-1, "Unknown grid '%s'\n", sgrid.c_str());
+    }
 
-	// -------------------------------------------------------------
-	GridSpec_LonLat spec;
-	spec.name = "modele_ll_" + szone + sgrid;
+    // -------------------------------------------------------------
+    GridSpec_LonLat spec;
+    spec.name = "modele_ll_" + szone + sgrid;
 
-	spec.spherical_clip = std::bind(&clip, zone, _1, _2, _3, _4);
-	spec_fn(spec);
-	spec.points_in_side = 2;	// Use 2 for comparison with past experiments
-	spec.eq_rad = EQ_RAD;
-	
+    spec.spherical_clip = std::bind(&clip, zone, _1, _2, _3, _4);
+    spec_fn(spec);
+    spec.points_in_side = 2;    // Use 2 for comparison with past experiments
+    spec.eq_rad = EQ_RAD;
+    
 
-	// ------------ Make the grid from the spec
-	Grid_LonLat grid;
-	spec.indexing = Indexing<int,long>(
-		{0,0}, {spec.nlon(), spec.nlat()}, {1,0});	// col major
-	spec.make_grid(grid);
+    // ------------ Make the grid from the spec
+    Grid_LonLat grid;
+    spec.indexing = Indexing<int,long>(
+        {0,0}, {spec.nlon(), spec.nlat()}, {1,0});  // col major
+    spec.make_grid(grid);
 
-	// ------------- Write it out to NetCDF
-	ibmisc::NcIO ncio(spec.name + ".nc", netCDF::NcFile::replace);
-	grid.ncio(ncio, "grid");
-	ncio.close();
+    // ------------- Write it out to NetCDF
+    ibmisc::NcIO ncio(spec.name + ".nc", netCDF::NcFile::replace);
+    grid.ncio(ncio, "grid");
+    ncio.close();
 }

@@ -23,10 +23,10 @@
 
 /// Classmembers of the Python class
 struct PyIceSheet {
-	PyObject_HEAD
-	std::unique_ptr<glint2::IceSheet> sheet;	// The sheet, in C++
+    PyObject_HEAD
+    std::unique_ptr<glint2::IceSheet> sheet;    // The sheet, in C++
 
-	void init(std::unique_ptr<glint2::IceSheet> &&_sheet);
+    void init(std::unique_ptr<glint2::IceSheet> &&_sheet);
 
 };
 

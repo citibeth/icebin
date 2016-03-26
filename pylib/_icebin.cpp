@@ -465,11 +465,11 @@ static const char *__pyx_f[] = {
 struct __pyx_obj_7_icebin_PyVertex;
 
 /* "_icebin.pyx":15
- * 		const double y
+ *      const double y
  * 
  * cdef class PyVertex:             # <<<<<<<<<<<<<<
- * 	cdef Vertex *thisptr
- * 	def __cinit__(self, double x, double y, int index):
+ *  cdef Vertex *thisptr
+ *  def __cinit__(self, double x, double y, int index):
  */
 struct __pyx_obj_7_icebin_PyVertex {
   PyObject_HEAD
@@ -671,10 +671,10 @@ static PyObject *__pyx_tp_new_7_icebin_PyVertex(PyTypeObject *t, PyObject *a, Py
 
 /* "_icebin.pyx":17
  * cdef class PyVertex:
- * 	cdef Vertex *thisptr
- * 	def __cinit__(self, double x, double y, int index):             # <<<<<<<<<<<<<<
- * 		self.thisptr = new Vertex(x,y,index)
- * 	def __dealloc__(self):
+ *  cdef Vertex *thisptr
+ *  def __cinit__(self, double x, double y, int index):             # <<<<<<<<<<<<<<
+ *      self.thisptr = new Vertex(x,y,index)
+ *  def __dealloc__(self):
  */
 
 /* Python wrapper */
@@ -757,11 +757,11 @@ static int __pyx_pf_7_icebin_8PyVertex___cinit__(struct __pyx_obj_7_icebin_PyVer
   __Pyx_RefNannySetupContext("__cinit__", 0);
 
   /* "_icebin.pyx":18
- * 	cdef Vertex *thisptr
- * 	def __cinit__(self, double x, double y, int index):
- * 		self.thisptr = new Vertex(x,y,index)             # <<<<<<<<<<<<<<
- * 	def __dealloc__(self):
- * 		del self.thisptr
+ *  cdef Vertex *thisptr
+ *  def __cinit__(self, double x, double y, int index):
+ *      self.thisptr = new Vertex(x,y,index)             # <<<<<<<<<<<<<<
+ *  def __dealloc__(self):
+ *      del self.thisptr
  */
   try {
     __pyx_t_1 = new icebin::Vertex(__pyx_v_x, __pyx_v_y, __pyx_v_index);
@@ -773,10 +773,10 @@ static int __pyx_pf_7_icebin_8PyVertex___cinit__(struct __pyx_obj_7_icebin_PyVer
 
   /* "_icebin.pyx":17
  * cdef class PyVertex:
- * 	cdef Vertex *thisptr
- * 	def __cinit__(self, double x, double y, int index):             # <<<<<<<<<<<<<<
- * 		self.thisptr = new Vertex(x,y,index)
- * 	def __dealloc__(self):
+ *  cdef Vertex *thisptr
+ *  def __cinit__(self, double x, double y, int index):             # <<<<<<<<<<<<<<
+ *      self.thisptr = new Vertex(x,y,index)
+ *  def __dealloc__(self):
  */
 
   /* function exit code */
@@ -791,10 +791,10 @@ static int __pyx_pf_7_icebin_8PyVertex___cinit__(struct __pyx_obj_7_icebin_PyVer
 }
 
 /* "_icebin.pyx":19
- * 	def __cinit__(self, double x, double y, int index):
- * 		self.thisptr = new Vertex(x,y,index)
- * 	def __dealloc__(self):             # <<<<<<<<<<<<<<
- * 		del self.thisptr
+ *  def __cinit__(self, double x, double y, int index):
+ *      self.thisptr = new Vertex(x,y,index)
+ *  def __dealloc__(self):             # <<<<<<<<<<<<<<
+ *      del self.thisptr
  * 
  */
 
@@ -814,19 +814,19 @@ static void __pyx_pf_7_icebin_8PyVertex_2__dealloc__(struct __pyx_obj_7_icebin_P
   __Pyx_RefNannySetupContext("__dealloc__", 0);
 
   /* "_icebin.pyx":20
- * 		self.thisptr = new Vertex(x,y,index)
- * 	def __dealloc__(self):
- * 		del self.thisptr             # <<<<<<<<<<<<<<
+ *      self.thisptr = new Vertex(x,y,index)
+ *  def __dealloc__(self):
+ *      del self.thisptr             # <<<<<<<<<<<<<<
  * 
- * 	@property
+ *  @property
  */
   delete __pyx_v_self->thisptr;
 
   /* "_icebin.pyx":19
- * 	def __cinit__(self, double x, double y, int index):
- * 		self.thisptr = new Vertex(x,y,index)
- * 	def __dealloc__(self):             # <<<<<<<<<<<<<<
- * 		del self.thisptr
+ *  def __cinit__(self, double x, double y, int index):
+ *      self.thisptr = new Vertex(x,y,index)
+ *  def __dealloc__(self):             # <<<<<<<<<<<<<<
+ *      del self.thisptr
  * 
  */
 
@@ -836,9 +836,9 @@ static void __pyx_pf_7_icebin_8PyVertex_2__dealloc__(struct __pyx_obj_7_icebin_P
 
 /* "_icebin.pyx":23
  * 
- * 	@property
- * 	def x(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.x
+ *  @property
+ *  def x(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.x
  * 
  */
 
@@ -865,11 +865,11 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_4x(struct __pyx_obj_7_icebin_PyVert
   __Pyx_RefNannySetupContext("x", 0);
 
   /* "_icebin.pyx":24
- * 	@property
- * 	def x(self):
- * 		return self.thisptr.x             # <<<<<<<<<<<<<<
+ *  @property
+ *  def x(self):
+ *      return self.thisptr.x             # <<<<<<<<<<<<<<
  * 
- * 	@property
+ *  @property
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_1 = PyFloat_FromDouble(__pyx_v_self->thisptr->x); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 24; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
@@ -880,9 +880,9 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_4x(struct __pyx_obj_7_icebin_PyVert
 
   /* "_icebin.pyx":23
  * 
- * 	@property
- * 	def x(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.x
+ *  @property
+ *  def x(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.x
  * 
  */
 
@@ -899,9 +899,9 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_4x(struct __pyx_obj_7_icebin_PyVert
 
 /* "_icebin.pyx":27
  * 
- * 	@property
- * 	def y(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.y
+ *  @property
+ *  def y(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.y
  * 
  */
 
@@ -928,11 +928,11 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_6y(struct __pyx_obj_7_icebin_PyVert
   __Pyx_RefNannySetupContext("y", 0);
 
   /* "_icebin.pyx":28
- * 	@property
- * 	def y(self):
- * 		return self.thisptr.y             # <<<<<<<<<<<<<<
+ *  @property
+ *  def y(self):
+ *      return self.thisptr.y             # <<<<<<<<<<<<<<
  * 
- * 	@property
+ *  @property
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_1 = PyFloat_FromDouble(__pyx_v_self->thisptr->y); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 28; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
@@ -943,9 +943,9 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_6y(struct __pyx_obj_7_icebin_PyVert
 
   /* "_icebin.pyx":27
  * 
- * 	@property
- * 	def y(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.y
+ *  @property
+ *  def y(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.y
  * 
  */
 
@@ -962,9 +962,9 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_6y(struct __pyx_obj_7_icebin_PyVert
 
 /* "_icebin.pyx":31
  * 
- * 	@property
- * 	def index(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.index
+ *  @property
+ *  def index(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.index
  * 
  */
 
@@ -991,9 +991,9 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_8index(struct __pyx_obj_7_icebin_Py
   __Pyx_RefNannySetupContext("index", 0);
 
   /* "_icebin.pyx":32
- * 	@property
- * 	def index(self):
- * 		return self.thisptr.index             # <<<<<<<<<<<<<<
+ *  @property
+ *  def index(self):
+ *      return self.thisptr.index             # <<<<<<<<<<<<<<
  * 
  */
   __Pyx_XDECREF(__pyx_r);
@@ -1005,9 +1005,9 @@ static PyObject *__pyx_pf_7_icebin_8PyVertex_8index(struct __pyx_obj_7_icebin_Py
 
   /* "_icebin.pyx":31
  * 
- * 	@property
- * 	def index(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.index
+ *  @property
+ *  def index(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.index
  * 
  */
 
@@ -1271,20 +1271,20 @@ PyMODINIT_FUNC PyInit__icebin(void)
 
   /* "_icebin.pyx":23
  * 
- * 	@property
- * 	def x(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.x
+ *  @property
+ *  def x(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.x
  * 
  */
   __pyx_t_1 = __Pyx_GetNameInClass((PyObject *)__pyx_ptype_7_icebin_PyVertex, __pyx_n_s_x); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 23; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
 
   /* "_icebin.pyx":22
- * 		del self.thisptr
+ *      del self.thisptr
  * 
- * 	@property             # <<<<<<<<<<<<<<
- * 	def x(self):
- * 		return self.thisptr.x
+ *  @property             # <<<<<<<<<<<<<<
+ *  def x(self):
+ *      return self.thisptr.x
  */
   __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 22; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
@@ -1300,20 +1300,20 @@ PyMODINIT_FUNC PyInit__icebin(void)
 
   /* "_icebin.pyx":27
  * 
- * 	@property
- * 	def y(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.y
+ *  @property
+ *  def y(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.y
  * 
  */
   __pyx_t_1 = __Pyx_GetNameInClass((PyObject *)__pyx_ptype_7_icebin_PyVertex, __pyx_n_s_y); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 27; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
 
   /* "_icebin.pyx":26
- * 		return self.thisptr.x
+ *      return self.thisptr.x
  * 
- * 	@property             # <<<<<<<<<<<<<<
- * 	def y(self):
- * 		return self.thisptr.y
+ *  @property             # <<<<<<<<<<<<<<
+ *  def y(self):
+ *      return self.thisptr.y
  */
   __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 26; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);
@@ -1329,20 +1329,20 @@ PyMODINIT_FUNC PyInit__icebin(void)
 
   /* "_icebin.pyx":31
  * 
- * 	@property
- * 	def index(self):             # <<<<<<<<<<<<<<
- * 		return self.thisptr.index
+ *  @property
+ *  def index(self):             # <<<<<<<<<<<<<<
+ *      return self.thisptr.index
  * 
  */
   __pyx_t_1 = __Pyx_GetNameInClass((PyObject *)__pyx_ptype_7_icebin_PyVertex, __pyx_n_s_index); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 31; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
 
   /* "_icebin.pyx":30
- * 		return self.thisptr.y
+ *      return self.thisptr.y
  * 
- * 	@property             # <<<<<<<<<<<<<<
- * 	def index(self):
- * 		return self.thisptr.index
+ *  @property             # <<<<<<<<<<<<<<
+ *  def index(self):
+ *      return self.thisptr.index
  */
   __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 30; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_2);

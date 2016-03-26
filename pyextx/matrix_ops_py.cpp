@@ -43,59 +43,59 @@
 
 PyObject *coo_matvec_py(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	try {
-		PyObject *mat_py = NULL;
-		PyObject *xx_py = NULL;
-		PyObject *yy_py = NULL;
-		int ignore_nan = 0;
+    try {
+        PyObject *mat_py = NULL;
+        PyObject *xx_py = NULL;
+        PyObject *yy_py = NULL;
+        int ignore_nan = 0;
 
-		static char const *keyword_list[] =
-			{"mat", "xx", "yy", "ignore_nan", NULL};
-		if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "OOO|i",
-			const_cast<char **>(keyword_list),
-			&mat_py, &xx_py, &yy_py, &ignore_nan))
-		{
-			PyErr_SetString(PyExc_ValueError,
-				"coo_matvec_py() called with invalid arguments.");
-			return NULL;
-		}
+        static char const *keyword_list[] =
+            {"mat", "xx", "yy", "ignore_nan", NULL};
+        if (!PyArg_ParseTupleAndKeywords(
+            args, kwds, "OOO|i",
+            const_cast<char **>(keyword_list),
+            &mat_py, &xx_py, &yy_py, &ignore_nan))
+        {
+            PyErr_SetString(PyExc_ValueError,
+                "coo_matvec_py() called with invalid arguments.");
+            return NULL;
+        }
 
-		// Cast and typecheck arguments
-		giss::BlitzSparseMatrix mat(giss::py_to_BlitzSparseMatrix(mat_py, "mat"));
-		auto xx(giss::py_to_blitz<double,1>(xx_py, "xx", {mat.ncol}));
-		auto yy(giss::py_to_blitz<double,1>(yy_py, "yy", {mat.nrow}));
+        // Cast and typecheck arguments
+        giss::BlitzSparseMatrix mat(giss::py_to_BlitzSparseMatrix(mat_py, "mat"));
+        auto xx(giss::py_to_blitz<double,1>(xx_py, "xx", {mat.ncol}));
+        auto yy(giss::py_to_blitz<double,1>(yy_py, "yy", {mat.nrow}));
 
-		// Keep track of which items we've written to.
-		std::vector<bool> written(mat.nrow, false);
+        // Keep track of which items we've written to.
+        std::vector<bool> written(mat.nrow, false);
 
-		// Do the multiplication, and we're done!
-		int nnz = mat.size();
-		for (int n=0; n<nnz; ++n) {
-			int row = mat.rows()(n);
-			int col = mat.cols()(n);
-			double val = mat.vals()(n);
+        // Do the multiplication, and we're done!
+        int nnz = mat.size();
+        for (int n=0; n<nnz; ++n) {
+            int row = mat.rows()(n);
+            int col = mat.cols()(n);
+            double val = mat.vals()(n);
 
-			// Ignore NaN in input vector
-			if ((ignore_nan != 0) && std::isnan(xx(col))) {
-				continue;
-			}
+            // Ignore NaN in input vector
+            if ((ignore_nan != 0) && std::isnan(xx(col))) {
+                continue;
+            }
 
-			// Just do Snowdrift-style "REPLACE".  "MERGE" was never used.
-			double old_yy;
-			if (written[row]) {
-				old_yy = yy(row);
-			} else {
-				old_yy = 0;
-				written[row] = true;
-			}
-			yy(row) = old_yy + val * xx(col);
-		}
+            // Just do Snowdrift-style "REPLACE".  "MERGE" was never used.
+            double old_yy;
+            if (written[row]) {
+                old_yy = yy(row);
+            } else {
+                old_yy = 0;
+                written[row] = true;
+            }
+            yy(row) = old_yy + val * xx(col);
+        }
 
-	} catch(...) {
-		return NULL;	// Error
-	}
-	return Py_BuildValue("i", 0);
+    } catch(...) {
+        return NULL;    // Error
+    }
+    return Py_BuildValue("i", 0);
 
 }
 
@@ -103,9 +103,9 @@ PyObject *coo_matvec_py(PyObject *self, PyObject *args, PyObject *kwds)
 
 
 PyMethodDef matrix_ops_functions[] = {
-	{"coo_matvec", (PyCFunction)coo_matvec_py, METH_VARARGS|METH_KEYWORDS,
-		"Compute M*x, taking care with unspecified elements in M"},
+    {"coo_matvec", (PyCFunction)coo_matvec_py, METH_VARARGS|METH_KEYWORDS,
+        "Compute M*x, taking care with unspecified elements in M"},
 
-	{NULL}     /* Sentinel - marks the end of this structure */
+    {NULL}     /* Sentinel - marks the end of this structure */
 };
 

@@ -40,9 +40,9 @@ licenses = {}
 
 ret = []
 for line in license :
-	ret.append('# ')
-	ret.append(line)
-	ret.append('\n')
+    ret.append('# ')
+    ret.append(line)
+    ret.append('\n')
 ret.append('\n')
 license_py = "".join(ret)
 re_py = re.compile(r".*?\n# along with this program.  If not, see <http://www.gnu.org/licenses/>.(\n\n)", re.MULTILINE|re.DOTALL)
@@ -50,9 +50,9 @@ licenses['.py'] = (license_py, re_py)
 
 ret = []
 for line in license :
-	ret.append('! ')
-	ret.append(line)
-	ret.append('\n')
+    ret.append('! ')
+    ret.append(line)
+    ret.append('\n')
 ret.append('\n')
 license_f = "".join(ret)
 re_f = re.compile(r".*?\n! along with this program.  If not, see <http://www.gnu.org/licenses/>.(\n\n)", re.MULTILINE|re.DOTALL)
@@ -63,9 +63,9 @@ licenses['.F'] = (license_f, re_f)
 
 ret = ['/*\n']
 for line in license :
-	ret.append(' * ')
-	ret.append(line)
-	ret.append('\n')
+    ret.append(' * ')
+    ret.append(line)
+    ret.append('\n')
 ret.append(' */\n')
 ret.append('\n')
 re_c = re.compile(r".*?\n \* along with this program.  If not, see <http://www.gnu.org/licenses/>.\n \*/\n\n", re.MULTILINE|re.DOTALL)
@@ -77,30 +77,30 @@ licenses['.hpp'] = (license_c, re_c)
 
 # -------------------------------------
 def relicense_file(fname) :
-	# Determine extension
-	ext = os.path.splitext(fname)[1]
-	(mylicense, myre) = licenses[ext]
+    # Determine extension
+    ext = os.path.splitext(fname)[1]
+    (mylicense, myre) = licenses[ext]
 
-	# Read entire contents
-	with open(fname) as file :
-		txt = file.read()
+    # Read entire contents
+    with open(fname) as file :
+        txt = file.read()
 
-	match = myre.match(txt)
-	if match is None :
-		body = txt
-	else :
-		body = txt[match.end():]
-	newtxt = "".join([mylicense, body])
+    match = myre.match(txt)
+    if match is None :
+        body = txt
+    else :
+        body = txt[match.end():]
+    newtxt = "".join([mylicense, body])
 
-	if newtxt == txt :
-		print '%s: Already has license' % fname
-	else :
-		print '%s: Adding license' % fname
-		os.rename(fname, fname + '.bak')
-		out = open(fname, 'w')
-		out.write(newtxt)
-		out.close()
+    if newtxt == txt :
+        print '%s: Already has license' % fname
+    else :
+        print '%s: Adding license' % fname
+        os.rename(fname, fname + '.bak')
+        out = open(fname, 'w')
+        out.write(newtxt)
+        out.close()
 
 
 for f in sys.argv[1:] :
-	relicense_file(f)
+    relicense_file(f)

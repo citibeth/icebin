@@ -39,5 +39,5 @@ nc.close()
 nele = len(rows_i)
 
 for ix in range(0,nele) :
-	vdiff = vals[ix] - hp2hc.data[ix]
-	print '(%d - %d) --> ([%d %d %d] - [%d %d %d]) %f' % (hp2hc.row[ix], hp2hc.col[ix], rows_i[ix], rows_j[ix], rows_k[ix], cols_i[ix], cols_j[ix], cols_k[ix], vals[ix])
+    vdiff = vals[ix] - hp2hc.data[ix]
+    print '(%d - %d) --> ([%d %d %d] - [%d %d %d]) %f' % (hp2hc.row[ix], hp2hc.col[ix], rows_i[ix], rows_j[ix], rows_k[ix], cols_i[ix], cols_j[ix], cols_k[ix], vals[ix])

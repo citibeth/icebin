@@ -23,14 +23,14 @@
 
 /// Classmembers of the Python class
 struct PyGrid {
-	PyObject_HEAD
-	std::unique_ptr<glint2::Grid> grid;	// The grid, in C++
+    PyObject_HEAD
+    std::unique_ptr<glint2::Grid> grid; // The grid, in C++
 
-	// Values copied out of grid
-//	long ncells_full;
+    // Values copied out of grid
+//  long ncells_full;
 
-	void init(std::unique_ptr<glint2::Grid> &&_grid);
-//	PyGrid() {}
+    void init(std::unique_ptr<glint2::Grid> &&_grid);
+//  PyGrid() {}
 
 };
 

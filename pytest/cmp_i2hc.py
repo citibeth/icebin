@@ -115,5 +115,5 @@ reverse = True
 plot_args['cmap'] = giss.plot.cpt('giss-cpt/BlRe.cpt', reverse=reverse).cmap
 
 
-giss.plot.plot_var(basemap=basemap, **pp)		# Plot, and show on screen
+giss.plot.plot_var(basemap=basemap, **pp)       # Plot, and show on screen
 
