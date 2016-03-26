@@ -21,4 +21,5 @@ foreach (GRID
 )
 	add_executable(${GRID} ${GRID}.cpp)
 	target_link_libraries (${GRID} icebin ${EXTERNAL_LIBS})
+    install(TARGETS ${GRID} DESTINATION bin)
 endforeach()

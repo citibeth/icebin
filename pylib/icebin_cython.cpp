@@ -32,11 +32,8 @@ void GCMRegridder_init(GCMRegridder *cself,
 	long nhp = hpdefs.size();
 	cself->init(
 		std::move(gridA),
-		Domain<int>(
-			std::vector<int>(gridA->indexing.base), std::move(high)),
 		std::move(hpdefs),
-		Indexing<long,long>(
-			{0,0}, {gridA->ndata(), nhp}, {1,0}),
+		Indexing<long,long>({0,0}, {gridA->ndata(), nhp}, {1,0}),
 		_correctA);
 
 }
