@@ -26,22 +26,22 @@ namespace icebin {
 
 class GridSpec_Exchange : public GridSpec {
 public :
-	Grid const *gridA;
-	Grid const *gridI;
+    Grid const *gridA;
+    Grid const *gridI;
 
-	/** Transformation to get from local Grid coords to Exchange Grid coords */
-	std::string sproj;
+    /** Transformation to get from local Grid coords to Exchange Grid coords */
+    std::string sproj;
 
-	/** Keep track of the "full" indexing space for the Overlap Matrix. */
-	long gridA_cells_nfull;
-	long gridI_cells_nfull;
+    /** Keep track of the "full" indexing space for the Overlap Matrix. */
+    long gridA_cells_nfull;
+    long gridI_cells_nfull;
 
-	GridSpec_Exchange() : gridA(0), gridI(0), gridA_cells_nfull(-1), gridI_cells_nfull(-1) {}
+    GridSpec_Exchange() : gridA(0), gridI(0), gridA_cells_nfull(-1), gridI_cells_nfull(-1) {}
 
-	void make_grid(Grid &grid);
-	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    void make_grid(Grid &grid);
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };
 
 
 
-}	// namespace glint2
+}   // namespace glint2

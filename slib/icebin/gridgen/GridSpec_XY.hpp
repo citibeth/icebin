@@ -29,25 +29,25 @@ namespace icebin {
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
 struct GridSpec_XY : public GridSpec {
 
-	std::string name;
-	std::string sproj;
-	std::function<bool(Cell const &)> euclidian_clip;
-	ibmisc::Indexing<int,long> indexing;
+    std::string name;
+    std::string sproj;
+    std::function<bool(Cell const &)> euclidian_clip;
+    ibmisc::Indexing<int,long> indexing;
 
-	/** Cell boundaries in the x direction.
-	Sorted low to high.
-	Number of grid cells in the x direction = x_boundaries.size() - 1. */
-	std::vector<double> xb;
+    /** Cell boundaries in the x direction.
+    Sorted low to high.
+    Number of grid cells in the x direction = x_boundaries.size() - 1. */
+    std::vector<double> xb;
 
-	/** Cell boundaries in the y direction.
-	Sorted low to high.
-	Number of grid cells in the y direction = y_boundaries.size() - 1. */
-	std::vector<double> yb;
+    /** Cell boundaries in the y direction.
+    Sorted low to high.
+    Number of grid cells in the y direction = y_boundaries.size() - 1. */
+    std::vector<double> yb;
 
-	int nx() const { return xb.size() - 1; }
-	int ny() const { return yb.size() - 1; }
+    int nx() const { return xb.size() - 1; }
+    int ny() const { return yb.size() - 1; }
 
-	void make_grid(Grid_XY &grid);
+    void make_grid(Grid_XY &grid);
 
 };
 
@@ -60,24 +60,24 @@ struct GridSpec_XY : public GridSpec {
 /** Create a new Cartesian grid with evenly spaced grid cell boundaries.
 @param name Value of <generic-name>.info:name in netCDF file.
 @param x0 Lowest boundary in the x direction.
-@param x1 Highest boundary in the x direction.	
+@param x1 Highest boundary in the x direction.  
 @param dx Size of grid cell in the x direction.
-	Will be adjusted if (x1-x0) is not an even multiple of dx
+    Will be adjusted if (x1-x0) is not an even multiple of dx
 @param y0 Lowest boundary in the y direction.
-@param y1 Highest boundary in the y direction.	
+@param y1 Highest boundary in the y direction.  
 @param dy Size of grid cell in the y direction.
-	Will be adjusted if (y1-y0) is not an even multiple of dy
+    Will be adjusted if (y1-y0) is not an even multiple of dy
 @param euclidian_clip Only realize grid cells that pass this test.
 @return The newly created GridSpec_XY.
 @see EuclidianClip
 */
 void set_xy_boundaries(GridSpec_XY &grid,
-	double x0, double x1, double dx,
-	double y0, double y1, double dy);
+    double x0, double x1, double dx,
+    double y0, double y1, double dy);
 
 void set_xy_centers(GridSpec_XY &grid,
-	double x0, double x1, double dx,
-	double y0, double y1, double dy);
+    double x0, double x1, double dx,
+    double y0, double y1, double dy);
 
 
 

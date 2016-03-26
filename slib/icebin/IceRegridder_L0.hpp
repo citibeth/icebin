@@ -23,40 +23,40 @@
 namespace icebin {
 
 BOOST_ENUM_VALUES( IceExch, int,
-	(ICE)	(0)
-	(EXCH)	(1)
+    (ICE)   (0)
+    (EXCH)  (1)
 )
 
 class IceRegridder_L0 : public IceRegridder
-{		// For ice model with level-value grid cells
+{       // For ice model with level-value grid cells
 public:
-	/** The grid we use at the interpolation grid (exchange or ice) */
-	IceExch interp_grid;
+    /** The grid we use at the interpolation grid (exchange or ice) */
+    IceExch interp_grid;
 
-	/** Number of grid cells in the ice grid */
-	size_t nI() const
-		{ return gridI->cells.nfull(); }
+    /** Number of grid cells in the ice grid */
+    size_t nI() const
+        { return gridI->cells.nfull(); }
 
-	/** Number of grid cells in the interpolation grid */
-	size_t nG() const
-		{ return interp_grid == IceExch::ICE ? nI() : exgrid->cells.nfull(); }
+    /** Number of grid cells in the interpolation grid */
+    size_t nG() const
+        { return interp_grid == IceExch::ICE ? nI() : exgrid->cells.nfull(); }
 
-	IceRegridder_L0() : interp_grid(IceExch::EXCH) {}
+    IceRegridder_L0() : interp_grid(IceExch::EXCH) {}
 
 public:
 
-	void GvEp(
-		spsparse::SparseTriplets<SparseMatrix> &ret) const;
+    void GvEp(
+        spsparse::SparseTriplets<SparseMatrix> &ret) const;
 
-	void GvI(
-		spsparse::SparseTriplets<SparseMatrix> &ret) const;
+    void GvI(
+        spsparse::SparseTriplets<SparseMatrix> &ret) const;
 
-	void GvAp(
-		spsparse::SparseTriplets<SparseMatrix> &ret) const;
+    void GvAp(
+        spsparse::SparseTriplets<SparseMatrix> &ret) const;
 
-	void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };
 
 
-}	// namespace icebin
+}   // namespace icebin

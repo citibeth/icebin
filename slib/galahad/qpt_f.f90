@@ -22,36 +22,36 @@
 
 !> Container module for the Fortran peer class.
 MODULE qpt_x
-	use, intrinsic :: iso_c_binding
-	use hsl_zd11_double
-	use zd11_x
+    use, intrinsic :: iso_c_binding
+    use hsl_zd11_double
+    use zd11_x
 
 IMPLICIT NONE
 
-	!> Peer derived type for QPT_problem_type.  Equivalent to the C++
+    !> Peer derived type for QPT_problem_type.  Equivalent to the C++
     !! class galahad::qpt_problem_c, which documents the classmembers.
-	type QPT_problem_c
-		type(c_ptr) :: this_fc		! QTP_problem_type * (peer)
+    type QPT_problem_c
+        type(c_ptr) :: this_fc      ! QTP_problem_type * (peer)
 
-	    type(c_ptr) :: m       ! int &; number of constraints
-	    type(c_ptr) :: n       ! int &; number of variables
-	    type(c_ptr) :: f   ! double & constant term
-		type(c_ptr) :: Hessian_kind
+        type(c_ptr) :: m       ! int &; number of constraints
+        type(c_ptr) :: n       ! int &; number of variables
+        type(c_ptr) :: f   ! double & constant term
+        type(c_ptr) :: Hessian_kind
 
-	    type(c_ptr) :: G
-	    type(c_ptr) :: X_l
-	    type(c_ptr) :: X_u
-	    type(c_ptr) :: C_l
-	    type(c_ptr) :: C_u
-	    type(c_ptr) :: C
-	    type(c_ptr) :: X
-	    type(c_ptr) :: Y
-	    type(c_ptr) :: Z
-!		type(c_ptr) :: WEIGHT
-		type(c_ptr) :: X0
+        type(c_ptr) :: G
+        type(c_ptr) :: X_l
+        type(c_ptr) :: X_u
+        type(c_ptr) :: C_l
+        type(c_ptr) :: C_u
+        type(c_ptr) :: C
+        type(c_ptr) :: X
+        type(c_ptr) :: Y
+        type(c_ptr) :: Z
+!       type(c_ptr) :: WEIGHT
+        type(c_ptr) :: X0
 
-	    type(ZD11_c) :: A, H
-	end type QPT_problem_c
+        type(ZD11_c) :: A, H
+    end type QPT_problem_c
 
 END MODULE qpt_x
 
@@ -77,63 +77,63 @@ use zd11_x
 use c_loc_x
 use, intrinsic :: iso_c_binding
 IMPLICIT NONE
-type(c_ptr), value :: this_cc			! qpt_problem_c *
-	type(qpt_problem_c), pointer :: this_c
-type(c_ptr), value :: this_fc			! qpt_problem_type *
-	type(QPT_problem_type), pointer :: this_f
+type(c_ptr), value :: this_cc           ! qpt_problem_c *
+    type(qpt_problem_c), pointer :: this_c
+type(c_ptr), value :: this_fc           ! qpt_problem_type *
+    type(QPT_problem_type), pointer :: this_f
 integer(c_int), value :: m, n
-logical(kind=c_bool), value :: eqp		! Are we preparing for a problem w/ equality constraints?
+logical(kind=c_bool), value :: eqp      ! Are we preparing for a problem w/ equality constraints?
 integer, value :: Hessian_kind
 
-	call c_f_pointer(this_fc, this_f)
-	call c_f_pointer(this_cc, this_c)
+    call c_f_pointer(this_fc, this_f)
+    call c_f_pointer(this_cc, this_c)
 
 
-		this_f%m = m
-		this_f%n = n
+        this_f%m = m
+        this_f%n = n
 
-		this_c%this_fc = c_loc(this_f)
+        this_c%this_fc = c_loc(this_f)
 
-		this_c%m = c_loc(this_f%m)
-		this_c%n = c_loc(this_f%n)
-		this_c%f = c_loc(this_f%f)
-		this_c%Hessian_kind = c_loc(this_f%Hessian_kind)
-		this_f%Hessian_kind = Hessian_kind
+        this_c%m = c_loc(this_f%m)
+        this_c%n = c_loc(this_f%n)
+        this_c%f = c_loc(this_f%f)
+        this_c%Hessian_kind = c_loc(this_f%Hessian_kind)
+        this_f%Hessian_kind = Hessian_kind
 
-		if (Hessian_kind > 0) then
-			allocate(this_f%X0(n))
-			this_c%X0 = c_loc_array_double(this_f%X0)
-		end if
-!		! NOTE: Other Hessian_kinds are not implemented
+        if (Hessian_kind > 0) then
+            allocate(this_f%X0(n))
+            this_c%X0 = c_loc_array_double(this_f%X0)
+        end if
+!       ! NOTE: Other Hessian_kinds are not implemented
 
-		allocate(this_f%G(n), this_f%X_l(n), this_f%X_u(n))
-		this_c%G = c_loc_array_double(this_f%G)
-		this_c%X_l = c_loc_array_double(this_f%X_l)
-		this_c%X_u = c_loc_array_double(this_f%X_u)
+        allocate(this_f%G(n), this_f%X_l(n), this_f%X_u(n))
+        this_c%G = c_loc_array_double(this_f%G)
+        this_c%X_l = c_loc_array_double(this_f%X_l)
+        this_c%X_u = c_loc_array_double(this_f%X_u)
 
-	! write(6,*) 'QPT_problem-c_init() eqp=', eqp
-		if (eqp) then
-			allocate(this_f%C(m))
-			this_c%C = c_loc_array_double(this_f%C)
-	! write(6,*) 'this_c%C=', this_c%C
-		else
-			allocate(this_f%C_l(m), this_f%C_u(m))
-			this_c%C_l = c_loc_array_double(this_f%C_l)
-			this_c%C_u = c_loc_array_double(this_f%C_u)
-	! write(6,*) 'this_c%C_u=', this_c%C_u
-		end if
+    ! write(6,*) 'QPT_problem-c_init() eqp=', eqp
+        if (eqp) then
+            allocate(this_f%C(m))
+            this_c%C = c_loc_array_double(this_f%C)
+    ! write(6,*) 'this_c%C=', this_c%C
+        else
+            allocate(this_f%C_l(m), this_f%C_u(m))
+            this_c%C_l = c_loc_array_double(this_f%C_l)
+            this_c%C_u = c_loc_array_double(this_f%C_u)
+    ! write(6,*) 'this_c%C_u=', this_c%C_u
+        end if
 
-		allocate(this_f%X(n), this_f%Y(m), this_f%Z(n))
-		this_c%X = c_loc_array_double(this_f%X)
-		this_c%Y = c_loc_array_double(this_f%Y)
-		this_c%Z = c_loc_array_double(this_f%Z)
+        allocate(this_f%X(n), this_f%Y(m), this_f%Z(n))
+        this_c%X = c_loc_array_double(this_f%X)
+        this_c%Y = c_loc_array_double(this_f%Y)
+        this_c%Z = c_loc_array_double(this_f%Z)
 
 !print *, c_loc(this_f%A)
 !write(6,*) 'ZD11_init(this_c%A)', A_ne
-!		ptr => this_f%A
-!		call ZD11_init_f(this_c%A, ptr, m, n, A_ne)
+!       ptr => this_f%A
+!       call ZD11_init_f(this_c%A, ptr, m, n, A_ne)
 !write(6,*) 'ZD11_init(this_c%H)'
-!		call ZD11_init_f(this_c%H, this_f%H, n, n, H_ne)
+!       call ZD11_init_f(this_c%H, this_f%H, n, n, H_ne)
 
 end subroutine QPT_problem_init_c
 ! ----------------------------------------------------------
@@ -149,15 +149,15 @@ use zd11_x
 use c_loc_x
 use, intrinsic :: iso_c_binding
 IMPLICIT NONE
-type(c_ptr), value :: this_cc			! qpt_problem_c *
-	type(qpt_problem_c), pointer :: this_c
+type(c_ptr), value :: this_cc           ! qpt_problem_c *
+    type(qpt_problem_c), pointer :: this_c
 type(QPT_problem_type), pointer :: this_f
-integer(c_int), value :: H_ne		! # of elements in H (Hessian) matrix
+integer(c_int), value :: H_ne       ! # of elements in H (Hessian) matrix
 
-	call c_f_pointer(this_cc, this_c)
-	call c_f_pointer(this_c%this_fc, this_f)
-	write(6,*) 'ZD11_init(this_c%H)',H_ne
-	call ZD11_init_f(this_c%H, this_f%H, this_f%n, this_f%n, H_ne)
+    call c_f_pointer(this_cc, this_c)
+    call c_f_pointer(this_c%this_fc, this_f)
+    write(6,*) 'ZD11_init(this_c%H)',H_ne
+    call ZD11_init_f(this_c%H, this_f%H, this_f%n, this_f%n, H_ne)
 
 end subroutine QPT_problem_alloc_H
 ! ----------------------------------------------------------
@@ -172,15 +172,15 @@ use zd11_x
 use c_loc_x
 use, intrinsic :: iso_c_binding
 IMPLICIT NONE
-type(c_ptr), value :: this_cc			! qpt_problem_c *
-	type(qpt_problem_c), pointer :: this_c
+type(c_ptr), value :: this_cc           ! qpt_problem_c *
+    type(qpt_problem_c), pointer :: this_c
 type(QPT_problem_type), pointer :: this_f
-integer(c_int), value :: A_ne		! # of elements in A (constraints) matrix
+integer(c_int), value :: A_ne       ! # of elements in A (constraints) matrix
 
-	call c_f_pointer(this_cc, this_c)
-	call c_f_pointer(this_c%this_fc, this_f)
-	write(6,*) 'ZD11_init(this_c%A)'
-	call ZD11_init_f(this_c%A, this_f%A, this_f%m, this_f%n, A_ne)
+    call c_f_pointer(this_cc, this_c)
+    call c_f_pointer(this_c%this_fc, this_f)
+    write(6,*) 'ZD11_init(this_c%A)'
+    call ZD11_init_f(this_c%A, this_f%A, this_f%m, this_f%n, A_ne)
 
 end subroutine QPT_problem_alloc_A
 ! ----------------------------------------------------------
@@ -194,11 +194,11 @@ use, intrinsic :: iso_c_binding
 IMPLICIT NONE
 type(c_ptr) :: QPT_problem_new_c
 
-	type(c_ptr) :: self
+    type(c_ptr) :: self
 
-	type(QPT_problem_type), pointer :: main
-	allocate(main)
-	QPT_problem_new_c = c_loc(main)
+    type(QPT_problem_type), pointer :: main
+    allocate(main)
+    QPT_problem_new_c = c_loc(main)
 end function QPT_problem_new_c
 ! ---------------------------------------------------------------------
 !> De-allocates an instance of the Fortran underlying derived type QPT_problem_type,
@@ -211,8 +211,8 @@ USE qpt_x
 use, intrinsic :: iso_c_binding
 IMPLICIT NONE
 type(c_ptr), value :: this_fc
-	type(QPT_problem_type), pointer :: this_f
+    type(QPT_problem_type), pointer :: this_f
 
-	call c_f_pointer(this_fc, this_f)
-	deallocate(this_f)
+    call c_f_pointer(this_fc, this_f)
+    deallocate(this_f)
 end subroutine QPT_problem_delete_c

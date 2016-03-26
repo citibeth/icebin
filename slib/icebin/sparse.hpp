@@ -11,11 +11,11 @@ typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
 
 
 struct WeightedSparse {
-	SparseMatrix M;
-	SparseVector weight;
+    SparseMatrix M;
+    SparseVector weight;
 
-	WeightedSparse() {}
-	WeightedSparse(std::array<size_t, 2> const &shape) : M(shape), weight({shape[0]}) {}
+    WeightedSparse() {}
+    WeightedSparse(std::array<size_t, 2> const &shape) : M(shape), weight({shape[0]}) {}
 };
 
 

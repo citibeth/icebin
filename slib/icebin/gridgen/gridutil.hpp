@@ -10,13 +10,13 @@ namespace icebin {
 /** Eliminates duplicate vertices in the Grid.
 DOES NOT account for floating point rounding error */
 class VertexCache {
-	std::unordered_map<std::pair<double,double>, Vertex *> _vertices;
+    std::unordered_map<std::pair<double,double>, Vertex *> _vertices;
 public:
-	Grid *grid;
-	VertexCache(Grid *_grid) : grid(_grid) {}
+    Grid *grid;
+    VertexCache(Grid *_grid) : grid(_grid) {}
 
-	Vertex *add_vertex(double x, double y);
-	Vertex *add_vertex(Cell &cell, double x, double y);
+    Vertex *add_vertex(double x, double y);
+    Vertex *add_vertex(Cell &cell, double x, double y);
 };
 
 
@@ -28,10 +28,10 @@ inline double loncorrect(double lon, double min)
 {
     double max = min + 360.0;
 
-	while (lon >= max) lon -= 360.0;
-	while (lon < min) lon += 360.0;
+    while (lon >= max) lon -= 360.0;
+    while (lon < min) lon += 360.0;
 
-	return lon;
+    return lon;
 }
 
-}	// namespace glint2
+}   // namespace glint2

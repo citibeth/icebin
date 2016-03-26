@@ -92,7 +92,7 @@ class IceModel_PISM : public IceModel
     // ------------------------
 public:
 
-	virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet);
+    virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet);
 
     int nx() { return pism_grid->Mx(); }
     int ny() { return pism_grid->My(); }

@@ -43,8 +43,8 @@ integer, intent(out) :: dim
 
 integer :: dimid
 
-	call check(nf90_inq_dimid(nc, dimname, dimid))
-	call check(nf90_inquire_dimension(nc, dimid, len=dim))
+    call check(nf90_inq_dimid(nc, dimname, dimid))
+    call check(nf90_inquire_dimension(nc, dimid, len=dim))
 end subroutine nc_read_dim
 ! -------------------------------------------------------------
 subroutine nc_read_dims(nc, ndims, dimids, dims)
@@ -54,9 +54,9 @@ integer, dimension(ndims), intent(in) :: dimids
 integer, dimension(ndims) :: dims
 integer :: i
 
-	do i=1,ndims
-		call check(nf90_inquire_dimension(nc, dimids(i), len=dims(i)))
-	end do
+    do i=1,ndims
+        call check(nf90_inquire_dimension(nc, dimids(i), len=dims(i)))
+    end do
 end subroutine nc_read_dims
 
 ! -------------------------------------------------------------
@@ -71,22 +71,22 @@ integer, dimension(NF90_MAX_VAR_DIMS) :: dimids
 integer :: ndims
 integer, dimension(NF90_MAX_VAR_DIMS) :: dims
 
-	integer :: varid
+    integer :: varid
 
-!	write (6,*) 'Reading variable',name
-	call check(nf90_inq_varid(nc, name, varid))
-	call check(nf90_inquire_variable(nc, varid, &
-		ndims=ndims, dimids=dimids))
+!   write (6,*) 'Reading variable',name
+    call check(nf90_inq_varid(nc, name, varid))
+    call check(nf90_inquire_variable(nc, varid, &
+        ndims=ndims, dimids=dimids))
 
-	if (ndims /= 1) then
-		WRITE( 6, "('Expected 1 dimension, got ', I4)") ndims
-    	stop 2
-	end if
+    if (ndims /= 1) then
+        WRITE( 6, "('Expected 1 dimension, got ', I4)") ndims
+        stop 2
+    end if
 
-	call nc_read_dims(nc, ndims, dimids, dims)
-	allocate(A(dims(1)))
+    call nc_read_dims(nc, ndims, dimids, dims)
+    allocate(A(dims(1)))
 
-	call check(nf90_get_var(nc, varid, A))
+    call check(nf90_get_var(nc, varid, A))
 
 end subroutine nc_read_1d_array_double
 ! -------------------------------------------------------------
@@ -100,22 +100,22 @@ integer, dimension(NF90_MAX_VAR_DIMS) :: dimids
 integer :: ndims
 integer, dimension(NF90_MAX_VAR_DIMS) :: dims
 
-	integer :: varid
+    integer :: varid
 
-!	write (6,*) 'Reading variable',name
-	call check(nf90_inq_varid(nc, name, varid))
-	call check(nf90_inquire_variable(nc, varid, &
-		ndims=ndims, dimids=dimids))
+!   write (6,*) 'Reading variable',name
+    call check(nf90_inq_varid(nc, name, varid))
+    call check(nf90_inquire_variable(nc, varid, &
+        ndims=ndims, dimids=dimids))
 
-	if (ndims /= 1) then
-		WRITE( 6, "('Expected 1 dimension, got ', I4)") ndims
-    	stop 2
-	end if
+    if (ndims /= 1) then
+        WRITE( 6, "('Expected 1 dimension, got ', I4)") ndims
+        stop 2
+    end if
 
-	call nc_read_dims(nc, ndims, dimids, dims)
-	allocate(A(dims(1)))
+    call nc_read_dims(nc, ndims, dimids, dims)
+    allocate(A(dims(1)))
 
-	call check(nf90_get_var(nc, varid, A))
+    call check(nf90_get_var(nc, varid, A))
 
 end subroutine nc_read_1d_array_int
 ! -------------------------------------------------------------
@@ -129,21 +129,21 @@ integer, dimension(NF90_MAX_VAR_DIMS) :: dimids
 integer :: ndims
 integer, dimension(NF90_MAX_VAR_DIMS) :: dims
 
-	integer :: varid
+    integer :: varid
 
-!	write (6,*) 'Reading variable',name
-	call check(nf90_inq_varid(nc, name, varid))
-	call check(nf90_inquire_variable(nc, varid, &
-		ndims=ndims, dimids=dimids))
+!   write (6,*) 'Reading variable',name
+    call check(nf90_inq_varid(nc, name, varid))
+    call check(nf90_inquire_variable(nc, varid, &
+        ndims=ndims, dimids=dimids))
 
-	if (ndims /= 2) then
-		WRITE( 6, "('Expected 2 dimensions, got ', I4)") ndims
-    	stop 2
-	end if
+    if (ndims /= 2) then
+        WRITE( 6, "('Expected 2 dimensions, got ', I4)") ndims
+        stop 2
+    end if
 
-	call nc_read_dims(nc, ndims, dimids, dims)
-	allocate(A(dims(1), dims(2)))
-	call check(nf90_get_var(nc, varid, A))
+    call nc_read_dims(nc, ndims, dimids, dims)
+    allocate(A(dims(1), dims(2)))
+    call check(nf90_get_var(nc, varid, A))
 
 end subroutine nc_read_2d_array_int
 ! -------------------------------------------------------------
@@ -154,12 +154,12 @@ character(*), intent(in) :: att_name
 !character, dimension(:), allocatable, intent(out) :: att_val
 character(*), intent(out) :: att_val
 
-	integer :: varid, strlen
+    integer :: varid, strlen
 
-	call check(nf90_inq_varid(nc, trim(var_name), varid))
-	call check(nf90_inquire_attribute(nc, varid, trim(att_name), len=strlen))
-!	allocate(att_val(strlen))
-	call check(nf90_get_att(nc, varid, trim(att_name), att_val))
+    call check(nf90_inq_varid(nc, trim(var_name), varid))
+    call check(nf90_inquire_attribute(nc, varid, trim(att_name), len=strlen))
+!   allocate(att_val(strlen))
+    call check(nf90_get_att(nc, varid, trim(att_name), att_val))
 end subroutine nc_read_attribute_str
 ! -------------------------------------------------------------
 ! subroutine nc_read_attribute_int(nc, var_name, att_name, att_val)
@@ -169,10 +169,10 @@ end subroutine nc_read_attribute_str
 ! !character, dimension(:), allocatable, intent(out) :: att_val
 ! integer, intent(out) :: att_val
 ! 
-! 	integer :: varid, strlen
+!   integer :: varid, strlen
 ! 
-! 	call check(nf90_inq_varid(nc, trim(var_name), varid))
-! 	call check(nf90_get_att(nc, varid, trim(att_name), att_val))
+!   call check(nf90_inq_varid(nc, trim(var_name), varid))
+!   call check(nf90_get_att(nc, varid, trim(att_name), att_val))
 ! end subroutine nc_read_attribute
 ! -------------------------------------------------------------
 
@@ -189,31 +189,31 @@ end subroutine nc_read_attribute_str
 ! integer :: err
 ! 
 ! character :: varname*100
-! 	varname=name
-! 	dotpos = len(name)+1
+!   varname=name
+!   dotpos = len(name)+1
 ! 
-! 	varname(dotpos:) = '.nrows'
-! 	print *, 'AA1  ',trim(varname)
-! 	call nc_read_dim(nc, varname, A%m)
+!   varname(dotpos:) = '.nrows'
+!   print *, 'AA1  ',trim(varname)
+!   call nc_read_dim(nc, varname, A%m)
 ! 
-! 	varname(dotpos:) = '.ncols'
-! 	print *, 'AA2  ',trim(varname)
-! 	call nc_read_dim(nc, varname, A%n)
+!   varname(dotpos:) = '.ncols'
+!   print *, 'AA2  ',trim(varname)
+!   call nc_read_dim(nc, varname, A%n)
 ! 
-! 	CALL SMT_put( A%type, 'SPARSE_BY_ROWS', err )
+!   CALL SMT_put( A%type, 'SPARSE_BY_ROWS', err )
 ! 
-! 	varname(dotpos:) = '.ptr'
-! 	print *, 'AA1  ',trim(varname)
-! 	call nc_read_1d_array_int(nc, varname, A%ptr)
-! 	varname(dotpos:) = '.col'
-! 	print *, 'AA1  ',trim(varname)
-! 	call nc_read_1d_array_int(nc, varname, A%col)
-! 	varname(dotpos:) = '.val'
-! 	print *, 'AA1  ',trim(varname)
-! 	call nc_read_1d_array_double(nc, varname, A%val)
-! 	print *,'done'
+!   varname(dotpos:) = '.ptr'
+!   print *, 'AA1  ',trim(varname)
+!   call nc_read_1d_array_int(nc, varname, A%ptr)
+!   varname(dotpos:) = '.col'
+!   print *, 'AA1  ',trim(varname)
+!   call nc_read_1d_array_int(nc, varname, A%col)
+!   varname(dotpos:) = '.val'
+!   print *, 'AA1  ',trim(varname)
+!   call nc_read_1d_array_double(nc, varname, A%val)
+!   print *,'done'
 ! 
-! 	A%ne = size(A%val,1)
+!   A%ne = size(A%val,1)
 ! 
 ! end subroutine nc_read_sparse_matrix
 ! -------------------------------------------------------------

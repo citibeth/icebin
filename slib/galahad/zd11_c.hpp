@@ -26,7 +26,7 @@ class NcFile;
 
 namespace galahad {
 
-	class zd11_f;		// Fortran type, opaque
+    class zd11_f;       // Fortran type, opaque
 }
 
 /** @see zdqq_f.f90 */
@@ -42,35 +42,35 @@ specifics of how to set the fields in this class.
 @see galahad, zd11_type, zd11_x::zd11_c */
 class zd11_c {
 public :
-	zd11_f &main;		///< Actual storage for this
+    zd11_f &main;       ///< Actual storage for this
 
-	int &m;
-	int &n;
-	int &ne;				///< Number of non-zero elements
+    int &m;
+    int &n;
+    int &ne;                ///< Number of non-zero elements
 
-	int * const row;		///< int[ne]
-	int * const col;		///< int[ne]
-	double * const val;		// double[ne]
+    int * const row;        ///< int[ne]
+    int * const col;        ///< int[ne]
+    double * const val;     // double[ne]
 
-	/** Construct a dummy instance of this peer class.
-	The Fortran subroutine hsl_zd11_double_x::zd11_c_init() is used to fill in
-	references to the original Fortran data structure.
-	@see zd11_c_init(), hsl_zd11_double::zd11_type */
-	zd11_c() : main(*(zd11_f *)0), m(*(int *)0), n(*(int *)0), ne(*(int *)0),
-		row(0), col(0), val(0) {}
+    /** Construct a dummy instance of this peer class.
+    The Fortran subroutine hsl_zd11_double_x::zd11_c_init() is used to fill in
+    references to the original Fortran data structure.
+    @see zd11_c_init(), hsl_zd11_double::zd11_type */
+    zd11_c() : main(*(zd11_f *)0), m(*(int *)0), n(*(int *)0), ne(*(int *)0),
+        row(0), col(0), val(0) {}
 
-	/** Set the type parameter in the zd11 data structure.
-	@param str Should be 'DENSE', 'COORDINATE', 'SPARSE BY ROWS' or 'DIAGONAL'. */
-	int put_type(std::string const &str)
-		{ return zd11_put_type_c(main, str.c_str(), str.length()); }
+    /** Set the type parameter in the zd11 data structure.
+    @param str Should be 'DENSE', 'COORDINATE', 'SPARSE BY ROWS' or 'DIAGONAL'. */
+    int put_type(std::string const &str)
+        { return zd11_put_type_c(main, str.c_str(), str.length()); }
 
-	/** Used to write this data structure to a netCDF file.
-	Defines the required variables.  Call the returned boost::function
-	later to write the data.
-	@param nc NetCDF file to write
-	@param vname Variable name to use in writing this sparse matrix.
-	@return Function to call later to write the data. */
-	boost::function<void()> netcdf_define(NcFile &nc, std::string const &vname);
+    /** Used to write this data structure to a netCDF file.
+    Defines the required variables.  Call the returned boost::function
+    later to write the data.
+    @param nc NetCDF file to write
+    @param vname Variable name to use in writing this sparse matrix.
+    @return Function to call later to write the data. */
+    boost::function<void()> netcdf_define(NcFile &nc, std::string const &vname);
 };
 
 };

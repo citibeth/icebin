@@ -30,4 +30,4 @@ extern void setup(GCMCoupler const &coupler, IceModel &model);
 
 
 
-}}		// namespace
+}}      // namespace

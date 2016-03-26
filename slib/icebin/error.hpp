@@ -21,11 +21,11 @@ extern error_ptr icebin_error;
 class Exception : public std::exception
 {
 public:
-	virtual ~Exception()
-		{}
+    virtual ~Exception()
+        {}
 
-	virtual const char* what() const noexcept
-		{ return "icebin::Exception()"; }
+    virtual const char* what() const noexcept
+        { return "icebin::Exception()"; }
 };
 
 }

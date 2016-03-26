@@ -32,32 +32,32 @@
 !   !> Sparse matrix representation
 !   !! Originally derived from HSL library (via GALAHAD; same as SMT_TYPE in GALAHAD).
 !   TYPE, PUBLIC :: zd11_type
-!     INTEGER :: m	!< Number of rows in this matrix.
-! 	INTEGER :: n	!< Number of columns in this matrix.
-! 	INTEGER :: ne	!< Number of non-zero elements in this matrix.
+!     INTEGER :: m  !< Number of rows in this matrix.
+!   INTEGER :: n    !< Number of columns in this matrix.
+!   INTEGER :: ne   !< Number of non-zero elements in this matrix.
 ! 
-! 	!> "Name" of this matrix, not really needed.
+!   !> "Name" of this matrix, not really needed.
 !     CHARACTER, ALLOCATABLE, DIMENSION(:) :: id
 ! 
-! 	!> Indicates the storage scheme used.
-! 	!! It is set equal to either
-! 	!! 'DENSE', 'COORDINATE', 'SPARSE BY ROWS' or 'DIAGONAL'.  Use ZD11_put()
-! 	!! to set this variable.
+!   !> Indicates the storage scheme used.
+!   !! It is set equal to either
+!   !! 'DENSE', 'COORDINATE', 'SPARSE BY ROWS' or 'DIAGONAL'.  Use ZD11_put()
+!   !! to set this variable.
 !     CHARACTER, ALLOCATABLE, DIMENSION(:) :: type
 ! 
-! 	!> If type == 'COORDINATE', then this holds the row indices of
-! 	!! the non-zero elements (index base = 1).  Otherwise, it is not needed.
+!   !> If type == 'COORDINATE', then this holds the row indices of
+!   !! the non-zero elements (index base = 1).  Otherwise, it is not needed.
 !     INTEGER, ALLOCATABLE, DIMENSION(:) :: row
 ! 
-! 	!> If type == 'COORDINATE' or 'SPARSE BY ROWS', this holds the column indices
-! 	!! of the non-zero elements (index base = 1).  Otherwise, it is not needed.
+!   !> If type == 'COORDINATE' or 'SPARSE BY ROWS', this holds the column indices
+!   !! of the non-zero elements (index base = 1).  Otherwise, it is not needed.
 !     INTEGER, ALLOCATABLE, DIMENSION(:) :: col
 ! 
-! 	!> If type == 'SPARSE BY ROWS', this holds the starting position
-! 	!! of each row in the arrays col and val (index base = 1)
+!   !> If type == 'SPARSE BY ROWS', this holds the starting position
+!   !! of each row in the arrays col and val (index base = 1)
 !     INTEGER, ALLOCATABLE, DIMENSION(:) :: ptr
 ! 
-! 	!> The value of each non-zero element in the matrix.
+!   !> The value of each non-zero element in the matrix.
 !     REAL ( KIND( 1.0D+0 ) ), ALLOCATABLE, DIMENSION(:) :: val
 !   END TYPE
 ! 
@@ -142,18 +142,18 @@ module zd11_x
 
 use, intrinsic :: iso_c_binding
 
-	!> Fortran side of the C++ peer class to zd11_type
-	!! @see giss::ZD11
-	type ZD11_c
-		! Pointer to the main struct (but we don't own this pointer)
-		type(c_ptr) :: this_fc		! zd11_type *
+    !> Fortran side of the C++ peer class to zd11_type
+    !! @see giss::ZD11
+    type ZD11_c
+        ! Pointer to the main struct (but we don't own this pointer)
+        type(c_ptr) :: this_fc      ! zd11_type *
 
-		! Make portions of main available to C
-	    type(c_ptr) :: m, n, ne		! int * (scalar)
-		type(c_ptr) :: row			! int[m]
-		type(c_ptr) :: col			! int[n]
-		type(c_ptr) :: val			! double[ne]
-	end type
+        ! Make portions of main available to C
+        type(c_ptr) :: m, n, ne     ! int * (scalar)
+        type(c_ptr) :: row          ! int[m]
+        type(c_ptr) :: col          ! int[n]
+        type(c_ptr) :: val          ! double[ne]
+    end type
 
 CONTAINS
 
@@ -180,22 +180,22 @@ integer, value :: m, n, ne
 
 integer :: stat
 
-	this_f%m = m
-	this_f%n = n
-	this_f%ne = ne
+    this_f%m = m
+    this_f%n = n
+    this_f%ne = ne
 
-	this_c%this_fc = c_loc(this_f)
-	this_c%m = c_loc(this_f%m)
-	this_c%n = c_loc(this_f%n)
-	this_c%ne = c_loc(this_f%ne)
-	allocate(this_f%row(ne))
-	this_c%row = c_loc_array_int(this_f%row)
-	allocate(this_f%col(ne))
-	this_c%col = c_loc_array_int(this_f%col)
-	allocate(this_f%val(ne))
-	this_c%val = c_loc_array_double(this_f%val)
+    this_c%this_fc = c_loc(this_f)
+    this_c%m = c_loc(this_f%m)
+    this_c%n = c_loc(this_f%n)
+    this_c%ne = c_loc(this_f%ne)
+    allocate(this_f%row(ne))
+    this_c%row = c_loc_array_int(this_f%row)
+    allocate(this_f%col(ne))
+    this_c%col = c_loc_array_int(this_f%col)
+    allocate(this_f%val(ne))
+    this_c%val = c_loc_array_double(this_f%val)
 
-	call ZD11_put(this_f%type, 'COORDINATE', stat)
+    call ZD11_put(this_f%type, 'COORDINATE', stat)
 end subroutine ZD11_init_f
 
 
@@ -210,25 +210,25 @@ end module zd11_x
 
 !subroutine ZD11_c_destroy(self)
 !type(ZD11_c) :: self
-!	type(zd11_type), pointer :: main
-!	call c_f_pointer(self%main, main)
-!	deallocate(main)
+!   type(zd11_type), pointer :: main
+!   call c_f_pointer(self%main, main)
+!   deallocate(main)
 !subroutine ZD11_c_destroy(self)
 
 !> Helper function for giss::ZD11::put_type()
 function ZD11_put_type_c(this_fc, string, l) bind(c)
-	use HSL_ZD11_double
-	use, intrinsic :: iso_c_binding
+    use HSL_ZD11_double
+    use, intrinsic :: iso_c_binding
 implicit none
-type(c_ptr), value :: this_fc				! zd11_f *
-	type(zd11_type), pointer :: this_f
-character(kind=c_char), dimension(*) :: string	! char *
-integer(c_int) :: l						! strlen(str)
+type(c_ptr), value :: this_fc               ! zd11_f *
+    type(zd11_type), pointer :: this_f
+character(kind=c_char), dimension(*) :: string  ! char *
+integer(c_int) :: l                     ! strlen(str)
 integer(c_int) :: ZD11_put_type_c
 
 
-	call c_f_pointer(this_fc, this_f)
-!	call c_f_pointer(string_c, string)
+    call c_f_pointer(this_fc, this_f)
+!   call c_f_pointer(string_c, string)
 
      if (allocated(this_f%type)) then
         deallocate(this_f%type,stat=ZD11_put_type_c)
