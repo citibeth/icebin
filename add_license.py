@@ -48,6 +48,7 @@ license_py = "".join(ret)
 re_py = re.compile(r".*?\n# along with this program.  If not, see <http://www.gnu.org/licenses/>.(\n\n)", re.MULTILINE|re.DOTALL)
 licenses['.py'] = (license_py, re_py)
 licenses['.pxd'] = (license_py, re_py)
+licenses['.pyx'] = (license_py, re_py)
 
 ret = []
 for line in license :
