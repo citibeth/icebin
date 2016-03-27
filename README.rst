@@ -185,8 +185,8 @@ Install IceBin
 The manual install of IceBin itself is similar::
 
     cd ~
-    git clone https://github.com/citibeth/ibmisc.git -b v0.1.0
-    cd ibmisc
+    git clone https://github.com/citibeth/icebin.git -b v0.1.0
+    cd icebin
 
     spack spec icebin@local +gridgen +python ~coupler ~pism ^ibmisc@local ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
     spack spconfig icebin@local +gridgen +python ~coupler ~pism ^ibmisc@local ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
@@ -208,3 +208,54 @@ IceBin produces a Python extension.  The following Spack commands will install t
     spack activate py-numpy
     spack install py-scipy ^atlas ^python@3:
     spack activate py-scipy
+    spack install py-netcdf ^py-numpy+blas+lapack ^atlas ^python@3:
+    spack activate py-netcdf
+
+These installations may be tested as follows, which should produce no output::
+
+    spack load python@3:
+    python3 -c 'import cython'
+    python3 -c 'import numpy'
+    python3 -c 'import scipy'
+    python3 -c 'import netCDF4'
+
+
+Install PyGISS Library
+----------------------
+
+The PyGISS library may be installed automatically or manually.
+
+Auto PyGISS Install
++++++++++++++++++++
+
+.. code-block:: bash
+
+    spack install py-giss ^py-numpy+blas+lapack ^atlas ^python@3:
+    spack activate py-giss
+
+Manual PyGISS Install
++++++++++++++++++++++
+
+Manual installation allows for quick updating of Python code without
+re-installing:
+
+.. code-block:: bash
+
+    cd ~
+    git clone https://github.com/citibeth/pygiss.git -b v0.1.0
+    export PYTHONPATH=$PYTHONPATH:$HOME/pygiss
+
+
+Activate Stuff You Need
+-----------------------
+
+The following commands will activate the Spack-installed packages
+needed for basic Python use of IceBin::
+
+    export PATH=`spack location -i icebin`/bin:$PATH
+    spack load python@3:
+    spack load ibmisc
+    spack load icebin
+    python3 -c 'import ibmisc'
+    python3 -c 'import icebin'
+
