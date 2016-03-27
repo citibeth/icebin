@@ -7,7 +7,7 @@ generalized grids.
 
 License
 =======
-IceBin is licensed under the GNU General Public License v3.
+See the file LICENSE for details on IceBin licensing.
 
 Requirements
 ============
