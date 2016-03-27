@@ -167,9 +167,9 @@ Spack can install packages automatically, or assist in building packages manuall
 
     spack spec ibmisc@local +python +netcdf ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
 
-3. If this looks good, install the prerequisites (change ``spec`` to ``install`` on the command line)::
+3. If this looks good, install the prerequisites (change ``spec`` to ``spconfig`` on the command line)::
 
-    spack install ibmisc@local +python +netcdf ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
+    spack spconfig ibmisc@local +python +netcdf ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
 
 4. Now build IBMisc itself::
 
