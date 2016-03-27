@@ -30,14 +30,14 @@ Spack to install IceBin.  Instructions for Linux are provided here.  For more in
 Install Spack
 --------------
 
-1. Download:
+1. Download::
 
-.code-block ::
-    > cd ~
+    cd ~
     # git clone git@github.com:citibeth/spack.git -b efischer/icebin
-    > git clone https://github.com/citibeth/spack.git -b efischer/icebin
+    git clone https://github.com/citibeth/spack.git -b efischer/icebin
 
 2. Add to your ``.bashrc`` file::
+
     export SPACK_ROOT=$HOME/spack
     . $SPACK_ROOT/share/spack/setup-env.sh
 
@@ -48,7 +48,7 @@ Set up Spack Compilers
 IceBin is known to work with GCC 4.9.3.  In theory, it works with
 other C++11 compilers as well.  Enter the following, to see what
 compilers Spack has found on your system::
-    > spack compilers
+    spack compilers
 
 This produces a file ``~/.spack/compilers.yaml``, which looks as
 follows on CentOS 7::
@@ -62,14 +62,16 @@ follows on CentOS 7::
 
 If you are happy with the compilers Spack found, you can proceed.  Otherwise, you need to build GCC 4.9.3::
 
-    > spack install gcc@4.9.3
+    spack install gcc@4.9.3
 
 Once that completes, add GCC 4.9.3 to the ``compilers.yaml`` file:
 
 1. Identify the location of your new GCC with::
+
     spack location -i gcc@4.9.3
 
 2. Add it to your compilers.yaml file, to look something like::
+
     compilers:
       linux-x86_64:
         gcc@4.8.5:
@@ -88,6 +90,7 @@ Configure Spack
 ---------------
 
 Now it is time to tell Spack which compilers and package versions are preferred.  Do this by creating the file ``~/.spack/packages.yaml``.  It should look like this::
+
     packages:
         python:
             version: [3.5.1]
@@ -138,9 +141,11 @@ Install Git
 -----------
 
 You might wish to install the latest, greatest version of git.  Do this with::
+
     spack install git+curl+expat
 
-Once Git is installed, make it available to Bash via:
+Once Git is installed, make it available to Bash via::
+
     spack load git
 
 
@@ -151,17 +156,21 @@ Install IBMisc
 Spack can install packages automatically, or assist in building packages manually.  We will use Spack to automatically install all of IceBin's prerequisites, and then manually install IceBin and its support library IBMisc from GitHub.
 
 1. Download the IBMisc library (support for IceBin)::
+
     cd ~
     git clone https://github.com/citibeth/ibmisc.git -b v0.1.0
     cd ibmisc
 
 2. Ask Spack about the prerequisites for IBMisc::
+
     spack spec ibmisc@local +python +netcdf ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
 
 3. If this looks good, install the prerequisites (change ``spec`` to ``install`` on the command line)::
+
     spack install ibmisc@local +python +netcdf ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
 
-4. Now build IBMisc itself:
+4. Now build IBMisc itself::
+
     mkdir build
     cd build
     ../spconfig.py ..
@@ -171,7 +180,7 @@ Spack can install packages automatically, or assist in building packages manuall
 Install IceBin
 --------------
 
-The manual install of IceBin itself is similar:
+The manual install of IceBin itself is similar::
 
     cd ~
     git clone https://github.com/citibeth/ibmisc.git -b v0.1.0
@@ -190,6 +199,7 @@ Set Up Spack Python
 -------------------
 
 IceBin produces a Python extension.  The following Spack commands will install the Python modules necessary to run that extension::
+
     spack install py-cython ^python@3:
     spack activate py-cython
     spack install py-numpy+blas+lapack ^atlas ^python@3:
