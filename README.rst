@@ -48,10 +48,12 @@ Set up Spack Compilers
 IceBin is known to work with GCC 4.9.3.  In theory, it works with
 other C++11 compilers as well.  Enter the following, to see what
 compilers Spack has found on your system::
+
     spack compilers
 
 This produces a file ``~/.spack/compilers.yaml``, which looks as
 follows on CentOS 7::
+
     compilers:
       linux-x86_64:
         gcc@4.8.5:
@@ -84,7 +86,7 @@ Once that completes, add GCC 4.9.3 to the ``compilers.yaml`` file:
           cxx: /home/rpfische/spack/opt/spack/linux-x86_64/gcc-4.8.5/gcc-4.9.3-layphctulnk3omsbjpzftqv6dlxpfe3d/bin/g++
           f77: /home/rpfische/spack/opt/spack/linux-x86_64/gcc-4.8.5/gcc-4.9.3-layphctulnk3omsbjpzftqv6dlxpfe3d/bin/gfortran
           fc: /home/rpfische/spack/opt/spack/linux-x86_64/gcc-4.8.5/gcc-4.9.3-layphctulnk3omsbjpzftqv6dlxpfe3d/bin/gfortran
-        
+
 
 Configure Spack
 ---------------
@@ -135,7 +137,7 @@ A few things to note here:
         ==> Warning: Consider updating to the latest version of this package.
         ==> Warning: More details at http://www.openssl.org
 
-    You can safely ignore these warnings because they are false.
+   You can safely ignore these warnings because they are false.
 
 Install Git
 -----------
