@@ -176,8 +176,8 @@ Spack can install packages automatically, or assist in building packages manuall
     mkdir build
     cd build
     ../spconfig.py ..
-    make
-    make install
+    make -j8
+    make -j8 install
 
 Install IceBin
 --------------
@@ -188,14 +188,13 @@ The manual install of IceBin itself is similar::
     git clone https://github.com/citibeth/icebin.git -b v0.1.0
     cd icebin
 
-    spack spec icebin@local +gridgen +python ~coupler ~pism ^ibmisc@local ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
     spack spconfig icebin@local +gridgen +python ~coupler ~pism ^ibmisc@local ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
 
     mkdir build
     cd build
     ../spconfig.py ..
-    make
-    make install
+    make -j8
+    make -j8 install
 
 Set Up Spack Python
 -------------------
@@ -210,15 +209,24 @@ IceBin produces a Python extension.  The following Spack commands will install t
     spack activate py-scipy
     spack install py-netcdf ^py-numpy+blas+lapack ^atlas ^python@3:
     spack activate py-netcdf
+    spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^atlas ^python@3:
+    spack activate py-basemap
+    spack install py-proj ^python@3:
+    spack activate py-proj
 
-These installations may be tested as follows, which should produce no output::
+These installations may be tested as follows::
 
+    # These do not produce output
     spack load python@3:
     python3 -c 'import cython'
     python3 -c 'import numpy'
     python3 -c 'import scipy'
     python3 -c 'import netCDF4'
+    python3 -c 'import matplotlib'
+    python3 -c 'from mpl_toolkits.basemap import Basemap'
 
+    # This does produce output...
+    python3 -c 'import pyproj; pyproj.test()'
 
 Install PyGISS Library
 ----------------------
@@ -230,8 +238,9 @@ Auto PyGISS Install
 
 .. code-block:: bash
 
-    spack install py-giss ^py-numpy+blas+lapack ^atlas ^python@3:
+    spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^atlas ^python@3:
     spack activate py-giss
+    python3 -c 'import giss'
 
 Manual PyGISS Install
 +++++++++++++++++++++
@@ -244,6 +253,7 @@ re-installing:
     cd ~
     git clone https://github.com/citibeth/pygiss.git -b v0.1.0
     export PYTHONPATH=$PYTHONPATH:$HOME/pygiss
+    python3 -c 'import giss'
 
 
 Activate Stuff You Need
@@ -258,4 +268,5 @@ needed for basic Python use of IceBin::
     spack load icebin
     python3 -c 'import ibmisc'
     python3 -c 'import icebin'
+    which overlap
 
