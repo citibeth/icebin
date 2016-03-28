@@ -258,7 +258,7 @@ std::unique_ptr<Grid> new_grid(Grid::Type type)
 std::unique_ptr<Grid> new_grid(NcIO &ncio, std::string const &vname)
 {
     Grid::Type type;
-    auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
     get_or_put_att_enum(info_v, ncio.rw, "type", type);
     return new_grid(type);
 }
@@ -266,7 +266,7 @@ std::unique_ptr<Grid> new_grid(NcIO &ncio, std::string const &vname)
 void Grid::ncio(NcIO &ncio, std::string const &vname)
 {
     // ------ Attributes
-    auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
 
     get_or_put_att(info_v, ncio.rw, "name", name);
 

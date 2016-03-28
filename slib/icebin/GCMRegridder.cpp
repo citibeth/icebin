@@ -96,7 +96,7 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
         exgrid = new_grid(ncio, vname + ".exgrid");
     }
 
-    auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
     get_or_put_att(info_v, ncio.rw, "name", _name);
     get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 
@@ -138,7 +138,7 @@ std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
 std::unique_ptr<IceRegridder> new_ice_regridder(NcIO &ncio, std::string vname)
 {
     std::string vn(vname + ".gridI.info");
-    auto gridI_info_v = get_or_add_var(ncio, vn, netCDF::ncInt64, {});
+    auto gridI_info_v = get_or_add_var(ncio, vn, "int64", {});
 
     Grid::Parameterization parameterization;
     get_or_put_att_enum(gridI_info_v, ncio.rw, "parameterization", parameterization);
@@ -158,7 +158,7 @@ void GCMRegridder::clear()
 
 void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 {
-    auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
 
     if (ncio.rw == 'r') {
         clear();

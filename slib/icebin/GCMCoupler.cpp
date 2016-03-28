@@ -73,7 +73,7 @@ std::unique_ptr<IceModel> new_ice_model(NcIO &ncio, std::string vname,
     GCMCoupler const *_coupler, IceRegridder *_sheet)
 {
     std::string vn(vname + ".info");
-    auto info_v = get_or_add_var(ncio, vn, netCDF::ncInt64, {});
+    auto info_v = get_or_add_var(ncio, vn, "int64", {});
 
     IceModel::Type type;
     get_or_put_att_enum(info_v, ncio.rw, "ice_model", type);
@@ -236,7 +236,7 @@ void GCMCoupler::ncread(
     // Read gcm_out_file, an optional variable telling the GCM-specific
     // part of IceBin to write out exactly what it sees coming from the GCM
     // (so it can be replayed later with desm)
-    auto info_v = get_or_add_var(ncio, vname + ".info", netCDF::ncInt64, {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
 
     gcm_out_file = "";
     get_or_put_att(info_v, ncio.rw, "gcm_out_file", gcm_out_file, false);
