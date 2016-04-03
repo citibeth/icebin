@@ -1,3 +1,6 @@
+apt-get install gettext libssl-dev libjpeg-dev libpthread-stubs0-dev libxau-dev libqt4-dev
+
+
 Introduction
 ============
 
@@ -120,64 +123,6 @@ Once that completes, add GCC 4.9.3 to the ``compilers.yaml`` file:
           fc: /home/rpfische/spack/opt/spack/linux-x86_64/gcc-4.8.5/gcc-4.9.3-layphctulnk3omsbjpzftqv6dlxpfe3d/bin/gfortran
 
 
-
-Install Environment Modules
--------------------------------
-
-In order to use Spack's generated environment modules, you must have
-installed the *Environment Modules* package.  On many Linux
-distributions, this can be installed from the vendor's repository.
-For example: ```yum install environment-modules``
-(Fedora/RHEL/CentOS).  If your Linux distribution does not have
-Environment Modules, you can get it with Spack:
-
-1. Install with::
-
-    spack install environment-modules
-
-2. Activate with::
-
-    MODULES_HOME=`spack location -i environment-modules`
-     MODULES_VERSION=`ls -1 $MODULES_HOME/Modules | head -1`
-     ${MODULES_HOME}/Modules/${MODULES_VERSION}/bin/add.modules
-
-This adds to your ``.bashrc`` (or similar) files, enabling Environment
-Modules when you log in.  It will ask your permission before changing
-any files.
-
-Once you've activate Environment Modules, you need to log out and in
-again.  Test with a simple Environment Module command, eg::
-
-    module avail
-
-
-Enable Spack Shell Support
---------------------------------
-
-You can enable shell support by sourcing some files in the
-``/share/spack`` directory.
-
-For ``bash`` or ``ksh``, run:
-
-.. code-block:: sh
-
-   . $SPACK_ROOT/share/spack/setup-env.sh
-
-For ``csh`` and ``tcsh`` run:
-
-.. code-block:: csh
-
-   setenv SPACK_ROOT /path/to/spack
-   source $SPACK_ROOT/share/spack/setup-env.csh
-
-You can put the above code in your ``.bashrc`` or ``.cshrc``, and
-Spack's shell support will be available on the command line.
-
-Log out and in again; you can now test this with a simple command like::
-
-    spack load gcc
-
-
 Configure Spack
 ---------------
 
@@ -211,6 +156,65 @@ A few things to note here:
 
    You can safely ignore these warnings because they are false.
 
+
+Install Environment Modules
+-------------------------------
+
+In order to use Spack's generated environment modules, you must have
+installed the *Environment Modules* package.  On many Linux
+distributions, this can be installed from the vendor's repository.
+For example: ```yum install environment-modules``
+(Fedora/RHEL/CentOS).  If your Linux distribution does not have
+Environment Modules, you can get it with Spack:
+
+1. Install with::
+
+    spack install environment-modules
+
+2. Activate with::
+
+    TMP=`tempfile`
+    echo >$TMP
+    MODULE_HOME=`spack location -i environment-modules`
+     MODULE_VERSION=`ls -1 $MODULE_HOME/Modules | head -1`
+     ${MODULE_HOME}/Modules/${MODULE_VERSION}/bin/add.modules <$TMP
+     cp .bashrc $TMP
+     echo "MODULE_VERSION=${MODULE_VERSION}" > .bashrc
+     cat $TMP >>.bashrc
+
+This adds to your ``.bashrc`` (or similar) files, enabling Environment
+Modules when you log in.  Re-load your .bashrc (or log out and in
+again), and then test that the ``module`` command is found with:
+
+    module avail
+
+Enable Spack Shell Support
+--------------------------------
+
+Spack shell support allows Spack to work with Environment Modules.
+You can enable it by sourcing some files in the ``/share/spack``
+directory.  Add this to your ``.bashrc`` file, after the environment
+modules setup section:
+
+.. code-block:: sh
+
+    export SPACK_ROOT=$HOME/spack
+    . $SPACK_ROOT/share/spack/setup-env.sh
+
+
+You can put the above code in your ``.bashrc`` or ``.cshrc``, and
+Spack's shell support will be available on the command line.
+
+Log out and in again; you can now test this with a simple command like::
+
+    spack find
+    spack load gcc
+
+You can also use environment modules directly, for example::
+
+    module avail
+
+
 Install Git
 -----------
 
@@ -223,6 +227,13 @@ Do this with::
 Once Git is installed, make it available to Bash via::
 
     spack load git
+
+Updated Binutils
+-----------------
+
+On Ubuntu 12.04, an updated ``binutils`` may be required to build some packages (eg, ``py-numpy``)::
+
+    spack load binutils
 
 
 Install IceBin Application Packages
@@ -256,9 +267,17 @@ looks like this::
         icebin:
             version: [0.1.0]
 
+        # Recommended for security reasons
+        # Do not install OpenSSL as non-root user.
         openssl:
             paths:
                 openssl@system: /usr
+            buildable: False
+
+        # Recommended, unless your system doesn't provide Qt4
+        qt:
+            paths:
+                qt@system: /usr
             buildable: False
 
         all:
@@ -302,7 +321,7 @@ for basic Python use of IceBin::
 
     module load `spack module find --dependencies tcl icebin py-basemap py-giss py-proj@citibeth-latlong2`
 
-Alternately, you can generate ``bash`` commands to do the same, and then cut-n-paste them into your ``.bashrc``::
+Alternately, you can generate ``bash`` commands to do the same, and then cut-n-paste them into your ``.bashrc`` (this will run faster)::
 
     spack module find --dependencies --shell tcl icebin py-basemap py-giss py-proj
 
