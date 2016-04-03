@@ -20,6 +20,13 @@ IceBin is built with Spack, which requires a functional Python 2.6 or
 Python 2.7 on your system.  Other standard build tools are assumed as
 well: make, git, etc.  All other prerequisites are built with Spack.
 
+Ubuntu 12.04
+-------------
+
+The following installation was enough to prepare a bare Ubuntu 12.04 machine for use with Spack::
+
+    sudo apt-get install build-essential git curl m4 bison
+
 
 Download and Install
 ====================
@@ -57,7 +64,7 @@ Install Spack
 
 2. Add to your ``.bashrc`` file::
 
-    export SPACK_ROOT=$HOME/spack2
+    export SPACK_ROOT=$HOME/spack
     . $SPACK_ROOT/share/spack/setup-env.sh
 
 3. Remove non-system stuff from your ``PATH``, ``LD_LIBRARY_PATH`` and
@@ -83,6 +90,9 @@ follows on CentOS 7::
           cxx: /usr/bin/g++
           f77: /usr/bin/gfortran
           fc: /usr/bin/gfortran
+
+
+**NOTE**: ``spack compilers`` does not always detect all installed compiilers.  Make sure to check ``compilers.yaml`` after it has been auto-generated.  Errors like "Compiler 'gcc@4.6' does not support compiling C++ programs" indicate a problem in ``compilers.yaml``.
 
 If you are happy with the compilers Spack found, you can proceed.  Otherwise, you need to build GCC 4.9.3::
 
