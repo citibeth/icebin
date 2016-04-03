@@ -25,7 +25,26 @@ Download and Install
 ====================
 
 In order to install IceBin's numerous dependencies, we recommend using
-Spack to install IceBin.  Instructions for Linux are provided here.  For more information on Spack, see: http://software.llnl.gov/spack
+Spack to install IceBin.  Installing IceBin therefore involves three steps:
+
+1. Install essential build tools (Spack, Environment Modules, GCC and git).
+
+2. Use Spack to install IceBin and related packages.
+
+Step 1 is general for any package one might install with Spack;
+whereas step 2 is specific to IceBin.  Instructions for Linux are
+provided here; this has not been tested or debugged on Macintosh.
+
+Install Build Tools
+``````````````````````
+
+The build tools consist of Spack, which may be used to install
+Environment Modules, GCC and git if necessary.  By using Spack to
+bootstrap the build envrionment, one ensures that an up-to-date
+version of the build tools is available, no matter what host operating
+system is being used.  For more information on Spack, see:
+http://software.llnl.gov/spack
+
 
 Install Spack
 --------------
@@ -38,9 +57,12 @@ Install Spack
 
 2. Add to your ``.bashrc`` file::
 
-    export SPACK_ROOT=$HOME/spack
+    export SPACK_ROOT=$HOME/spack2
     . $SPACK_ROOT/share/spack/setup-env.sh
 
+3. Remove non-system stuff from your ``PATH``, ``LD_LIBRARY_PATH`` and
+   other environment variables, which can cause strange errors when
+   building with Spack.
 
 Set up Spack Compilers
 ----------------------
@@ -88,26 +110,70 @@ Once that completes, add GCC 4.9.3 to the ``compilers.yaml`` file:
           fc: /home/rpfische/spack/opt/spack/linux-x86_64/gcc-4.8.5/gcc-4.9.3-layphctulnk3omsbjpzftqv6dlxpfe3d/bin/gfortran
 
 
+
+Install Environment Modules
+-------------------------------
+
+In order to use Spack's generated environment modules, you must have
+installed the *Environment Modules* package.  On many Linux
+distributions, this can be installed from the vendor's repository.
+For example: ```yum install environment-modules``
+(Fedora/RHEL/CentOS).  If your Linux distribution does not have
+Environment Modules, you can get it with Spack:
+
+1. Install with::
+
+    spack install environment-modules
+
+2. Activate with::
+
+    MODULES_HOME=`spack location -i environment-modules`
+     MODULES_VERSION=`ls -1 $MODULES_HOME/Modules | head -1`
+     ${MODULES_HOME}/Modules/${MODULES_VERSION}/bin/add.modules
+
+This adds to your ``.bashrc`` (or similar) files, enabling Environment
+Modules when you log in.  It will ask your permission before changing
+any files.
+
+Once you've activate Environment Modules, you need to log out and in
+again.  Test with a simple Environment Module command, eg::
+
+    module avail
+
+
+Enable Spack Shell Support
+--------------------------------
+
+You can enable shell support by sourcing some files in the
+``/share/spack`` directory.
+
+For ``bash`` or ``ksh``, run:
+
+.. code-block:: sh
+
+   . $SPACK_ROOT/share/spack/setup-env.sh
+
+For ``csh`` and ``tcsh`` run:
+
+.. code-block:: csh
+
+   setenv SPACK_ROOT /path/to/spack
+   source $SPACK_ROOT/share/spack/setup-env.csh
+
+You can put the above code in your ``.bashrc`` or ``.cshrc``, and
+Spack's shell support will be available on the command line.
+
+Log out and in again; you can now test this with a simple command like::
+
+    spack load gcc
+
+
 Configure Spack
 ---------------
 
-Now it is time to tell Spack which compilers and package versions are preferred.  Do this by creating the file ``~/.spack/packages.yaml``.  It should look like this::
+Create the file ``~/.spack/packages.yaml``.  It can look like this for now::
 
     packages:
-        python:
-            version: [3.5.1]
-        py-cython:
-            version: [0.23.4]
-
-        netcdf-cxx4:
-            version: [ecdf914]
-
-        ibmisc:
-            version: [0.1.0]
-
-        icebin:
-            version: [0.1.0]
-
         openssl:
             paths:
                 openssl@system: /usr
@@ -115,10 +181,6 @@ Now it is time to tell Spack which compilers and package versions are preferred.
 
         all:
             compiler: [gcc@4.9.3]
-            providers:
-                mpi: [openmpi]
-                blas: [atlas]
-                lapack: [atlas]
 
 A few things to note here:
 
@@ -142,7 +204,9 @@ A few things to note here:
 Install Git
 -----------
 
-You might wish to install the latest, greatest version of git.  Do this with::
+Older versions of git do not provide features that are necessary
+today.  You might wish to install the latest, greatest version of git.
+Do this with::
 
     spack install git+curl+expat
 
@@ -151,122 +215,110 @@ Once Git is installed, make it available to Bash via::
     spack load git
 
 
+Install IceBin Application Packages
+````````````````````````````````````
 
-Install IBMisc
------------------
+The IceBin library has many build and run dependencies.  The
+instructions below will install them all.
 
-Spack can install packages automatically, or assist in building packages manually.  We will use Spack to automatically install all of IceBin's prerequisites, and then manually install IceBin and its support library IBMisc from GitHub.
+Configure Package Versions
+-----------------------------
 
-1. Download the IBMisc library (support for IceBin)::
+Now it is time to tell Spack which compilers and package versions are
+preferred.  Do this by adding to ``~/.spack/packages.yaml`` so it
+looks like this::
 
-    cd ~
-    git clone https://github.com/citibeth/ibmisc.git -b v0.1.0
-    cd ibmisc
+    packages:
+        python:
+            version: [3.5.1]
+        py-cython:
+            version: [0.23.4]
+        py-proj:
+            # Normal released version is buggy
+            version: [citibeth-latlong2]
 
-2. Ask Spack about the prerequisites for IBMisc::
+        netcdf-cxx4:
+            version: [ecdf914]
 
-    spack spec ibmisc@local +python +netcdf ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
+        ibmisc:
+            version: [0.1.0]
 
-3. If this looks good, install the prerequisites (change ``spec`` to ``spconfig`` on the command line)::
+        icebin:
+            version: [0.1.0]
 
-    spack spconfig ibmisc@local +python +netcdf ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
+        openssl:
+            paths:
+                openssl@system: /usr
+            buildable: False
 
-4. Now build IBMisc itself::
+        all:
+            compiler: [gcc@4.9.3]
+            providers:
+                mpi: [openmpi]
+                blas: [openblas]
+                lapack: [openblas]
 
-    mkdir build
-    cd build
-    ../spconfig.py ..
-    make -j8
-    make -j8 install
 
 Install IceBin
---------------
+-----------------
 
-The manual install of IceBin itself is similar::
+.. code-block:: bash
+
+    spack install icebin@0.1.1 +gridgen +python ~coupler ~pism \
+        ^ibmisc@0.1.1 ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack \
+        ^openblas~shared ^python@3:
+
+Additionally, download the IceBin source code for testing purposes::
 
     cd ~
-    git clone https://github.com/citibeth/icebin.git -b v0.1.0
+    git clone https://github.com/citibeth/icebin.git -b v0.1.1
     cd icebin
 
-    spack spconfig icebin@local +gridgen +python ~coupler ~pism ^ibmisc@local ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^atlas ^python@3:
-
-    mkdir build
-    cd build
-    ../spconfig.py ..
-    make -j8
-    make -j8 install
-
-Set Up Spack Python
+Spack Python Stack
 -------------------
 
 IceBin produces a Python extension.  The following Spack commands will install the Python modules necessary to run that extension::
 
-    spack install py-cython ^python@3:
-    spack activate py-cython
-    spack install py-numpy+blas+lapack ^atlas ^python@3:
-    spack activate py-numpy
-    spack install py-scipy ^atlas ^python@3:
-    spack activate py-scipy
-    spack install py-netcdf ^py-numpy+blas+lapack ^atlas ^python@3:
-    spack activate py-netcdf
-    spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^atlas ^python@3:
-    spack activate py-basemap
-    spack install py-proj ^python@3:
-    spack activate py-proj
+    spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas~shared ^python@3:
+    spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas~shared ^py-proj@citibeth-latlong2 ^python@3:
 
-These installations may be tested as follows::
+
+Activate Stuff You Need
+-----------------------
+
+
+The following command will load the Spack-installed packages needed
+for basic Python use of IceBin::
+
+    module load `spack module find --dependencies tcl icebin py-basemap py-giss py-proj@citibeth-latlong2`
+
+Alternately, you can generate ``bash`` commands to do the same, and then cut-n-paste them into your ``.bashrc``::
+
+    spack module find --dependencies --shell tcl icebin py-basemap py-giss py-proj
+
+Add the downloaded IceBin to the front of your ``PYTHONPATH``, to
+ensure that the downloaded version is used when editing / testing
+IceBin examples::
+
+    export $PYTHONPATH=$HOME/icebin/pylib:$PYTHONPATH
+
+
+Test the Activation
+----------------------
+
+The loaded packages may be tested as follows::
 
     # These do not produce output
-    spack load python@3:
     python3 -c 'import cython'
     python3 -c 'import numpy'
     python3 -c 'import scipy'
     python3 -c 'import netCDF4'
     python3 -c 'import matplotlib'
     python3 -c 'from mpl_toolkits.basemap import Basemap'
+    python3 -c 'import ibmisc'
+    python3 -c 'import icebin'
+    python3 -c 'import giss'
 
     # This does produce output...
     python3 -c 'import pyproj; pyproj.test()'
-
-Install PyGISS Library
-----------------------
-
-The PyGISS library may be installed automatically or manually.
-
-Auto PyGISS Install
-+++++++++++++++++++
-
-.. code-block:: bash
-
-    spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^atlas ^python@3:
-    spack activate py-giss
-    python3 -c 'import giss'
-
-Manual PyGISS Install
-+++++++++++++++++++++
-
-Manual installation allows for quick updating of Python code without
-re-installing:
-
-.. code-block:: bash
-
-    cd ~
-    git clone https://github.com/citibeth/pygiss.git -b v0.1.0
-    export PYTHONPATH=$PYTHONPATH:$HOME/pygiss
-    python3 -c 'import giss'
-
-
-Activate Stuff You Need
------------------------
-
-The following commands will activate the Spack-installed packages
-needed for basic Python use of IceBin::
-
-    export PATH=`spack location -i icebin`/bin:$PATH
-    spack load python@3:
-    spack load ibmisc
-    spack load icebin
-    python3 -c 'import ibmisc'
-    python3 -c 'import icebin'
     which overlap
-
