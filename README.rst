@@ -1,6 +1,3 @@
-apt-get install gettext libssl-dev libjpeg-dev libpthread-stubs0-dev libxau-dev libqt4-dev
-
-
 Introduction
 ============
 
@@ -26,9 +23,12 @@ well: make, git, etc.  All other prerequisites are built with Spack.
 Ubuntu 12.04
 -------------
 
-The following installation was enough to prepare a bare Ubuntu 12.04 machine for use with Spack::
+The following installation was enough to prepare a bare Ubuntu 12.04
+machine to build the IceBin software stack with Spack:
 
-    sudo apt-get install build-essential git curl m4 bison
+    sudo apt-get install build-essential git curl m4 bison gettext \
+        libssl-dev libjpeg-dev libpthread-stubs0-dev libxau-dev libqt4-dev
+
 
 
 Download and Install
@@ -319,17 +319,19 @@ Activate Stuff You Need
 The following command will load the Spack-installed packages needed
 for basic Python use of IceBin::
 
-    module load `spack module find --dependencies tcl icebin py-basemap py-giss py-proj@citibeth-latlong2`
+    module load `spack module find tcl icebin netcdf cmake@3.5.1`
+    module load `spack module find --dependencies tcl py-basemap py-giss`
 
 Alternately, you can generate ``bash`` commands to do the same, and then cut-n-paste them into your ``.bashrc`` (this will run faster)::
 
-    spack module find --dependencies --shell tcl icebin py-basemap py-giss py-proj
+    spack module find --shell tcl icebin netcdf cmake@3.5.1
+    spack module find --dependencies --shell tcl py-basemap py-giss
 
 Add the downloaded IceBin to the front of your ``PYTHONPATH``, to
 ensure that the downloaded version is used when editing / testing
 IceBin examples::
 
-    export $PYTHONPATH=$HOME/icebin/pylib:$PYTHONPATH
+    export PYTHONPATH=$HOME/icebin/pylib:$PYTHONPATH
 
 
 Test the Activation
