@@ -244,8 +244,8 @@ public:
         (XY)            (1)     // Rectilinear X/Y grid
         (LONLAT)        (2)     // Global lat-lon grid (maybe with polar caps)
         (EXCHANGE)      (3)     // Exchange grid, from overlap of two other grids
-//      (CUBESPHERE)    (4)     // Global Cubed Sphere grid
-//      (MESH)          (5)     // Arbitrary mesh (could be global or on plane)
+        (CUBESPHERE)    (4)     // Global Cubed Sphere grid
+        (MESH)          (5)     // Arbitrary mesh (could be global or on plane)
     )
 
     BOOST_ENUM_VALUES( Coordinates, int,

@@ -205,10 +205,22 @@ std::string const &vname)
     {
         auto cells_index(nc_read_blitz
             <long, 1>(nc, vname + ".cells.index"));
-        auto cells_ijk(nc_read_blitz
-            <long, 2>(nc, vname + ".cells.ijk"));
-        auto native_area(nc_read_blitz
-            <long, 1>(nc, vname + ".cells.native_area"));
+
+        NcVar cells_ijk_var(nc->getVar(vname + ".cells.ijk"));
+        blitz::Array<long,2> cells_ijk;
+        if (!cells_ijk_var.isNull()) {
+            // Some grids (eg, ISSM) don't have this.  It is optional
+            cells_ijk.reference(nc_read_blitz
+                <long, 2>(nc, vname + ".cells.ijk"));
+        }
+
+
+        NcVar native_area_var(nc->getVar(vname + ".cells.native_area"));
+        blitz::Array<long,1> native_area;
+        if (!native_area_var.isNull()) {
+            native_area.reference(nc_read_blitz
+                <long, 1>(nc, vname + ".cells.native_area"));
+        }
 
         // std::vector<double> cells_area(giss::read_double_vector(nc, vname + ".cells.area"));
         auto vrefs(nc_read_blitz
@@ -223,10 +235,18 @@ std::string const &vname)
 
             Cell cell;
             cell.index = cells_index(i);
-            cell.i = cells_ijk(i,0);
-            cell.j = cells_ijk(i,1);
-            cell.k = cells_ijk(i,2);
-            cell.native_area = native_area(i);
+            if (!cells_ijk_var.isNull()) {
+                cell.i = cells_ijk(i,0);
+                cell.j = cells_ijk(i,1);
+                cell.k = cells_ijk(i,2);
+            } else {
+                cell.i = cell.j = cell.k = 0;
+            }
+            if (!native_area_var.isNull()) {
+                cell.native_area = native_area(i);
+            } else {
+                cell.native_area = 0;
+            }
 
             // Add the vertices
             cell.reserve(vrefs_start(i+1) - vrefs_start(i));
