@@ -19,6 +19,8 @@ import giss.proj
 import giss.basemap
 import numpy as np
 import pyproj
+import functools
+import operator
 
 # -------------------------------------------------------
 class Indexing(object):
@@ -251,18 +253,16 @@ def read_nc(nc, vname):
     vertices_index = variables[vname + '.vertices.index'][:]
     vertices_xy = variables[vname + '.vertices.xy'][:]
     cells_index = variables[vname + '.cells.index'][:]
-    cells_ijk = variables[vname + '.cells.ijk'][:]
+    if vname + '.cells.ijk' in variables:
+        cells_ijk = variables[vname + '.cells.ijk'][:]
+    else:
+        cells_ijk = None
     if vname + '.cells.area' in variables:
         cells_area = variables[vname + '.cells.area'][:]
     else:
         cells_area = None
     cells_vertex_refs = variables[vname + '.cells.vertex_refs'][:]
     cells_vertex_refs_start = variables[vname + '.cells.vertex_refs_start'][:]
-
-    # Correct ISSM file (made with MATLAB?)
-    if attrs['type'] == 'MESH':
-        cells_vertex_refs = cells_vertex_refs - 1
-#    cells_vertex_refs_start = cells_vertex_refs_start - 1
 
     # ---------------------------------
     # Construct data structures
@@ -273,15 +273,12 @@ def read_nc(nc, vname):
     cells = dict()
     for nc_i in range(0, len(cells_index)):
         index = cells_index[nc_i]
-        ijk = cells_ijk[nc_i]
+        ijk = cells_ijk[nc_i] if cells_ijk is not None else (0,0,0)
         area = cells_area[nc_i] if cells_area is not None else 0
 
         r0 = cells_vertex_refs_start[nc_i]
         r1 = cells_vertex_refs_start[nc_i+1]
-#        if r0 == r1:
-#            print('r0, r1', r0, r1)
-        vertex_refs = cells_vertex_refs[r0:r1]
-        vertex_indices = vertices_index[vertex_refs]
+        vertex_indices = cells_vertex_refs[r0:r1]   # Vertex indices
 
         # Convert vertices to a list in the correct order
         vertices_as_list = [vertices[vertex_index] for vertex_index in vertex_indices]
@@ -300,6 +297,9 @@ def read_nc(nc, vname):
         return Grid_LonLat(indexing, vertices, cells, **attrs)
 
     elif attrs['type'] == 'MESH':
+        return Grid(indexing, vertices, cells, **attrs)
+
+    elif attrs['type'] == 'GENERIC':
         return Grid(indexing, vertices, cells, **attrs)
 
     raise ValueError('Unknown grid type {}'.format(attrs['type']))

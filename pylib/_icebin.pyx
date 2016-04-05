@@ -37,6 +37,21 @@ cdef class RegridMatrices:
         del self.cself
 
     def regrid(self, str spec_name, scale=True):
+        """Compute a regrid matrix.
+        spec_name:
+            Type of regrid matrix to obtain.  Choice are:
+            'EvI', 'AvI', 'IvA', 'IvE', 'EvA', 'AvE'
+        scale: Produce scaled matrix?
+            true  --> [kg m-2]
+            false --> [kg]
+        returns: (M, weights)
+            M: scipy.sparse.coo_matrix
+                Unscaled regridding matrix (i.e. produces [kg] not [kg m-2])
+            weight: np.array
+                Weight vector, defined by:
+                    M(scaled=True) = diag(1/weight) * M(scaled=False)
+                    M(scaled=False) = diag(weight) * M(scaled=True)
+        """
         (data,shape), weight = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale)
         # scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
         return scipy.sparse.coo_matrix(data, shape), weight

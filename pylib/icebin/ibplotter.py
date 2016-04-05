@@ -1,4 +1,5 @@
 import giss.plot
+from icebin import ibgrid
 
 """Create plotters without reading the full grid."""
 
@@ -9,13 +10,13 @@ def _Grid_XY_read_plotter(nc, vname) :
     sproj = nc.variables[vname + '.info'].projection
     xb2 = nc.variables[vname + '.x_boundaries'][:]
     yb2 = nc.variables[vname + '.y_boundaries'][:]
-    indexing = Indexing(nc, vname + '.indexing')
+    indexing = ibgrid.Indexing(nc, vname + '.indexing')
     return giss.plot.ProjXYPlotter(xb2, yb2, sproj, indexing.indices[0] == 0)
 
 def _Grid_LonLat_read_plotter(nc, vname) :
     lonb2 = nc.variables[vname + '.lon_boundaries'][:]
     latb2 = nc.variables[vname + '.lat_boundaries'][:]
-    indexing = Indexing(nc, vname + '.indexing')
+    indexing = ibgrid.Indexing(nc, vname + '.indexing')
     return giss.plot.LonLatPlotter(lonb2, latb2, transpose=(indexing.indices[0] == 0), boundaries=True)
 
 # ---------------------------------------------------

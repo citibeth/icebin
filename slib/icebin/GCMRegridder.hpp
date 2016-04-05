@@ -219,9 +219,15 @@ public:
 
     RegridMatrices(IceRegridder *sheet);
 
-    /** Retrieves a final regrid matrix. */
-    std::unique_ptr<WeightedSparse> regrid(std::string const &spec_name, bool scale) const
-        { return (regrids.at(spec_name))(scale); }
+    /** Retrieves a final regrid matrix.
+    @param scale: Produce scaled matrix?
+        true  --> [kg m-2]
+        false --> [kg]
+    */
+    std::unique_ptr<WeightedSparse> regrid(
+        std::string const &spec_name,
+        bool scale) const
+    { return (regrids.at(spec_name))(scale); }
 
 };
 

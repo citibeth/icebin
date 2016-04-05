@@ -93,7 +93,7 @@ def integrate_subelement(element, basis_vertex, polygon):
     return total
 
 
-def compute_AvI(gridX, gridI):
+def compute_AvI(exgrid, nA, gridI):
     """Computes A<-I regridding matrix.
     returns: AvI, weightsA, weightsI
 
@@ -115,7 +115,7 @@ def compute_AvI(gridX, gridI):
     data = []
     ii = []
     jj = []
-    for cellX in gridX.cells.values():
+    for cellX in exgrid.cells.values():
         # Get the polygon we wish to integrate around
         polygon = cellX.vertices
         ix_A = cellX.i      # Index in the atmosphere grid
@@ -136,8 +136,12 @@ def compute_AvI(gridX, gridI):
             ii.append(ix_A)
             jj.append(ix_I)
 
-    AvI = scipy.sparse.coo_matrix((data,(ii,jj)),
-        shape=(gridX.grid1_ncells_full, gridX.grid2_nvertices_full))
+    # Convert to zero-based indexing
+    ii = [i - gridI.indexing.base[0] for i in ii]
+    jj = [j - gridI.indexing.base[0] for j in jj]
+
+    nI = gridI.vertices_nfull
+    AvI = scipy.sparse.coo_matrix((data,(ii,jj)), shape=(nA, nI))
 
     weightsA = np.asarray(AvI.sum(1)).transpose()[0]
     weightsI = np.asarray(AvI.sum(0))[0]
