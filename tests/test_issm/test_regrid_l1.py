@@ -155,10 +155,13 @@ class TestMesh(unittest.TestCase):
             grid1_nvertices_full=gridA.vertices_num_full,
             grid2_nvertices_full=gridI.vertices_num_full)
 
-        AvI,weightsA,weightsI = element_l1.compute_AvI(gridX, gridI)
+        nA = gridA.cells_num_full
+        AvI,weightsA,weightsI = element_l1.compute_AvI(gridX, nA, gridI)
         #print(AvI.todense())
         #print(weightsA)
         #print(weightsI)
 
         self.assertAlmostEqual(sum(weightsA), sum(weightsI))
 
+if __name__ == '__main__':
+    unittest.main()
