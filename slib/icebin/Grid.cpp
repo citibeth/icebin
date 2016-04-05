@@ -395,8 +395,13 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
 
         // nc.add_var((vname + ".cells.area").c_str(), ncDouble, ncells_dim);
 
-        get_or_add_var(ncio, vname + ".cells.vertex_refs", ncInt, {nvrefs_d});
-        get_or_add_var(ncio, vname + ".cells.vertex_refs_start", ncInt, {cells_nrealized_plus_1_d});
+        get_or_add_var(ncio, vname + ".cells.vertex_refs", ncInt, {nvrefs_d})
+            .putAtt("comment",
+                "A list of cell indices.  Used to form grid cell polygons.");
+
+        get_or_add_var(ncio, vname + ".cells.vertex_refs_start", ncInt, {cells_nrealized_plus_1_d})
+            .putAtt("comment",
+                "Index into vertex_refs of the start of each polygon.");
 
         ncio += std::bind(&Grid::nc_write, this, ncio.nc, vname);
     } else {
