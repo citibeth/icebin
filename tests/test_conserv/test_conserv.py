@@ -19,6 +19,7 @@ import scipy.sparse
 import itertools
 
 import icebin
+from icebin import ibgrid, ibplotter
 import matplotlib
 #import basemap
 import numpy as np
@@ -39,13 +40,13 @@ class RegridTests(unittest.TestCase):
 
     def setUp(self):
         self.mm = icebin.GCMRegridder(ICEBIN_IN)
-        self.rm = self.mm.regrid_matrices('greenland')
+        self.rm = self.mm.regrid_matrices(ice_sheet)
         with netCDF4.Dataset(ICEBIN_IN) as nc:
-            self.indexingA = icebin.Indexing(nc, 'm.gridA.indexing')
-            self.indexingHP = icebin.Indexing(nc, 'm.indexingHP')
-            self.indexingI = icebin.Indexing(nc, 'm.{}.gridI.indexing'.format(ice_sheet))
-            self.plotterI = icebin.read_plotter(nc, 'm.{}.gridI'.format(ice_sheet))
-            self.plotterA = icebin.read_plotter(nc, 'm.gridA')
+            self.indexingA = ibgrid.Indexing(nc, 'm.gridA.indexing')
+            self.indexingHP = ibgrid.Indexing(nc, 'm.indexingHP')
+            self.indexingI = ibgrid.Indexing(nc, 'm.{}.gridI.indexing'.format(ice_sheet))
+            self.plotterI = ibplotter.read_nc(nc, 'm.{}.gridI'.format(ice_sheet))
+            self.plotterA = ibplotter.read_nc(nc, 'm.gridA')
 
         self.elevI, self.maskI = giss.pism.read_elevI_maskI('elev_mask.nc')
 

@@ -17,6 +17,7 @@
 import matplotlib
 import netCDF4
 import icebin
+from icebin import ibgrid
 import sys
 
 import giss.basemap
@@ -35,13 +36,13 @@ figure.set_size_inches(8.267,11.692)# A4
 
 # Read the grid
 nc = netCDF4.Dataset(grid_fname + '.nc', 'r')
-grid1 = icebin.Grid(nc, vname)
+grid1 = ibgrid.read_nc(nc, vname)
 nc.close()
 
 # Plot it!
 ax = figure.add_subplot(111)
 basemap = giss.basemap.greenland_laea(ax=ax)
-grid1.plot(basemap)
+grid1.plot(basemap, linewidth=.1)
 
 # ------------ Render the page
 figure.savefig(grid_fname + '.pdf', dpi=100, transparent=False)
