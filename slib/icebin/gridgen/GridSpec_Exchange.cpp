@@ -220,6 +220,7 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
             if (gridA->sproj != gridI->sproj) {
                 (*icebin_error)(-1, "Two XY grids must have the same projection\n");
             }
+            if (sproj == "") sproj = std::string(gridA->sproj.c_str());
         } else {
             // gridA=xy, gridI=ll: Project from grid 2 to gridA's xy
             proj2.reset(new Proj2(gridA->sproj, Proj2::Direction::LL2XY));
@@ -247,8 +248,8 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
     exgrid.vertices._nfull = -1;    // Not specified
     VertexCache exvcache(&exgrid);
 
-    OGrid ogridA(gridA, &*proj1);
-    OGrid ogridI(gridI, &*proj2);
+    OGrid ogridA(gridA, &*proj1);   // proj1 used to transform LL->XY when overlapping
+    OGrid ogridI(gridI, &*proj2);   // proj2 used to transform LL->XY when overlapping
     ogridI.realize_rtree();
 
     OCell const *ocell1;
