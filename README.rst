@@ -293,14 +293,14 @@ Install IceBin
 
 .. code-block:: bash
 
-    spack install icebin@0.1.1 +gridgen +python ~coupler ~pism \
+    spack install icebin@0.1.2 +gridgen +python ~coupler ~pism \
         ^ibmisc@0.1.1 ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack \
         ^openblas~shared ^python@3:
 
 Additionally, download the IceBin source code for testing purposes::
 
     cd ~
-    git clone https://github.com/citibeth/icebin.git -b v0.1.1
+    git clone https://github.com/citibeth/icebin.git -b v0.1.2
     cd icebin
 
 Spack Python Stack
@@ -310,6 +310,7 @@ IceBin produces a Python extension.  The following Spack commands will install t
 
     spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas~shared ^python@3:
     spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas~shared ^py-proj@citibeth-latlong2 ^python@3:
+    spack activate py-numpy
 
 
 Activate Stuff You Need
@@ -322,16 +323,27 @@ for basic Python use of IceBin::
     module load `spack module find tcl icebin netcdf cmake@3.5.1`
     module load `spack module find --dependencies tcl py-basemap py-giss`
 
-Alternately, you can generate ``bash`` commands to do the same, and then cut-n-paste them into your ``.bashrc`` (this will run faster)::
+You can speed up shell startup by turning these into ``module load`` commands.
 
-    spack module find --shell tcl icebin netcdf cmake@3.5.1
-    spack module find --dependencies --shell tcl py-basemap py-giss
+1. Cut-n-paste the script ``make_spackenv``::
 
-Add the downloaded IceBin to the front of your ``PYTHONPATH``, to
-ensure that the downloaded version is used when editing / testing
-IceBin examples::
+    #!/bin/sh
+    #
+    # Generate commands to load the Spack environment
 
+    SPACKENV=$HOME/spackenv.sh
+
+    spack module find --shell tcl git icebin@local ibmisc netcdf cmake@3.5.1 >$SPACKENV
+    spack module find --dependencies --shell tcl py-basemap py-giss >>$SPACKENV
+
+2. Add the following to your ``.bashrc`` file::
+
+    source $HOME/spackenv.sh
+    # Preferentially use your checked-out Python source
     export PYTHONPATH=$HOME/icebin/pylib:$PYTHONPATH
+
+3. Run ``sh make_spackenv`` whenever your Spack installation changes (including right now).
+
 
 
 Test the Activation
@@ -353,3 +365,36 @@ The loaded packages may be tested as follows::
     # This does produce output...
     python3 -c 'import pyproj; pyproj.test()'
     which overlap
+
+IceBin Demos
+============
+
+IceBin comes with two demonstrations of its regridding capabilities,
+in the folders ``tests/test_conserv`` and ``tests/test_issm``.  Each
+demo is self-contained, and is executed with the ``make`` command.
+The user may inspect ``makefile`` to determine the steps being
+demonstrated.
+
+test_conserv
+-------------
+
+This tests all six regridding matrices between a ModelE (global) GCM
+grid and the SeaRISE (local) ice grid.  Conservation is checked
+quantitatively.  Plots are also generated showing the grids involved,
+and the regridded fields.
+
+test_issm
+----------
+
+This tests regridding bewteen an ISSM mesh (I) and the SeaRISE Grid
+(A).  Plots are generated showing the grids involved and regridded
+fields.  However:
+
+1. This software is not able to directly plot functions on an ISSM
+   mesh.  Only versions of the function on the SeaRISE grid are
+   plotted at this time.
+
+2. No quantiative measures of conservation are taken.
+
+3. Construction of the regridding matrix ``AvI`` is currently only in
+   Python.  It has not been ported into the C++ code.
