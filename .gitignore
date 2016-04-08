@@ -22,7 +22,6 @@ depcomp
 aclocal.m4
 autom4te.cache
 install-sh
-makefile
 doxygen-doc
 build/
 __pycache__
