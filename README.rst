@@ -218,15 +218,25 @@ You can also use environment modules directly, for example::
 Install Git
 -----------
 
-Older versions of git do not provide features that are necessary
-today.  You might wish to install the latest, greatest version of git.
-Do this with::
+Older system-supplied versions of git do not provide features that are
+necessary today.  You might wish to install the latest, greatest
+version of git.  Do this with::
 
     spack install git+curl+expat
 
 Once Git is installed, make it available to Bash via::
 
     spack load git
+
+Install Curl
+-------------
+
+Older system-supplied versions of ``curl`` may not work to download
+some packages, particularly those using the *https* protocol.  If this
+is the case, you may use a newer Spack-installed ``curl`` instead::
+
+    spack install curl
+    spack load curl
 
 Updated Binutils
 -----------------
@@ -300,7 +310,7 @@ Install IceBin
 Additionally, download the IceBin source code for testing purposes::
 
     cd ~
-    git clone https://github.com/citibeth/icebin.git -b v0.1.2
+    git clone https://github.com/citibeth/icebin.git -b develop
     cd icebin
 
 Spack Python Stack
