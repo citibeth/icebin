@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     desc.add_options()
         ("help", "produce help message")
         ("zone", po::value<std::string>(), "Greenland or Antarctica")
-        ("grid", po::value<std::string>(), "Cell size [km]")
+        ("grid", po::value<int>(), "Cell size [km]")
         ("icemodel", po::value<std::string>(), "Ice model to use (pism or searise)");
 
     po::variables_map vm;
