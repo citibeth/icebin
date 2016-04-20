@@ -303,7 +303,7 @@ Install IceBin
 
 .. code-block:: bash
 
-    spack install icebin@0.1.3 +gridgen +python ~coupler ~pism \
+    spack install icebin@0.1.4 +gridgen +python ~coupler ~pism \
         ^ibmisc@0.1.1 ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack \
         ^openblas~shared ^python@3:
 
