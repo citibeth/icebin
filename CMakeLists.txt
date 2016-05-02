@@ -79,11 +79,11 @@ add_definitions(-DUSE_BLITZ)
 include_directories(${BLITZ_INCLUDE_DIR})
 list(APPEND EXTERNAL_LIBS ${BLITZ_LIBRARY})
 
-# --- NetCDF4-CXX
-find_package(NetCDF4_CXX REQUIRED)
+# --- NetCDF-CXX4
+find_package(NetCDF_CXX4 REQUIRED)
 add_definitions(-DUSE_NETCDF)
-include_directories(${NETCDF4_CXX_INCLUDE_DIR})
-list(APPEND EXTERNAL_LIBS ${NETCDF4_CXX_LIBRARY})
+include_directories(${NETCDF_CXX4_INCLUDE_DIR})
+list(APPEND EXTERNAL_LIBS ${NETCDF_CXX4_LIBRARY})
 
 
 # --- IBMisc
