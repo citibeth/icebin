@@ -18,9 +18,9 @@ if (NOT DEFINED USE_PYTHON)
 	set(USE_PYTHON NO)
 endif()
 
-if (NOT DEFINED USE_EVERYTRACE)
-	set(USE_EVERYTRACE NO)
-endif()
+#if (NOT DEFINED USE_EVERYTRACE)
+#	set(USE_EVERYTRACE NO)
+#endif()
 
 # -------- Find Dependencies
 
@@ -31,11 +31,11 @@ find_package(CGAL REQUIRED)
 find_package(MPFR REQUIRED)		# Used by CGAL
 find_package(MPI REQUIRED)
 
-set(NETCDF_CXX "YES")
-set(NETCDF_F90 "YES")
-find_package(NetCDF REQUIRED)
+find_package(NetCDF_C REQUIRED)
+find_package(NetCDF_CXX REQUIRED)
+find_package(NetCDF_Fortran REQUIRED)
 
-find_package(Everytrace)
+#find_package(Everytrace)
 
 find_package(PROJ4)
 find_package(Boost COMPONENTS filesystem system date_time thread REQUIRED)
@@ -58,7 +58,7 @@ if (${USE_PISM})
 endif()
 
 if (${USE_PYTHON})
-	find_package(Python REQUIRED)
+	find_package(Python3 REQUIRED)
 	find_package(Numpy REQUIRED)
 endif()
 
@@ -66,10 +66,10 @@ endif()
 
 # Set Pism_EXTERNAL_LIBS and include directories.
 include_directories (
-	${EVERYTRACE_INCLUDE_DIR}
+#	${EVERYTRACE_INCLUDE_DIR}
 	${PROJECT_SOURCE_DIR}/slib
 	${Boost_INCLUDE_DIRS}
-    ${NETCDF_INCLUDES} ${NETCDF_INCLUDES_CXX} ${NETCDF_INCLUDES_F77}
+    ${NETCDF_C_INCLUDE_DIR} ${NETCDF_CXX_INCLUDE_DIR} ${NETCDF_FORTRAN_INCLUDE_DIR}
     ${BLITZ++_INCLUDE_DIR}
     ${GMP_INCLUDE_DIR}
     ${CGAL_INCLUDE_DIR}
@@ -92,13 +92,13 @@ endif()
 message('zyx' ${GALAHAD_LIBRARIES})
 
 list(APPEND EXTERNAL_LIBS
-	${EVERYTRACE_CF_LIBRARY}
+#	${EVERYTRACE_CF_LIBRARY}
 	${Boost_LIBRARIES}
     ${UDUNITS2_LIBRARIES}
     ${FFTW_LIBRARIES}
     ${GSL_LIBRARIES}
 
-    ${NETCDF_LIBRARIES_F90} ${NETCDF_LIBRARIES_CXX} ${NETCDF_LIBRARIES_C}
+    ${NETCDF_C_LIBRARY} ${NETCDF_CXX_LIBRARY} ${NETCDF_FORTRAN_LIBRARY}
     ${MPI_C_LIBRARIES}
 	${GALAHAD_LIBRARIES}
 	${PROJ4_LIBRARIES}

@@ -1,3 +1,10 @@
 GLINT2 Library
 
 GLINT2 is a library that makes matrices needed for GCM-ice model coupling.
+
+
+install with:
+
+spack install pism@glint2~python ^netcdf+mpi ^openblas
+spack install glint2@glint2+coupler+pism ^pism@glint2~python ^netcdf+mpi ^openblas
+
