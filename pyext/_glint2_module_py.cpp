@@ -23,7 +23,7 @@
 #include <cmath>
 #include "pyutil.hpp"
 #include <giss/exit.hpp>
-#include <everytrace.h>
+//#include <everytrace.h>
 
 // ============================================================
 // Type definitions for the Python classes this module defines
@@ -88,7 +88,7 @@ static PyModuleDef glint2ModuleDef = {
 /** Exit subroutine to use when we're running Python */
 static void python_exit(int i)
 {
-	everytrace_dump();
+//	everytrace_dump();
 	fprintf(stderr, "Returning to Python interpreter.\n");
 	throw std::exception();		// This will get caught, then go back to Python
 }

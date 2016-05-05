@@ -1,43 +1,39 @@
-# - Try to find Galahad
 # Input Variables
 #    GALAHAD_ROOT
-#    GALAHAD_ARCH
-# Once done this will define
-#  GALAHAD_FOUND - System has Galahad
-#  GALAHAD_INCLUDE_DIRS - The Galahad include directories
-#  GALAHAD_LIBRARIES - The libraries needed to use Galahad
-##  GALAHAD_DEFINITIONS - Compiler switches required for using Galahad
-
-find_path(GALAHAD_ROOT  modules/${GALAHAD_ARCH}/double/galahad_qpt_double.mod
-          HINTS ${GALAHAD_ROOT})
+# Produces:
+#    GALAHAD_LIBRARIES
+#    GALAHAD_INCLUDE_DIRS
 
 
-set(GALAHAD_INCLUDE_DIRS ${GALAHAD_ROOT}/modules/${GALAHAD_ARCH}/double)
+FIND_PATH(GALAHAD_INCLUDE_DIRS galahad_symbols.mod
+	HINTS ${GALAHAD_ROOT}/include)
 
-message(GALAHAD_ROOT ${GALAHAD_ROOT})
-message(GALAHAD_INCLUDE_DIRS ${GALAHAD_INCLUDE_DIRS})
 
-Set(GALAHAD_LIB ${GALAHAD_ROOT}/objects/${GALAHAD_ARCH}/double)
-
-#     -DUSE_GALAHAD @PETSC_CFLAGS@)
-
-set(GALAHAD_COMPONENTS galahad galahad_hsl galahad_pardiso galahad_wsmp galahad_metis galahad_lapack galahad_blas)
-set(GALAHAD_LIBRARIES )		# Part of GCC
+set(GALAHAD_LIB_DIR ${GALAHAD_ROOT}/lib)
+set(GALAHAD_COMPONENTS galahad galahad_hsl galahad_pardiso galahad_wsmp galahad_metis galahad_lapack galahad_blas galahad_spral)
+set(GALAHAD_LIBRARIES )                # Part of GCC
 foreach(COMPONENT ${GALAHAD_COMPONENTS})
     string(TOUPPER ${COMPONENT} UPPERCOMPONENT)
-	find_library(${UPPERCOMPONENT}_LIBRARY ${COMPONENT}
-		HINTS ${GALAHAD_LIB})
-
-	message(xadding ${UPPERCOMPONENT} --- ${${UPPERCOMPONENT}_LIBRARY})
-	list(APPEND GALAHAD_LIBRARIES ${${UPPERCOMPONENT}_LIBRARY})
+    find_library(${UPPERCOMPONENT}_LIBRARY ${COMPONENT} HINTS ${GALAHAD_LIB})
+       message(adding ${UPPERCOMPONENT} --- ${${UPPERCOMPONENT}_LIBRARY})
+       list(APPEND GALAHAD_LIBRARIES ${${UPPERCOMPONENT}_LIBRARY})
 endforeach()
 
-include(FindPackageHandleStandardArgs)
-# handle the QUIETLY and REQUIRED arguments and set GALAHAD_FOUND to TRUE
-# if all listed variables are TRUE
-find_package_handle_standard_args(Galahad  DEFAULT_MSG
-                                  GALAHAD_LIBRARIES GALAHAD_INCLUDE_DIRS)
 
-mark_as_advanced(GALAHAD_INCLUDE_DIRS GALAHAD_LIBRARIES )
 
-message(GALAHAD_LIBRARIES ${GALAHAD_LIBRARIES})
+#FIND_LIBRARY(GALAHAD_LIBRARIES NAMES galahad
+#	HINTS ${GALAHAD_ROOT}/lib)
+
+IF (GALAHAD_INCLUDE_DIRS AND GALAHAD_LIBRARIES)
+   SET(GALAHAD_FOUND TRUE)
+ENDIF (GALAHAD_INCLUDE_DIRS AND GALAHAD_LIBRARIES)
+
+IF (GALAHAD_FOUND)
+   IF (NOT GALAHAD_FIND_QUIETLY)
+      MESSAGE(STATUS "Found GALAHAD_LIBRARIES: ${GALAHAD_LIBRARIES}")
+   ENDIF (NOT GALAHAD_FIND_QUIETLY)
+ELSE (GALAHAD_FOUND)
+   IF (GALAHAD_FIND_REQUIRED)
+      MESSAGE(FATAL_ERROR "Could not find GALAHAD")
+   ENDIF (GALAHAD_FIND_REQUIRED)
+ENDIF (GALAHAD_FOUND)

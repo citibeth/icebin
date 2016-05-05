@@ -26,7 +26,7 @@
 #===========================================================================
 
 # FindPython.cmake must be run first
-
+message("_------------------------------------- Find Numpy " ${PYTHON_EXECUTABLE})
 
 execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c"
     "import numpy; print(numpy.__version__); print(numpy.get_include());"
@@ -34,6 +34,10 @@ execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c"
     OUTPUT_VARIABLE _NUMPY_VALUES_OUTPUT
     ERROR_VARIABLE _NUMPY_ERROR_VALUE
     OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+message("Search success: " ${_NUMPY_SEARCH_SUCCESS})
+message("Values output: " ${_NUMPY_VALUES_OUTPUT})
+message("Error value: " ${_NUMPY_ERROR_VALUE})
 
 if(NOT _NUMPY_SEARCH_SUCCESS MATCHES 0)
     if(NumPy_FIND_REQUIRED)
@@ -43,6 +47,9 @@ if(NOT _NUMPY_SEARCH_SUCCESS MATCHES 0)
     set(NUMPY_FOUND FALSE)
     return()
 endif()
+
+
+message('xxxxxxxxxxxxxxxxxx')
 
 # Convert the process output into a list
 string(REGEX REPLACE ";" "\\\\;" _NUMPY_VALUES ${_NUMPY_VALUES_OUTPUT})

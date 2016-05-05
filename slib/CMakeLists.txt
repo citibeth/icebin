@@ -21,7 +21,7 @@ message("PROJECT_SOURCE_DIR " ${PROJECT_SOURCE_DIR})
 # The extension is already found. Any number of sources could be listed here.
 
 set(glint2_SOURCES 
-	libglint2_refaddr.cpp
+#	libglint2_refaddr.cpp
 	galahad/qpt_c.cpp
 	galahad/zd11_c.cpp
 	giss/DynamicEnum.cpp

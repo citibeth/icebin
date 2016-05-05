@@ -13,7 +13,7 @@
 #include <giss/sort.hpp>
 #include <giss/exit.hpp>
 
-extern "C" void libpismutil_refaddr();
+//extern "C" void libpismutil_refaddr();
 
 using namespace giss;
 using namespace pism;
@@ -297,7 +297,7 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
 	petsc_context.reset(new PetscContext(pism_comm, argc, argv));
 
 	pism::PISMEnd_ptr = &myPISMEnd;
-	libpismutil_refaddr();	// Set up for stacktrace
+//	libpismutil_refaddr();	// Set up for stacktrace
     unit_system.reset(new pism::UnitSystem(NULL));
     config.reset(new pism::Config(pism_comm, "pism_config", *unit_system));
 	overrides.reset(new pism::Config(pism_comm, "pism_overrides", *unit_system));

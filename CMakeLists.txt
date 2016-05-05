@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 list (APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include (setup_rpath)
+include_directories($ENV{CMAKE_TRANSITIVE_INCLUDE_PATH})
 
 # ------- Process Configure Options
 if (NOT DEFINED USE_PISM)
@@ -19,7 +20,7 @@ if (NOT DEFINED USE_PYTHON)
 endif()
 
 #if (NOT DEFINED USE_EVERYTRACE)
-#	set(USE_EVERYTRACE NO)
+#	set(USE_EVERYTRACE YES)
 #endif()
 
 # -------- Find Dependencies
@@ -54,7 +55,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 if (${USE_PISM})
 	message('------------ Using PISM')
 	find_package(PISM)
-	find_package(PETSC)
+	find_package(PETSc)
 endif()
 
 if (${USE_PYTHON})
@@ -78,7 +79,7 @@ include_directories (
     ${GSL_INCLUDES}
     ${UDUNITS2_INCLUDES}
     ${MPI_C_INCLUDE_PATH}
-
+    ${PROJ4_INCLUDES}
 	${GALAHAD_INCLUDE_DIRS})     # This should be optional
 
 if (${USE_PISM})
@@ -88,8 +89,6 @@ if (${USE_PISM})
 		${PETSC_INCLUDES}
 	)
 endif()
-
-message('zyx' ${GALAHAD_LIBRARIES})
 
 list(APPEND EXTERNAL_LIBS
 #	${EVERYTRACE_CF_LIBRARY}

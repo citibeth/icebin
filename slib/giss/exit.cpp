@@ -18,7 +18,8 @@
 
 #include <cstdio>
 #include <glint2/util.hpp>
-#include <everytrace.h>
+//#include <everytrace.h>
+#include <cstdio>
 
 #ifdef __GNUC__
 #include <execinfo.h>
@@ -29,6 +30,13 @@
 
 namespace giss {
 
-std::function<void(int)> exit(&everytrace_exit);
+static void my_exit(int err)
+{
+    fprintf(stderr, "Exiting now...\n");
+    int *p = 0;
+    *p=17;
+}
+
+std::function<void(int)> exit(&my_exit);
 
 }
