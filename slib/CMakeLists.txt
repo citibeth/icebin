@@ -22,6 +22,7 @@ message("PROJECT_SOURCE_DIR " ${PROJECT_SOURCE_DIR})
 
 set(glint2_SOURCES 
 #	libglint2_refaddr.cpp
+    ${EVERYTRACE_cf_mpi_REFADDR}
 	galahad/qpt_c.cpp
 	galahad/zd11_c.cpp
 	giss/DynamicEnum.cpp
@@ -89,7 +90,7 @@ set(glint2_SOURCES
 	galahad/zd11_c.cpp
 	galahad/qpt_c.cpp)
 
-add_library (glint2 SHARED ${glint2_SOURCES} ${EVERYTRACE_REFADDR})
+add_library (glint2 SHARED ${glint2_SOURCES} ${EVERYTRACE_CF_MPI_REFADDR})
 
 target_link_libraries(glint2 ${EXTERNAL_LIBS})
 

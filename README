@@ -7,4 +7,6 @@ install with:
 
 spack install pism@glint2~python ^netcdf+mpi ^openblas
 spack install glint2@glint2+coupler+pism ^pism@glint2~python ^netcdf+mpi ^openblas
+spack spconfig modele@glint2+glint2 ^glint2@glint2+coupler+pism ^pism@glint2~python ^netcdf+mpi ^openblas
 
+spack install py-giss@glint2 ^python@3:

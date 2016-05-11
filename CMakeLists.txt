@@ -59,6 +59,7 @@ if (${USE_PISM})
 endif()
 
 if (${USE_PYTHON})
+	message('------------ Using Python')
 	find_package(Python3 REQUIRED)
 	find_package(Numpy REQUIRED)
 endif()
