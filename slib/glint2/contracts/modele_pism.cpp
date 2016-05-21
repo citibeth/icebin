@@ -149,6 +149,10 @@ void IceModel_PISM::setup_contracts_modele()
 	ice_output.add_field("pism_smb.enth", nan, "W m-2", contracts::ICE, "");
 
 	// basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
+	ice_output.add_field("glint2_runoff.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("glint2_runoff.enth", nan, "W m-2", contracts::ICE, "");
+	ice_output.add_field("runoff.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+	ice_output.add_field("runoff.enth", nan, "W m-2", contracts::ICE, "");
 	ice_output.add_field("melt_grounded.mass", nan, "kg m-2 s-1", contracts::ICE, "");
 	ice_output.add_field("melt_grounded.enth", nan, "W m-2", contracts::ICE, "");
 	ice_output.add_field("melt_floating.mass", nan, "kg m-2 s-1", contracts::ICE, "");
