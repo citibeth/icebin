@@ -66,7 +66,6 @@ public :
 		IceInterp dest, bool fill_masked)
 	{
 		IceExch iedest = (dest == IceInterp::ICE ? IceExch::ICE : interp_grid);
-printf("hp_to_iceinterp(): dest=%s, iedest=%s\n", dest.str(), iedest.str());
 		return hp_to_iceexch(iedest, fill_masked);
 	}
 
