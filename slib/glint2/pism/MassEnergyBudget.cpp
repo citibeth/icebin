@@ -113,6 +113,13 @@ printf("MassEnergyBudget(%p)::create()\n", this);
 		"m-2 s-1", "glint2_smb"); CHKERRQ(ierr);
 	add_massenth(glint2_smb, DELTA, "glint2_smb.mass", "glint2_smb.enth");
 
+	ierr = glint2_runoff.create(grid, prefix+"glint2_runoff",
+		ghostedp, width); CHKERRQ(ierr);
+	ierr = glint2_runoff.set_attrs("diagnostic",
+		"glint2_runoff",
+		"m-2 s-1", "glint2_runoff"); CHKERRQ(ierr);
+	add_massenth(glint2_runoff, DELTA, "glint2_runoff.mass", "glint2_runoff.enth");
+
 	ierr = glint2_deltah.create(grid, prefix+"glint2_deltah",
 		ghostedp, width); CHKERRQ(ierr);
 	ierr = glint2_deltah.set_attrs("diagnostic",
@@ -135,6 +142,13 @@ printf("MassEnergyBudget(%p)::create()\n", this);
 	add_mass(nonneg_rule, 0, "");
 
 
+
+	ierr = runoff.create(grid, prefix+"runoff",
+		ghostedp, width); CHKERRQ(ierr);
+	ierr = runoff.set_attrs("diagnostic",
+		"Runoff inherited from glint2_runoff (negative)",
+		"m-2 s-1", "runoff"); CHKERRQ(ierr);
+	add_massenth(runoff, DELTA, "runoff.mass", "runoff.enth");
 
 	ierr = melt_grounded.create(grid, prefix+"melt_grounded",
 		ghostedp, width); CHKERRQ(ierr);

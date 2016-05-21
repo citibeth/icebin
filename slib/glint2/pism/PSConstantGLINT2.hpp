@@ -64,6 +64,8 @@ protected:
 	std::string input_file;
 public:
 	// Inputs from Glint2
+	pism::IceModelVec2S glint2_runo_rate;
+	pism::IceModelVec2S glint2_eruno_rate;
 	pism::IceModelVec2S glint2_wflux;
 	pism::IceModelVec2S glint2_deltah;
 	pism::IceModelVec2S glint2_massxfer_rate;

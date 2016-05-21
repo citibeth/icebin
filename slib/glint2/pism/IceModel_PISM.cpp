@@ -260,6 +260,10 @@ static void myPISMEnd()
 // Called from start_time_set().
 PetscErrorCode IceModel_PISM::allocate()
 {
+
+//TODO: Somewhere in here is overwriting Fortran memory allocator...
+//has trouble de-allocating at end of LIGlint2::init()
+
 	// Convert PISM arguments to old C style
 	int argc = pism_args.size();
 	char *argv_array[argc];
@@ -358,7 +362,13 @@ printf("[%d] end = %f\n", pism_rank, pism_grid->time->end());
 	int ix;
 	pism_ivars.resize(contract[INPUT].size_nounit(), NULL);
 
-	// We don't really use this, but we do need to store and pass through for conservation computations
+	ix = contract[INPUT].index("runo");
+		pism_ivars[ix] = &pism_surface_model->glint2_runo_rate;
+
+	ix = contract[INPUT].index("eruno");
+		pism_ivars[ix] = &pism_surface_model->glint2_eruno_rate;	
+
+// We don't really use this, but we do need to store and pass through for conservation computations
 	ix = contract[INPUT].index("massxfer");
 		pism_ivars[ix] = &pism_surface_model->glint2_massxfer_rate;
 

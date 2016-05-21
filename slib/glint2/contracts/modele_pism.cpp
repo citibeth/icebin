@@ -68,6 +68,10 @@ void IceModel_PISM::setup_contracts_modele()
 	CouplingContract &ice_input(contract[IceModel::INPUT]);
 
 	// ------ Decide on the coupling contract for this ice sheet
+    ice_input.add_field("runo", 0., "kg m-2 s-1", contracts::ELEVATION,
+        "Runoff coming through bottom of snow/firn model");
+    ice_input.add_field("eruno", 0., "W m-2", contracts::ELEVATION,
+        "Enthalpy of runo");
 	ice_input.add_field("massxfer", 0., "kg m-2 s-1", contracts::ELEVATION,
 		"Mass of ice being transferred Stieglitz --> Glint2");
 	ice_input.add_field("enthxfer", 0., "W m-2", contracts::ELEVATION,
@@ -102,9 +106,14 @@ void IceModel_PISM::setup_contracts_modele()
 	vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
 	vt.allocate();
 
+	ok = ok && vt.set("runo", "runo", "by_dt", 1.0);
+	ok = ok && vt.set("eruno", "eruno", "by_dt", 1.0);
+	ok = ok && vt.set("eruno", "runo", "by_dt", enth_modele_to_pism);
+
 	ok = ok && vt.set("massxfer", "massxfer", "by_dt", 1.0);
 	ok = ok && vt.set("enthxfer", "enthxfer", "by_dt", 1.0);
 	ok = ok && vt.set("enthxfer", "massxfer", "by_dt", enth_modele_to_pism);
+
 	ok = ok && vt.set("deltah", "deltah", "unit", 1.0);
 	}
 

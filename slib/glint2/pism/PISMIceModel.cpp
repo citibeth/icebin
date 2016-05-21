@@ -286,16 +286,34 @@ PetscErrorCode PISMIceModel::massContExplicitStep() {
 	ierr = surface->glint2_massxfer_rate.begin_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_enthxfer_rate.begin_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_deltah.begin_access(); CHKERRQ(ierr);
+    ierr = surface->glint2_runo_rate.begin_access(); CHKERRQ(ierr);
+    ierr = surface->glint2_eruno_rate.begin_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_smb.begin_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_deltah.begin_access(); CHKERRQ(ierr);
+    ierr = cur.glint2_runoff.begin_access(); CHKERRQ(ierr);
+    ierr = cur.runoff.begin_access(); CHKERRQ(ierr);
+
 	for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
 	for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
 		cur.glint2_smb.mass(i,j) += dt * surface->glint2_massxfer_rate(i,j);
 		cur.glint2_smb.enth(i,j) += dt * surface->glint2_enthxfer_rate(i,j);
 		cur.glint2_deltah(i,j) += surface->glint2_deltah(i,j);
+
+        // ------- Runoff inherited from the snow/firn model above us
+        // ---- Add to the ice sheet mass
+        cur.glint2_runoff.mass(i,j) += surface->glint2_runo_rate(i,j) * dt;
+        cur.glint2_runoff.enth(i,j) += surface->glint2_eruno_rate(i,j) * dt;
+        // ---- Subtract back off the ice sheet mass
+        cur.runoff.mass(i,j) -= surface->glint2_runo_rate(i,j) * dt;
+        cur.runoff.enth(i,j) -= surface->glint2_eruno_rate(i,j) * dt;
 	}}
+
+    ierr = cur.runoff.end_access(); CHKERRQ(ierr);
+    ierr = cur.glint2_runoff.end_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_massxfer_rate.end_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_enthxfer_rate.end_access(); CHKERRQ(ierr);
+    ierr = surface->glint2_eruno_rate.end_access(); CHKERRQ(ierr);
+    ierr = surface->glint2_runo_rate.end_access(); CHKERRQ(ierr);
 	ierr = surface->glint2_deltah.end_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_smb.end_access(); CHKERRQ(ierr);
 	ierr = cur.glint2_deltah.end_access(); CHKERRQ(ierr);
