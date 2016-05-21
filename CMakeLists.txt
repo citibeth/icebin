@@ -19,9 +19,9 @@ if (NOT DEFINED USE_PYTHON)
 	set(USE_PYTHON NO)
 endif()
 
-#if (NOT DEFINED USE_EVERYTRACE)
-#	set(USE_EVERYTRACE YES)
-#endif()
+if (NOT DEFINED USE_EVERYTRACE)
+	set(USE_EVERYTRACE YES)
+endif()
 
 # -------- Find Dependencies
 
@@ -36,7 +36,7 @@ find_package(NetCDF_C REQUIRED)
 find_package(NetCDF_CXX REQUIRED)
 find_package(NetCDF_Fortran REQUIRED)
 
-#find_package(Everytrace)
+find_package(Everytrace)
 
 find_package(PROJ4)
 find_package(Boost COMPONENTS filesystem system date_time thread REQUIRED)
@@ -68,7 +68,7 @@ endif()
 
 # Set Pism_EXTERNAL_LIBS and include directories.
 include_directories (
-#	${EVERYTRACE_INCLUDE_DIR}
+	${EVERYTRACE_INCLUDE_DIR}
 	${PROJECT_SOURCE_DIR}/slib
 	${Boost_INCLUDE_DIRS}
     ${NETCDF_C_INCLUDE_DIR} ${NETCDF_CXX_INCLUDE_DIR} ${NETCDF_FORTRAN_INCLUDE_DIR}
@@ -92,7 +92,7 @@ if (${USE_PISM})
 endif()
 
 list(APPEND EXTERNAL_LIBS
-#	${EVERYTRACE_CF_LIBRARY}
+	${EVERYTRACE_LIBRARY}
 	${Boost_LIBRARIES}
     ${UDUNITS2_LIBRARIES}
     ${FFTW_LIBRARIES}
