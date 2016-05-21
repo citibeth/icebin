@@ -730,7 +730,6 @@ static void densify_gcm_inputs_onroot(glint2_modele *api,
 	// This should only be run on the MPI root node
 	if (!api->gcm_coupler.am_i_root()) return;
 
-	printf("BEGIN densify_gcm_inputs_onroot()\n");
 
 	int const rank = api->gcm_coupler.rank();	// MPI rank; debugging
 	giss::CouplingContract const &contract(api->gcm_coupler.gcm_inputs);
@@ -738,6 +737,12 @@ static void densify_gcm_inputs_onroot(glint2_modele *api,
 
 	// Fortran-style array: i,j,ihp, indexing starts at 1
 	blitz::Array<double,3> gcm_inputs_d(gcm_inputs_d_f.to_blitz());
+
+printf("BEGIN densify_gcm_inputs_onroot()\n");
+for (int dim=0; dim<3; ++dim) {
+    printf("dim %d = (%d:%d)\n", dim, gcm_inputs_d.lbound(dim), gcm_inputs_d.ubound(dim));
+}
+
 
 	// We ARE the root note --- densify the data into the global gcm_inputs array
 	for (long ix = 0; ix < contract.size_nounit(); ++ix) {
@@ -767,8 +772,9 @@ static void densify_gcm_inputs_onroot(glint2_modele *api,
 
 			// Clear elevation point 0, since it's not involved in the
 			// Glint2 computation.
+printf("DENSIFY ihp=%d\n", ihp);
 			blitz::Array<double,1> ep_zero(
-				&gcm_inputs_d(1,1,ihp),	// i,j,ihp
+				&gcm_inputs_d(1,1,ihp+1),	// i,j,ihp; Fortran 1-based indexing
 				blitz::shape(n1*1), blitz::neverDeleteData);
 //			ep_zero = contract.field(ix).default_value;
 			ep_zero = 0;
@@ -776,8 +782,10 @@ static void densify_gcm_inputs_onroot(glint2_modele *api,
 
 		// Index into our big array-of-array of all gcm_inputs
 		// (ignoring the modelE elevation point 0)
+printf("DENSIFY n1=%d\n", n1);
+printf("DENSIFY glint2_ihp=%d glint2_var_nhp=%d\n", ihp, glint2_var_nhp);
 		blitz::Array<double,1> dense1d(
-			&gcm_inputs_d(1,1,glint2_ihp),	// i,j,ihp
+			&gcm_inputs_d(1,1,glint2_ihp+1),	// i,j,ihp; Fortran 1-based indexing
 			blitz::shape(n1*glint2_var_nhp), blitz::neverDeleteData);
 
 		// Convert this sparse vector...
