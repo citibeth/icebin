@@ -195,6 +195,10 @@ void IceModel_PISM::setup_contracts_modele()
 	ok = ok && vt.set("geothermal_flux", "geothermal_flux", "unit", 1.0);
 	ok = ok && vt.set("upward_geothermal_flux", "upward_geothermal_flux", "unit", 1.0);
 
+	ok = ok && vt.set("basal_runoff.mass", "runoff.mass", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "runoff.enth", "unit", 1.0);
+	ok = ok && vt.set("basal_runoff.enth", "runoff.mass", "unit", -enth_modele_to_pism);
+
 	ok = ok && vt.set("basal_runoff.mass", "melt_grounded.mass", "unit", 1.0);
 	ok = ok && vt.set("basal_runoff.enth", "melt_grounded.enth", "unit", 1.0);
 	ok = ok && vt.set("basal_runoff.enth", "melt_grounded.mass", "unit", -enth_modele_to_pism);
