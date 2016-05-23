@@ -55,6 +55,17 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 //	glint2_deltah.write_in_glaciological_units = true;
 
 
+	ierr = glint2_runo_rate.create(grid, "glint2_runo_rate", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_runo_rate.set_attrs("climate_state",
+		"enthalpy of constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
+		"kg m-2 s-1", ""); CHKERRQ(ierr);
+
+
+	ierr = glint2_eruno_rate.create(grid, "glint2_eruno_rate", WITHOUT_GHOSTS); CHKERRQ(ierr);
+	ierr = glint2_eruno_rate.set_attrs("climate_state",
+		"constant-in-time heat flux through top surface",
+		"W m-2", ""); CHKERRQ(ierr);
+
 	ierr = glint2_massxfer_rate.create(grid, "glint2_massxfer_rate", WITHOUT_GHOSTS); CHKERRQ(ierr);
 	ierr = glint2_massxfer_rate.set_attrs("climate_state",
 		"enthalpy of constant-in-time ice-equivalent surface mass balance (accumulation/ablation) rate",
@@ -65,6 +76,7 @@ printf("PSConstantGLINT2::allocate(): grid=%p, Mx My = %d %d\n", &grid, grid.Mx,
 	ierr = glint2_enthxfer_rate.set_attrs("climate_state",
 		"constant-in-time heat flux through top surface",
 		"W m-2", ""); CHKERRQ(ierr);
+
 
 	// This variable is computed from the inputs above.
 	ierr = surface_temp.create(grid, "surface_temp", WITHOUT_GHOSTS); CHKERRQ(ierr);
