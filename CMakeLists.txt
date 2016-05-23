@@ -8,19 +8,26 @@ include (setup_rpath)
 include_directories($ENV{CMAKE_TRANSITIVE_INCLUDE_PATH})
 
 # ------- Process Configure Options
+
+# -------- USE_PISM
 if (NOT DEFINED USE_PISM)
 	set(USE_PISM NO)
 endif()
-if(${USE_PISM})
+if(USE_PISM)
 	add_definitions(-DUSE_PISM)
 endif()
 
+# ------- USE_PYTHON
 if (NOT DEFINED USE_PYTHON)
 	set(USE_PYTHON NO)
 endif()
 
+# -------- USE_EVERYTRACE
 if (NOT DEFINED USE_EVERYTRACE)
 	set(USE_EVERYTRACE YES)
+endif()
+if (USE_EVERYTRACE)
+    add_definitions(-DUSE_EVERYTRACE)
 endif()
 
 # -------- Find Dependencies

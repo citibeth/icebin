@@ -33,6 +33,10 @@ public:
 			"GLINT2 PISM module";
 		PetscErrorCode ierr;
 printf("Calling PetscInitialize\n");
+#if 0
+        /* See note in IceModel_PISM.cpp for newer versions of PETSc... */
+        ierr = PetscOptionsSetValue("-no_signal_handler","true");
+#endif
 		ierr = PetscInitialize(&argc, &argv, PETSC_NULL, help); CHKERRQ(ierr);
 printf("Done calling PetscInitialize\n");
 		return 0;

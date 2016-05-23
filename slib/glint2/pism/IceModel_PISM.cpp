@@ -209,6 +209,35 @@ void IceModel_PISM::init(
 	// Create arguments from PISM configuration
 	pism_args.push_back("glint2_pism");
 
+    // Tell PETSc to NOT trap signals.  This allows Everytrace to do its job
+#ifdef USE_EVERYTRACE
+    /* (From private email between Elizabeth Fischer and barry Smith, 2015-10-28)
+    From: Barry Smith <bsmith@mcs.anl.gov>
+
+    In order to get PETSc to NOT mess with the signal handler at all you
+    need to pass the option -no_signal_handler in before the
+    PetscInitialize() which means it either needs to be in a command line
+    option, or in the environmental variable PETSC_OPTIONS or in a file
+    called .petscrc (or petscrc) in either the home directory or the
+    current working directory.
+
+    From: Barry Smith <bsmith@mcs.anl.gov>   (2015-10-29)
+
+    I have added in the branch
+    barry/all-petscoptionssetvalue-beforepetscinitialize and in the next
+    branch for testing the ability to call PetscOptionsSetValue() before
+    PetscInitialize(). This allows for the programatic ability to
+    set/change any of the PetscInitialization() default actions without
+    requiring using the command line. So you can now do
+
+      ierr = PetscOptionsSetValue("-no_signal_handler","true");
+      ierr = PetscInitialize(&argc,&argv,(char*)0,help);
+
+    and PETSc will not monkey with the signal handler all.  Thanks for the
+    push, I should have done this years ago. */
+    pism_args.push_back("-no_signal_handler");
+#endif
+
 	// Get arguments from GLINT2 configuration
 	for (int i=0; i<pism_var->num_atts(); ++i) {
 		auto att = giss::get_att(pism_var, i);
