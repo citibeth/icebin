@@ -186,7 +186,7 @@ giss::F90Array<double,3> &gcm_inputs_d_f)	// Fortran array
 	time_var->put(&time_s, counts_ijhc);
 
 	// Write arrays to it
-	int base_index = 0;
+	int base_index = 1;
 	for (unsigned int i=0; i < contract.size_nounit(); ++i) {
 		double const *array_base = &gcm_inputs_d(1,1,base_index);	// i,j,ihp
 
@@ -748,6 +748,9 @@ for (int dim=0; dim<3; ++dim) {
 	for (long ix = 0; ix < contract.size_nounit(); ++ix) {
 		int ihp = api->gcm_inputs_ihp[ix];				// First elevation point for this variable
 		int var_nhp = api->gcm_inputs_ihp[ix+1] - ihp;	// # elevation points for this variable (in ModelE)
+
+giss::CoupledField const &cf(contract.field(ix));
+printf("Field %d=%s ihp=%d, var_nhp=%d\n", ix,cf.name.c_str(), ihp, var_nhp);
 
 		// Check bounds
 		if (ihp+var_nhp > gcm_inputs_d.extent(2)) {
