@@ -611,9 +611,10 @@ void glint2_modele_get_fhc_im_c(glint2::modele::glint2_modele *api,
 	giss::F90Array<double, 3> &fhc_im1h_f)	// OUT
 {
 	auto fhc_im1h(fhc_im1h_f.to_blitz());
+    fhc_im1h = 0;
 
 	HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
-	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->gcm_coupler.maker->hp_to_atm());
+	std::unique_ptr<giss::VectorSparseMatrix> hp_to_atm(api->gcm_coupler.maker->hp_to_atm());    // AvE
 	ModelEDomain &domain(*api->domain);
 
 	// Filter this array, and convert to fhc format
@@ -645,9 +646,23 @@ void glint2_modele_get_fhc_im_c(glint2::modele::glint2_modele *api,
 	hp_to_atm.release();
 
 
+#if 1
 	// In a perfect world, summing FHC over elevation points will
 	// sum to one.  But in reality, it sums to something else, depending
 	// on size difference between grids on sphere vs. on the plane.
+    // So now we must normalize it to 1.
+    for (int j=fhc_im1h.lbound(1); j<=fhc_im1h.ubound(1); ++j) {
+    for (int i=fhc_im1h.lbound(0); i<=fhc_im1h.ubound(0); ++i) {
+        double weight = 0;
+        for (int ihp=fhc_im1h.lbound(2); ihp <= fhc_im1h.ubound(2); ++ihp)
+            weight += fhc_im1h(i,j,ihp);
+        if (weight > 0) {
+            double scale = 1.0 / weight;
+            for (int ihp=fhc_im1h.lbound(2); ihp <= fhc_im1h.ubound(2); ++ihp)
+                fhc_im1h(i,j,ihp) *= scale;
+        }
+    }}
+#endif
 
 }
 // -----------------------------------------------------
