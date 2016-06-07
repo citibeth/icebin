@@ -98,11 +98,38 @@ class Vertex(object):
 
 
 class Cell(object):
-    __slots__ = ['index', 'vertices', 'i', 'j', 'k', 'area']
+    __slots__ = ['index', 'vertices', 'i', 'j', 'k']
 
     def __init__(self, *args):
         for attr,val in zip(self.__slots__, args):
             setattr(self, attr, val)
+
+    def __repr__(self):
+        return 'Cell({}, {})'.format(self.index, self.vertices)
+
+    def area(self):
+        sum = 0.
+        v0 = self.vertices[-1]
+        for v1 in self.vertices:
+            sum += v0.x*v1.y - v1.x*v0.y
+            v0 = v1
+        return .5 * sum
+
+    # https://en.wikipedia.org/wiki/Centroid#Bounded_region
+    def centroid(self):
+        A2 = 0.        # Will be 2A
+        Cx = 0.
+        Cy = 0.
+        v0 = self.vertices[-1]
+        for v1 in self.vertices:
+            dA = v0.x*v1.y - v1.x*v0.y
+            A2 += dA
+            Cx += (v0.x + v1.x) * dA
+            Cy += (v0.y + v1.y) * dA
+            v0 = v1
+
+        w = 1./(3.*A2)    # 1/6A
+        return (w*Cx, w*Cy)
 
 class Grid(object):
     # Read Grid from a netCDF file
@@ -248,13 +275,15 @@ class Grid_LonLat(Grid):
             boundaries=True, transpose=(indexing.indices[0] == 0))
 
 # -------------------------------------------------------
-def read_nc(nc, vname):
+def read_nc(nc, vname, set_area=False):
     """Read the Grid from a netCDF file.
 
         nc : netCDF4
             Open netCDF file handle.
         vname : str
-            Name of variable from which to read the Grid."""
+            Name of variable from which to read the Grid.
+        set_area:
+            If True, make sure cell.area is set"""
 
     attrs = dict()      # Used to initialize grid
 
@@ -297,7 +326,6 @@ def read_nc(nc, vname):
     for nc_i in range(0, len(cells_index)):
         index = cells_index[nc_i]
         ijk = cells_ijk[nc_i] if cells_ijk is not None else (0,0,0)
-        area = cells_area[nc_i] if cells_area is not None else 0
 
         r0 = cells_vertex_refs_start[nc_i]
         r1 = cells_vertex_refs_start[nc_i+1]
@@ -305,7 +333,11 @@ def read_nc(nc, vname):
 
         # Convert vertices to a list in the correct order
         vertices_as_list = [vertices[vertex_index] for vertex_index in vertex_indices]
-        cells[index] = Cell(index, vertices_as_list, ijk[0], ijk[1], ijk[2], area)
+        cells[index] = Cell(index, vertices_as_list, ijk[0], ijk[1], ijk[2])
+
+        # Set the area ourselves if it wasn't set before
+        if set_area and cells_area is None:
+            cells[index].area = cells[index]._area()
 
     if attrs['type'] == 'XY':
         attrs['x_boundaries'] = variables[vname + '.x_boundaries'][:]

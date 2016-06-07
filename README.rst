@@ -266,7 +266,7 @@ looks like this::
             version: [0.23.4]
         py-proj:
             # Normal released version is buggy
-            version: [citibeth-latlong2]
+            version: [1.9.5.1.1]
 
         netcdf-cxx4:
             version: [ecdf914]
@@ -305,7 +305,7 @@ Install IceBin
 
     spack install icebin@0.1.4 +gridgen +python ~coupler ~pism \
         ^ibmisc@0.1.1 ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack \
-        ^openblas~shared ^python@3:
+        ^openblas ^python@3:
 
 Additionally, download the IceBin source code for testing purposes::
 
@@ -318,8 +318,8 @@ Spack Python Stack
 
 IceBin produces a Python extension.  The following Spack commands will install the Python modules necessary to run that extension::
 
-    spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas~shared ^python@3:
-    spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas~shared ^py-proj@citibeth-latlong2 ^python@3:
+    spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas ^python@3:
+    spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas ^python@3:
     spack activate py-numpy
 
 
