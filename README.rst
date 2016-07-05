@@ -222,7 +222,7 @@ Older system-supplied versions of git do not provide features that are
 necessary today.  You might wish to install the latest, greatest
 version of git.  Do this with::
 
-    spack install git+curl+expat
+    spack install git
 
 Once Git is installed, make it available to Bash via::
 
@@ -298,30 +298,36 @@ looks like this::
                 lapack: [openblas]
 
 
+Spack Python Stack
+-------------------
+
+IceBin produces a Python extension.  The following Spack commands will install the Python modules necessary to build and run that extension::
+
+    spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas ^python@3:
+    spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas ^python@3:
+    spack activate py-numpy
+
+
 Install IceBin
 -----------------
 
+Activate modules you need to build IceBin:
+    module load `spack module find --dependencies tcl py-numpy`
+
 .. code-block:: bash
 
-    spack install icebin@0.1.4 +gridgen +python ~coupler ~pism \
-        ^ibmisc@0.1.1 ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack \
+    spack install icebin@0.1.5 +gridgen +python ~coupler ~pism \
+        ^ibmisc@0.1.2 ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack \
         ^openblas ^python@3:
+
+    # Or to install just ibmisc
+    spack install ibmisc@0.1.2+python+netcdf ^netcdf-cxx4 ^netcdf+mpi ^eigen~suitesparse ^py-numpy+lapack ^openblas ^python@3:
 
 Additionally, download the IceBin source code for testing purposes::
 
     cd ~
     git clone https://github.com/citibeth/icebin.git -b develop
     cd icebin
-
-Spack Python Stack
--------------------
-
-IceBin produces a Python extension.  The following Spack commands will install the Python modules necessary to run that extension::
-
-    spack install py-basemap ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas ^python@3:
-    spack install py-giss ^py-matplotlib+gui+ipython ^py-numpy+blas+lapack ^openblas ^python@3:
-    spack activate py-numpy
-
 
 Activate Stuff You Need
 -----------------------
