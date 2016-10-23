@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 list (APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include (setup_rpath)
-include_directories($ENV{CMAKE_TRANSITIVE_INCLUDE_PATH})
+include_directories($ENV{SPACK_TRANSITIVE_INCLUDE_PATH})
 
 # ------- Process Configure Options
 
