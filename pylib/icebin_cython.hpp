@@ -38,9 +38,9 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &sinterp_style,
     PyObject *elevI_py, PyObject *maskI_py);
 
-inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale)
+inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA)
 {
-    std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name, scale));
+    std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name, scale, correctA));
 
     PyObject *weight_py = ibmisc::cython::blitz_to_np(Mw->weight.to_dense(0));
     PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw->M);

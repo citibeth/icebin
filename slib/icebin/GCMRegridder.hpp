@@ -140,7 +140,14 @@ public:
     std::unique_ptr<Grid> gridA;
 
 //  ibmisc::Domain<int> domainA;                // What's in our MPI halo?
-    bool correctA;      /// Should we correct for projection and geometric error?
+
+    /** Should we correct for projection and geometric error?
+    NOTE: This is read out of the IceBin file on disk, but not used
+          when generating regrid matrices (or anywhere else).  It may be
+          queried by an application program wishing to know the value
+          of correctA stored in the file; and then sent into the regridding
+          routines. */
+    bool correctA;
 
 
     /** Convert between (iA, iHP) <--> (iE) */
@@ -210,7 +217,7 @@ public:
 };  // class GCMRegridder
 // ===========================================================
 // -----------------------------------------------------------
-typedef std::function<std::unique_ptr<WeightedSparse>(bool scale)> RegridFunction;
+typedef std::function<std::unique_ptr<WeightedSparse>(bool scale, bool correctA)> RegridFunction;
 
 /** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
 class RegridMatrices {
@@ -226,8 +233,9 @@ public:
     */
     std::unique_ptr<WeightedSparse> regrid(
         std::string const &spec_name,
-        bool scale) const
-    { return (regrids.at(spec_name))(scale); }
+        bool scale,
+        bool correctA) const
+    { return (regrids.at(spec_name))(scale, correctA); }
 
 };
 

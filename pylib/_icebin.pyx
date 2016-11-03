@@ -36,7 +36,7 @@ cdef class RegridMatrices:
     def __dealloc__(self):
         del self.cself
 
-    def regrid(self, str spec_name, scale=True):
+    def regrid(self, str spec_name, scale=True, correctA=True):
         """Compute a regrid matrix.
         spec_name:
             Type of regrid matrix to obtain.  Choice are:
@@ -44,6 +44,7 @@ cdef class RegridMatrices:
         scale: Produce scaled matrix?
             true  --> [kg m-2]
             false --> [kg]
+        correctA: Correct for projection on A and E side of matrices?
         returns: (M, weights)
             M: scipy.sparse.coo_matrix
                 Unscaled regridding matrix (i.e. produces [kg] not [kg m-2])
@@ -52,7 +53,7 @@ cdef class RegridMatrices:
                     M(scaled=True) = diag(1/weight) * M(scaled=False)
                     M(scaled=False) = diag(weight) * M(scaled=True)
         """
-        (data,shape), weight = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale)
+        (data,shape), weight = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale, correctA)
         # scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
         return scipy.sparse.coo_matrix(data, shape), weight
 
