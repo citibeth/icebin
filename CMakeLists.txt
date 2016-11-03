@@ -20,10 +20,6 @@ endif()
 if (NOT DEFINED BUILD_PYTHON)
     set(BUILD_PYTHON NO)
 endif()
-if (BUILD_PYTHON)
-    find_package(Python REQUIRED)
-    find_package(Numpy REQUIRED)
-endif()
 
 
 
