@@ -1,5 +1,8 @@
 import giss.plot
+import icebin
 from icebin import ibgrid
+import netCDF4
+import numpy as np
 
 """Create plotters without reading the full grid."""
 
@@ -34,7 +37,7 @@ def read_nc(nc, vname):
     return ret
 # ---------------------------------------------------
 class PlotterE(giss.plot.Plotter):
-    def __init__(self, icebin_config, ice_sheet, IvE=None):
+    def __init__(self, icebin_config, ice_sheet, IvE=None, correctA=True):
         """icebin_config: str
             Name of IceBin configuration file
         ice_sheet: str
@@ -44,20 +47,28 @@ class PlotterE(giss.plot.Plotter):
         self.ice_sheet = ice_sheet
 
         # Get the regridding matrix, if we don't already have it
-        if not IvE:
-            # TODO: Call to C++ IceBin to get IvE
-            pass
+        if IvE is None:
+            mm = icebin.GCMRegridder(icebin_config)
+            rm = mm.regrid_matrices(ice_sheet)
+            IvE,wIvE = rm.regrid('IvE', scale=True, correctA=correctA)
         self.IvE = IvE
 
         with netCDF4.Dataset(icebin_config) as nc:
-            self.plotterI = read_plotter(nc=nc, vname='m.' + ice_sheet + '.gridI')
+            self.plotterI = read_nc(nc=nc, vname='m.' + ice_sheet + '.gridI')
 
             # Create a plotterA, to help determine coords when user clicks
             self.plotterA = _Grid_LonLat_read_plotter(nc, 'm.gridA')
 
             # Used to determine nearest elevation point (for display)
-            self.elevI = nc.variables['m.'+ice_sheet+'.elevI'][:]
-            self.elevI = self.elev2.reshape(self.plotterI.ny2, self.plotter2.nx2)
+            # (convert sparse to dense vector)
+            elevI_vals = nc.variables['m.'+ice_sheet+'.elevI.vals'][:]
+            elevI_indices = nc.variables['m.'+ice_sheet+'.elevI.indices'][:]
+            info = nc.variables['m.'+ice_sheet+'.gridI.info']
+            nI = getattr(info, 'cells.nfull')
+            elevI = np.zeros((nI,))+np.nan
+            elevI[elevI_indices] = elevI_vals
+
+            self.elevI = elevI.reshape(self.plotterI.ny2, self.plotterI.nx2)
             self.hpdefs = nc.variables['m.hpdefs'][:]
 
             # self.mask2 = nc.variables['m.' + ice_sheet + '.mask2'][:]
@@ -80,7 +91,7 @@ class PlotterE(giss.plot.Plotter):
 
 
     def context(self, basemap, valsE):
-        context = giss.util.LazyDict()
+        context = giss.giutil.LazyDict()
         context['basemap'] = basemap
         contextI = self.plotterI.context(basemap, self.regridI(valsE))
         context['contextI'] = contextI
