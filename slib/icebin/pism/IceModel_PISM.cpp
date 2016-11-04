@@ -26,8 +26,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 
-#include <base/stressbalance/PISMStressBalance.hh>
-#include <earth/PISMBedDef.hh>
+#include <pism/base/stressbalance/PISMStressBalance.hh>
+#include <pism/earth/PISMBedDef.hh>
 
 #include <spsparse/sort.hpp>
 
@@ -293,7 +293,7 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
     // petsc_initializer.reset(new pism::petsc::Initializer(pism_comm, argc, argv));
     petsc_initializer.reset(new pism::petsc::Initializer(argc, argv, "IceBin GCM Coupler"));
 
-    verbosityLevelFromOptions();
+    // verbosityLevelFromOptions();    // https://github.com/pism/pism/commit/3c75fd63
     Context::Ptr ctx = context_from_options(pism_comm, "IceModel_PISM");
     Logger::Ptr log = ctx->log();
 
@@ -425,17 +425,17 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
     // -------------- Link to PISM-format output variables, used to fill ovars
     pism_ovars.resize(contract[OUTPUT].size(), NULL);
     ix = contract[OUTPUT].index.at("ice_surface_elevation");       // Elevation of top surface of ice sheet
-        pism_ovars[ix] = &ice_model->ice_surface_elevation; // see PISM's iceModel.hh
+        pism_ovars[ix] = &ice_model->ice_surface_elevation(); // see PISM's iceModel.hh
 
     ix = contract[OUTPUT].index.at("ice_surface_elevation");
-        pism_ovars[ix] = &ice_model->ice_surface_elevation;
+        pism_ovars[ix] = &ice_model->ice_surface_elevation();
     ix = contract[OUTPUT].index.at("ice_thickness");
-        pism_ovars[ix] = &ice_model->ice_thickness;
+        pism_ovars[ix] = &ice_model->ice_thickness();
     ix = contract[OUTPUT].index.at("bed_topography");
-        pism_ovars[ix] = &ice_model->beddef->bed_elevation();
+        pism_ovars[ix] = &ice_model->bed_model()->bed_elevation();
 
     ix = contract[OUTPUT].index.at("mask");
-        pism_ovars[ix] = &ice_model->vMask;
+        pism_ovars[ix] = &ice_model->cell_type();
 
     // Mass of top two layers
     ix = contract[OUTPUT].index.at("M1");

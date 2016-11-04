@@ -32,7 +32,7 @@ if (BUILD_COUPLER)
         icebin/GCMParams.cpp
         icebin/GCMCoupler.cpp
         icebin/IceModel_Writer.cpp
-        icebin/IceModel_Decode.cpp
+#        icebin/IceModel_Decode.cpp
 #       icebin/IceModel_DISMAL.cpp
         icebin/contracts/contracts.cpp
     )
@@ -126,7 +126,12 @@ endif()
 #   galahad/zd11_c.cpp
 #   galahad/qpt_c.cpp)
 
-add_library (icebin SHARED ${icebin_SOURCES} ${EVERYTRACE_REFADDR})
+
+if (BUILD_COUPLER)
+  add_library (icebin SHARED ${EVERYTRACE_cf_mpi_REFADDR} ${icebin_SOURCES})
+else()
+  add_library (icebin SHARED ${EVERYTRACE_cf_REFADDR} ${icebin_SOURCES})
+endif()
 
 target_link_libraries(icebin ${EXTERNAL_LIBS})
 

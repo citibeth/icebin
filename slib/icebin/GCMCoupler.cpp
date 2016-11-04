@@ -555,7 +555,7 @@ void GCMCoupler::scaled_regrids(
 {
     for (int sheetix=0; sheetix < ice_models.size(); ++sheetix) {
         RegridMatrices rm(&*regridder.sheets[sheetix]);
-        auto AvI(rm.regrid(regrid_spec, false));
+        auto AvI(rm.regrid(regrid_spec, false, true));
 
         AvIs.push_back(std::move(AvI->M));
 

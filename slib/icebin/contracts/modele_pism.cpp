@@ -18,7 +18,7 @@
 
 #include <mpi.h>        // Must be first
 #include <limits>
-#include <base/enthalpyConverter.hh>
+#include <pism/base/enthalpyConverter.hh>
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/pism/IceModel_PISM.hpp>
@@ -95,8 +95,10 @@ void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
     //       the ice sheet (where ModelE operates).
     pism::EnthalpyConverter enth(*config);
     double const pressure = 0;
-    double E_s, E_l;
-    enth.getEnthalpyInterval(pressure, E_s, E_l);
+    double E_l;
+    // getEnthalpyInterval() replaced with enthalpy_liquid()
+    // https://github.com/pism/pism/commit/c820dfd8
+    E_l = enth.enthalpy_liquid(pressure);
     double const enth_modele_to_pism = E_l;     // (J/kg): Add to convert ModelE specific enthalpies (J/kg) to PISM specific enthalpies (J/kg)
     // NOTE: enth_modele_to_pism == 437000 J/kg
     if (pism_rank == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
