@@ -273,10 +273,6 @@ void IceRegridder::init(
     elevI = std::move(_elevI);
 }
 // ==============================================================
-/** Gives weights for linear interpolation with a bunch of points.
-If our point is off the end of the range, just continue the slope in extrapolation.
-@param xpoints This is not blitz::Array<double,1> because Blitz++ does not (yet) implement STL-compatibl
-e iterators. */
 extern void linterp_1d(
     std::vector<double> const &xpoints,
     double xx,

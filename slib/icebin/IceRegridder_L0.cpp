@@ -113,7 +113,9 @@ void IceRegridder_L0::GvI(
     std::unordered_map<long,double> const elevIh(elevI_hash());
 
     if (interp_grid == IceExch::ICE) {
-        // Ice <- Ice = Indentity Matrix
+        // Ice <- Ice = Indentity Matrix (scaled)
+        // But we need this unscaled... so we use the weight of
+        // each grid cell.
         for (auto cell=gridI->cells.begin(); cell != gridI->cells.end(); ++cell) {
             long iI = cell->index;
 

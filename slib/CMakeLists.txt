@@ -19,9 +19,6 @@ include_directories(${PROJECT_SOURCE_DIR}/slib)
 # -----------------------------------------------------------
 
 
-# Create a library called "Hello" which includes the source file "hello.cxx".
-# The extension is already found. Any number of sources could be listed here.
-
 set(icebin_SOURCES
     icebin/error.cpp
     icebin/Grid.cpp
