@@ -25,13 +25,16 @@ implicit none
 
 INTERFACE
 
-    ! Called from lisheeticebin%allocatee()
+    ! ------------------------------------------------------
+    ! ------------- LISheetIceBin::allocate()
+
+    ! Called from lisheeticebin%allocate()
     function new_icebin_modele_c() result(ret) bind(c)
     use iso_c_binding
         type(c_ptr) :: ret
     end function
 
-    ! Called from lisheeticebin%allocatee()
+    ! Called from lisheeticebin%allocate()
     subroutine icebin_modele_set_const(api, &
         name_f, name_len, &
         val, &
@@ -49,7 +52,7 @@ INTERFACE
     end subroutine
 
 
-    ! Called from lisheeticebin%allocatee()
+    ! Called from lisheeticebin%allocate()
     subroutine icebin_modele_init0(api, &
         run_dir_f, run_dir_len, &
         maker_fname_f, maker_fname_len, &
@@ -76,7 +79,7 @@ INTERFACE
         integer(c_int), value :: write_constants
     end subroutine
 
-    ! Called from lisheeticebin%allocatee() (via setup_gcm_inputs())
+    ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
     function icebin_modele_add_gcm_input(api, &
         field_f, field_len, &
         units_f, units_len, &
@@ -97,12 +100,19 @@ INTERFACE
         integer(c_int) :: icebin_modele_add_gcm_input
     end function
 
-    ! Called from lisheeticebin%allocatee()
+    ! Called from lisheeticebin%allocate() (via setup_gcm_inputs)
     function icebin_modele_gcm_inputs_nhp(api) bind(c)
     use iso_c_binding
         type(c_ptr), value :: api
         integer(c_int) :: icebin_modele_gcm_inputs_nhp
     end function icebin_modele_gcm_inputs_nhp
+
+    ! ------------------------------------------------------
+
+
+
+
+
 
 
     subroutine icebin_modele_delete(api) bind(c)

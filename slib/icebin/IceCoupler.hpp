@@ -133,9 +133,8 @@ public:
         _update_elevI();
         // Use that to re-do our regridding matrix.
         rm = RegridMatrices(regridder);
-        auto IvE(re.regrid("IvE", true, true));
-        dimE.add_sorted(IvE.dim_begin(1), IvE.dim_end(1));
-        densify_one_dim(IvEd, IvE, dimE, 1);
+        auto IvE(re.regrid("IvE", true, true);
+        IvE = 
         return rm;
     }
 
