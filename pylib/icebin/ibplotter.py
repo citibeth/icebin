@@ -50,7 +50,7 @@ class PlotterE(giss.plot.Plotter):
         if IvE is None:
             mm = icebin.GCMRegridder(icebin_config)
             rm = mm.regrid_matrices(ice_sheet)
-            IvE,wIvE = rm.regrid('IvE', scale=True, correctA=correctA)
+            IvE,wIvE = rm.regrid('IvE', scale=True)#, correctA=correctA)
         self.IvE = IvE
 
         with netCDF4.Dataset(icebin_config) as nc:

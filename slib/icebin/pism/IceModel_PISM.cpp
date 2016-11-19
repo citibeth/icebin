@@ -144,32 +144,28 @@ bool replace(std::string& str, const std::string& from, const std::string& to) {
 
 void IceModel_PISM::transfer_constant(std::string const &dest, std::string const &src, double multiply_by, bool set_new)
 {
-    auto &config(*ice_model->ctx()->config());   // PISM configuration
-
     // Make sure the PISM constant already exists
-    if (!set_new && !config.is_set(dest)) (*icebin_error)(-1,
+    if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
         "IceModel_PISM::transfer_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
 
     // Discover the units PISM requires.
-    std::string doc = config.get_string(dest + "_doc");
+    std::string doc = pism_config()->get_string(dest + "_doc");
     std::string units = doc.substr(0, doc.find(';'));
     double val = coupler->gcm_constants.get_as(src, units) * multiply_by;
-    config.set_double(dest, val);
+    pism_config()->set_double(dest, val);
 printf("IceModel_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), val, units.c_str(), src.c_str());
 }
 
 void IceModel_PISM::set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new)
 {
-    auto &config(*ice_model->ctx()->config());   // PISM configuration
-
     // Make sure the PISM constant already exists
-    if (!set_new && !config.is_set(dest)) (*icebin_error)(-1,
+    if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
         "IceModel_PISM::set_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
 
     ibmisc::ConstantSet const &gcm_constants(coupler->gcm_constants);
 
     // Discover the units PISM requires.
-    std::string doc = config.get_string(dest + "_doc");
+    std::string doc = pism_config()->get_string(dest + "_doc");
     std::string dest_units = doc.substr(0, doc.find(';'));
 
     UTUnit usrc(gcm_constants.ut_system->parse(src_units));
@@ -177,7 +173,7 @@ void IceModel_PISM::set_constant(std::string const &dest, double src_val, std::s
     CVConverter cv(usrc, udest);
     double dest_val = cv.convert(src_val);
 
-    config.set_double(dest, dest_val);
+    pism_config()->set_double(dest, dest_val);
 printf("IceModel_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), dest_val, dest_units.c_str(), usrc.c_str());
 }
 
@@ -284,10 +280,10 @@ printf("\n");
 //  MPI_Comm_dup(gcm_params.gcm_comm, &pism_comm);
     pism_comm = coupler->gcm_params.gcm_comm;
     PetscErrorCode ierr;
-    ierr = MPI_Comm_rank(pism_comm, &pism_rank); PISM_CHK(ierr, "MPI_Comm_rank");
-    ierr = MPI_Comm_size(pism_comm, &pism_size); PISM_CHK(ierr, "MPI_Comm_size");
+    ierr = MPI_Comm_rank(pism_comm, &_pism_rank); PISM_CHK(ierr, "MPI_Comm_rank");
+    ierr = MPI_Comm_size(pism_comm, &_pism_size); PISM_CHK(ierr, "MPI_Comm_size");
 
-printf("[%d] pism_size = %d\n", pism_rank, pism_size);
+printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     // Initialize Petsc
     // petsc_initializer.reset(new pism::petsc::Initializer(pism_comm, argc, argv));
@@ -346,7 +342,7 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
     pism::icebin::IBIceModel::Params params;
         params.time_start_s = coupler->gcm_params.time_start_s;
         params.output_dir = boost::filesystem::absolute(coupler->gcm_params.run_dir).string();
-    ice_model.reset(new pism::icebin::IBIceModel(pism_grid, ctx, params));
+    pism_ice_model.reset(new pism::icebin::IBIceModel(pism_grid, ctx, params));
 
     // ------------------------------------------- \\
 
@@ -364,15 +360,15 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
     //  IceModel::model_state_setup()       [iMinit.cc]
     //  IceModel::init_couplers()           [iMinit.cc]
     //  surface->init()
-    ice_model->init();
+    pism_ice_model->init();
 
     // ============== Set up variables for INPUT contract
 
-    // During the ice_model->init() call above the PISMIceModel
+    // During the pism_ice_model->init() call above the PISMIceModel
     // class (derived from PISM's IceModel) allocated an instance
     // of PSConstantICEBIN. This instance is owned and will be
-    // de-allocated by PISMIceModel ice_model.
-    pism_surface_model = ice_model->ib_surface_model();
+    // de-allocated by PISMIceModel pism_ice_model.
+    pism_surface_model = pism_ice_model->ib_surface_model();
 
     // Set up corresponence between IceBin fields and variables
     // in the PISM data structures.
@@ -425,39 +421,39 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
     // -------------- Link to PISM-format output variables, used to fill ovars
     pism_ovars.resize(contract[OUTPUT].size(), NULL);
     ix = contract[OUTPUT].index.at("ice_surface_elevation");       // Elevation of top surface of ice sheet
-        pism_ovars[ix] = &ice_model->ice_surface_elevation(); // see PISM's iceModel.hh
+        pism_ovars[ix] = &pism_ice_model->ice_surface_elevation(); // see PISM's iceModel.hh
 
     ix = contract[OUTPUT].index.at("ice_surface_elevation");
-        pism_ovars[ix] = &ice_model->ice_surface_elevation();
+        pism_ovars[ix] = &pism_ice_model->ice_surface_elevation();
     ix = contract[OUTPUT].index.at("ice_thickness");
-        pism_ovars[ix] = &ice_model->ice_thickness();
+        pism_ovars[ix] = &pism_ice_model->ice_thickness();
     ix = contract[OUTPUT].index.at("bed_topography");
-        pism_ovars[ix] = &ice_model->bed_model()->bed_elevation();
+        pism_ovars[ix] = &pism_ice_model->bed_model()->bed_elevation();
 
     ix = contract[OUTPUT].index.at("mask");
-        pism_ovars[ix] = &ice_model->cell_type();
+        pism_ovars[ix] = &pism_ice_model->cell_type();
 
     // Mass of top two layers
     ix = contract[OUTPUT].index.at("M1");
-        pism_ovars[ix] = &ice_model->M1;
+        pism_ovars[ix] = &pism_ice_model->M1;
     ix = contract[OUTPUT].index.at("M2");
-        pism_ovars[ix] = &ice_model->M2;
+        pism_ovars[ix] = &pism_ice_model->M2;
 
     // Enthalpy of top two layers
     ix = contract[OUTPUT].index.at("H1");
-        pism_ovars[ix] = &ice_model->H1;
+        pism_ovars[ix] = &pism_ice_model->H1;
     ix = contract[OUTPUT].index.at("H2");
-        pism_ovars[ix] = &ice_model->H2;
+        pism_ovars[ix] = &pism_ice_model->H2;
 
     // Volume of top two layers
     ix = contract[OUTPUT].index.at("V1");
-        pism_ovars[ix] = &ice_model->V1;
+        pism_ovars[ix] = &pism_ice_model->V1;
     ix = contract[OUTPUT].index.at("V2");
-        pism_ovars[ix] = &ice_model->V2;
+        pism_ovars[ix] = &pism_ice_model->V2;
 
     // For MassEnergyBudget variables that have a contract name specified,
     // link them up into pism_ovars now.
-    for (auto ii = ice_model->rate.all_vecs.begin(); ii != ice_model->rate.all_vecs.end(); ++ii) {
+    for (auto ii = pism_ice_model->rate.all_vecs.begin(); ii != pism_ice_model->rate.all_vecs.end(); ++ii) {
         if (ii->contract_name == "") continue;
 
         int ix = contract[OUTPUT].index.at(ii->contract_name);
@@ -471,7 +467,7 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
         std::vector<pism::IceModelVec const *> vecs;
         for (auto &vec : pism_ovars) vecs.push_back(vec);
         pism_out_nc.reset(new pism::icebin::VecBundleWriter(
-            ice_model->grid(), ofname, vecs));
+            pism_ice_model->grid(), ofname, vecs));
         pism_out_nc->init();
     }
 
@@ -482,7 +478,7 @@ printf("[%d] pism_size = %d\n", pism_rank, pism_size);
         std::vector<pism::IceModelVec const *> vecs;
         for (auto &vec : pism_ivars) vecs.push_back(vec);
         pism_in_nc.reset(new pism::icebin::VecBundleWriter(
-            ice_model->grid(), ofname, vecs));
+            pism_ice_model->grid(), ofname, vecs));
         pism_in_nc->init();
     }
 
@@ -595,7 +591,7 @@ void IceModel_PISM::run_timestep(double time_s,
 
     // Check number of variables matches for input
     if (ivals2.size() != pism_ivars.size()) (*icebin_error)(-1,
-        "[%d] IceModel_PISM::run_timestep: ivals2.size()=%ld does not match pism_ivars.size()=%ld", pism_rank, ivals2.size(), pism_ivars.size());
+        "[%d] IceModel_PISM::run_timestep: ivals2.size()=%ld does not match pism_ivars.size()=%ld", pism_rank(), ivals2.size(), pism_ivars.size());
 
     // Check Petsc types
     if (sizeof(double) != sizeof(PetscScalar)) {
@@ -672,8 +668,8 @@ printf("IceModel_PISM::run_timestep(): timestep_s = %g\n", timestep_s);
     // This is done by taking the changes in the "borrowed" enthalpies
     // from the GCM, and applying them to the corresponding top layer in
     // the ice model.  The result is placed in surface->surface_temp.
-    pism::icebin::IBSurfaceModel * const surface = ice_model->ib_surface_model();
-    ice_model->construct_surface_temp(
+    pism::icebin::IBSurfaceModel * const surface = pism_ice_model->ib_surface_model();
+    pism_ice_model->construct_surface_temp(
         surface->icebin_deltah,
         contract[INPUT].at("deltah").default_value,
         timestep_s,
@@ -684,26 +680,26 @@ printf("IceModel_PISM::run_timestep(): timestep_s = %g\n", timestep_s);
 
     // =========== Run PISM for one coupling timestep
     // Time of last time we coupled
-    printf("BEGIN ice_model->run_to(%f -> %f) %p\n",
-        pism_grid->ctx()->time()->current(), time_s, ice_model.get());
+    printf("BEGIN pism_ice_model->run_to(%f -> %f) %p\n",
+        pism_grid->ctx()->time()->current(), time_s, pism_ice_model.get());
     // See icebin::gpism::PISMIceModel::run_to()
-    ice_model->run_to(time_s);
-    printf("END ice_model->run_to()\n");
+    pism_ice_model->run_to(time_s);
+    printf("END pism_ice_model->run_to()\n");
 
 
-    if ((ice_model->mass_t() != time_s) || (ice_model->enthalpy_t() != time_s)) {
+    if ((pism_ice_model->mass_t() != time_s) || (pism_ice_model->enthalpy_t() != time_s)) {
         (*icebin_error)(-1,
-            "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match ICEBIN time %f", ice_model->mass_t(), ice_model->enthalpy_t(), time_s);
+            "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match ICEBIN time %f", pism_ice_model->mass_t(), pism_ice_model->enthalpy_t(), time_s);
     }
 
-    // ice_model->enthalpy_t() == time_s here
-    ice_model->prepare_outputs(old_pism_time);
+    // pism_ice_model->enthalpy_t() == time_s here
+    pism_ice_model->prepare_outputs(old_pism_time);
 printf("pism_out_nc->write() after regular timestep\n");
     pism_out_nc->write(time_s);
-//    ice_model->pism_out_state_nc->write(time_s);
+//    pism_ice_model->pism_out_state_nc->write(time_s);
 
     get_state(0);
-    ice_model->reset_rate();
+    pism_ice_model->reset_rate();
 
 printf("Current time is pism: %f --> %f, ICEBIN: %f\n", old_pism_time, pism_grid->ctx()->time()->current(), time_s);
 
@@ -734,7 +730,7 @@ void IceModel_PISM::get_state(unsigned int mask)
 
             // Check number of variables matches for output
             if (ice_ovals_I.size() != pism_ovars.size()) (*icebin_error)(-1,
-                "[%d] IceModel_PISM::run_timestep: ice_ovals_I.size()=%ld does not match pism_ovars.size()=%ld", pism_rank, ice_ovals_I.size(), pism_ovars.size());
+                "[%d] IceModel_PISM::run_timestep: ice_ovals_I.size()=%ld does not match pism_ovars.size()=%ld", pism_rank(), ice_ovals_I.size(), pism_ovars.size());
 
             // Reshape 1D blitz variable to 2D for use with PISM
             blitz::Array<double,2> oval2_xy(
@@ -765,13 +761,13 @@ void IceModel_PISM::get_initial_state(double time_s)
 //  double time_s = coupler->gcm_params.time_start_s;
 
     // Only prepare PISMIceModel outputs for things we need at init time.
-    ice_model->prepare_initial_outputs(); PISM_CHK(ierr, "run_timestep");
+    pism_ice_model->prepare_initial_outputs(); PISM_CHK(ierr, "run_timestep");
 printf("pism_out_nc->write() after get_initial_state\n");
     pism_out_nc->write(time_s); PISM_CHK(ierr, "run_timestep");
-//    ice_model->pism_out_state_nc->write(time_s); PISM_CHK(ierr, "run_timestep");
+//    pism_ice_model->pism_out_state_nc->write(time_s); PISM_CHK(ierr, "run_timestep");
 
     // Copy outputs to Icebin-supplied variables, only for INITIAL variables
-printf("[%d] Calling get_state(%d)\n", pism_rank, contracts::INITIAL);
+printf("[%d] Calling get_state(%d)\n", pism_rank(), contracts::INITIAL);
     get_state(contracts::INITIAL); PISM_CHK(ierr, "run_timestep");
 }
 

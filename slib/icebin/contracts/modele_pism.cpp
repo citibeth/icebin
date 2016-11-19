@@ -23,6 +23,8 @@
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/pism/IceModel_PISM.hpp>
 
+using namespace ibmisc;
+
 // --------------------------------------------------------
 namespace icebin {
 namespace contracts {
@@ -30,11 +32,11 @@ namespace contracts {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 /** GCM-specific contract */
-void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
+void setup_modele_pism(GCMCoupler const &_coupler, IceModel &_model)
 {
     // Get arguments we need from coupler
-    auto coupler(dynamic_cast<modele::GCMCoupler_ModelE const *>(_coupler));
-    auto model(dynamic_cast<icebin::gpism::IceModel_PISM *>(_model));
+    auto coupler(dynamic_cast<modele::GCMCoupler_ModelE const *>(&_coupler));
+    auto model(dynamic_cast<icebin::gpism::IceModel_PISM *>(&_model));
     
 
     printf("BEGIN setup_modele_pism()\n");
@@ -76,14 +78,14 @@ void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
 
 
     // ============ GCM -> Ice
-    VarSet &ice_input(contract[IceModel::INPUT]);
+    VarSet &ice_input(model->contract[IceModel::INPUT]);
 
     // ------ Decide on the coupling contract for this ice sheet
-    ice_input.add_field("massxfer", 0., "kg m-2 s-1", contracts::ELEVATION,
+    ice_input.add("massxfer", 0., "kg m-2 s-1", contracts::ELEVATION,
         "Mass of ice being transferred Stieglitz --> Icebin");
-    ice_input.add_field("enthxfer", 0., "W m-2", contracts::ELEVATION,
+    ice_input.add("enthxfer", 0., "W m-2", contracts::ELEVATION,
         "Enthalpy of ice being transferred Stieglitz --> Icebin");
-    ice_input.add_field("deltah", 0., "J m-2", contracts::ELEVATION,
+    ice_input.add("deltah", 0., "J m-2", contracts::ELEVATION,
         "Change of enthalpy of top layer in PISM");
 
     // Figure out the conversion between GCM and PISM enthalpy
@@ -93,7 +95,7 @@ void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
     // NOTE: Pressure in PISM is RELATIVE to atmospheric pressure.
     //       Thus, p=0 is the correct to use at the top surface of
     //       the ice sheet (where ModelE operates).
-    pism::EnthalpyConverter enth(*config);
+    pism::EnthalpyConverter enth(*model->pism_config());
     double const pressure = 0;
     double E_l;
     // getEnthalpyInterval() replaced with enthalpy_liquid()
@@ -101,7 +103,7 @@ void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
     E_l = enth.enthalpy_liquid(pressure);
     double const enth_modele_to_pism = E_l;     // (J/kg): Add to convert ModelE specific enthalpies (J/kg) to PISM specific enthalpies (J/kg)
     // NOTE: enth_modele_to_pism == 437000 J/kg
-    if (pism_rank == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
+    if (model->pism_rank() == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
 
     bool ok = true;
 
@@ -109,11 +111,12 @@ void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
     double const byRHOW = 1.0 / RHOW;
 
     // ------------- Convert the contract to a var transformer
-    {VarTransformer &vt(var_transformer[IceModel::INPUT]);
-    vt.set_names(VarTransformer::INPUTS, &coupler->gcm_outputs);
-    vt.set_names(VarTransformer::OUTPUTS, &ice_input);
-    vt.set_names(VarTransformer::SCALARS, &coupler->ice_input_scalars);
-    vt.allocate();
+    // ------------- of I <- E   (Ice <- GCM)
+    {VarTransformer &vt(model->var_transformer[IceModel::INPUT]);
+    vt.set_dims(
+        ice_input.keys(),             // outputs
+        coupler->gcm_outputs.keys(),  // inputs
+        coupler->scalars.keys());      // scalars
 
     ok = ok && vt.set("massxfer", "massxfer", "by_dt", 1.0);
     ok = ok && vt.set("enthxfer", "enthxfer", "by_dt", 1.0);
@@ -122,60 +125,60 @@ void setup_modele_pism(GCMCoupler const *_coupler, IceModel *_model)
     }
 
     // ============== Ice -> GCM
-    CouplingContract &ice_output(contract[IceModel::OUTPUT]);
+    VarSet &ice_output(model->contract[IceModel::OUTPUT]);
 
     // Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
 
-    ice_output.add_field("ice_surface_elevation", nan, "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");
-    ice_output.add_field("ice_thickness", nan, "m", contracts::ICE|contracts::INITIAL, "thickness of ice");
-    ice_output.add_field("bed_topography", nan, "m", contracts::ICE|contracts::INITIAL, "topography of bedrock");
+    ice_output.add("ice_surface_elevation", nan, "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");
+    ice_output.add("ice_thickness", nan, "m", contracts::ICE|contracts::INITIAL, "thickness of ice");
+    ice_output.add("bed_topography", nan, "m", contracts::ICE|contracts::INITIAL, "topography of bedrock");
 
 
-    ice_output.add_field("mask", nan, "", contracts::ICE|contracts::INITIAL, "PISM land surface type");
+    ice_output.add("mask", nan, "", contracts::ICE|contracts::INITIAL, "PISM land surface type");
 
-    ice_output.add_field("M1", nan, "kg m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add_field("M2", nan, "kg m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add_field("H1", nan, "J m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add_field("H2", nan, "J m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add_field("V1", nan, "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add_field("V2", nan, "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
+    ice_output.add("M1", nan, "kg m-2", contracts::ICE|contracts::INITIAL, "");
+    ice_output.add("M2", nan, "kg m-2", contracts::ICE|contracts::INITIAL, "");
+    ice_output.add("H1", nan, "J m-2", contracts::ICE|contracts::INITIAL, "");
+    ice_output.add("H2", nan, "J m-2", contracts::ICE|contracts::INITIAL, "");
+    ice_output.add("V1", nan, "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
+    ice_output.add("V2", nan, "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
 
-    ice_output.add_field("basal_frictional_heating", nan, "W m-2", contracts::ICE, "");
-    ice_output.add_field("strain_heating", nan, "W m-2", contracts::ICE, "");
-    ice_output.add_field("geothermal_flux", nan, "W m-2", contracts::ICE, "");
-    ice_output.add_field("upward_geothermal_flux", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("basal_frictional_heating", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("strain_heating", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("geothermal_flux", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("upward_geothermal_flux", nan, "W m-2", contracts::ICE, "");
 
-    ice_output.add_field("calving.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add_field("calving.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add_field("icebin_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add_field("icebin_smb.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add_field("pism_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add_field("pism_smb.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("calving.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+    ice_output.add("calving.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("icebin_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+    ice_output.add("icebin_smb.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+    ice_output.add("pism_smb.enth", nan, "W m-2", contracts::ICE, "");
 
     // basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
-    ice_output.add_field("melt_grounded.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add_field("melt_grounded.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add_field("melt_floating.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add_field("melt_floating.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("melt_grounded.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+    ice_output.add("melt_grounded.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("melt_floating.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+    ice_output.add("melt_floating.enth", nan, "W m-2", contracts::ICE, "");
 
-    ice_output.add_field("internal_advection.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add_field("internal_advection.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add_field("epsilon.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add_field("epsilon.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("internal_advection.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+    ice_output.add("internal_advection.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("epsilon.mass", nan, "kg m-2 s-1", contracts::ICE, "");
+    ice_output.add("epsilon.enth", nan, "W m-2", contracts::ICE, "");
 
-    ice_output.add_field("unit", nan, "", 0, "Dimensionless identity");
+    ice_output.add("unit", nan, "", 0, "Dimensionless identity");
 
-    std::cout << "========= Ice Model Outputs (" << sheet->name << ") modele_pism.cpp:" << std::endl;
+    std::cout << "========= Ice Model Outputs (" << model->name() << ") modele_pism.cpp:" << std::endl;
     std::cout << ice_output << std::endl;
 
     // ------- Variable and unit conversions, Ice -> GCM
-    {VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
+    {VarTransformer &vt(model->var_transformer[IceModel::OUTPUT]);
 
     // NOTE: coupler->gcm_inputs is set up through calls to add_gcm_input_xx() in LANDICE_COM.f
-    vt.set_dim(VarTransformer::INPUTS, &ice_output);
-    vt.set_dim(VarTransformer::OUTPUTS, &coupler->gcm_inputs);
-    vt.set_dim(VarTransformer::SCALARS, &coupler->ice_input_scalars);
-    vt.allocate();
+    vt.set_dims(
+        coupler->gcm_inputs.keys(),    // outputs
+        ice_output.keys(),            // inputs
+        coupler->scalars.keys());    // scalars
 
 //  ok = ok && vt.set("elev2", "ice_surface_elevation", "unit", 1.0);
     ok = ok && vt.set("elev1", "ice_surface_elevation", "unit", 1.0);

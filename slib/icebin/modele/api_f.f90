@@ -15,7 +15,7 @@
 ! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module icebin_modele
-use f90blitz
+use icebin_f90blitz
 use iso_c_binding
 !use MpiSupport_mod
 implicit none
@@ -25,11 +25,13 @@ implicit none
 
 INTERFACE
 
+    ! Called from lisheeticebin%allocatee()
     function new_icebin_modele_c() result(ret) bind(c)
     use iso_c_binding
         type(c_ptr) :: ret
     end function
 
+    ! Called from lisheeticebin%allocatee()
     subroutine icebin_modele_set_const(api, &
         name_f, name_len, &
         val, &
@@ -46,38 +48,8 @@ INTERFACE
         integer(c_int), value :: description_len
     end subroutine
 
-    function icebin_modele_add_gcm_input(api, &
-        field_f, field_len, &
-        units_f, units_len, &
-        grid_f, grid_len, &
-        initial, &
-        long_name_f, long_name_len) bind(c)
-    use iso_c_binding
-        type(c_ptr), value :: api
-        character(c_char) :: field_f(*)
-        integer(c_int), value :: field_len
-        character(c_char) :: units_f(*)
-        integer(c_int), value :: units_len
-        character(c_char) :: grid_f(*)
-        integer(c_int), value :: grid_len
-        character(c_char) :: long_name_f(*)
-        integer(c_int), value :: initial
-        integer(c_int), value :: long_name_len
-        integer(c_int) :: icebin_modele_add_gcm_input
-    end function
 
-    function icebin_modele_nhp_gcm(api) bind(c)
-    use iso_c_binding
-        type(c_ptr), value :: api
-        integer(c_int) :: icebin_modele_nhp_gcm
-    end function icebin_modele_nhp_gcm
-
-    function icebin_modele_gcm_inputs_nhp(api) bind(c)
-    use iso_c_binding
-        type(c_ptr), value :: api
-        integer(c_int) :: icebin_modele_gcm_inputs_nhp
-    end function icebin_modele_gcm_inputs_nhp
-
+    ! Called from lisheeticebin%allocatee()
     subroutine icebin_modele_init0(api, &
         run_dir_f, run_dir_len, &
         maker_fname_f, maker_fname_len, &
@@ -104,9 +76,38 @@ INTERFACE
         integer(c_int), value :: write_constants
     end subroutine
 
+    ! Called from lisheeticebin%allocatee() (via setup_gcm_inputs())
+    function icebin_modele_add_gcm_input(api, &
+        field_f, field_len, &
+        units_f, units_len, &
+        grid_f, grid_len, &
+        initial, &
+        long_name_f, long_name_len) bind(c)
+    use iso_c_binding
+        type(c_ptr), value :: api
+        character(c_char) :: field_f(*)
+        integer(c_int), value :: field_len
+        character(c_char) :: units_f(*)
+        integer(c_int), value :: units_len
+        character(c_char) :: grid_f(*)
+        integer(c_int), value :: grid_len
+        character(c_char) :: long_name_f(*)
+        integer(c_int), value :: initial
+        integer(c_int), value :: long_name_len
+        integer(c_int) :: icebin_modele_add_gcm_input
+    end function
+
+    ! Called from lisheeticebin%allocatee()
+    function icebin_modele_gcm_inputs_nhp(api) bind(c)
+    use iso_c_binding
+        type(c_ptr), value :: api
+        integer(c_int) :: icebin_modele_gcm_inputs_nhp
+    end function icebin_modele_gcm_inputs_nhp
+
+
     subroutine icebin_modele_delete(api) bind(c)
         use iso_c_binding
-        use f90blitz
+        use icebin_f90blitz
         type(c_ptr) :: api      ! NOT VALUE here.
     end subroutine
 
@@ -119,38 +120,16 @@ INTERFACE
     end subroutine
 
     ! -------------------------------------------
-    subroutine icebin_modele_get_flice_im_c(api, &
-        flice1_icebin_f) bind(c)
-    use iso_c_binding
-    use f90blitz
-        type(c_ptr), value :: api
-        type(arr_spec_2) :: flice1_icebin_f
-    end subroutine
-
-    subroutine icebin_modele_get_fhc_im_c(api, fhc_im1h_f) bind(c)
-    use iso_c_binding
-    use f90blitz
-        type(c_ptr), value :: api
-        type(arr_spec_3) :: fhc_im1h_f
-    end subroutine
-
-    subroutine icebin_modele_get_elevhp_im_c(api, elevhp_im1h_f) bind(c)
-    use iso_c_binding
-    use f90blitz
-        type(c_ptr), value :: api
-        type(arr_spec_3) :: elevhp_im1h_f
-    end subroutine
-    ! -------------------------------------------
     subroutine icebin_modele_init_hp_to_ices(api) bind(c)
     use iso_c_binding
-    use f90blitz
+    use icebin_f90blitz
         type(c_ptr), value :: api
     end subroutine
 
     subroutine icebin_modele_couple_to_ice_c(api, itime, &
         gcm_inputs_d_f) bind(c)
     use iso_c_binding
-    use f90blitz
+    use icebin_f90blitz
         type(c_ptr), value :: api
         integer(c_int), value :: itime
         type(arr_spec_3) :: massxfer_f, enthxfer_f, deltah_f
@@ -159,7 +138,7 @@ INTERFACE
 
     subroutine icebin_modele_get_initial_state_c(api, itime, gcm_inputs_d_f) bind(c)
     use iso_c_binding
-    use f90blitz
+    use icebin_f90blitz
         type(c_ptr), value :: api
         integer(c_int), value :: itime
         type(arr_spec_3) :: gcm_inputs_d_f
@@ -168,7 +147,7 @@ INTERFACE
     subroutine icebin_modele_set_gcm_output_c(api, &
         field_name_f, field_name_len, arr_f) bind(c)
     use iso_c_binding
-    use f90blitz
+    use icebin_f90blitz
         type(c_ptr), value :: api
         character(c_char) :: field_name_f(*)
         integer(c_int), value :: field_name_len

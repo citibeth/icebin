@@ -20,6 +20,8 @@
 
 #include <string>
 #include <ibmisc/IndexSet.hpp>
+#include <ibmisc/VarTransformer.hpp>
+#include <icebin/sparse.hpp>
 
 namespace icebin {
 
@@ -43,6 +45,9 @@ public:
 
     ibmisc::IndexSet<std::string> index;    // Densely ordered set of constant names
     std::vector<VarMeta> data;  // Meta-data and value data
+
+    std::vector<std::string> const &keys() const
+        { return index.keys(); }
 
     int add(
         std::string const &name,
@@ -71,6 +76,9 @@ public:
 
 };
 
+}
+
+// ------------------------------------------------------
 
 
 }   // Namespace
@@ -85,3 +93,4 @@ inline std::ostream &operator<<(std::ostream &out, icebin::VarSet const &vars)
     }
     return out;
 }
+

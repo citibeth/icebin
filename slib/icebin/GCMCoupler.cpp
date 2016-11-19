@@ -23,6 +23,7 @@
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/contracts/contracts.hpp>
 #include <spsparse/multiply_sparse.hpp>
+#include <spsparse/sort.hpp>
 
 #ifdef USE_PISM
 #include <icebin/pism/IceModel_PISM.hpp>
@@ -34,180 +35,8 @@ using namespace netCDF;
 
 namespace icebin {
 
-std::unique_ptr<IceModel> new_ice_model(IceModel::Type type,
-    GCMCoupler const *_coupler, IceRegridder *_sheet)
-{
-    std::unique_ptr<IceModel> ice_model;
-
-    switch(type.index()) {
-#if 0
-        case IceModel::Type::DISMAL :
-            ice_model.reset(new IceModel_DISMAL);
-        break;
-#endif
-        case IceModel::Type::WRITER :
-            ice_model.reset(new IceModel_Writer);
-        break;
-#ifdef USE_PISM
-        case IceModel::Type::PISM :
-            ice_model.reset(new gpism::IceModel_PISM);
-        break;
-#endif
-        default :
-            (*icebin_error)(-1,
-                "Unknown IceModel::Type %s", type.str());
-    }
-
-
-    // Do basic initialization...
-    ice_model->coupler = _coupler;
-    ice_model->sheet = _sheet;
-    ice_model->ice_constants.init(&_coupler->ut_system);
-
-    return ice_model;
-
-
-}
-
-std::unique_ptr<IceModel> new_ice_model(NcIO &ncio, std::string vname,
-    GCMCoupler const *_coupler, IceRegridder *_sheet)
-{
-    std::string vn(vname + ".info");
-    auto info_v = get_or_add_var(ncio, vn, "int64", {});
-
-    IceModel::Type type;
-    get_or_put_att_enum(info_v, ncio.rw, "ice_model", type);
-
-    return new_ice_model(type, _coupler, _sheet);
-}
-
-void IceModel::ncread(
-ibmisc::NcIO &ncio, std::string const &vname_sheet)
-{
-    gcm_per_ice_sheet_params = coupler->read_gcm_per_ice_sheet_params(ncio, vname_sheet);
-}
-
-
-
-IceModel::~IceModel() {}
-
-#if 0
-VarSet *IceModel::new_VarSet() {
-    _extra_contracts.push_back(
-        std::unique_ptr<VarSet>(
-        new VarSet()));
-    return _extra_contracts[_extra_contracts.size()-1].get();
-}
-#endif
-
 // ==========================================================
-bool IceModel::am_i_root() const
-    { return coupler->am_i_root(); }
-
-/** Allocate vectors in preparation of calling an ice model. */
-void IceModel::allocate_ice_ovals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceModel::allocate_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.");
-
-    if (ice_ovals_I.size() != 0) (*icebin_error)(-1,
-        "[%d] IceModel::allocate_ice_ovals_I(): called twice without a free() inbetween.  Fix the code. (old size is %ld)\n", coupler->gcm_params.gcm_rank, ice_ovals_I.size());
-
-    // Allocate for direct output from ice model
-    VarSet const &ocontract(contract[IceModel::OUTPUT]);
-    for (int i=0; i < ocontract.size(); ++i)
-        ice_ovals_I.push_back(blitz::Array<double,1>(ndata()));
-}
-
-
-/** Allocate in preparation of var transformations (but not regridding yet) */
-void IceModel::allocate_gcm_ivals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceModel::allocate_ice_ivals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-
-    if (gcm_ivals_I.size() != 0) (*icebin_error)(-1,
-        "IceModel::allocate_gcm_ivals_I(): called twice without a free() inbetween.  Fix the code.\n");
-
-
-    VarSet const &gcm_inputs(coupler->gcm_inputs);
-    for (int i=0; i < gcm_inputs.size(); ++i) {
-        gcm_ivals_I.push_back(blitz::Array<double,1>(ndata()));
-    }
-}
-
-/** Free portions not needed after finished calling ice model and
-applying variable transform.  This will be variables desired on
-anything other than the ELEVATION grid. */
-void IceModel::free_ice_ovals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceModel::free_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-
-    ice_ovals_I.clear();
-}
-
-/** Free all memory used by this.  Called when we're done with a coupling timestep. */
-void IceModel::free_ovals_ivals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceModel::free_ovals_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-
-    ice_ovals_I.clear();
-    gcm_ivals_I.clear();
-}
-
-// -----------------------------------------------------------
-/** Allocates and sets gcm_ivals_I variable
-@param mask Control which GCM input variables to set (according to, etc, INITIAL flag in contract) */
-void IceModel::set_gcm_inputs(unsigned int mask)
-{
-  printf("BEGIN IceModel::set_gcm_inputs()\n");
-    allocate_gcm_ivals_I();
-
-    // Compute the variable transformation
-    ibmisc::VarTransformer &vt(var_transformer[IceModel::OUTPUT]);
-    ibmisc::CSRAndUnits trans = vt.apply_scalars({
-        std::make_pair("unit", 1.0)});
-
-    VarSet const &gcm_inputs(coupler->gcm_inputs);
-
-    // Apply the variable transformation
-    for (int xi=0; xi<vt.dim(ibmisc::VarTransformer::OUTPUTS).size(); ++xi) {   // xi is index of output variable
-        gcm_ivals_I[xi] = 0;    // Vector operation: clear before sum
-        VarMeta const &cf(gcm_inputs[xi]);
-
-        if ((cf.flags & mask) != mask) continue;
-
-        // Consider each output variable separately...
-        std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
-        for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
-            int xj = xjj->first;        // Index of input variable
-            double io_val = xjj->second;    // Amount to multiply it by
-            gcm_ivals_I[xi] += ice_ovals_I[xj] * io_val;        // blitz++ vector operation
-        }
-        gcm_ivals_I[xi] += trans.units[xi];
-    }
-
-    printf("END IceModel::set_gcm_inputs()\n");
-}
-
-// -----------------------------------------------------------
-
-
-
-
-
-
-
-
-
-// ==========================================================
-/** @param nc The Glint22 configuration file */
+/** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
     std::string const &_fname,
     std::string const &_vname,
@@ -267,32 +96,32 @@ void GCMCoupler::ncread(
 
 #endif
 
-    ice_models.clear();
+    ice_couplers.clear();
     for (size_t i=0; i < regridder.sheets.size(); ++i) {
         IceRegridder *sheet = &*regridder.sheets[i];
         std::string vname_sheet = vname + "." + sheet->name();
 
-        // Create an IceModel corresponding to this IceSheet.
-        std::unique_ptr<IceModel> ice_model(new_ice_model(ncio, vname_sheet, this, sheet));
-        ice_model->ncread(ncio, vname_sheet);
+        // Create an IceCoupler corresponding to this IceSheet.
+        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio, vname_sheet, this, sheet));
+        ice_coupler->ncread(ncio, vname_sheet);
 
-        contracts::setup(*this, *ice_model);    // where does this go w.r.t ncread() and upate?
-        ice_model->update_ice_sheet(ncio, vname_sheet);
+        contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
+        ice_coupler->update_ice_sheet(ncio, vname_sheet);
 
         // ---- Create the affiliated writers
         // Writer for ice model input
-        auto iwriter(dynamic_cast_unique_ptr<IceModel_Writer, IceModel>(
-            new_ice_model(IceModel::Type::WRITER, this, sheet)));
-        iwriter->init(IceModel::INPUT, &*ice_model);        // Writer-specific initialization
-        ice_model->_iwriter = std::move(iwriter);
+        auto iwriter(dynamic_cast_unique_ptr<IceCoupler_Writer, IceCoupler>(
+            new_ice_coupler(IceCoupler::Type::WRITER, this, sheet)));
+        iwriter->init(IceCoupler::INPUT, &*ice_coupler);        // Writer-specific initialization
+        ice_coupler->_iwriter = std::move(iwriter);
 
         // Writer for ice model output
-        auto owriter(dynamic_cast_unique_ptr<IceModel_Writer, IceModel>(
-            new_ice_model(IceModel::Type::WRITER, this, sheet)));
-        owriter->init(IceModel::OUTPUT, &*ice_model);       // Writer-specific initialization
-        ice_model->_owriter = std::move(owriter);
+        auto owriter(dynamic_cast_unique_ptr<IceCoupler_Writer, IceCoupler>(
+            new_ice_coupler(IceCoupler::Type::WRITER, this, sheet)));
+        owriter->init(IceCoupler::OUTPUT, &*ice_coupler);       // Writer-specific initialization
+        ice_coupler->_owriter = std::move(owriter);
 
-        ice_models.push_back(std::move(ice_model));
+        ice_couplers.push_back(std::move(ice_coupler));
     }
 
     ncio.close();
@@ -307,31 +136,31 @@ void GCMCoupler::set_start_time(
 {
     gcm_params.set_start_time(time_base, time_start_s);
 
-    for (size_t sheetix=0; sheetix < ice_models.size(); ++sheetix) {
-        auto &ice_model(ice_models[sheetix]);
+    for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+        auto &ice_coupler(ice_couplers[sheetix]);
 
-        ice_model->start_time_set();
+        ice_coupler->start_time_set();
 
         // Handle writing stuff, if the
-        IceModel_Writer *iwriter = ice_model->iwriter();    // The affiliated input-writer (if it exists).
+        IceCoupler_Writer *iwriter = ice_coupler->iwriter();    // The affiliated input-writer (if it exists).
         if (iwriter) iwriter->start_time_set();
 
-        IceModel_Writer *owriter = ice_model->owriter();
+        IceCoupler_Writer *owriter = ice_coupler->owriter();
         if (owriter) owriter->start_time_set();
 
         // This function is the last phase of initialization.
         // Only now can we assume that the contracts are fully set up.
 #if 1
         // Print out the contract and var transformations
-        std::cout << "========= Contract for " << ice_model->name() << std::endl;
+        std::cout << "========= Contract for " << ice_coupler->name() << std::endl;
         std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
-        std::cout << ice_model->contract[IceModel::INPUT];
+        std::cout << ice_coupler->contract[IceCoupler::INPUT];
         std::cout << "TRANSFORMATIONS:" << std::endl;
-        std::cout << ice_model->var_transformer[IceModel::INPUT];
+        std::cout << ice_coupler->var_transformer[IceCoupler::INPUT];
         std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
-        std::cout << ice_model->contract[IceModel::OUTPUT];
+        std::cout << ice_coupler->contract[IceCoupler::OUTPUT];
         std::cout << "TRANSFORMATIONS:" << std::endl;
-        std::cout << ice_model->var_transformer[IceModel::OUTPUT];
+        std::cout << ice_coupler->var_transformer[IceCoupler::OUTPUT];
 #endif
     }
 
@@ -367,23 +196,23 @@ int SMBMsg::compar(void const *a, void const *b)
 // ===================================================
 // GCMCoupler
 
-/** Parameters to the call_ice_model() method.  Calls to the
+/** Parameters to the call_ice_coupler() method.  Calls to the
 ice model are planned first, then executed separately. */
-class CallIceModelParams {
+class CallIceCouplerParams {
 public:
     int sheetix;
     SMBMsg *begin;
     SMBMsg *next;
 
-    CallIceModelParams() {}
+    CallIceCouplerParams() {}
 
-    CallIceModelParams(int _sheetix, SMBMsg *_begin, SMBMsg *_next) :
+    CallIceCouplerParams(int _sheetix, SMBMsg *_begin, SMBMsg *_next) :
         sheetix(_sheetix), begin(_begin), next(_next) {}
 };
 
 /** PROTECTED method.  Called by all MPI nodes. */
-void GCMCoupler::call_ice_model(
-    IceModel *model,
+void GCMCoupler::call_ice_coupler(
+    IceCoupler *model,
     int sheetix,
     double time_s,
     ibmisc::DynArray<SMBMsg> &rbuf,
@@ -392,9 +221,9 @@ void GCMCoupler::call_ice_model(
     // ----------------- Construct input arrays
     // The number of fields for THIS ice sheet will be <= the number
     // of fields in SMBMsg
-    int nfields = model->contract[IceModel::INPUT].size();
+    int nfields = model->contract[IceCoupler::INPUT].size();
 
-printf("BEGIN GCMCoupler::call_ice_model(%s, nfields=%ld)\n", model->name().c_str(), nfields);
+printf("BEGIN GCMCoupler::call_ice_coupler(%s, nfields=%ld)\n", model->name().c_str(), nfields);
 
     // Construct indices vector
     blitz::TinyVector<int,1> shape(rbuf.diff(end, begin));
@@ -415,24 +244,24 @@ printf("BEGIN GCMCoupler::call_ice_model(%s, nfields=%ld)\n", model->name().c_st
 
     // -------------- Run the model
     // Record exactly the same inputs that this ice model is seeing.
-    IceModel_Writer *iwriter = model->iwriter();
+    IceCoupler_Writer *iwriter = model->iwriter();
     if (iwriter) iwriter->run_timestep(time_s, indices, ivals2);
 
     // Now call to the ice model
-//  printf("[%d] BEGIN GCMCoupler::call_ice_model() calling model->run_timestep()\n", rank);
+//  printf("[%d] BEGIN GCMCoupler::call_ice_coupler() calling model->run_timestep()\n", rank);
     model->run_timestep(time_s, indices, ivals2);
-//  printf("[%d]END GCMCoupler::call_ice_model() calling model->run_timestep()\n", rank);
+//  printf("[%d]END GCMCoupler::call_ice_coupler() calling model->run_timestep()\n", rank);
 
     // Record what the ice model produced.
     // NOTE: This shouldn't change model->ice_ovals_I
-    IceModel_Writer *owriter = model->owriter();
+    IceCoupler_Writer *owriter = model->owriter();
     if (owriter) {
         printf("BEGIN owriter->run_timestep()\n");
         owriter->run_decoded(time_s, model->ice_ovals_I);
         printf("END owriter->run_timestep()\n");
     }
 
-printf("END GCMCoupler::call_ice_model(nfields=%ld)\n", nfields);
+printf("END GCMCoupler::call_ice_coupler(nfields=%ld)\n", nfields);
 };
 
 /** @param sbuf the (filled) array of ice grid values for this MPI node. */
@@ -494,11 +323,11 @@ printf("BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size
         // Figure out which ice sheets we have data for
         auto lscan(rbuf->begin());
         auto rscan(lscan);
-        std::map<int, CallIceModelParams> im_params;
+        std::map<int, CallIceCouplerParams> im_params;
         while (rscan < rbuf->end()) {
             if (rscan->sheetix != lscan->sheetix) {
                 int sheetix = lscan->sheetix;
-                auto cimp(CallIceModelParams(sheetix, lscan.get(), rscan.get()));
+                auto cimp(CallIceCouplerParams(sheetix, lscan.get(), rscan.get()));
                 im_params[sheetix] = cimp;
                 lscan = rscan;
             }
@@ -507,22 +336,22 @@ printf("BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size
         }
 
         // (ONLY ON GCM ROOT)
-        // NOTE: call_ice_model() is called (below) even on NON-ROOT
+        // NOTE: call_ice_coupler() is called (below) even on NON-ROOT
         // Call all our ice models
-        for (size_t sheetix=0; sheetix < ice_models.size(); ++sheetix) {
-            auto &ice_model(ice_models[sheetix]);
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
 
             // Assume we have data for all ice models
             // (So we can easily maintain MPI SIMD operation)
             auto params(im_params.find(sheetix));
-            call_ice_model(&*ice_model, sheetix, time_s, *rbuf,
+            call_ice_coupler(&*ice_coupler, sheetix, time_s, *rbuf,
                 params->second.begin, params->second.next);
 
             // Convert to variables the GCM wants (but still on the ice grid)
-            ice_model->set_gcm_inputs(0);   // Fills in gcm_ivals_I
+            ice_coupler->set_gcm_inputs(0);   // Fills in gcm_ivals_I
 
             // Free ice_ovals_I
-            ice_model->free_ice_ovals_I();
+            ice_coupler->free_ice_ovals_I();
         }
 
         regrid_gcm_inputs_onroot(time_s, gcm_ivals, 0);
@@ -532,12 +361,12 @@ printf("BEGIN GCMCoupler::couple_to_ice() time_s=%f, sbuf.size=%d, sbuf.ele_size
         // models, we just call through anyway because we will
         // receive data in an upcomming MPI_Scatter
         // Call all our ice models
-        for (size_t sheetix=0; sheetix < ice_models.size(); ++sheetix) {
-            auto &ice_model(ice_models[sheetix]);
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
 
             // Assume we have data for all ice models
             // (So we can easily maintain MPI SIMD operation)
-            call_ice_model(&*ice_model, sheetix, time_s, *rbuf,
+            call_ice_coupler(&*ice_coupler, sheetix, time_s, *rbuf,
                 NULL, NULL);
 
         }       // if (gcm_params.gcm_rank == gcm_params.gcm_root)
@@ -553,7 +382,7 @@ void GCMCoupler::scaled_regrids(
     std::vector<SparseMatrix> AvIs,
     SparseVector scaleA)
 {
-    for (int sheetix=0; sheetix < ice_models.size(); ++sheetix) {
+    for (int sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         RegridMatrices rm(&*regridder.sheets[sheetix]);
         auto AvI(rm.regrid(regrid_spec, false, true));
 
@@ -607,13 +436,13 @@ unsigned int mask)
 
         // Accumulate sum of all ice sheets for this variable
         SparseVector ival_unscaled;
-        for (size_t sheetix=0; sheetix < ice_models.size(); ++sheetix) {
-            auto &ice_model(ice_models[sheetix]);
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
 
             // Compute: ival_unscaled += XvI * valI
             auto &XvIs(dest_grid == contracts::ATMOSPHERE ? AvIs : EvIs);
             auto &XvI(XvIs[sheetix]);
-            auto &valI(ice_model->gcm_ivals_I[var_ix]);
+            auto &valI(ice_coupler->gcm_ivals_I[var_ix]);
             for (auto ii=XvI.begin(); ii != XvI.end(); ++ii)
                 ival_unscaled.add({ii.index(0)}, ii.val() * valI(ii.index(1)));;
         }
@@ -625,10 +454,10 @@ unsigned int mask)
     }
     // ----------------- Free Memory
     // (ONLY ON GCM ROOT)
-    for (size_t sheetix=0; sheetix < ice_models.size(); ++sheetix) {
-        auto &ice_model(ice_models[sheetix]);
+    for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+        auto &ice_coupler(ice_couplers[sheetix]);
 
-        ice_model->free_ovals_ivals_I();
+        ice_coupler->free_ovals_ivals_I();
     }
 
     printf("END GCMCoupler::regrid_gcm_inputs_onroot\n");
@@ -646,28 +475,28 @@ std::vector<SparseVector> &gcm_ivals)   // Root node only: Already-allocated spa
     if (am_i_root()) {
 
         // (ONLY ON GCM ROOT)
-        // NOTE: call_ice_model() is called (below) even on NON-ROOT
+        // NOTE: call_ice_coupler() is called (below) even on NON-ROOT
         // Call all our ice models
-        for (size_t sheetix=0; sheetix < ice_models.size(); ++sheetix) {
-            auto &ice_model(ice_models[sheetix]);
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
 
-            ice_model->get_initial_state(time_s);
+            ice_coupler->get_initial_state(time_s);
 
             // Record what the ice model produced.
-            // NOTE: This shouldn't change ice_model->ice_ovals_I
-            IceModel_Writer *owriter = ice_model->owriter();
+            // NOTE: This shouldn't change ice_coupler->ice_ovals_I
+            IceCoupler_Writer *owriter = ice_coupler->owriter();
             const double time_s = gcm_params.time_start_s;
             if (owriter) {
                 printf("BEGIN owriter->run_timestep()\n");
-                owriter->run_decoded(time_s, ice_model->ice_ovals_I);
+                owriter->run_decoded(time_s, ice_coupler->ice_ovals_I);
                 printf("END owriter->run_timestep()\n");
             }
 
             // Convert to variables the GCM wants (but still on the ice grid)
-            ice_model->set_gcm_inputs(contracts::INITIAL);  // Fills in gcm_ivals_I
+            ice_coupler->set_gcm_inputs(contracts::INITIAL);  // Fills in gcm_ivals_I
 
             // Free ice_ovals_I
-            ice_model->free_ice_ovals_I();
+            ice_coupler->free_ice_ovals_I();
         }
 
         // Fill in gcm_ivals
@@ -679,10 +508,10 @@ std::vector<SparseVector> &gcm_ivals)   // Root node only: Already-allocated spa
         // models, we just call through anyway because we will
         // receive data in an upcomming MPI_Scatter
         // Call all our ice models
-        for (size_t sheetix=0; sheetix < ice_models.size(); ++sheetix) {
-            auto &ice_model(ice_models[sheetix]);
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
 
-            ice_model->get_initial_state(time_s);
+            ice_coupler->get_initial_state(time_s);
         }       // if (gcm_params.gcm_rank == gcm_params.gcm_root)
 
     }
@@ -692,5 +521,115 @@ std::vector<SparseVector> &gcm_ivals)   // Root node only: Already-allocated spa
 
 int GCMCoupler::rank() const
     { return gcm_params.gcm_rank; }
+
+
+// =============================================================
+
+/** Updates regridding matrices using the latest state of the ice
+    models. */
+void GCMCoupler::update_regridders()
+{
+    for (auto &ii : ice_regridders) {
+        ii->
+    }
+}
+
+
+struct SparseParallelVectors {
+    // Stores a bunch of parallel sparse vectors
+    // Index of each element in the parallel vectors
+    std::vector<long> index;
+    // Values of for each element in the vectors.  
+    std::vector<double> vals;
+    // Number of _vals element per _ix element
+    int nvar;
+};
+
+struct GCMCoupleOutput {
+    // Outputs from IceCoupler, transformed and regridded back to E/A
+//    std::vector<SparseVector> gcm_ivals;    // both A and E grids.
+
+
+    // Mapping from the index of a variable in gcm_ivalsE/gcm_ivalsA
+    // and the index within the GCMCoupler::gcm_inputs
+    SparseParallelVectors[GCMCoupler::GCMI::COUNT] gcm_ivals; // gcm_ivalsE, gcm_ivalsA
+
+
+    // Values required to update TOPO, etc. in ModelE
+    // (see add_fhc.py for how these are to be used)
+    // We can get these from AvE
+    // SparseVector wAvE;     // Area of A grid cells that overlap ice
+    //SparseVector areaA;    // Total (native) area of A grid cells
+    //SparseVector elevA;    // Used for atmosphere orography (ZATMO in ModelE)
+
+    // Regrid matrix to go from last step's elevation classes to this
+    // step's elevation classes.
+    SparseMatrix E1vE0;
+
+    // Regrid matrix to convert to atmosphere.
+    // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
+    WeightedSparse AvE;
+
+    // Used for temperature downscaling according to a lapse rate
+    SparseVector elevE;
+};
+
+// ------------------------------------------------------------
+// ------------------------------------------------------------
+
+CoupleReturn GCMCoupler::couple(
+// Simulation time [s]
+double time_s,
+// Values from GCM, passed GCM -> Ice
+std::vector<SparseVector> gcm_ovalsE,
+CoupleReturn &ret)
+{
+    
+    for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+        auto &ice_coupler(ice_couplers[sheetix]);
+
+        // Store regridding matrices for the last timestep, which we will
+        // need to create ice_ivals
+        std::unique_ptr<WeightedSparse> IvE0(std::move(ice_coupler.IvE));
+        std::unique_ptr<WeightedSparse> IvA0(std::move(ice_coupler.IvA));
+
+        // Create ice_ivals (dense)
+        auto ice_ivalsI(allocate_dense(ice_coupler.contract[
+
+        std::vector<blitz::Array<double,1>> ice_ivalsI(gcm_inputs.size());
+
+        VarSet const &ocontract(contract[IceCoupler::OUTPUT]);
+        for (int i=0; i < ocontract.size(); ++i)
+            ice_ovals_I.push_back(blitz::Array<double,1>(ndata()));
+
+
+
+    for (int i=0; i < gcm_inputs.size(); ++i) {
+        gcm_ivals_I.push_back(blitz::Array<double,1>(ndata()));
+    }
+
+
+
+        // Update elevI and compute IvE for later
+        RegridMatrices rm(ice_coupler.update_elevI());
+
+        WeightedSparse const &IvE(ice_coupler.IvE);
+        WeightedSparse &IvA(rm.regrd("IvA"));
+
+
+
+
+        // Get the matrices we need to create ice_ivals
+        WeightedSparse EvI(rm.regrid("EvI", true, true));
+        WeightedSparse AvI(rm.regrid("AvI", true, true));
+
+
+        multiply(ret.Ev1Ev0, EvI.M, IvE0.M);
+
+
+    }
+    return ret;
+}
+
 
 }       // namespace

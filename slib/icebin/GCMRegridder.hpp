@@ -150,7 +150,7 @@ Regridding matrices are computed in a three-level hierarhcy:
   .. code-block:: c++
 
      GCMRegridder gcm_regridder(...);
-     auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
+     RegridMatrices rm(gcm_regridder.sheet("greenland"));
      // rm.regrid("AvI", scale=true, correctA=true)
      auto AvI(rm.regrid("AvI", true, true));
      AvI.M        // The matrix
@@ -350,7 +350,7 @@ public:
 
     typedef std::vector<std::unique_ptr<IceRegridder>> SheetsT;
     /** Ice sheets stored by index defined in sheets_index */
-    SheetsT sheets;
+    SheetsT ice_regridders;
 
 public:
 
@@ -435,7 +435,8 @@ public:
 // -----------------------------------------------------------
 typedef std::function<std::unique_ptr<WeightedSparse>(bool scale, bool correctA)> RegridFunction;
 
-/** Holds the set of "Ur" (original) matrices produced by an IceRegridder. */
+/** Holds the set of "Ur" (original) matrices produced by an
+    IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices {
 public:
     std::map<std::string, RegridFunction> regrids;
@@ -464,7 +465,6 @@ public:
         bool scale,
         bool correctA) const
     { return (regrids.at(spec_name))(scale, correctA); }
-
 };
 
 

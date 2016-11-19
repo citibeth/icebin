@@ -22,6 +22,7 @@
 // PISM Includes... want to be included first
 #include <petsc.h>
 #include <petscvec.h>
+#include <pism/base/util/Context.hh>
 #include <pism/base/util/IceGrid.hh>
 #include <pism/base/util/iceModelVec.hh>
 #include <pism/base/iceModel.hh>
@@ -55,11 +56,15 @@ class IceModel_PISM : public IceModel
 {
     icebin::Grid_XY const *icebin_gridI;
     MPI_Comm pism_comm;         // Commnicator used by ice model
-    PetscMPIInt pism_rank, pism_size;
+    PetscMPIInt _pism_rank, _pism_size;
     const int pism_root = 0;
 
-    bool am_i_root() const { return pism_rank == 0; }
+public:
+    PetscMPIInt pism_rank() const { return _pism_rank; }
+    PetscMPIInt pism_size() const { return _pism_size; }
+    bool am_i_root() const { return _pism_rank == 0; }
 
+private:
     /** Arguments to be passed to PISM at PISM initialization */
     std::vector<std::string> pism_args;
 
@@ -75,9 +80,12 @@ class IceModel_PISM : public IceModel
     // See: http://msdn.microsoft.com/en-us/library/8183zf3x%28v=vs.110%29.aspx
     std::unique_ptr<pism::petsc::Initializer> petsc_initializer;
     pism::IceGrid::Ptr pism_grid;
-    std::unique_ptr<pism::icebin::IBIceModel> ice_model;
+    std::unique_ptr<pism::icebin::IBIceModel> pism_ice_model;
     pism::icebin::IBSurfaceModel *pism_surface_model;   // We don't own this.
+public:
+    pism::Context::ConfigPtr pism_config() { return pism_ice_model->ctx()->config(); }
 
+private:
     // Stuff used for Scatter/Gather
     pism::petsc::DM::Ptr da2;
     Vec g2, g2natural;  //!< global Vecs used to transfer data to/from processor 0.

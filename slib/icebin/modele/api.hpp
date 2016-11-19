@@ -32,19 +32,6 @@ namespace modele {
 // The ModelE interface to IceBin.  This is called directly by ModelE.
 // ------------------------------------------------------
 
-/** Make a sparse matrix with a vector of these.  This struct is
-specific to ModelE's (i,j,k) indexing scheme. */
-struct hp_to_ice_rec {
-    int row;
-    int col_i, col_j, col_k;
-    double val;
-
-    hp_to_ice_rec(int _row, int _col_i, int _col_j, int _col_k, double _val) :
-        row(_row), col_i(_col_i), col_j(_col_j), col_k(_col_k), val(_val) {}
-
-};
-// ------------------------------------------------------
-
 struct icebin_modele {
     ModelEDomain *domain;   // Points to domain owned by maker
 
@@ -60,13 +47,6 @@ struct icebin_modele {
     This has a sentinel on the end, thus indicating the extent of
     each variable as well. */
     std::vector<int> gcm_inputs_ihp;
-
-    /** The matrix used for each IceModel, used to convert from
-    the elevation grid to ice grid.  Each hp_to_ice_rec is one
-    non-zero element of the matrix. */
-    std::map<int, 
-        spsparse::
-std::vector<hp_to_ice_rec>> hp_to_ices;
 
     /** Last time the coupler was called (or start of run) */
     int itime_last;

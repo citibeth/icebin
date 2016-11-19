@@ -17,13 +17,25 @@ include_directories(${PROJECT_SOURCE_DIR}/slib)
 #message("PROJECT_SOURCE_DIR " ${PROJECT_SOURCE_DIR})
 
 # -----------------------------------------------------------
+#     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/f90blitz.f90
 
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
+        ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.h
+    COMMAND
+    python ${IBMISC_INCLUDE_DIR}/ibmisc/f90blitz_f.py icebin_f90blitz
+        ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
+        ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.h)
+
+#add_custom_target(makeme ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/f90blitz.f90)
 
 set(icebin_SOURCES
     icebin/error.cpp
     icebin/Grid.cpp
     icebin/GCMRegridder.cpp
     icebin/IceRegridder_L0.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
 )
 
 if (BUILD_COUPLER)
@@ -36,15 +48,27 @@ if (BUILD_COUPLER)
 #       icebin/IceModel_DISMAL.cpp
         icebin/contracts/contracts.cpp
     )
-endif()
 
-if (USE_PISM)
-    list(APPEND icebin_SOURCES
-        icebin/pism/IceModel_PISM.cpp
-        icebin/contracts/modele_pism.cpp
-    )
-endif()
+    if (USE_MODELE)
+        list(APPEND icebin_SOURCES
+            icebin/modele/api.cpp
+            icebin/modele/api_f.f90
+            icebin/modele/GCMCoupler_ModelE.cpp
+        )
+    endif()
 
+    if (USE_PISM)
+        list(APPEND icebin_SOURCES
+            icebin/pism/IceModel_PISM.cpp
+        )
+        if (USE_MODELE)
+            list(APPEND icebin_SOURCES
+                icebin/contracts/modele_pism.cpp
+            )
+        endif()
+    endif()
+
+endif()
 
 if (BUILD_GRIDGEN)
     list(APPEND icebin_SOURCES
@@ -126,16 +150,24 @@ endif()
 #   galahad/zd11_c.cpp
 #   galahad/qpt_c.cpp)
 
-
-if (BUILD_COUPLER)
-  add_library (icebin SHARED ${EVERYTRACE_cf_mpi_REFADDR} ${icebin_SOURCES})
+if (USE_EVERYTRACE)
+    if (BUILD_COUPLER)
+      add_library (icebin SHARED ${EVERYTRACE_cf_mpi_REFADDR} ${icebin_SOURCES})
+    else()
+      add_library (icebin SHARED ${EVERYTRACE_cf_REFADDR} ${icebin_SOURCES})
+    endif()
 else()
-  add_library (icebin SHARED ${EVERYTRACE_cf_REFADDR} ${icebin_SOURCES})
+    add_library (icebin SHARED ${icebin_SOURCES})
 endif()
 
 target_link_libraries(icebin ${EXTERNAL_LIBS})
+if (USE_EVERYTRACE)
+    target_link_libraries(icebin ${EVERYTRACE_LIBRARY})
+endif()
 
 install(TARGETS icebin DESTINATION lib)
+
+
 
 # install Icebin headers
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/slib/ DESTINATION include

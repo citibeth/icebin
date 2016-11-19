@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 list (APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include (setup_rpath)
+message("TRANSITIVE $ENV{SPACK_TRANSITIVE_INCLUDE_PATH}")
 include_directories($ENV{SPACK_TRANSITIVE_INCLUDE_PATH})
 
 # ------- Process Configure Options
@@ -21,7 +22,9 @@ if (NOT DEFINED BUILD_PYTHON)
     set(BUILD_PYTHON NO)
 endif()
 
-
+if (NOT DEFINED BUILD_DOCS)
+    set(BUILD_DOCS NO)
+endif()
 
 if (NOT DEFINED BUILD_GRIDGEN)
     set(BUILD_GRIDGEN YES)
@@ -50,7 +53,7 @@ if (BUILD_COUPLER)
     endif()
     if(USE_PISM)
         find_package(PISM)
-        find_package(PETSC)
+        find_package(PETSc)
         include_directories(
             ${PISM_INCLUDE_DIRS}
             ${PETSC_INCLUDES}
@@ -58,6 +61,12 @@ if (BUILD_COUPLER)
         list(APPEND EXTERNAL_LIBS ${PETSC_LIBRARIES} ${PISM_LIBRARIES})
 
         add_definitions(-DUSE_PISM)
+    endif()
+    if (NOT DEFINED USE_MODELE)
+        set(USE_MODELE NO)
+    endif()
+    if (USE_MODELE)
+        add_definitions(-DUSE_MODELE)
     endif()
     add_definitions(-DBUILD_COUPLER)
 endif()

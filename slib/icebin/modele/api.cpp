@@ -17,11 +17,11 @@
  */
 
 #include <mpi.h>    // For Intel MPI, mpi.h must be included before stdio.h
-#include <netcdfcpp.h>
-#include <ibmisc/mpi.hpp>
+#include <ibmisc/netcdf.hpp>
+//#include <ibmisc/mpi.hpp>
 #include <ibmisc/blitz.hpp>
 #include <ibmisc/f90blitz.hpp>
-#include <icebin/HCIndex.hpp>
+//#include <icebin/HCIndex.hpp>
 #include <icebin/modele/icebin_modele.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 //#include <icebin/IceModel_TConv.hpp>
@@ -32,6 +32,8 @@
 
 using namespace icebin;
 using namespace icebin::modele;
+using namespace ibmisc;
+using namespace netCDF;
 
 
 // ================================================================
@@ -79,71 +81,67 @@ std::string const &fname)
 
     // Set up NetCDF file to store GCM output as we received them (modele_out.nc)
     int nhp_gcm = icebin_modele_nhp_gcm(api);
-    NcFile ncout(fname.c_str(), NcFile::Replace);
-    NcDim *im_dim = ncout.add_dim("im", api->domain->im);
-    NcDim *jm_dim = ncout.add_dim("jm", api->domain->jm);
-    NcDim *nhp_dim = ncout.add_dim("nhp", nhp_gcm);
-    NcDim *one_dim = ncout.add_dim("one", 1);
-    NcDim *time_dim = ncout.add_dim("time");        // No dimsize --> unlimited
+    NcIO ncio(fname, NcFile::replace)
 
-    const NcDim *dims_elevation[4]{time_dim, nhp_dim, jm_dim, im_dim};
-    const NcDim *dims_atmosphere[3]{time_dim, jm_dim, im_dim};
+    auto dims_elevation(get_or_add_dims(ncio, 
+        {"time", "nhp", "jm", "im"}, 
+        {-1, nhp_gcm, api->domain->jm, api->domain->im}));
+    auto dims_atomsphere(get_or_add_dims(ncio,
+        {"time", "jm", "im"}, 
+        {-1, api->domain->jm, api->domain->im}));
+    auto dims_b(get_or_add_dims(ncio, {"one"}, {1}));
 
-    const NcDim *dims_b[1]{one_dim};
-    NcVar *grid_var = ncout.add_var("grid", ibmisc::get_nc_type<double>(), 1, dims_b);
-    grid_var->add_att("file", api->gcm_coupler.fname.c_str());
-    grid_var->add_att("variable", api->gcm_coupler.vname.c_str());
+    NcVar grid_var = ncio.nc->addVar("grid", ibmisc::get_nc_type<double>(), dims_b);
+    grid_var.putAtt("file", api->gcm_coupler.fname);
+    grid_var.putAtt("variable", api->gcm_coupler.vname);
 
-    NcVar *time0_var = ncout.add_var("time0", ibmisc::get_nc_type<double>(), 1, dims_b);
-    time0_var->add_att("units", gcm_params.time_units.c_str());
-    time0_var->add_att("calendar", "365_day");
-    time0_var->add_att("axis", "T");
-    time0_var->add_att("long_name", "Simulation start time");
+    NcVar time0_var = ncio.nc->addVar("time0", ibmisc::get_nc_type<double>(), dims_b);
+    time0_var.putAtt("units", gcm_params.time_units);
+    time0_var.putAtt("calendar", "365_day");
+    time0_var.putAtt("axis", "T");
+    time0_var.putAtt("long_name", "Simulation start time");
 
-    NcVar *time_var = ncout.add_var("time", ibmisc::get_nc_type<double>(), 1, dims_atmosphere);
-    time_var->add_att("units", gcm_params.time_units.c_str());
-    time_var->add_att("calendar", "365_day");
-    time_var->add_att("axis", "T");
-    time_var->add_att("long_name", "Coupling times");
+    NcVar time_var = ncio.nc->addVar("time", ibmisc::get_nc_type<double>(), dims_atmosphere);
+    time_var.putAtt("units", gcm_params.time_units);
+    time_var.putAtt("calendar", "365_day");
+    time_var.putAtt("axis", "T");
+    time_var.putAtt("long_name", "Coupling times");
 
     //ibmisc::CouplingContract &gcm_outputs(api->gcm_coupler.gcm_outputs);
 
     for (unsigned int i=0; i < contract.size_nounit(); ++i) {
 
-        NcVar *nc_var = 0;
+        NcVar nc_var;
         ibmisc::CoupledField const &cf(contract.field(i));
 printf("Creating NC variable for %s (%s)\n", cf.name.c_str(), contracts::to_str(cf.flags).c_str());
         switch(cf.flags & contracts::GRID_BITS) {
             case contracts::ATMOSPHERE :
-                nc_var = ncout.add_var(cf.name.c_str(),
-                    ibmisc::get_nc_type<double>(), 3, dims_atmosphere);
+                nc_var = ncio.nc->addVar(cf.name,
+                    ibmisc::get_nc_type<double>(), dims_atmosphere);
             break;
             case contracts::ELEVATION :
-                nc_var = ncout.add_var(cf.name.c_str(),
-                ibmisc::get_nc_type<double>(), 4, dims_elevation);
+                nc_var = ncio.nc->addVar(cf.name,
+                ibmisc::get_nc_type<double>(), dims_elevation);
             break;
             default:
-                fprintf(stderr, "init_ncfile() unable to handle grid type %s for field %s\n", contracts::to_str(cf.flags).c_str(), cf.name.c_str());
+                fprintf(stderr, "init_ncfile() unable to handle grid type %s for field %s\n", contracts::to_str(cf.flags), cf.name);
                 ibmisc::exit(1);
         }
 
         auto comment(boost::format(
             "%s[t,...] holds the mean from time[t-1] to time[t].  See time0[0] if t=0.")
             % contract.name(i));
-        nc_var->add_att("comment", comment.str().c_str());
+        nc_var.putAtt("comment", comment.str());
 
         std::string const &description(contract.field(i).get_description());
-        if (description != "") nc_var->add_att("long_name", description.c_str());
+        if (description != "") nc_var.putAtt("long_name", description);
 
         std::string const &units(contract.field(i).get_units());
-        if (units != "") nc_var->add_att("units", units.c_str());
+        if (units != "") nc_var.putAtt("units", units);
     }
 
     // Put initial time in it...
-    long cur[1]{0};
-    long counts[1]{1};
-    time0_var->set_cur(cur);
-    time0_var->put(&gcm_params.time_start_s, counts);
+    time0_var.putVar({0}, {1}, &gcm_params.time_start_s);
 
     ncout.close();
     printf("END init_ncfile(%s)\n", fname.c_str());
@@ -605,15 +603,19 @@ printf("END icebin_modele_get_flice_im_c()\n");
 }
 // -----------------------------------------------------
 /** Produces the (dense) FHC_IM array from the (sparse) hp_to_atm
-coming from rawl Icebin. */
+coming from raw IceBin. */
 extern "C"
 void icebin_modele_get_fhc_im_c(icebin::modele::icebin_modele *api,
     ibmisc::F90Array<double, 3> &fhc_im1h_f)    // OUT
 {
     auto fhc_im1h(fhc_im1h_f.to_blitz());
 
-    HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
-    std::unique_ptr<ibmisc::VectorSparseMatrix> hp_to_atm(api->gcm_coupler.maker->hp_to_atm());
+    auto &regridder(api->gcm_coupler.regridder);
+    auto &indexingHP(regridder.indexingHP);
+    // HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
+
+    RegridMatrices rm(regridder.$$$$$$$$$$$$$$$$$$$$$$
+    std::unique_ptr<ibmisc::VectorSparseMatrix> hp_to_atm(regridder.hp_to_atm());
     ModelEDomain &domain(*api->domain);
 
     // Filter this array, and convert to fhc format
@@ -649,78 +651,6 @@ void icebin_modele_get_fhc_im_c(icebin::modele::icebin_modele *api,
     // sum to one.  But in reality, it sums to something else, depending
     // on size difference between grids on sphere vs. on the plane.
 
-}
-// -----------------------------------------------------
-extern "C"
-void icebin_modele_get_elevhp_im_c(icebin::modele::icebin_modele *api,
-    ibmisc::F90Array<double, 3> &elev1h_f)  // IN/OUT
-{
-
-    // =================== elev1h
-    // Just copy out of hpdefs array, elevation points are the same
-    // on all grid cells.
-
-    auto elev1h(elev1h_f.to_blitz());
-    int nhp_im = api->gcm_coupler.maker->nhp(-1);
-    if (nhp_im != elev1h.extent(2)) {
-        fprintf(stderr, "icebin_modele_get_elev1h: Inconsistent nhp (%d vs %d)\n", elev1h.extent(2), nhp_im);
-        ibmisc::exit(1);
-    }
-
-    // Copy 1-D height point definitions to elev1h
-    for (int k=0; k < nhp_im; ++k) {
-        double val = api->gcm_coupler.maker->hpdefs[k];
-        for (int j=elev1h.lbound(1); j <= elev1h.ubound(1); ++j) {
-        for (int i=elev1h.lbound(0); i <= elev1h.ubound(0); ++i) {
-            // +1 for C-to-Fortran conversion
-            elev1h(i,j,k+1) = val;
-        }}
-    }
-}
-// -----------------------------------------------------
-extern "C"
-void icebin_modele_init_hp_to_ices(icebin::modele::icebin_modele *api)
-{
-    int const rank = api->gcm_coupler.rank();   // MPI rank; debugging
-printf("[%d] BEGIN icebin_modele_init_hp_to_ices\n", rank);
-
-    ModelEDomain &domain(*api->domain);
-    HCIndex &hc_index(*api->gcm_coupler.maker->hc_index);
-
-    // ====================== hp_to_ices
-    api->hp_to_ices.clear();
-    for (auto sheet=api->gcm_coupler.maker->sheets.begin(); sheet != api->gcm_coupler.maker->sheets.end(); ++sheet) {
-
-        // Get matrix for HP2ICE
-        std::unique_ptr<ibmisc::VectorSparseMatrix> imat(
-            sheet->hp_to_iceinterp(IceInterp::ICE));
-        if (imat->size() == 0) continue;
-
-        // Convert to GCM coordinates
-        std::vector<hp_to_ice_rec> omat;
-        omat.reserve(imat->size());
-        for (auto ii=imat->begin(); ii != imat->end(); ++ii) {
-            // Get index in HP space
-            int lindex[domain.num_local_indices];
-            int hp1, i1;
-            hc_index.index_to_ik(ii.col(), i1, hp1);
-            domain.global_to_local(i1, lindex);
-            if (!domain.in_domain(lindex)) continue;
-
-            // Write to output matrix
-            // +1 for C-to-Fortran conversion
-            // +1 because lowest HP/HC is reserved for non-model ice
-            omat.push_back(hp_to_ice_rec(
-                ii.row(),
-                lindex[0], lindex[1], hp1+2,
-                ii.val()));
-        }
-
-        // Store away
-        api->hp_to_ices[sheet->index] = std::move(omat);
-    }
-
-printf("[%d] END icebin_modele_init_hp_to_ices\n", rank);
 }
 // -----------------------------------------------------
 static void densify_gcm_inputs_onroot(icebin_modele *api,

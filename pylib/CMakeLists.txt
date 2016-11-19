@@ -5,9 +5,9 @@ find_package(Numpy)
 
 # ----------Stuff to help with running Python before this project is installed.
 
-# --- Convenience link to Python source
-execute_process(COMMAND ln -s ${CMAKE_CURRENT_SOURCE_DIR} src
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+## --- Convenience link to Python source
+#execute_process(COMMAND ln -s ${CMAKE_CURRENT_SOURCE_DIR} src
+#    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 # -------------------------------------------------------------
 

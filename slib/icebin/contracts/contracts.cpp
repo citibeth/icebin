@@ -27,7 +27,7 @@ namespace contracts{
 
 // ======================================================
 struct VtableEntry {
-    std::function<void(GCMCoupler &, IceModel &)> setup;
+    std::function<void(GCMCoupler const &, IceModel &)> setup;
 };
 struct Vtable : public std::map<
     std::pair<GCMCoupler::Type, IceModel::Type>,
@@ -38,7 +38,7 @@ struct Vtable : public std::map<
 
 
 #if defined(USE_MODELE) && defined(USE_PISM)
-    extern setup_modele_pism(GCMCoupler &, IceModel &);
+    extern void setup_modele_pism(GCMCoupler const &, IceModel &);
 #endif
 
 Vtable::Vtable()
@@ -47,7 +47,7 @@ Vtable::Vtable()
 
 #if defined(USE_MODELE) && defined(USE_PISM)
     entry.setup = &setup_modele_pism;
-    vtable.insert(std::make_pair(
+    insert(std::make_pair(
         std::make_pair(GCMCoupler::Type::MODELE, IceModel::Type::PISM),
         std::move(entry)));
 #endif
@@ -55,7 +55,7 @@ Vtable::Vtable()
 // -------------------------------------------
 static Vtable vtable;
 
-void setup(GCMCoupler &coupler, IceModel &ice_model)
+void setup(GCMCoupler const &coupler, IceModel &ice_model)
 {
     vtable.at(std::make_pair(coupler.type, ice_model.type))
         .setup(coupler, ice_model);

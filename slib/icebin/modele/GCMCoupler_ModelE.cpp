@@ -17,9 +17,11 @@
  */
 
 #include <mpi.h>        // Intel MPI wants to be first
-#include <giss/memory.hpp>
+#include <ibmisc/memory.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/contracts/contracts.hpp>
+
+use namespace ibmisc;
 
 namespace icebin {
 namespace modele {
@@ -94,7 +96,7 @@ GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
     params->coupling_type = giss::parse_enum<ModelE_CouplingType>(
         giss::get_att(gcm_var, "coupling_type")->as_string(0));
 
-    return giss::static_cast_unique_ptr<GCMPerIceSheetParams>(params);
+    return static_cast_unique_ptr<GCMPerIceSheetParams>(params);
 }
 
 
