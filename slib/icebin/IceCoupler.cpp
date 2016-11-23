@@ -39,8 +39,6 @@ namespace icebin {
 std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
     GCMCoupler const *_gcm_coupler, IceRegridder *_regridder)
 {
-    std::unique_ptr<GCMPerIceSheetParams> params(
-        _gcm_coupler->read_gcm_per_ice_sheet_params(ncio, vname));
     std::string vn(vname + ".info");
     auto info_v = get_or_add_var(ncio, vn, "int64", {});
 
@@ -70,7 +68,8 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
     ice_coupler->sheet = _sheet;
 //    ice_coupler->ice_constants.init(&_coupler->ut_system);
 
-    ice_coupler->gcm_per_ice_sheet_params = gcm_coupler->read_gcm_per_ice_sheet_params(ncio);
+    ice_coupler->gcm_per_ice_sheet_params =
+        gcm_coupler->read_gcm_per_ice_sheet_params(ncio, vname);
     ice_coupler->ncread(ncio, vname);
 
     return ice_coupler;
@@ -133,7 +132,7 @@ static std::array<std::string, 2> _writer_ofname = {"ice_model_in.nc", "ice_mode
 void IceCoupler::couple(
 double time_s,
 // Values from GCM, passed GCM -> Ice
-ArraySparseParallelVectors const &gcm_ovalsE,
+ArraySparseParallelVectorsE const &gcm_ovalsE,
 GCMCoupleOutput &out,    // Accumulate matrices here...
 bool do_run)
 {
@@ -159,10 +158,13 @@ bool do_run)
     densify_one_dim(IvEd0, IvE0, dimE, 1);
 
     // Densify gcm_ovalsE --> gcm_ovalsEd
+    // This should ONLY involve iE already mentioned in IvE0;
+    // if not, there will be an exception.
     blitz::Array<double,2> gcm_ovalsEd(dimE.sparse_extent(), gcm_coupler->gcm_outputsE);
     gcm_ovalsEd = 0;
     for (size_t i=0; i<gcm_ovalsE.index.size(); ++i) {
-        iEd = dimE.to_dense(gcm_ovalsE.index[i]);
+        auto iE(gcm_ovalsE.index[i]);
+        iEd = dimE.to_dense(iE);
         for (size_t ivar=0; ivar<gcm_ovalsE.values.size(); ++i) {
             gcm_ovals(iEd, ivar) += gcm_ovalsE.values[ivar](i);
         }

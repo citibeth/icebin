@@ -22,8 +22,7 @@
 
 namespace icebin {
 
-GCMParams::GCMParams() :
-    gcm_rank(-1), gcm_root(-1)
+GCMParams::GCMParams()
 {
     // Set a reasonable default initial value for start time.
     ibmisc::time::tm const time_base(1900,1,1);
@@ -48,14 +47,9 @@ void GCMParams::set_start_time(
 }
 
 GCMParams::GCMParams(
-    MPI_Comm const _gcm_comm,
-    int _gcm_root,
     boost::filesystem::path const &_config_dir)
-: gcm_comm(_gcm_comm), gcm_root(_gcm_root), config_dir(_config_dir), time_start_s(0)
-{
-    MPI_Comm_rank(gcm_comm, &gcm_rank);
-
-}
+: config_dir(_config_dir), time_start_s(0)
+{}
 
 }
 

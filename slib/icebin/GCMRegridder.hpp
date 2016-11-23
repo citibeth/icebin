@@ -339,7 +339,7 @@ public:
         between (iA, iHP) <--> (iE).  The iA index may be broken down
         further into grid-specific coordinates using gridA->indexing.
     */
-    ibmisc::Indexing<long,long> indexingHP;
+    ibmisc::Indexing<long,long> indexingHC;
 
     /** Position of height points in elevation space (same for all GCM
     grid cells) */

@@ -156,7 +156,7 @@ void GCMCoupler::set_start_time(
 GCMCouplerOutput GCMCoupler::couple(
 // Simulation time [s]
 double time_s,
-ArraySparseParallelVectors const &gcm_ovalsE,
+ArraySparseParallelVectorsE const &gcm_ovalsE,
 bool do_run)
 {
     // Initialize output

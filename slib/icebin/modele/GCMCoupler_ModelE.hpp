@@ -42,6 +42,16 @@ public:
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
+    /** The first GCM elevation class that is an IceBin class. */
+    int icebin_base_hc;
+    int icebin_nhc;    // Number of elevation classes used by IceBin
+
+    blitz::Array<double,3> fhc;    // Reference to Fortran array FHC
+
+    // Low and high indices for this MPI node.
+    // Indices are in C order (jm, im)
+    ibmisc::Domain<int> domainA;
+
 public:
     GCMCoupler_ModelE();
 
