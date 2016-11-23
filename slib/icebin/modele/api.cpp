@@ -36,6 +36,31 @@ using namespace ibmisc;
 using namespace netCDF;
 
 
+// SMBMsg
+
+MPI_Datatype SMBMsg::new_MPI_struct(int nfields)
+{
+    int nele = 2 + nfields;
+    int blocklengths[] = {1, 1, nfields};
+    MPI_Aint displacements[] = {offsetof(SMBMsg,sheetix), offsetof(SMBMsg,iI), offsetof(SMBMsg, vals)};
+    MPI_Datatype types[] = {MPI_INT, MPI_INT, MPI_DOUBLE};
+    MPI_Datatype ret;
+    MPI_Type_create_struct(3, blocklengths, displacements, types, &ret);
+    MPI_Type_commit(&ret);
+    return ret;
+}
+
+/** for use with qsort */
+int SMBMsg::compar(void const *a, void const *b)
+{
+    SMBMsg const *aa = reinterpret_cast<SMBMsg const *>(a);
+    SMBMsg const *bb = reinterpret_cast<SMBMsg const *>(b);
+    int cmp = aa->sheetix - bb->sheetix;
+    if (cmp != 0) return cmp;
+    return aa->iI - bb->iI;
+}
+
+
 // ================================================================
 
 struct ModelEMsg {

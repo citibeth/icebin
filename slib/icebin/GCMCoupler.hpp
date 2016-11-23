@@ -33,6 +33,57 @@
 
 namespace icebin {
 
+struct VectorSparseParallelVectors {
+    // Stores a bunch of parallel sparse vectors
+    // Index of each element in the parallel vectors
+    std::vector<long> index;
+    // Values of for each element in the vectors.  
+    std::vector<double> vals;
+    // Number of _vals element per _ix element
+    int nvar;
+};
+
+struct ArraySparseParallelVectors {
+    // Stores a bunch of parallel sparse vectors
+    // Index of each element in the parallel vectors
+    blitz::Array<long,1> index;
+    std::vector<blitz::Array<double,1>> values;
+};
+
+// extern ArraySparseParallelVectors vector_to_array(VectorSparseParallelVectors vecs);
+
+
+struct GCMCouplerOutput {
+    // Outputs from IceCoupler, transformed and regridded back to E/A
+//    std::vector<SparseVector> gcm_ivals;    // both A and E grids.
+
+
+    // Mapping from the index of a variable in gcm_ivalsE/gcm_ivalsA
+    // and the index within the GCMCoupler::gcm_inputs
+    VectorSparseParallelVectors[GCMCoupler::GCMI::COUNT] gcm_ivals; // gcm_ivalsE, gcm_ivalsA
+
+
+    // Values required to update TOPO, etc. in ModelE
+    // (see add_fhc.py for how these are to be used)
+    // We can get these from AvE
+    // SparseVector wAvE;     // Area of A grid cells that overlap ice
+    //SparseVector areaA;    // Total (native) area of A grid cells
+    //SparseVector elevA;    // Used for atmosphere orography (ZATMO in ModelE)
+
+    // Regrid matrix to go from last step's elevation classes to this
+    // step's elevation classes.
+    SparseMatrix E1vE0;
+
+    // Regrid matrix to convert to atmosphere.
+    // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
+    WeightedSparse AvE;
+
+    // Used for temperature downscaling according to a lapse rate
+    SparseVector elevE;
+};
+
+
+
 class GCMCoupler {
 public:
     /** Type tags for subclasses of GCMCoupler */
@@ -43,9 +94,9 @@ public:
     Type const type;
 
     /** Filename this coupler (including grid) was read from. */
-    std::string fname;
+    std::string icebin_in;
     /** Variable inside fname this coupler (including grid) was read from. */
-    std::string vname;
+//    std::string vname;
 
     ibmisc::Domain<int> domainA;                // What's in our MPI halo?
 

@@ -35,20 +35,25 @@ using namespace netCDF;
 
 namespace icebin {
 
-std::unique_ptr<IceCoupler> new_ice_coupler(IceCoupler::Type type,
-    GCMCoupler const *_coupler, IceRegridder *_sheet)
-{
-    std::unique_ptr<IceCoupler> ice_coupler;
 
+std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
+    GCMCoupler const *_gcm_coupler, IceRegridder *_regridder)
+{
+    std::unique_ptr<GCMPerIceSheetParams> params(
+        _gcm_coupler->read_gcm_per_ice_sheet_params(ncio, vname));
+    std::string vn(vname + ".info");
+    auto info_v = get_or_add_var(ncio, vn, "int64", {});
+
+    IceCoupler::Type type;
+    get_or_put_att_enum(info_v, ncio.rw, "ice_coupler", type);
+
+    std::unique_ptr<IceCoupler> ice_coupler;
     switch(type.index()) {
 #if 0
         case IceCoupler::Type::DISMAL :
             ice_coupler.reset(new IceCoupler_DISMAL);
         break;
 #endif
-        case IceCoupler::Type::WRITER :
-            ice_coupler.reset(new IceCoupler_Writer);
-        break;
 #ifdef USE_PISM
         case IceCoupler::Type::PISM :
             ice_coupler.reset(new gpism::IceCoupler_PISM);
@@ -63,241 +68,74 @@ std::unique_ptr<IceCoupler> new_ice_coupler(IceCoupler::Type type,
     // Do basic initialization...
     ice_coupler->coupler = _coupler;
     ice_coupler->sheet = _sheet;
-    ice_coupler->ice_constants.init(&_coupler->ut_system);
+//    ice_coupler->ice_constants.init(&_coupler->ut_system);
+
+    ice_coupler->gcm_per_ice_sheet_params = gcm_coupler->read_gcm_per_ice_sheet_params(ncio);
+    ice_coupler->ncread(ncio, vname);
 
     return ice_coupler;
-
-
 }
-
-std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
-    GCMCoupler const *_coupler, IceRegridder *_sheet)
-{
-    std::string vn(vname + ".info");
-    auto info_v = get_or_add_var(ncio, vn, "int64", {});
-
-    IceCoupler::Type type;
-    get_or_put_att_enum(info_v, ncio.rw, "ice_coupler", type);
-
-    return new_ice_coupler(type, _coupler, _sheet);
-}
-
-void IceCoupler::ncread(
-ibmisc::NcIO &ncio, std::string const &vname_sheet)
-{
-    gcm_per_ice_sheet_params = coupler->read_gcm_per_ice_sheet_params(ncio, vname_sheet);
-}
-
 
 
 IceCoupler::~IceCoupler() {}
-
-#if 0
-VarSet *IceCoupler::new_VarSet() {
-    _extra_contracts.push_back(
-        std::unique_ptr<VarSet>(
-        new VarSet()));
-    return _extra_contracts[_extra_contracts.size()-1].get();
-}
-#endif
-
-// ==========================================================
-bool IceCoupler::am_i_root() const
-    { return coupler->am_i_root(); }
-
-/** Allocate vectors in preparation of calling an ice model. */
-void IceCoupler::allocate_ice_ovals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceCoupler::allocate_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.");
-
-    if (ice_ovals_I.size() != 0) (*icebin_error)(-1,
-        "[%d] IceCoupler::allocate_ice_ovals_I(): called twice without a free() inbetween.  Fix the code. (old size is %ld)\n", coupler->gcm_params.gcm_rank, ice_ovals_I.size());
-
-    // Allocate for direct output from ice model
-    VarSet const &ocontract(contract[IceCoupler::OUTPUT]);
-    for (int i=0; i < ocontract.size(); ++i)
-        ice_ovals_I.push_back(blitz::Array<double,1>(ndata()));
-}
-
-
-/** Allocate in preparation of var transformations (but not regridding yet) */
-void IceCoupler::allocate_gcm_ivals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceCoupler::allocate_ice_ivals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-
-    if (gcm_ivals_I.size() != 0) (*icebin_error)(-1,
-        "IceCoupler::allocate_gcm_ivals_I(): called twice without a free() inbetween.  Fix the code.\n");
-
-
-    VarSet const &gcm_inputs(coupler->gcm_inputs);
-    for (int i=0; i < gcm_inputs.size(); ++i) {
-        gcm_ivals_I.push_back(blitz::Array<double,1>(ndata()));
-    }
-}
-
-/** Free portions not needed after finished calling ice model and
-applying variable transform.  This will be variables desired on
-anything other than the ELEVATION grid. */
-void IceCoupler::free_ice_ovals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceCoupler::free_ice_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-
-    ice_ovals_I.clear();
-}
-
-/** Free all memory used by this.  Called when we're done with a coupling timestep. */
-void IceCoupler::free_ovals_ivals_I()
-{
-    // Check for program errors
-    if (!coupler->am_i_root()) (*icebin_error)(-1,
-        "IceCoupler::free_ovals_ovals_I() should only be called from GCM root MPI node.  Fix the code.\n");
-
-    ice_ovals_I.clear();
-    gcm_ivals_I.clear();
-}
-
-// -----------------------------------------------------------
-/** Allocates and sets gcm_ivals_I variable
-@param mask Control which GCM input variables to set (according to, etc, INITIAL flag in contract) */
-void IceCoupler::set_gcm_inputs(unsigned int mask)
-{
-  printf("BEGIN IceCoupler::set_gcm_inputs()\n");
-    allocate_gcm_ivals_I();
-
-    // Compute the variable transformation
-    ibmisc::VarTransformer &vt(var_transformer[IceCoupler::OUTPUT]);
-    ibmisc::CSRAndUnits trans = vt.apply_scalars({
-        std::make_pair("unit", 1.0)});
-
-    VarSet const &gcm_inputs(coupler->gcm_inputs);
-
-    // Apply the variable transformation
-    for (int xi=0; xi<vt.dim(ibmisc::VarTransformer::OUTPUTS).size(); ++xi) {   // xi is index of output variable
-        gcm_ivals_I[xi] = 0;    // Vector operation: clear before sum
-        VarMeta const &cf(gcm_inputs[xi]);
-
-        if ((cf.flags & mask) != mask) continue;
-
-        // Consider each output variable separately...
-        std::vector<std::pair<int, double>> const &row(trans.mat[xi]);
-        for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
-            int xj = xjj->first;        // Index of input variable
-            double io_val = xjj->second;    // Amount to multiply it by
-            gcm_ivals_I[xi] += ice_ovals_I[xj] * io_val;        // blitz++ vector operation
-        }
-        gcm_ivals_I[xi] += trans.units[xi];
-    }
-
-    printf("END IceCoupler::set_gcm_inputs()\n");
-}
 // ==========================================================
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-// REMEMBER: Decoding converts a set of (index, value) pairs into
-// normal arrays (with NaN where no value was given.)
-void IceCoupler_Decode::run_timestep(double time_s,
-	blitz::Array<int,1> const &indices,
-	std::vector<blitz::Array<double,1>> const &ivals2)
-{
-printf("BEGIN IceCoupler_Decode::run_timestep(time_s = %f) size=%ld\n", time_s, indices.size());
-
-	blitz::Array<int,1> nindices;
-	std::vector<blitz::Array<double,1>> nivals2;
-
-	blitz::Array<int,1> const *xindices;
-	std::vector<blitz::Array<double,1>> const *xivals2;
-
-	// Test out freestanding sorting/consolidation code
-	// This section of code is NOT necessary.
-	if (false) {
-		std::vector<int> perm = sorted_perm(indices);
-		nindices.reference(blitz::Array<int,1>(indices.size()));
-		int nconsolidated = consolidate_by_perm(indices, perm, indices, nindices, DuplicatePolicy::REPLACE);
-printf("IceCoupler_Decode: consolidated from %d down to %d\n", indices.size(), nconsolidated);
-		nindices.reference(blitz::Array<int,1>(nconsolidated));
-		consolidate_by_perm(indices, perm, indices, nindices, DuplicatePolicy::REPLACE);
-
-		for (unsigned int i=0; i<ivals2.size(); ++i) {
-			blitz::Array<double,1> nvals(nconsolidated);
-			consolidate_by_perm(indices, perm, ivals2[i], nvals, DuplicatePolicy::ADD);
-			nivals2.push_back(nvals);
-		}
-
-		xindices = &nindices;
-		xivals2 = &nivals2;
-	} else {
-		xindices = &indices;
-		xivals2 = &ivals2;
-	}
-
-	std::vector<blitz::Array<double,1>> ivals2d;	/// Decoded fields
-
-	// Naming convention on array variables:
-	//     ivals2 = Vector of Values-arrays on grid2 (ice grid)
-	//     ivals2d = Vector of DECODED values-arrays on grid2
-	//     vals = Individual value array from ivals2
-	//     valsd = Individual valu array from ivals2d
-	// Loop through the fields we require
-	VarSet const &icontract(contract[IceCoupler::INPUT]);
-	for (int i=0; i<icontract.size(); ++i) {
-
-		blitz::Array<double,1> const &vals((*xivals2)[i]);
-
-		// Decode the field!
-		blitz::Array<double,1> valsd(ndata());
-		valsd = nan;
-		int n = xindices->size();
-		for (int i=0; i < n; ++i) {
-			int ix = (*xindices)(i);
-			// Do our own bounds checking!
-			if (ix < 0 || ix >= ndata()) (*icebin_error)(-1,
-                "IceCoupler: index %d out of range [0, %d)\n", ix, ndata());
-
-			// Add this value to existing field
-			double &oval = valsd(ix);
-			if (std::isnan(oval)) oval = vals(i);
-			else oval += vals(i);
-		}
-
-		// Convert any remaining nans to default value,
-		// so we have a valid number everywhere.
-		double default_value = icontract[i].default_value;
-		for (int j=0; j<ndata(); ++j) {
-			double &val(valsd(j));
-			if (std::isnan(val)) val = default_value;
-		}
-
-		// Store decoded field in our output
-		ivals2d.push_back(valsd);
-printf("Done decoding required field, %s\n", icontract[i].name.c_str());
-	}
-
-	// Pass decoded fields on to subclass
-	run_decoded(time_s, ivals2d);
-printf("END IceCoupler_Decode::run_timestep(%f)\n", time_s);
-}
-
 // ------------------------------------------------------------
 
-SparseMatrix regrid_M(IceRegridder &regridder, std::string const &spec_name)
-    { return std::move(regridder.regrid(spec_name)->M); }
+/** Returns just the matrix part of regridding.  Also sets scale and
+    correctA.  Local convenience function. */
+inline SparseMatrix regrid_M(
+IceRegridder &regridder,
+std::string const &spec_name)
+    { return std::move(regridder.regrid(spec_name, true, true)->M); }
 
 
 
 // ==============================================================
-/** @return ice_ovalsI */
+void IceCoupler::set_start_time(
+        ibmisc::time::tm const &time_base,
+        double time_start_s)
+{
+    // Set up writers
+    for (int io=0; io<2; ++io) {
+        ice_coupler->writer[io].reset(new IceWriter(
+            *this, contract[io],
+            name() + (io == 0 ? "_in.nc" : "_out.nc")));
+    }
+
+    // This function is the last phase of initialization.
+    // Only now can we assume that the contracts are fully set up.
+#if 1
+    // Print out the contract and var transformations
+    std::cout << "========= Contract for " << name() << std::endl;
+    std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
+    std::cout << contract[IceCoupler::INPUT];
+    std::cout << "TRANSFORMATIONS:" << std::endl;
+    std::cout << var_transformer[IceCoupler::INPUT];
+    std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
+    std::cout << contract[IceCoupler::OUTPUT];
+    std::cout << "TRANSFORMATIONS:" << std::endl;
+    std::cout << var_transformer[IceCoupler::OUTPUT];
+#endif
+
+
+}
+
+// ==============================================================
+
+static std::array<std::string, 2> _writer_ofname = {"ice_model_in.nc", "ice_model_out.nc"};
+
+
+/** 
+@param do_run True if we are to actually run (otherwise just return ice_ovalsI from current state)
+@return ice_ovalsI */
 void IceCoupler::couple(
 double time_s,
 // Values from GCM, passed GCM -> Ice
-blitz::Array<long,1> gcm_ovalsE_index,    // Indices of sparse vectors...
-std::vector<blitz::Array<double,1>> gcm_ovalsE_values,    // values[var](i)
-GCMCoupleOutput &out)    // Accumulate matrices here...
+ArraySparseParallelVectors const &gcm_ovalsE,
+GCMCoupleOutput &out,    // Accumulate matrices here...
+bool do_run)
 {
     // Store regridding matrices for the last timestep, which we will
     // need to create ice_ivals
@@ -321,12 +159,12 @@ GCMCoupleOutput &out)    // Accumulate matrices here...
     densify_one_dim(IvEd0, IvE0, dimE, 1);
 
     // Densify gcm_ovalsE --> gcm_ovalsEd
-    blitz::Array<double,2> gcm_ovalsEd(dimE.sparse_extent(), gcm_cupler->gcm_outputsE);
+    blitz::Array<double,2> gcm_ovalsEd(dimE.sparse_extent(), gcm_coupler->gcm_outputsE);
     gcm_ovalsEd = 0;
-    for (size_t i=0; i<gcm_ovalsE_index.size(); ++i) {
-        iEd = dimE.to_dense(gcm_ovalsE_index[i]);
-        for (size_t ivar=0; ivar<gcm_ovalsE_values.size(); ++i) {
-            gcm_ovals(iEd, ivar) += gcm_ovalsE_values[ivar](i);
+    for (size_t i=0; i<gcm_ovalsE.index.size(); ++i) {
+        iEd = dimE.to_dense(gcm_ovalsE.index[i]);
+        for (size_t ivar=0; ivar<gcm_ovalsE.values.size(); ++i) {
+            gcm_ovals(iEd, ivar) += gcm_ovalsE.values[ivar](i);
         }
     }
 
@@ -336,28 +174,45 @@ GCMCoupleOutput &out)    // Accumulate matrices here...
         std::make_pair("unit", 1.0)});
     CSRAndUnits icei_v_gcmo(var_transformer[INPUT].apply_scalars(scalars));
 
+    // ice_ivalsEd_{jk} = icei_v_gcmo_{kl} * gcm_ovalsEd_{jl}
+    // ice_ivalsI_{ik} = IvEd_{ij} * ice_ivalsEd_{jk}
+    //       or:
+    // ice_ivalsI_{ik} = IvEd_{ij} * icei_v_gcmo_{kl} * gcm_ovalsEd_{jl}
+    //       where:
+    // |i| = # ice grid cells (|I|)
+    // |j| = # dense elevation grid cells (|Ed|)
+    // |k| = # variables in ice_input
+    // |l| = # variables in gcm_output
+    //
+    // (NOTE storage order; indices are row-major)
+
     // Regrid & combine to form ice_ivalsI
-    for (auto iM = IvEd.begin(); iM != IvEd.end(); ++iM) {
+    for (auto iIvEd = IvEd.begin(); iIvEd != IvEd.end(); ++iIvEd) {
+        auto ii(iIvEd.index(0));
+        auto jj(iIvEd.index(1));
+        auto IvEd_ij(iIvEd.val());
+
         // Transform units on the input while multiplying by M
-        for (size_t ovar = 0; ovar < contracts[INPUT].size(); ++ovar) {
-            double zval = 0;
-            std::vector<std::pair<int, double>> const &row(icei_v_gcmo.mat[xi]);
-            for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
-                int xj = xjj->first;
-                double xval = xjj->second;
-                zval += xval * gcm_ovalsEd(iM.index(1), xj);
+        for (size_t kk = 0; kk < contracts[INPUT].size(); ++kk) {
+            double ice_ivalsEd_jk = 0;
+            std::vector<std::pair<int, double>> const &row(icei_v_gcmo.mat[kk]);
+            for (auto rowk_iter=row.begin(); rowk_iter != row.end(); ++rowk_iter) {
+                auto ll(rowk_iter->first);
+                auto icei_v_gcmo_kl(row_iter->second);
+
+                ice_ivalsEd_jk += icei_v_gcmo_kl * gcm_ovalsEd(jj, ll);
             }
-            ice_ivalsI(iM.index(0), ovar) += iM.val() * zval;
+            ice_ivalsI(ii, kk) += IvEd_ij * ice_ivalsEd_jk;
         }
     }
 
     // ========= Step the ice model forward
-    iwriter()->run_timestep(time_s, ice_ivalsI);    // TODO: Change to a write that takes a contract and a vector of fields
-    run_timestep(time_s, ice_ivalsI, ice_ovalsI);
-    owriter()->run_timestep(time_s, ice_ovalsI);
+    if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
+    run_timestep(time_s, ice_ivalsI, ice_ovalsI, do_run);
+    if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
 
     // ========== Update regridding matrices
-    _update_elevI();
+    update_elevI();
     RegridMatrices rm(regridder);
 
     // Compute IvE (for next timestep)
@@ -384,25 +239,36 @@ GCMCoupleOutput &out)    // Accumulate matrices here...
     XvIs[GCMCoupler::GCMI::E] = &EvI;
     XvIs[GCMCoupler::GCMI::A] = &AvI;
     // Do it once for _E variables and once for _A variables.
-    for (int i=0; i < GCMCoupler::GCMI::COUNT; ++i) {
-        VarSet &contract(gcm_coupler->gcm_inputs[i]);
-        SparseMatrix &XvI(*XvIs[i]);
-        SparseParallelVectors &gcm_ivalsX(coupler_ret.gcm_ivals[i]);
+    for (int iEA=0; iEA < GCMCoupler::GCMI::COUNT; ++iEA) {
+        VarSet &contract(gcm_coupler->gcm_inputs[iEA]);
+        SparseMatrix &XvI(*XvIs[iEA]);
+        SparseParallelVectors &gcm_ivalsX(coupler_ret.gcm_ivals[iEA]);
+
+        // gcm_ivalsX_{jn} = XvI_{ji} * gcmi_v_iceo_{nm} * ice_ovalsI_{im}
+        //       where:
+        // |i| = # ice grid cells (|I|)
+        // |j| = # elevation/atmosphere grid cells (|X|)
+        // |m| = # variables in ice_output
+        // |n| = # variables in gcm_input
 
         // Do the multiplication
-        for (auto iM = XvI.begin(); iM != XvI.end(); ++iM) {
+        for (auto iXvI(XvI->begin()); iXvI != XvI->end(); ++iXvI) {
+            auto jj(iXvI.index(0));
+            auto ii(iXvI.index(1));
+            auto XvI_ji(iXvI.val());
 
             // Transform units on the input while multiplying by M
-            gcm_ivalsX.index.push_back(iM.index(0));
-            for (size_t ovar = 0; ovar < contract.size(); ++ovar) {
+            gcm_ivalsX.index.push_back(jj);
+            for (size_t nn = 0; nn < contract.size(); ++nn) {
                 double zval = 0;
-                std::vector<std::pair<int, double>> const &row(gcmi_v_iceo.mat[xi]);
-                for (auto xjj=row.begin(); xjj != row.end(); ++xjj) {
-                    int xj = xjj->first;
-                    double xval = xjj->second;
-                    zval += xval * ice_ovalsI(iM.index(1), xj);
+                double gcm_ivalsI_in = 0;
+                std::vector<std::pair<int, double>> const &row(gcmi_v_iceo.mat[nn]);
+                for (auto rown_iter=row.begin(); rown_iter != row.end(); ++rown_iter) {
+                    auto mm(rown_iter->first);
+                    auto gcmi_v_iceo_nm(rown_iter->second);
+                    gcm_ivalsX_in += gcmi_v_iceo_nm * ice_ovalsI(ii, mm);
                 }
-                gcm_ivalsX.vals.push_back(iM.val() * zval);
+                gcm_ivalsX.vals.push_back(XvI_ji * gcm_ivalsX_in);
             }
         }
     }
