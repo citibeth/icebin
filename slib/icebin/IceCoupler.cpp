@@ -214,7 +214,7 @@ bool do_run)
     if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
 
     // ========== Update regridding matrices
-    update_elevI();
+    auto elevI(get_elevI());    // blitz
     RegridMatrices rm(regridder);
 
     // Compute IvE (for next timestep)
@@ -223,27 +223,29 @@ bool do_run)
     densify_one_dim(IvEd, IvE->M, dimE, 1);
 
     // Compute regrid matrices we need now
-    auto EvI(regrid_M(re, "EvI"));
-    auto AvI(regrid_M(re, "AvI"));
-    auto AvE(regrid_M(re, "AvE"));
+    auto EvI(regrid(re, "EvI"));
+    auto AvI(regrid(re, "AvI"));
+    auto AvE(regrid(re, "AvE"));
+    copy(out.AvE1, AvE.M, AvE.dims[0], AvE.dims[1]);
+    copy(out.wAvE1, AvE.weight, AvE.dims[0]);    // Blitz array (or should it be an Eigen column vector?)
 
     // Accumulate global things for all ice sheets....
-    multiply(coupler_ret.E1vE0, EvI, IvE0);
-    copy(coupler_ret.AvE.M, AvE.M);
-    copy(coupler_ret.AvE.weight, AvE.weight);
-    multiply(coupler_ret.elevE, EvI, elevI);
-
+    copy(out.E1vE0, EvI.M*IvE0, EvI.dims[0], dimE0);   // copy eigen matrix
+    copy(out.elevE1, EvI * to_col_vector(elevI), EvI.dims[0]);   // copy eigen column vector
 
     // ========= Compute gcm_ivalsE = EvI * vt * ice_ovals
     CSRAndUnits gcmi_v_iceo(var_transformer[OUTPUT].apply_scalars(scalars));
 
-    std::array<SparseMatrix *, GCMCoupler::GCMI::COUNT> XvIs;
+    std::array<WeightedSparse *, GCMCoupler::GCMI::COUNT> XvIs;
     XvIs[GCMCoupler::GCMI::E] = &EvI;
     XvIs[GCMCoupler::GCMI::A] = &AvI;
+    std::vector<double> vals(contract.size());
+
     // Do it once for _E variables and once for _A variables.
     for (int iEA=0; iEA < GCMCoupler::GCMI::COUNT; ++iEA) {
         VarSet &contract(gcm_coupler->gcm_inputs[iEA]);
-        SparseMatrix &XvI(*XvIs[iEA]);
+        WeightedSparse &XvI_ws(*XvIs[iEA]);
+        SparseMatrix XvI(to_spsparse(XvI_ws.M, XvI_ws.dims[0], XvI_ws.dims[1]));
         SparseParallelVectors &gcm_ivalsX(coupler_ret.gcm_ivals[iEA]);
 
         // gcm_ivalsX_{jn} = XvI_{ji} * gcmi_v_iceo_{nm} * ice_ovalsI_{im}
@@ -260,7 +262,6 @@ bool do_run)
             auto XvI_ji(iXvI.val());
 
             // Transform units on the input while multiplying by M
-            gcm_ivalsX.index.push_back(jj);
             for (size_t nn = 0; nn < contract.size(); ++nn) {
                 double zval = 0;
                 double gcm_ivalsI_in = 0;
@@ -270,8 +271,9 @@ bool do_run)
                     auto gcmi_v_iceo_nm(rown_iter->second);
                     gcm_ivalsX_in += gcmi_v_iceo_nm * ice_ovalsI(ii, mm);
                 }
-                gcm_ivalsX.vals.push_back(XvI_ji * gcm_ivalsX_in);
+                vals[nn] = XvI_ji * gcm_ivalsX_in;
             }
+            gcm_ivals.add(jj, vals);
         }
     }
 }

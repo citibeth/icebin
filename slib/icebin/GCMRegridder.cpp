@@ -316,29 +316,32 @@ struct UrAE {
 };
 
 
-typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrixT;
-typedef SparseSet<long,int> SparseSetT;
 
+// ------------------------------------------------------------
+std::function<bool(long)> in_sparse_fn(SparseSetT const &dim)
+    { return std::bind(&SparseSetT::in_sparse, &dim, _1); }
+// ------------------------------------------------------------
 static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *sheet, bool scale, bool correctA, UrAE const &AE)
 {
     SparseSetT dimA, dimG, dimI;
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     // GvI
-    SparseTriplets<SparseMatrix> GvI({&dimG, &dimI});
-    GvI.set_shape({sheet->nG(), sheet->nI()});
-    sheet->GvI(GvI);
+    SparseTriplets<SparseMatrix> GvI_t({&dimG, &dimI});    // _t=triplets
+    GvI_t.set_shape({sheet->nG(), sheet->nI()});
+    sheet->GvI(GvI_t);
 
     // ApvG
-    SparseTriplets<SparseMatrix> GvAp({&dimG, &dimA});
-    GvAp.set_shape({sheet->nG(), AE.nfull});
-    AE.GvAp(GvAp);
+    SparseTriplets<SparseMatrix> GvAp_t({&dimG, &dimA});
+    GvAp_t.set_shape({sheet->nG(), AE.nfull});
+    AE.GvAp(GvAp_t);
 
     // ----- Convert to Eigen and multiply
-    auto GvI_e(GvI.to_eigen());
-    auto sGvI_e(GvI.eigen_scale_matrix(0));
-    auto ApvG_e(GvAp.to_eigen('T'));
-    EigenSparseMatrixT ApvI_e(ApvG_e * sGvI_e * GvI_e);
+    auto GvI_e(GvI_t.to_eigen());
+    auto sGvI_e(scale_matrix(sum(GvI_e,0)))
+    auto ApvG_e(GvAp_t.to_eigen('T'));
+    std::unique_ptr<EigenSparseMatrix> ApvI_e(
+        new EigenSparseMatrix(ApvG_e * sGvI_e * GvI_e));
 
     // ----- Apply final scaling, and convert back to sparse dimension
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse);
@@ -348,44 +351,44 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *sheet, bool sc
         // Scaling matrix AvAp
         SparseTriplets<SparseMatrix> sApvA({&dimA, &dimA});
         sApvA.set_shape({AE.nfull, AE.nfull});
-        AE.sApvA(sApvA, std::bind(&SparseSetT::in_sparse, dimA, _1));   // Filter to avoid adding more items to dimA
+        AE.sApvA(sApvA, in_sparse_fn(dimA));   // Filter to avoid adding more items to dimA
 
         if (scale) {
             // Get two diagonal Eigen scale matrices
             auto sAvAp_e(sApvA.to_eigen('.', true));        // Invert it...
-            auto sApvI_e(weight_matrix(ApvI_e, 0, true));
+            auto sApvI_e(weight_matrix(*ApvI_e, 0, true));
 
-            EigenSparseMatrixT AvI_scaled_e(sAvAp_e * sApvI_e * ApvI_e);
-            eigenM_to_sparseM(ret->M, AvI_scaled_e, {&dimA, &dimI});
+            ret->M.reset(new EigenSparseMatrix(
+                sAvAp_e * sApvI_e * *ApvI_e));    // AvI_scaled
         } else {
-            eigenM_to_sparseM(ret->M, ApvI_e, {&dimA, &dimI});
+            ret->M = std::move(ApvI_e);
         }
-
 
         // ----- Compute the final weight matrix
         auto wAvAp_e(sApvA.to_eigen('.', false));       // Invert it...
         auto wApvI_e(weight_matrix(ApvI_e, 0, false));
-        EigenSparseMatrixT weight_e(wAvAp_e * wApvI_e);
-        ret->weight.set_shape({dimA.sparse_extent()});
-        sum_rows(ret->weight, weight_e, {&dimA});
+        EigenSparseMatrix weight_e(wAvAp_e * wApvI_e);
 
+        // Sums rows of an Eigen matrix into a dense blitz::Array
+        ret->weight.reference(sum_rows(weight_e));
     } else {
 
         if (scale) {
             // Get two diagonal Eigen scale matrices
             auto sApvI_e(weight_matrix(ApvI_e, 0, true));
 
-            EigenSparseMatrixT AvI_scaled_e(sApvI_e * ApvI_e);
-            eigenM_to_sparseM(ret->M, AvI_scaled_e, {&dimA, &dimI});
+            ret->M.reset(new EigenSparseMatrix(
+                sApvI_e * ApvI_e));    // ApvI_scaled
         } else {
-            eigenM_to_sparseM(ret->M, ApvI_e, {&dimA, &dimI});
+            ret->M = std::move(ApvI_e);
         }
 
         // ----- Compute the final weight matrix
         auto wApvI_e(weight_matrix(ApvI_e, 0, false));
-        ret->weight.set_shape({dimA.sparse_extent()});
-        sum_rows(ret->weight, wApvI_e, {&dimA});
+        ret->weight.reference(sum_rows(wApvI_e));
     }
+    ret->dim[0] = std::move(dimA);
+    ret->dim[1] = std::move(dimI);
 
     return ret;
 }
@@ -411,40 +414,36 @@ static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *sheet, bool sc
     auto IvG_e(GvI.to_eigen('T'));
 
     // Unscaled matrix
-    EigenSparseMatrixT IvAp_e(IvG_e * sGvAp_e * GvAp_e);
+    EigenSparseMatrix IvAp_e(IvG_e * sGvAp_e * GvAp_e);
 
     // ----- Apply final scaling, and convert back to sparse dimension
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse({dimI.sparse_extent(), dimA.sparse_extent()}));
     if (correctA) {
         // sApvA
         SparseTriplets<SparseMatrix> sApvA({&dimA, &dimA});
-        std::function<bool(long)> filter_fn(std::bind(&SparseSetT::in_sparse, dimA, _1));
         sApvA.set_shape({AE.nfull, AE.nfull});
-        AE.sApvA(sApvA, filter_fn); // Filter to avoid adding more items to dimA
+        AE.sApvA(sApvA, in_sparse_fn(dimA)); // Filter to avoid adding more items to dimA
         auto sApvA_e(sApvA.to_eigen('.', false));       // Don't invert it...
 
         if (scale) {
             auto sIvAp_e(weight_matrix(IvAp_e, 0, true));
-            EigenSparseMatrixT IvA_scaled_e(sIvAp_e * IvAp_e * sApvA_e);
-            eigenM_to_sparseM(ret->M, IvA_scaled_e, {&dimI, &dimA});
+            ret->M = sIvAp_e * IvAp_e * sApvA_e;
         } else {
-            EigenSparseMatrixT IvA_e(IvAp_e * sApvA_e);
-            eigenM_to_sparseM(ret->M, IvA_e, {&dimI, &dimA});
+            ret->M = IvAp_e * sApvA_e;
         }
     } else {
         if (scale) {
             auto sIvAp_e(weight_matrix(IvAp_e, 0, true));
-            EigenSparseMatrixT IvA_scaled_e(sIvAp_e * IvAp_e);
-            eigenM_to_sparseM(ret->M, IvA_scaled_e, {&dimI, &dimA});
+            ret->M = sIvAp_e * IvAp_e;
         } else {
-            eigenM_to_sparseM(ret->M, IvAp_e, {&dimI, &dimA});
+            ret->M = std::move(IvAp_e);
         }
     }
+    ret->dim[0] = std::move(dimI);
+    ret->dim[1] = std::move(dimA);
 
     // Get weight vector from IvAp_e
-    ret->weight.set_shape({dimI.sparse_extent()});
-    sum_rows(ret->weight, IvAp_e, {&dimI});
-    ret->weight.consolidate({0});
+    ret->weight.reference(sum_rows(IvAp_e));
 
     return ret;
 }
@@ -473,58 +472,52 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *sheet, bool sca
     auto EpvG_e(GvEp.to_eigen('T'));
 
     // Unweighted matrix
-    EigenSparseMatrixT EpvAp_e(EpvG_e * sGvAp_e * GvAp_e);
+    EigenSparseMatrix EpvAp_e(EpvG_e * sGvAp_e * GvAp_e);
 
     // ----- Apply final scaling, and convert back to sparse dimension
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse);
     if (correctA) {
 
         // sApvA
-        SparseTriplets<SparseMatrix> sApvA({&dimA, &dimA});
-        std::function<bool(long)> filter_fn(std::bind(&SparseSetT::in_sparse, dimA, _1));
-        sApvA.set_shape({A.nfull, A.nfull});
-        A.sApvA(sApvA, filter_fn);  // Filter to avoid adding more items to dimA
-        auto sApvA_e(sApvA.to_eigen('.', false));       // Don't invert it...
+        SparseTriplets<SparseMatrix> sApvA_t({&dimA, &dimA});
+        sApvA_t.set_shape({A.nfull, A.nfull});
+        A.sApvA(sApvA_t, in_sparse_fn(dimA));  // Filter to avoid adding more items to dimA
+        auto sApvA_e(sApvA_t.to_eigen('.', false));       // Don't invert it...
 
         // ---- Obtain sEpvE
         SparseTriplets<SparseMatrix> sEpvE({&dimE, &dimE});
         sEpvE.set_shape({E.nfull, E.nfull});
-        E.sApvA(sEpvE, std::bind(&SparseSetT::in_sparse, dimE, _1));    // Avoid adding more items to dimE
+        E.sApvA(sEpvE_t, std::bind(&SparseSetT::in_sparse, dimE, _1));    // Avoid adding more items to dimE
 
         if (scale) {
-            auto sEvEp_e(sEpvE.to_eigen('.', true));        // Invert it...
+            auto sEvEp_e(sEpvE_t.to_eigen('.', true));        // Invert it...
             auto sEpvAp_e(weight_matrix(EpvAp_e, 0, true));
 
-            EigenSparseMatrixT EvA_scaled_e(sEvEp_e * sEpvAp_e * EpvAp_e * sApvA_e);
-            eigenM_to_sparseM(ret->M, EvA_scaled_e, {&dimE, &dimA});
+            ret->M = sEvEp_e * sEpvAp_e * EpvAp_e * sApvA_e;    // EvA
         } else {
-            EigenSparseMatrixT EpvA_e(EpvAp_e * sApvA_e);
-            eigenM_to_sparseM(ret->M, EpvA_e, {&dimE, &dimA});
+            ret->M = EpvAp_e * sApvA_e;
         }
 
         // ----- Compute the final weight (diagonal) matrix
-        auto wEvEp_e(sEpvE.to_eigen('.', false));
-        auto wEpvAp_e(weight_matrix(EpvAp_e, 0, false));
-        EigenSparseMatrixT weight_e(wEvEp_e * wEpvAp_e);
-        ret->weight.set_shape({dimE.sparse_extent()});
-        sum_rows(ret->weight, weight_e, {&dimE});
+        auto wEvEp_e(sEpvE_t.to_eigen('.', false));
+        auto wEpvAp_b(sum(EpvAp_e,0));    // _b = Blitz++
+        EigenSparseMatrix weight_e(wEvEp_e * weight_matrix(wEpvAp_b));
+        ret->weight.reference(wEpvAp_b);
 
     } else {    // ~correctA
-
+        auto wEpvAp_b(sum(EpvAp_e,0));
         if (scale) {
-            auto sEpvAp_e(weight_matrix(EpvAp_e, 0, true));
+            auto sEpvAp_e(scale_matrix(wEpvAp_b));
 
-            EigenSparseMatrixT EvA_scaled_e(sEpvAp_e * EpvAp_e);
-            eigenM_to_sparseM(ret->M, EvA_scaled_e, {&dimE, &dimA});
+            ret->M = sEpvAp_e * EpvAp_e;
         } else {
-            eigenM_to_sparseM(ret->M, EpvAp_e, {&dimE, &dimA});
+            ret->M = std::move(EpvAp_e);
         }
+        ret->dim[0] = std::move(dimE);
+        ret->dim[1] = std::move(dimA);
 
         // ----- Compute the final weight (diagonal) matrix
-        auto wEpvAp_e(weight_matrix(EpvAp_e, 0, false));
-        ret->weight.set_shape({dimE.sparse_extent()});
-        sum_rows(ret->weight, wEpvAp_e, {&dimE});
-
+        ret->weight.reference(wEpvAp_b);
     }
 
     return ret;

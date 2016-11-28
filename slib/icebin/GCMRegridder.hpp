@@ -316,6 +316,28 @@ extern void linterp_1d(
     int *indices, double *weights); // Size-2 arrays
 
 // ================================================
+/** The sparse vector and matrix data types we'll use in IceBin. */
+typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
+typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
+
+typedef blitz::Array<double,1> DenseVector;
+typedef blitz::Array<double,2> DenseMatrix;
+
+typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrix;
+
+/** Return value of a sparse matrix *//
+struct WeightedSparse {
+    SparseSetT dims[2];    // Dense-to-sparse mapping for the dimensions
+    std::unique_ptr<EigenSparseMatrixT> M;
+    std::Array<double,1> weight;
+};
+
+typedef spsparse::SparseSet<long,int> SparseSet;
+
+
+
+// ----------------------------------------------------
+
 /** Generates the matrices required in the GCM */
 class GCMRegridder
 {
@@ -432,6 +454,7 @@ public:
 
 };  // class GCMRegridder
 // ===========================================================
+
 // -----------------------------------------------------------
 typedef std::function<std::unique_ptr<WeightedSparse>(bool scale, bool correctA)> RegridFunction;
 

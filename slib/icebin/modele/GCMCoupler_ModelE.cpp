@@ -21,6 +21,20 @@
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/contracts/contracts.hpp>
 
+// See here to serialize objects with non-default constructor
+//    http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
+// http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/tutorial.html
+// http://www.ocoudert.com/blog/2011/07/09/a-practical-guide-to-c-serialization/
+// Binary archive that defines boost::archive::binary_oarchive
+// and boost::archive::binary_iarchive
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+
+#include <boost/serialization/serialization.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/export.hpp>
+
+
 use namespace ibmisc;
 
 namespace icebin {
@@ -161,6 +175,7 @@ double time_s,
 blitz::Array<double,4> const &gcm_ovalsE,    // Fortran array: im,jm,nhc,nvar
 bool do_run)
 {
+    GCMCouplerOutput out;
 //    int im = gcm_ovalsE.extent(0);
 //    int jm = gcm_ovalsE.extent(1);
 
@@ -205,7 +220,7 @@ bool do_run)
         gcm_params.gcm_comm, gcm_params.gcm_root, sbuf, nfields, nmsg, 0);
 
     // Process the gathered data
-    if (rank == gcm_params.gcm_root) {
+    if (am_i_root()) {
 
         SparseParallelVectorsE gcm_ovalsE_s(rbuf->size());
 
@@ -222,13 +237,55 @@ bool do_run)
         }
 
         // Couple!
-        this->couple(time_s, gcm_ovalsE_s, do_run);
+        // One out per MPI domain...
+        std::vector<SingleDomainGCMCouplerOutput> outs(
+            this->couple(time_s, gcm_ovalsE_s, out, do_run));
 
+        // -------- Scatter...
+        // Serialize each domain's data to one giant array
+        // https://www.mpich.org/static/docs/v3.2/www3/MPI_Scatterv.html
+        std::vector<int> sendcounts, displs;    // See MPI_Scatterv()
+        displs.push_back(0);
+        ostringstream obuf(std::ios:binary);
+        boost::archive::binary_oarchive oarchiver(obuf);
+        for (SingleDomainGCMCouplerOutput &out : outs) {
+            oarchiver >> out;
+            displs.push_back(obuf.tellp());
+            size_t const n(displs.size());
+            sendcounts.push_back(displs[n-1] - displs[n-2]);
+        }
+        std::string ostr(obuf.str());    // Convert to contiguous buffer
+
+        // Get the count for each node
+        std::vector<int> counts2, displs2;
+        for (int i=0; i<sendcounts.size(); ++i) {
+            counts2.push_back(1);
+            displs2.push_back(i);
+        }
+        int local_count;
+        MPI_Scatterv(
+            &sendcounts[0], &counts2[0], &displs2[0], MPI::INT,
+            &local_count, 1, MPI::INT,
+            0, comm);
+
+        // Scatter the serialized data
+        std::string ibuf_str(local_count, '\0');    // Allocate buffer
+        MPI_Scatterv(
+            &ostr[0], &sendcounts[0], &displs[0], MPI::CHAR,
+            &ibuf_str[0], ibuf_str.size(), MPI::CHAR,
+            0, comm);
+
+        // Deserialize our portion
+        SingleDomainGCMCouplerOutput out_thisrank;
+        istringstream ibuf_stream(ibuf_str, std::ios::binary);
+        boost::archive::binary_archive oa(ibuf_stream);
+        ibuf_stream >> out_thisrank;
+
+    } else {
+        We must call MPI_Scatterv() as well...
     }
 
-    // Get dimensions of full domain
-    int nhp_gcm = icebin_modele_nhp_gcm(api);
-    ModelEDomain const *domain(&*api->domain);
+        // Update FHC, etc...
 
 }
 
