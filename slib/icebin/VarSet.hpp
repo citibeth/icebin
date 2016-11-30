@@ -74,7 +74,22 @@ public:
     VarMeta const &at(std::string const &name) const
         { return data[index.at(name)]; }
 
+    /** Defines each variable in the DimSet, according to a set of dimensions. */
+    NcVar ncdefine(NcIO &ncio,
+        std::vector<netCDF::NcDim> const &dims,
+        std::string vname_base)
+    {
+        for (size_t i=0; i<size(); ++i) {
+            auto &var((*this)[i]);
+            get_or_add_var(ncio, vname_base+var.name, "double", dims);
+        }
+    }
+
 };
+
+
+
+
 
 }
 

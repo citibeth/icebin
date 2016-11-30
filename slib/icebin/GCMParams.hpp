@@ -32,6 +32,8 @@ struct GCMParams {
     std::string time_units;     // CF-compliant string describing the time units
     double time_start_s;        // Start of simulation, as far as ice model is concerned (seconds since time_base).
 
+    bool icebin_logging = true;    // Should IceBin log input & output?
+
     GCMParams();
 
     GCMParams(

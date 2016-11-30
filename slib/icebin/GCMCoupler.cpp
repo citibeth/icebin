@@ -145,6 +145,7 @@ void GCMCoupler::set_start_time(
     double time_start_s)
 {
     gcm_params.set_start_time(time_base, time_start_s);
+    last_time_s = time_start_s;
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         ice_couplers[sheetix]->set_start_time(time_base, time_start_s);
@@ -156,21 +157,158 @@ void GCMCoupler::set_start_time(
 GCMCouplerOutput GCMCoupler::couple(
 // Simulation time [s]
 double time_s,
+std::array<int,3> const &yymmdd, // Date that time_s lies on
 ArraySparseParallelVectorsE const &gcm_ovalsE,
 bool do_run)
 {
-    // Initialize output
-    GCMCouplerOutput out;
-    for (int i=0; i<GCMI::COUNT; ++i) {
-        out.gcm_ivals[i].nvar = gcm_inputs[i].size();
+    std::string sdate = (boost::format
+        ("%04d%02d%02d") % yymmdd[0] % yymmdd[1] % yymmdd[2]).str();
+    std::string log_dir = "icebin";
+
+    if (gcm_params.icebin_logging) {
+        std::string fname = "gcm-out-" + sdate;
+        NcIO ncio(fname, 'w');
+        ncio_gcm_output(ncio, gcm_ovalsE, {last_time_s, time_s},
+            gcm_params.time_units, "");
+        ncio();
     }
+
+    // Initialize output
+    GCMCouplerOutput out(gcm_inputs[i].size());
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
         ice_coupler.couple(time_s, gcm_ovalsE, out, do_run);
     }
+
+
+    if (gcm_params.icebin_logging) {
+        std::string fname = "gcm-out-" + sdate;
+        NcIO ncio(fname, 'r');
+        ncio_gcm_input(ncio, gcm_ovalsE, {last_time_s, time_s},
+            gcm_params.time_units, "");
+        ncio();
+    }
+
+
     return out;
 }
+// ------------------------------------------------------------
+static ncwrite_dense(
+    NcFile *nc,
+    ArraySparseParallelVectors *vecs,
+    VarSet *contract,
+    ibmisc::IndexingBase const *indexing,
+    std::string const &vname_base)
+{
+    // im,jm,ihc  0-based
+    blitz::Array<double,1> denseE(indexing->extent());    // All dims
 
+    // NetCDF needs dimensions in stride-descending order
+    std::vector<size_t> startp
+    std::vector<size_t> extents;
+    for (int dimi : indexing->indices) {
+        startp.push_back(0);
+        extents.push_back(indexing->extents[dimi]);
+    }
+
+    // Go through each variable...
+    for (unsigned int ivar=0; ivar < vals.values.size(); ++ivar) {
+        // Fill our dense var
+        denseE = nan;
+        for (unsigned int i=0; i<vals.index.size(); ++i)
+            dense(vals.index[i]) = vals.values[ivar][i];
+
+        // Store in the netCDF variable
+        NcVar ncvar(nc.getVar(vname_base + (*contract)[ivar].name));
+        ncvar.putVar(startp, countp, denseE.data());
+    }
+
+}
+
+/** Densifies the sparse vectors, and then writes them out to netCDF */
+void ncio_dense(
+    NcIO &ncio,
+    ArraySparseParallelVectors &vec,    
+    VarSet &contract,
+    ibmisc::IndexingBase const &indexing,
+    std::string const &vname_base = "")
+{
+    if (ncio.rw != 'w') (*icebin_error)(-1,
+        "ncio_dense(ArraySparseParallelVectors) only writes, no read.");
+
+    // Create the variables
+    NcDimSpec dim_spec({"time"}, {-1});
+    append(dim_spec, indexingAE);
+    contract.ncdefine(ncio, dim_spec.to_dims(), vname_base);
+
+    ncio += std::bind(&ncwrite_dense, ncio.nc,
+        &vec, &contract, &indexing,
+        vname_base);
+}
+// ------------------------------------------------------------
+template<ValT>
+inline append(std::vector<ValT> &out, std::vector<ValT> const &inn)
+{
+    for (auto ii=inn.begin(); ii != inn.end(); ++ii)
+        out.push_back(*ii);
+}
+GCMCouplerOutput concatenate(std::vector<GCMCouplerOutput> const &outs)
+{
+    GCMCouplerOutput all_out;
+
+    if (outs.size() == 0) return all_out;
+
+    for (GridAE iAE=0; iAE<GridAE::count; ++iAE) {
+        append(all_out.gcm_ivals[iAE].index, out.gcm_ivals[iAE].index);
+        append(all_out.gcm_ivals[iAE].vals, out.gcm_ivals[iAE].vals);
+    }
+
+    all_out = outs[0];
+    for (size_t i=1; i<outs.size(); ++i) {
+        GCMCouplerOutput &out(outs[i]);
+
+        copy(all_out.E1vE0, E1vE0);
+        copy(all_out.AvE1, AvE1);
+        copy(all_out.wAvE1, wAvE1);
+        copy(all_out.elevE1, elevE1);
+    }
+
+    return all_out;
+}
+// ------------------------------------------------------------
+/** Top-level ncio() to log output from coupler. (coupler->GCM) */
+void GCMCoupler::ncio_gcm_input(NcIO &ncio,
+    GCMCouplerOutput &out,        // All MPI ranks included here
+    std::array<double,2> const &timespan,    // timespan[1] = current time_s
+    std::string time_units,
+    std::string const &vname_base)
+{
+    ncio_timespan(ncio, timespan, time_units, vname_base);
+
+    for (GridAE iAE=0; iAE<GridAE::count; ++iAE) {
+        ncio_dense(ncio, out.gcm_ivals[iAE], gcm_inputs[iAE],
+            regridder.indexing(iAE), vname_base);
+    }
+
+    ncio_spsparse(ncio, out.E1vE0, false, vname_base+"Ev1Ev0");
+    ncio_spsparse(ncio, out.AvE1, false, vname_base+"AvE1");
+    ncio_spsparse(ncio, out.wAvE1, false, vname_base+"wAvE1");
+    ncio_spsparse(ncio, out.elevE1, false, vname_base+"elevE1");
+}
+
+/** Top-level ncio() to log input to coupler. (GCM->coupler) */
+void GCMCoupler::ncio_gcm_output(NcIO &ncio,
+    ArraySparseParallelVectors &gcm_ovalsE,
+    std::array<double,2> const &timespan,    // timespan[1] = current time_s
+    std::string time_units,
+    std::string const &vname_base)
+{
+    ncio_timespan(ncio, timespan, time_units, vname_base);
+
+    ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
+        regridder.indexingE, vname_base);
+}
+// ------------------------------------------------------------
 
 }       // namespace

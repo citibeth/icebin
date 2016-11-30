@@ -47,7 +47,7 @@ public:
     // Number of _vals element per _ix element
     int nvar;
 
-    VectorParallelVectors() : nvar(1) {}
+    VectorParallelVectors(int _nvar) : nvar(_nvar) {}
 
     inline size_t size() { return index.size(); }
 
@@ -170,7 +170,7 @@ struct GCMCouplerOutput {
 
     // Mapping from the index of a variable in gcm_ivalsE/gcm_ivalsA
     // and the index within the GCMCoupler::gcm_inputs
-    std::array<VectorSparseParallelVectors,2> gcm_ivals;    // gcm_ivalsE, gcm_ivalsA
+    std::array<VectorSparseParallelVectors, GridAE::count> gcm_ivals;
 
     // Values required to update TOPO, etc. in ModelE
     // (see add_fhc.py for how these are to be used)
@@ -191,6 +191,13 @@ struct GCMCouplerOutput {
     // Used for temperature downscaling according to a lapse rate
     SparseVector elevE1;
 
+    GCMCouplerOutput(int nvar) :
+        gcm_ivals({
+            VectorSparseParallelVectors(nvar),
+            VectorSparseParallelVectors(nvar),
+        }) {}
+    }
+
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
     {
@@ -208,9 +215,9 @@ struct MultiDomainGCMCouplerOutput {
     std::array<DomainDecomposer const *, 2> domains;    // domainsE, domainsA
 
     // GCMCouplerOutput for each MPI rank
-    std::vector<SingleDomainGCMCouplerOutput> single_outs;
+    std::unique_ptr<std::vector<GCMCouplerOutput>> single_outs;
 
-    MultiDomain<VectorSparseParallelVectors> gcm_ivalsE, gcm_ivalsA;
+    std::array<MultiDomain<VectorSparseParallelVectors>,2> gcm_ivalsE;
 
     std::array<MultiDomain<VectorSparseParallelVectors &, 2>> gcm_ivals;
 
@@ -219,39 +226,38 @@ struct MultiDomainGCMCouplerOutput {
     MultiDomain<SparseVector,1> wAvE1;
     MultiDomain<SparseVector,0> elevE1;
 
+    std::unique_ptr<std::vector<GCMCouplerOutput>> _init_single_outs(
+        int ndomain, int nvar)
+    {
+        std::unique_ptr<std::vector<GCMCouplerOutput>> ret(
+            new std::vector<GCMCouplerOutput>());
+        ret->reserve(ndomain);
+        for (size_t i=0; i<ndomain; ++i)
+            ret->push_back(GCMCouplerOutput(nvar));
 
-    GCMCouplerOutput(
-        DomainDecomposer const *domainsE,
+        return ret;
+    }
+
+
+    MultiDomainGCMCouplerOutput(
         DomainDecomposer const *domainsA
+        DomainDecomposer const *domainsE,
+        int nvar
     ) :    // domainsE, domainsA
-        domains({domainsE, domainsA}),
-        single_out(_domains[0]->size()),
-        gcm_ivalsE(&single_out[0].gcm_ivalsE, 0,
-            domainsE, sizeof(SingleDomainGCMCouplerOutput)),
-        gcm_ivalsA(&single_out[0].gcm_ivalsE, 0,
-            domainsA, sizeof(SingleDomainGCMCouplerOutput)),
-        gcm_ivals({gcm_ivalsE, gcm_ivalsA}),
-        E1vE0(&single_out[0].E1vE0, 0,
-            domainsE, sizeof(SingleDomainGCMCouplerOutput)),
-        AvE1(&single_out[0].AvE1, 0,
-            domainsA, sizeof(SingleDomainGCMCouplerOutput)),
-        wAvE1(&single_out[0].wAvE1, 0,
-            domainsA, sizeof(SingleDomainGCMCouplerOutput)),
-        elevE1(&single_out[0].elevE1, 0,
-            domainsE, sizeof(SingleDomainGCMCouplerOutput)),
+        domains({domainsA, domainsE}),
+        single_outs(_init_single_outs(domainsA->size(), nvar)),
+        gcm_ivalsE(&single_outs->front().gcm_ivalsE, 0, domainsE, sizeof(GCMCouplerOutput)),
+        gcm_ivalsA(&single_outs->front().gcm_ivalsE, 0, domainsA, sizeof(GCMCouplerOutput)),
+        gcm_ivals({gcm_ivalsA, gcm_ivalsE}),
+        E1vE0(&single_outs->front().E1vE0, 0, domainsE, sizeof(GCMCouplerOutput)),
+        AvE1(&single_outs->front().AvE1, 0, domainsA, sizeof(GCMCouplerOutput)),
+        wAvE1(&single_outs->front().wAvE1, 0, domainsA, sizeof(GCMCouplerOutput)),
+        elevE1(&single_outs->front().elevE1, 0, domainsE, sizeof(GCMCouplerOutput)),
     {
     }
 };
 
 
-
-
-
-
-/** Represents a single rank (sub-domain) of a GCMCouplerOutput object. */
-struct GCMCouplerOutput_Rank {
-    GCMCouplerOutput
-};
 
 
 struct IceOutMsgE {
@@ -274,11 +280,11 @@ struct IceOutMsgE {
 
 //struct IceCouplerOutput {
 //    // Mapping between sparse and dense dimensions for E and A grids
-//    std::array<SparseSet, GCMCoupler::GCMI::COUNT> dims;
+//    std::array<SparseSet, GridAE::count> dims;
 //
 //    // Dense array with sparse indices represented in dims
 //    // gcm_ivals[E/A](nE/nA, nvar)
-//    std::array<blitz::Array<double,2>> gcm_ivals;    // gcm_ivalsE1, gcm_ivalsA
+//    std::array<blitz::Array<double,GridAE::count>> gcm_ivals;    // gcm_ivalsE1, gcm_ivalsA
 //
 //
 //    // Values required to update TOPO, etc. in ModelE
@@ -331,6 +337,9 @@ public:
     );
     Type const type;
 
+    // Last time this coupler was called
+    double last_time_s;
+
     /** Filename this coupler (including grid) was read from. */
     std::string icebin_in;
 
@@ -352,8 +361,7 @@ public:
     VarSet gcm_outputsE;
 
     /** Description of fields to send back to the GCM; some on E, some on A */
-    enum class GCMI { E, A, COUNT };
-    VarSet[GCMI::COUNT] gcm_inputs;    // gcm_inputsE, gcm_inputsA
+    std::array<VarSet, GridAE::count> gcm_inputs;    // gcm_inputsE, gcm_inputsA
 
     /** Names of items used in the SCALARS dimension of VarTranslator.
     Used for ice_input and gcm_inputs.
@@ -399,7 +407,7 @@ void GCMCoupler::couple(
 // Simulation time [s]
 double time_s,
 ArraySparseParallelVectorsE const &gcm_ovalsE,
-GCMCoupleOutput &out,
+MultiDomainGCMCoupleOutput &out,
 bool do_run)
 
 };

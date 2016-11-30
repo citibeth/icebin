@@ -338,6 +338,9 @@ typedef spsparse::SparseSet<long,int> SparseSet;
 
 // ----------------------------------------------------
 
+/** Used to index arrays that are done for A and E grids */
+enum class GridAE { A, E, count };
+
 /** Generates the matrices required in the GCM */
 class GCMRegridder
 {
@@ -369,6 +372,8 @@ public:
     // (im,jm,...,ihp) zero-based indices
     ibmisc::Indexing<int, long> indexingE;
 
+    ibmisc::Indexing<int, long> &indexing(GridAE iAE)
+        { return (iAE == GridAE::A ? gridA.indexing : indexingE); }
 
     /** Position of height points in elevation space (same for all GCM
     grid cells) */

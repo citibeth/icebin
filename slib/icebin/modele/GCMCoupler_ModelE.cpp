@@ -18,6 +18,7 @@
 
 #include <mpi.h>        // Intel MPI wants to be first
 #include <ibmisc/memory.hpp>
+#include <ibmisc/ncfile.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/contracts/contracts.hpp>
 
@@ -287,134 +288,9 @@ bool do_run)
     // TODO: Nothing for now
 }
 // ===============================================================
-void nc_write_time0(netCDF::NcGroup *nc, double time0_s)
-{
-    netCDF::NcVar time0_var(nc->getVar("time0"));
-    time0_var.putVar({0}, {1}, time0);
-}
-
-static void define_time0(NcIO &ncio, double &time0_s, std::string &time_units)
-{
-    // if (ncio.rw == 'r') (*icebin_error)(-1, "Read not supported");
-
-    NcDim time_dim(get_or_add_dim(ncio, "time", -1));
-
-    NcVar time0_var = ncio.nc->addVar("time0", ibmisc::get_nc_type<double>(), dims_b);
-    time0_var.putAtt("units", time_units);
-    time0_var.putAtt("calendar", "365_day");
-    time0_var.putAtt("axis", "T");
-    time0_var.putAtt("long_name", "Simulation start time");
-
-    NcVar time_var = ncio.nc->addVar("time", ibmisc::get_nc_type<double>(), dims_atmosphere);
-    time_var.putAtt("units", time_units);
-    time_var.putAtt("calendar", "365_day");
-    time_var.putAtt("axis", "T");
-    time_var.putAtt("long_name", "Coupling times");
-
-    ncio += std::bind(&nc_write_time0, ncio.nc, time0_s);
-}
-// ----------------------------------------------------------
-
-static void define_gcm_varsAE(
-NcIO &ncio,
-VarSet &contract,
-ibmisc::Indexing<int,long> const &indexingAE)
-{
-    auto dims(get_or_add_dims(ncio,
-        concatenate(
-            std::vector<std::string>{"time"},
-            indexingAE.names),
-        concatenate(
-            std::vector<int>{-1},
-            indexingAE.extent)));
-
-    for (size_t i=0; i<contract.size(); ++i) {
-        NcVar ncvar(get_or_add_var(ncio, contract[i].name, "double", dims));
-        ncvar.putAtt("units", contract[i].units);
-        ncvar.putAtt("description", contract[i].description);
-    }
-}
-
-template<int RANK>
-static void write_gcm_varsAE(
-NcIO &ncio,
-VarSet &contract,
-ibmisc::Indexing<int,long> const &indexingAE,
-ArraySparseParallelVectors &vals)
-{
-    NcDim time_dim(nc.getDim("time"));
-
-    // im,jm,ihc  0-based
-    auto denseE(regridder.indexingAE.make_blitz<double,RANK>());
-
-     auto startp(concatenate(
-        std::vector<size_t>{time_dim.Size()}
-        std::vector<size_t>(RANK, 0)));
-
-    // Dimensions in netCDF are ihp,jm,im; reverse of indexingE
-    auto countp(concatenate(
-        std::vector<size_t>{1},
-        reverse(indexingAE.extent)));
-
-    blitz::TinyVector<int,RANK> tvec;
-    for (unsigned int ivar=0; ivar < vals.values.size(); ++ivar) {
-        // Fill our dense var
-        denseE = nan;
-        blitz::TinyVector<int,3> tiny;
-        for (unsigned int i=0; i<vals.index.size(); ++i) {
-            indexingAE.index_to_tuple(&tiny[0], vals.index[i]);
-            denseE(tiny) = vals.values[ivar][i];
-        }
-
-        // Store in the netCDF variable
-        NcVar ncvar(nc.getVar(contracts[ivar].name));
-        ncvar.putVar(startp, countp, denseE.data());
-    }
-}
-// -------------------------------------------------------------------
-// -------------------------------------------------------------------
+// NetCDF Logging Stuff
 
 
-void GCMCoupler_ModelE::define_gcm_output(NcIO &ncio)
-{
-    ncw_time0(ncio, gcm_params.time_start_s, gcm_params.time_units);
-    define_gcm_varsE(ncio, gcm_outputsE, regridder.indexingE);
-}
-
-
-void GCMCoupler_ModelE::write_gcm_output(
-double time_s,
-VectorSparseParallelVectors &gcm_ovalsE)
-{
-    write_gcm_varsAE<3>(ncio, gcm_outputsE, regridder.indexingE,
-        to_array(gcm_ovalsE));
-}
-
-// -------------------------------------------------------------------
-
-void GCMCoupler_ModelE::define_coupler_output(
-NcIO &ncio,
-double time_s)
-{
-    define_gcm_varsAE(ncio, gcm_inputs[GCMCoupler::GCMI::A], regridder.indexingA);
-    define_gcm_varsAE(ncio, gcm_inputs[GCMCoupler::GCMI::E], regridder.indexingE);
-}
-
-
-void GCMCoupler_ModelE::write_coupler_output(
-double time_s,
-std::vector<GCMCouplerOutput> const &out)
-{
-    int iAE;
-
-    iAE = GCMCoupler::GCMI::A;
-    write_gcm_varsAE<2>(ncio, gcm_outputs[iAE], regridder.indexingA,
-        to_array(gcm_ivals[iAE]));
-
-    iAE = GCMCoupler::GCMI::E;
-    write_gcm_varsEE<3>(ncio, gcm_outputs[iAE], regridder.indexingE,
-        to_array(gcm_ivals[GCMCoupler::GCMI::E]));
-}
 
 
 
