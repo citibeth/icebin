@@ -71,7 +71,7 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         GCMRegridder *self,
         string &gridA_fname,
         string &gridA_vname,
-        vector[double] &hpdefs,
+        vector[double] &hcdefs,
         bool correctA) except +
 
     cdef void GCMRegridder_add_sheet(

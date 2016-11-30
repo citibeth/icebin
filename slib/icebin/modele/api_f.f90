@@ -80,14 +80,39 @@ INTERFACE
     end subroutine
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
-    function icebin_modele_add_gcm_input(api, &
+    function icebin_modele_add_gcm_inputA(api, &
         field_f, field_len, &
         units_f, units_len, &
         grid_f, grid_len, &
         initial, &
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
+    use f90blitz
         type(c_ptr), value :: api
+        type(arr_spec_2) :: var_f
+        character(c_char) :: field_f(*)
+        integer(c_int), value :: field_len
+        character(c_char) :: units_f(*)
+        integer(c_int), value :: units_len
+        character(c_char) :: grid_f(*)
+        integer(c_int), value :: grid_len
+        character(c_char) :: long_name_f(*)
+        integer(c_int), value :: initial
+        integer(c_int), value :: long_name_len
+        integer(c_int) :: icebin_modele_add_gcm_input
+    end function
+
+    ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
+    function icebin_modele_add_gcm_inputE(api, &
+        field_f, field_len, &
+        units_f, units_len, &
+        grid_f, grid_len, &
+        initial, &
+        long_name_f, long_name_len) bind(c)
+    use iso_c_binding
+    use f90blitz
+        type(c_ptr), value :: api
+        type(arr_spec_3) :: var_f
         character(c_char) :: field_f(*)
         integer(c_int), value :: field_len
         character(c_char) :: units_f(*)

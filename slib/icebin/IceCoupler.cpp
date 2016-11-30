@@ -276,4 +276,6 @@ bool do_run)
             gcm_ivals.add(jj, vals);
         }
     }
+
+    dimE0 = std::move(dimE);
 }

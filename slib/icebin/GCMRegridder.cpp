@@ -83,7 +83,7 @@ void IceRegridder::sEpvE(SparseTriplets<SparseMatrix> &w, std::function<bool(lon
         long tuple[2] = {cell->index, 0};
         long &ihp(tuple[1]);
         for (ihp=0; ihp<nhp; ++ihp) {
-            long indexE = gcm->indexingHP.tuple_to_index(tuple);
+            long indexE = gcm->indexingHC.tuple_to_index(tuple);
             if (!filter_fn(indexE)) continue;
             w.add({indexE, indexE}, cell->native_area / cell->proj_area(&proj));
         }
@@ -95,6 +95,33 @@ void IceRegridder::clear()
     gridI.reset();
     exgrid.reset();
     elevI.clear();
+}
+// -------------------------------------------------------------
+/** Determines correct indexing for the E grid.
+Returns: im,jm,...,iHC*/
+static ibmisc::Indexing<int,long> derive_indexingE(
+ibmisc::Indexing<int,long> const &indexingA,      // im,jm,...
+ibmisc::Indexing<long,long> const &indexingHC)    // iA,iHC
+{
+    std::vector<std::string> name(indexingA.name);    // Name of each dimension
+    std::vector<int> base(indexingA.base);   // First element in each index
+    std::vector<int> extent(indexingA.extent); // Extent (# elements) of each index
+    std::vector<int> indices(indexingA.indices);   // Index IDs sorted by descending stride. {0,1,...} for row-major, reversed for col-major
+
+    name.push_back(indexingHC.name[1]);
+    base.push_back(indexingHC.base[1]);
+    extent.push_back(indexingHC.extent[1]);
+
+    if (indexingHC.indices[0] == 0) {    // HC is row major so we are too
+        indices.push_back(indexingA.rank());
+    } else {
+        for (auto &ii : indices) ++ii;
+        indices.push_back(0);
+    }
+
+    return ibmisc::Indexing<int,long>(
+        std::move(name), std::move(base),
+        std::move(extent), std::move(indices));
 }
 // -------------------------------------------------------------
 void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
@@ -112,23 +139,27 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
     gridI->ncio(ncio, vname + ".gridI");
     exgrid->ncio(ncio, vname + ".exgrid");
     ncio_spsparse(ncio, elevI, true, vname + ".elevI");
+
+    indexingE = derive_indexingE(gridA->indexing, indexingHC);
 }
 // ========================================================
 void GCMRegridder::init(
     std::unique_ptr<Grid> &&_gridA,
 //  ibmisc::Domain<int> &&_domainA,     // Tells us which cells in gridA to keep...
-    std::vector<double> &&_hpdefs,  // [nhp]
-    ibmisc::Indexing<long,long> &&_indexingHP,
+    std::vector<double> &&_hcdefs,  // [nhp]
+    ibmisc::Indexing<long,long> &&_indexingHC,
     bool _correctA)
 {
     gridA = std::move(_gridA);
 //  domainA = std::move(_domainA);
-    hpdefs = std::move(_hpdefs);
-    indexingHP = std::move(_indexingHP);
+    hcdefs = std::move(_hcdefs);
+    indexingHC = std::move(_indexingHC);
     correctA = _correctA;
 
-    if (indexingHP.rank() != 2) (*icebin_error)(-1,
-        "indexingHP has rank %d, it must have rank=2", indexingHP.rank());
+    if (indexingHC.rank() != 2) (*icebin_error)(-1,
+        "indexingHC has rank %d, it must have rank=2", indexingHC.rank());
+
+    indexingE = derive_indexingE(gridA->indexing, indexingHC);
 }
 // -------------------------------------------------------------
 std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
@@ -160,7 +191,7 @@ std::unique_ptr<IceRegridder> new_ice_regridder(NcIO &ncio, std::string vname)
 void GCMRegridder::clear()
 {
     gridA.reset();
-    hpdefs.clear();
+    hcdefs.clear();
     sheets_index.clear();
     sheets.clear();
 }
@@ -176,9 +207,9 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
 
     // Read/Write gridA and other global stuff
     gridA->ncio(ncio, vname + ".gridA");
-    indexingHP.ncio(ncio, ncInt, vname + ".indexingHP");
-    ncio_vector(ncio, hpdefs, true, vname + ".hpdefs", ncDouble,
-        get_or_add_dims(ncio, {vname + ".nhp"}, {hpdefs.size()} ));
+    indexingHC.ncio(ncio, ncInt, vname + ".indexingHC");
+    ncio_vector(ncio, hcdefs, true, vname + ".hcdefs", ncDouble,
+        get_or_add_dims(ncio, {vname + ".nhp"}, {hcdefs.size()} ));
 //  domainA.ncio(ncio, ncInt, vname + ".domainA");
     get_or_put_att(info_v, ncio.rw, vname + ".correctA", &correctA, 1);
 

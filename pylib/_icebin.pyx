@@ -64,8 +64,8 @@ cdef class GCMRegridder:
         cdef ibmisc.NcIO ncio
 
         try:
-            gridA_fname, gridA_vname, hpdefs, correctA = args
-            cicebin.GCMRegridder_init(&self.cself, gridA_fname.encode(), gridA_vname.encode(), hpdefs, correctA)
+            gridA_fname, gridA_vname, hcdefs, correctA = args
+            cicebin.GCMRegridder_init(&self.cself, gridA_fname.encode(), gridA_vname.encode(), hcdefs, correctA)
             return
         except:
             pass

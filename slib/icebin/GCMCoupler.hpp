@@ -49,6 +49,8 @@ public:
 
     VectorParallelVectors() : nvar(1) {}
 
+    inline size_t size() { return index.size(); }
+
     friend class boost::serialization::access;
     template<typename ArchiveT>
     void serialize(ArchiveT& ar, const unsigned version) {
@@ -69,13 +71,50 @@ public:
 
 };
 
-struct ArraySparseParallelVectorsE {
+VectorParallelVectors concatenate(std::vector<VectorParallelVectors> const &vecs)
+{
+    VectorParallelVectors ret;
+
+    if (len(vecs) == 0) (*icebin_error)(-1,
+        "Must concatenate at least one vector");
+
+    ret.nvar = vecs[0].nvar;
+
+    for (auto ii=vecs.begin(); ii != vecs.end(); ++ii) {
+        ret.insert(ret.index.end(), ii->index.begin(), ii->index.end());
+        ret.insert(ret.vals.end(), ii->vals.begin(), ii->vals.end());
+
+        if (ret.nvar != ii->nvar) (*icebin_error)(-1,
+            "Inconsistant nvar: %d vs %d", ret.nvar, ii->nvar);
+    }
+    return ret;
+}
+
+
+struct ArraySparseParallelVectors {
     // Stores a bunch of parallel sparse vectors
     // Index of each element in the parallel vectors
-    blitz::Array<long,1> ixA;
-    blitz::Array<int,1> ixHC;
+    blitz::Array<long,1> index;
     std::vector<blitz::Array<double,1>> values;
 };
+
+ArraySparseParallelVectors to_array(VectorSparseParallelVectors &vecs)
+{
+    ArraySparseParallelVectors ret;
+
+    // make_array(address, nele, stride)
+    vecs.ixA.reference(make_array(&vecs.index[0], vecs.index.size(), 1));
+
+    ret.values.reserve(vecs.nvar);
+    size_t nele = vecs.values.size() / vecs.nvar;
+    for (int ivar=0; ivar<nvar; ++ivar) {
+        ret.values.push_back(make_array(&vecs.values[i], nele, nvar));
+    }
+
+    return ret;
+}
+
+
 
 // extern ArraySparseParallelVectors vector_to_array(VectorSparseParallelVectors vecs);
 
@@ -125,7 +164,7 @@ public:
     int get_domain(long index);
 }
 
-struct SingleDomainGCMCouplerOutput {
+struct GCMCouplerOutput {
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
 
@@ -163,6 +202,7 @@ struct SingleDomainGCMCouplerOutput {
     }
 };
 
+/** Used to write to an array od GCMCouplerOutput */
 struct MultiDomainGCMCouplerOutput {
 
     std::array<DomainDecomposer const *, 2> domains;    // domainsE, domainsA

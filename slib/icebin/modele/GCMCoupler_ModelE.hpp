@@ -40,17 +40,47 @@ public:
     ModelE_CouplingType coupling_type;
 };
 
+struct ModelEInputs
+{
+    // Pointers to arrys within ModelE
+
+    // gcm_ivalsAI[E/A][ivar](i, j, ihc)    Fortran-order 1-based indexing
+    std::vector<std::vector<blitz::Array<double,3>>> gcm_ivals;
+
+    // i,j,ihc arrays on Elevation grid
+    blitz::Array<double,3> fhc;
+    blitz::Array<double,3> elevE;
+
+    // i,j arrays on Atmosphere grid
+    blitz::Array<double,2> focean;
+    blitz::Array<double,2> flake;
+    blitz::Array<double,2> fgrnd;    // Alt: fearth0
+    blitz::Array<double,2> fgice;    // Alt: flice
+    blitz::Array<double,2> zatmo;      // i,j
+    
+};
+
+
+
+
 class GCMCoupler_ModelE : public GCMCoupler
 {
-    /** The first GCM elevation class that is an IceBin class. */
+    // Last time this coupler was called
+    double last_time_s;
+
+    // Variables borrowed from ModelE, used to return data to it.
+    // All these variables are Fortran-order, 1-based indexing
+    ModelEInputs modele_f;
+
+    // The first GCM elevation class that is an IceBin class (0-based indexing)
     int icebin_base_hc;
     int icebin_nhc;    // Number of elevation classes used by IceBin
 
-    blitz::Array<double,3> fhc;    // Reference to Fortran array FHC
-
     // Low and high indices for this MPI node.
-    // Indices are in C order (jm, im)
+    // Indices are in Fortran order (im, jm) with zero-based indexing
     ibmisc::Domain<int> domainA;
+    // Low and high indices for global domain (Fortran order, 0-based)
+    ibmisc::Domain<int> domainA_global;
 
 public:
     GCMCoupler_ModelE();
@@ -60,11 +90,6 @@ public:
     read_gcm_per_ice_sheet_params(
         ibmisc::NcIO &ncio,
         std::string const &sheet_vname);
-
-    /** Does contract setup for ONE IceModel instance.
-    Calls throught to IceModel::setup_contract_xxx() */
-    virtual void setup_contracts(IceModel &mod) const;
-
 };
 
 

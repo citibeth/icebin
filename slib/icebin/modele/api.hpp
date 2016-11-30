@@ -31,7 +31,6 @@ namespace modele {
 
 // The ModelE interface to IceBin.  This is called directly by ModelE.
 // ------------------------------------------------------
-
 struct icebin_modele {
     ModelEDomain *domain;   // Points to domain owned by maker
 
@@ -49,7 +48,7 @@ struct icebin_modele {
     std::vector<int> gcm_inputs_ihp;
 
     /** Last time the coupler was called (or start of run) */
-    int itime_last;
+//    int itime_last;
 
     icebin_modele()
     {

@@ -360,12 +360,19 @@ public:
         an elevation class iHP.  This converts converts indices
         between (iA, iHP) <--> (iE).  The iA index may be broken down
         further into grid-specific coordinates using gridA->indexing.
+
+        (iA, iHP) zero-based
     */
     ibmisc::Indexing<long,long> indexingHC;
 
+    // Derived from gridA.indexing and indexingHC
+    // (im,jm,...,ihp) zero-based indices
+    ibmisc::Indexing<int, long> indexingE;
+
+
     /** Position of height points in elevation space (same for all GCM
     grid cells) */
-    std::vector<double> hpdefs; // [nhp]
+    std::vector<double> hcdefs; // [nhp]
 
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> sheets_index;
@@ -388,16 +395,16 @@ public:
 
     @param _gridA
         The atmosphere grid to use
-    @param _hpdefs
+    @param _hcdefs
         Elevation of each elevation class to use.  (The
         same definitions will be used for every grid cell).
-    @param _indexingHP
+    @param _indexingHC
         How to convert (iA, iHP) <--> (iE) */
     void init(
         std::unique_ptr<Grid> &&_gridA,
 //      ibmisc::Domain<int> &&_domainA,     // Tells us which cells in gridA to keep...
-        std::vector<double> &&_hpdefs,
-        ibmisc::Indexing<long,long> &&_indexingHP,
+        std::vector<double> &&_hcdefs,
+        ibmisc::Indexing<long,long> &&_indexingHC,
         bool _correctA);
 
     // -----------------------------------------
@@ -426,7 +433,8 @@ public:
     void filter_cellsA(std::function<bool(long)> const &keepA);
 
     /** Higher-level filter, filter out cells not in our MPI domain.
-    @param domainA Description of our MPI domain. */
+    @param domainA Description of our MPI domain.
+    Indices are in C order with 0-based indexing. */
     void filter_cellsA(ibmisc::Domain<int> const &domainA);
 
     typedef ibmisc::DerefRandomAccessIter<const IceRegridder, typename SheetsT::const_iterator> const_iterator;
@@ -443,7 +451,7 @@ public:
     void wA(SparseVector &w) const;
 
     /** @return Number of elevation points for a given grid cell */
-    unsigned int nhp(int i1) const { return hpdefs.size(); }
+    unsigned int nhp(int i1) const { return hcdefs.size(); }
 
     /** @return Number of elevation points for grid cells in general */
     unsigned int nhp() const { return nhp(-1); }

@@ -437,7 +437,7 @@ extern "C" void icebin_modele_init0(
     printf("Opening ICEBIN config file: %s\n", icebin_config_rfname.c_str());
 
     // Read the coupler, along with ice model proxies
-    api->gcm_coupler.read_from_netcdf(icebin_config_rfname.string(), maker_vname, std::move(mdomain));
+    api->gcm_coupler.ncread(icebin_config_rfname.string(), maker_vname, std::move(mdomain));
 
     // Check bounds on the IceSheets, set up any state, etc.
     // This is done AFTER setup of gcm_coupler because gcm_coupler.read_from_netcdf()
@@ -457,34 +457,13 @@ extern "C" void icebin_modele_delete(icebin_modele *&api)
     api = 0;
 }
 // -----------------------------------------------------
-extern "C"
-int icebin_modele_nhp_gcm(icebin_modele const *api)
-{
-    int nhp_im = api->gcm_coupler.maker->nhp(-1);   // Assume all grid cells have same # EP
-    // HP/HC = 1 (Fortran) reserved for legacy "non-model" ice
-    // (not part of ICEBIN)
-
-    // "nhp_gcm = nhp_im+1" is embedded in the code in this compilation
-    // unit.  The first elevation point is skipped in arrays passed from the
-    // GCM because that is a non-ice model elevation point.
-    return nhp_im + 1;
-}
-// -----------------------------------------------------
-/** @return Number of "copies" of the atmosphere grid must be used
-to store the inputs. */
-extern "C"
-int icebin_modele_gcm_inputs_nhp(icebin_modele *api)
-{
-    int ihp = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
-    return ihp;
-}
-// -----------------------------------------------------
 /** @para var_nhp Number of elevation points for this variable.
  (equal to 1 for atmosphere variables, or nhp for elevation-grid variables)
 @param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
 extern "C"
-int icebin_modele_add_gcm_input(
+int icebin_modele_add_gcm_inputA(
 icebin_modele *api,
+F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 char const *grid_f, int grid_len,
@@ -495,32 +474,72 @@ char const *long_name_f, int long_name_len)
     std::string units(units_f, units_len);
     std::string grid(grid_f, grid_len);
     std::string long_name(long_name_f, long_name_len);
+    auto var(var_f.to_blitz());
 
-    int ihp = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
-    int var_nhp;
     unsigned int flags = 0;
-    if (grid == "ATMOSPHERE") {
-        var_nhp = 1;
-        flags = contracts::ATMOSPHERE;
-    } else if (grid == "ELEVATION") {
-        var_nhp = icebin_modele_nhp_gcm(api);
-        flags = contracts::ELEVATION;
-    } else {
-        fprintf(stderr, "Unrecognized grid: %s\n", grid.c_str());
-        ibmisc::exit(1);
-    }
-
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    api->gcm_coupler.gcm_inputs.add_field(field_name, xnan, units, flags, long_name);
+    api->gcm_coupler.gcm_inputs[GCMCoupler::GCMI::A].add(
+        field_name, xnan, units, flags, long_name);
 
-    api->gcm_inputs_ihp.push_back(ihp + var_nhp);
-    int ret = ihp+1;        // Convert to Fortran (1-based) indexing
+    api->modele.gcm_ivals[GCMCoupler::GCMI::A].push_back(var);
 
-    printf("icebin_modele_add_gcm_input(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
+    printf("icebin_modele_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
 
     return ret;
+}
+
+
+
+extern "C"
+int icebin_modele_add_gcm_inputE(
+icebin_modele *api,
+F90Array<double, 3> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+char const *grid_f, int grid_len,
+int initial,    // bool
+char const *long_name_f, int long_name_len)
+{
+    std::string field_name(field_name_f, field_name_len);
+    std::string units(units_f, units_len);
+    std::string grid(grid_f, grid_len);
+    std::string long_name(long_name_f, long_name_len);
+    auto var(var_f.to_blitz());
+
+    unsigned int flags = 0;
+    if (initial) flags |= contracts::INITIAL;
+
+    static double const xnan = std::numeric_limits<double>::quiet_NaN();
+    api->gcm_coupler.gcm_inputs[GCMCoupler::GCMI::E].add(
+        field_name, xnan, units, flags, long_name);
+
+    api->modele.gcm_ivals[GCMCoupler::GCMI::E].push_back(var);
+
+    printf("icebin_modele_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
+
+    return ret;
+}
+// -----------------------------------------------------
+extern "C"
+void icebin_modele_reference_modele_vars(
+    F90Array<double, 3> &fhc,
+    F90Array<double, 3> &elevE,
+    F90Array<double, 2> &focean,
+    F90Array<double, 2> &flake,
+    F90Array<double, 2> &fgrnd,
+    F90Array<double, 2> &fgice,
+    F90Array<double, 2> &zatmo)
+{
+    auto &modele(api->gcm_coupler.modele);
+    modele.fhc.reference(fhc.to_blitz());
+    modele.elevI.reference(elevI.to_blitz());
+    modele.focean.reference(focean.to_blitz());
+    modele.flake.reference(flake.to_blitz());
+    modele.fgrnd.reference(fgrnd.to_blitz());
+    modele.fgice.reference(fgice.to_blitz());
+    modele.zatmo.reference(zatmo.to_blitz());
 }
 // -----------------------------------------------------
 extern "C"

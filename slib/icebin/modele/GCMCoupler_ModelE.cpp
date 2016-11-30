@@ -142,6 +142,10 @@ MPI_Datatype ModelEMsg::new_MPI_struct(int nfields)
     return ret;
 }
 // -----------------------------------------------------
+
+
+
+// -----------------------------------------------------
 /**
 This will:
 1. Simultaneously:
@@ -182,112 +186,236 @@ bool do_run)
     int nhc_gcm = gcm_ovalsE.extent(2);
     int nvar = gcm_ovalsE.extent(3);
 
-    // Count total number of elements in the inputs (for this MPI domain)
-    long nele_l = 0;
-    for (int ihc=icebin_base_hc; ihc < icebin_base_hc + icebin_nhc; ++ihc) {
-    for (int j=domainA.base[0]; j != domainA.base[0]+domainA.extent[0]; ++j) {
-    for (int i=domainA.base[1]; i != domainA.base[1]+domainA.extent[1]; ++i) {
-        if (fhc(im,jm,nhc) != 0) ++nele_l;
-    }}}
-
     // Allocate buffer for that amount of stuff
     ibmisc::DynArray<ModelEMsg> sbuf(ModelEMsg::size(nvar), nele_l);
 
-    // Fill it in...
-    std::vector<int> tupleA;
-    for (int ihc=icebin_base_hc; ihc < icebin_base_hc + icebin_nhc; ++ihc) {
-    for (int j=domainA.base[0]; j != domainA.base[0]+domainA.extent[0]; ++j) {
-    for (int i=domainA.base[1]; i != domainA.base[1]+domainA.extent[1]; ++i) {
-        if (fhc(im,jm,nhc) == 0) continue;
 
-        ModelEMsg &msg(sbuf[nmsg]);
-        tupleA[0] = j-1;    // F2C index conversion
-        tupleA[1] = i-1;    // F2C index conversion
-        msg.iA = indexingA.tuple_to_index(tupleA);
-        msg.ihc = ihc-icebin_base_hc-1;    // Use only IceBin HC's, F2C index conversion
+    // Fill it in...
+    VectorSparseParallelVectors gcm_ovalsE_s(nvar);
+    std::vector<double> val(nvar);
+
+    auto &indexingA(regridder.gridA->indexing);
+
+    // domain uses Fortran-order, 0-based indexing...
+    for (int ihc=icebin_base_hc; ihc < icebin_base_hc + icebin_nhc; ++ihc) {
+    for (int j=domainA.base[1]; j != domainA.base[1]+domainA.extent[1]; ++j) {
+    for (int i=domainA.base[0]; i != domainA.base[0]+domainA.extent[0]; ++i) {
+        // i,j are 0-based indexes.
+
+        if (modele_f.fhc(i+1,j+1,ihc+1) == 0) continue;    // C2F indexing
+
+        long iE = gcm_regridder->indexingHC.tuple_to_index<2>({
+            indexingA.tuple_to_index<2>({i, j}),
+            ihc-icebin_base_hc-1   // Use only IceBin HC's, F2C index conversion
+        });
+
         for (unsigned int ivar=0; ivar<nvar; ++ivar)
-            msg[ivar] = gcm_ovalsE(i,j,ihc,ivar);
-        ++nmsg;
+            val[ivar] = gcm_ovalsE(i,j,ihc,ivar);    // Fortran-order
+
+        gcm_ovalsE_s.add(iE, val);
     }}}
 
-    // Sanity check: make sure we haven't overrun our buffer
-    if (nmsg != sbuf.size) (*icebin_error)(
-        "Wrong number of items in buffer: %d vs %d expected\n", nmsg, sbuf.size);
 
     // Gather it to root
-    GCMParams const &gcm_params(api->gcm_coupler.gcm_params);
-    std::unique_ptr<ibmisc::DynArray<ModelEMsg>> rbuf = ibmisc::gather_msg_array(
-        gcm_params.gcm_comm, gcm_params.gcm_root, sbuf, nfields, nmsg, 0);
+    // boost::mpi::communicator &gcm_world(world);
+    GCMCouplerOutput out;
+    if (world.am_i_root()) {
+        std::vector<VectorSparseParallelVectors> every_gcm_ovalsE_s;
+        boost::mpi::gather(world, gcm_ovalsE_s, every_gcm_ovalsE_s, world.root);
 
-    // Process the gathered data
-    if (am_i_root()) {
+        // Concatenate them all
+        ArraySparseParallelVectors gcm_ovalsE_s(
+            to_array(concatenate(every_gcm_ovalsE_s)));
 
-        SparseParallelVectorsE gcm_ovalsE_s(rbuf->size());
+        // Log output from GCM
+        write_gcm_ovalsE(last_time_s, gcm_ovalsE_s);
 
-        // Construct ArraySparseParallelVectorsE from msgs
-        size_t msg_size = ModelEMsg::size(nvar);    // bytes
-        gcm_ovalsE_s.ixA.reference(make_array(
-            &rbuf[0].iA, msg_size / sizeof(long)));
-        gcm_ovalsE_s.ixHC.reference(make_array(
-            &rbuf[0].ihc, msg_size / sizeof(int)));
-        gcm_ovalsE_s.values.reserve(nvar);
-        for (int ivar=0; ivar<nvar; ++ivar) {
-            gcm_ovalsE_s.values.push_back(
-                make_array(&rbuf[0].vals[i], msg_size / sizeof(double)));
-        }
+        // every_outs has one item per MPI rank
+        std::vector<GCMCouplerOutput> every_outs(
+            this->couple(time_s,
+                to_array(concatenate(every_gcm_ovalsE_s))));
 
-        // Couple!
-        // One out per MPI domain...
-        std::vector<SingleDomainGCMCouplerOutput> outs(
-            this->couple(time_s, gcm_ovalsE_s, out, do_run));
+        // Log input back to GCM
+        this->write_gcm_coupler_outputs(time_s, every_outs);
 
-        // -------- Scatter...
-        // Serialize each domain's data to one giant array
-        // https://www.mpich.org/static/docs/v3.2/www3/MPI_Scatterv.html
-        std::vector<int> sendcounts, displs;    // See MPI_Scatterv()
-        displs.push_back(0);
-        ostringstream obuf(std::ios:binary);
-        boost::archive::binary_oarchive oarchiver(obuf);
-        for (SingleDomainGCMCouplerOutput &out : outs) {
-            oarchiver >> out;
-            displs.push_back(obuf.tellp());
-            size_t const n(displs.size());
-            sendcounts.push_back(displs[n-1] - displs[n-2]);
-        }
-        std::string ostr(obuf.str());    // Convert to contiguous buffer
+        // Scatter!
+        boost::mpi::scatter(world, every_outs, out, world.root);
 
-        // Get the count for each node
-        std::vector<int> counts2, displs2;
-        for (int i=0; i<sendcounts.size(); ++i) {
-            counts2.push_back(1);
-            displs2.push_back(i);
-        }
-        int local_count;
-        MPI_Scatterv(
-            &sendcounts[0], &counts2[0], &displs2[0], MPI::INT,
-            &local_count, 1, MPI::INT,
-            0, comm);
 
-        // Scatter the serialized data
-        std::string ibuf_str(local_count, '\0');    // Allocate buffer
-        MPI_Scatterv(
-            &ostr[0], &sendcounts[0], &displs[0], MPI::CHAR,
-            &ibuf_str[0], ibuf_str.size(), MPI::CHAR,
-            0, comm);
+    } else {    // ~world.am_i_root()
+        // Send our input to root
+        boost::mpi::gather(world, gcm_ovalsE_s, world.root);
 
-        // Deserialize our portion
-        SingleDomainGCMCouplerOutput out_thisrank;
-        istringstream ibuf_stream(ibuf_str, std::ios::binary);
-        boost::archive::binary_archive oa(ibuf_stream);
-        ibuf_stream >> out_thisrank;
+        // Let root do the work...
 
-    } else {
-        We must call MPI_Scatterv() as well...
+        // Receive our output back from root
+        boost::mpi::scatter(world, out, world.root);
     }
 
-        // Update FHC, etc...
+    // Update gcm_ival variables...
+    for (unsigned iAE=0; iAE<2; ++iAE) {
+        VectorSparseParallelVectors &gcm_ivalsX_s(out.gcm_ivals[iAE]);
+        std::vector<blit::Array<double,3>> &gcm_ivalsX(modele.gcm_ivals[iAE]);
 
+        std::array<int,2> ahc;
+        std::array<int,2> ij;
+        for (size_t i=0; i<out.gcm_ivalsX_s.size(); ++i) {
+            if (iAE == GCMI::A) {
+                long iA = gcm_ivalsX_s.index[i];
+                auto ij(indexingA.index_to_tuple(iA));    // zero-based
+                int const i_f = ij[0]+1;    // C2F
+                int const j_f = ij[1]+1;
+                for (unsigned int ivar=0; ivar<out.nvar; ++ivar) {
+                    gcm_ivalsX[ivar](i_f, j_f) =
+                        out.gcm_ivalsX_s.vals[i*out.nvar + ivar];
+                }
+
+            } else {
+                long iE = gcm_ivalsX_s.index[i];
+                ahc = indexingHC.index_to_tuple(iE);
+                ij = indexingA.index_to_tuple(ahc[0]);
+                int const i_f = ij[0]+1;    // C2F
+                int const j_f = ij[1]+1;
+                int const ihc_f = ahc[1]+icebin_base_hc+1;
+                gcm_ivalsX(i_f, j_f, ihc_f) =
+                    out.gcm_ivalsX_s.vals[i*out.nvar + ivar];
+            }
+        }
+    }
+
+    // Update FHC, TOPO, etc.
+    // TODO: Nothing for now
 }
+// ===============================================================
+void nc_write_time0(netCDF::NcGroup *nc, double time0_s)
+{
+    netCDF::NcVar time0_var(nc->getVar("time0"));
+    time0_var.putVar({0}, {1}, time0);
+}
+
+static void define_time0(NcIO &ncio, double &time0_s, std::string &time_units)
+{
+    // if (ncio.rw == 'r') (*icebin_error)(-1, "Read not supported");
+
+    NcDim time_dim(get_or_add_dim(ncio, "time", -1));
+
+    NcVar time0_var = ncio.nc->addVar("time0", ibmisc::get_nc_type<double>(), dims_b);
+    time0_var.putAtt("units", time_units);
+    time0_var.putAtt("calendar", "365_day");
+    time0_var.putAtt("axis", "T");
+    time0_var.putAtt("long_name", "Simulation start time");
+
+    NcVar time_var = ncio.nc->addVar("time", ibmisc::get_nc_type<double>(), dims_atmosphere);
+    time_var.putAtt("units", time_units);
+    time_var.putAtt("calendar", "365_day");
+    time_var.putAtt("axis", "T");
+    time_var.putAtt("long_name", "Coupling times");
+
+    ncio += std::bind(&nc_write_time0, ncio.nc, time0_s);
+}
+// ----------------------------------------------------------
+
+static void define_gcm_varsAE(
+NcIO &ncio,
+VarSet &contract,
+ibmisc::Indexing<int,long> const &indexingAE)
+{
+    auto dims(get_or_add_dims(ncio,
+        concatenate(
+            std::vector<std::string>{"time"},
+            indexingAE.names),
+        concatenate(
+            std::vector<int>{-1},
+            indexingAE.extent)));
+
+    for (size_t i=0; i<contract.size(); ++i) {
+        NcVar ncvar(get_or_add_var(ncio, contract[i].name, "double", dims));
+        ncvar.putAtt("units", contract[i].units);
+        ncvar.putAtt("description", contract[i].description);
+    }
+}
+
+template<int RANK>
+static void write_gcm_varsAE(
+NcIO &ncio,
+VarSet &contract,
+ibmisc::Indexing<int,long> const &indexingAE,
+ArraySparseParallelVectors &vals)
+{
+    NcDim time_dim(nc.getDim("time"));
+
+    // im,jm,ihc  0-based
+    auto denseE(regridder.indexingAE.make_blitz<double,RANK>());
+
+     auto startp(concatenate(
+        std::vector<size_t>{time_dim.Size()}
+        std::vector<size_t>(RANK, 0)));
+
+    // Dimensions in netCDF are ihp,jm,im; reverse of indexingE
+    auto countp(concatenate(
+        std::vector<size_t>{1},
+        reverse(indexingAE.extent)));
+
+    blitz::TinyVector<int,RANK> tvec;
+    for (unsigned int ivar=0; ivar < vals.values.size(); ++ivar) {
+        // Fill our dense var
+        denseE = nan;
+        blitz::TinyVector<int,3> tiny;
+        for (unsigned int i=0; i<vals.index.size(); ++i) {
+            indexingAE.index_to_tuple(&tiny[0], vals.index[i]);
+            denseE(tiny) = vals.values[ivar][i];
+        }
+
+        // Store in the netCDF variable
+        NcVar ncvar(nc.getVar(contracts[ivar].name));
+        ncvar.putVar(startp, countp, denseE.data());
+    }
+}
+// -------------------------------------------------------------------
+// -------------------------------------------------------------------
+
+
+void GCMCoupler_ModelE::define_gcm_output(NcIO &ncio)
+{
+    ncw_time0(ncio, gcm_params.time_start_s, gcm_params.time_units);
+    define_gcm_varsE(ncio, gcm_outputsE, regridder.indexingE);
+}
+
+
+void GCMCoupler_ModelE::write_gcm_output(
+double time_s,
+VectorSparseParallelVectors &gcm_ovalsE)
+{
+    write_gcm_varsAE<3>(ncio, gcm_outputsE, regridder.indexingE,
+        to_array(gcm_ovalsE));
+}
+
+// -------------------------------------------------------------------
+
+void GCMCoupler_ModelE::define_coupler_output(
+NcIO &ncio,
+double time_s)
+{
+    define_gcm_varsAE(ncio, gcm_inputs[GCMCoupler::GCMI::A], regridder.indexingA);
+    define_gcm_varsAE(ncio, gcm_inputs[GCMCoupler::GCMI::E], regridder.indexingE);
+}
+
+
+void GCMCoupler_ModelE::write_coupler_output(
+double time_s,
+std::vector<GCMCouplerOutput> const &out)
+{
+    int iAE;
+
+    iAE = GCMCoupler::GCMI::A;
+    write_gcm_varsAE<2>(ncio, gcm_outputs[iAE], regridder.indexingA,
+        to_array(gcm_ivals[iAE]));
+
+    iAE = GCMCoupler::GCMI::E;
+    write_gcm_varsEE<3>(ncio, gcm_outputs[iAE], regridder.indexingE,
+        to_array(gcm_ivals[GCMCoupler::GCMI::E]));
+}
+
 
 
 }}

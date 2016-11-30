@@ -36,6 +36,10 @@ public:
     IceRegridder *regridder;   // This is not const; see IceCoupler::update_elevI()
     std::unique_ptr<WeightedSparse> IvE;    // Regridding matrix made from regridder
 
+    EigenSparseMatrix IvE0;
+    SparseSet dimE0;
+
+
     // [INPUT|OUTPUT] variables
     // List of fields this dynamic ice model takes for input / output.
     std::array<VarSet, 2> contract;

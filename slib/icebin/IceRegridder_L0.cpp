@@ -92,14 +92,14 @@ void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
                     int ihps[2];
                     double whps[2];
                     linterp_1d(gcm->hpdefs, elevation, ihps, whps);
-                    ret.add({iG, gcm->indexingHP.tuple_to_index<2>({iA, ihps[0]})},
+                    ret.add({iG, gcm->indexingHC.tuple_to_index<2>({iA, ihps[0]})},
                         cell->native_area * whps[0]);
-                    ret.add({iG, gcm->indexingHP.tuple_to_index<2>({iA, ihps[1]})},
+                    ret.add({iG, gcm->indexingHC.tuple_to_index<2>({iA, ihps[1]})},
                         cell->native_area * whps[1]);
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {
                     int ihps0 = nearest_1d(gcm->hpdefs, elevation);
-                    ret.add({iG, gcm->indexingHP.tuple_to_index<2>({iA, ihps0})},
+                    ret.add({iG, gcm->indexingHC.tuple_to_index<2>({iA, ihps0})},
                         cell->native_area);
                 } break;
             }
