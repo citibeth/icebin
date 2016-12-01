@@ -49,35 +49,6 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
     GCMCoupler(GCMCoupler::Type::MODELE)
 {
 
-    // ------------ GCM Outputs
-    // The GCM must produce the same set of outputs, no matter what
-    // ice model is being used
-    gcm_outputs.add_field("runo", nan, "kg m-2", ELEVATION,
-        "Downward water flux through bottom layer");
-    gcm_outputs.add_field("eruno", nan, "J m-2", ELEVATION,
-        "Enthalpy of downward water flux through bottom layer");
-#ifdef TRACERS_WATER
-    gcm_outputs.add_field("trruno")
-#endif
-    gcm_outputs.add_field("deltah", nan, "J m-2", ELEVATION,
-        "Enthalpy change of 'borrowed' layer");
-    gcm_outputs.add_field("massxfer", nan, "kg m-2", ELEVATION,
-        "Mass of ice being transferred Stieglitz --> Icebin");
-    gcm_outputs.add_field("enthxfer", nan, "J m-2", ELEVATION,
-        "Enthlpy of ice being transferred Stieglitz --> Icebin");
-#ifdef TRACERS_WATER
-    gcm_outputs.add_field("trxfer");
-#endif
-    gcm_outputs.add_field("volxfer", nan, "m^3 m-2", ELEVATION,
-        "Volume of ice being transferred Stieglitz --> Icebin");
-
-//    gcm_outputs.add_field("unit", nan, "", 0, "Dimensionless identity");
-
-
-    // ------------------------- GCM Inputs
-    // ModelE sets this, via repeated calls to add_gcm_input_ij()
-    // and add_gcm_input_ijhc().  See alloc_landic_com() in LANDICE_COM.f
-
     // ----------------- Scalars provided by the GCM
     // Scalars are things that can only be computed at the last minute
     // (eg, dt for a particular coupling timestep).  Constants that
@@ -177,8 +148,8 @@ Put elsewhere in the Fortran code:
 */
 void GCMCoupler_ModelE::couple_native(
 double time_s,
-blitz::Array<double,4> const &gcm_ovalsE,    // Fortran array: im,jm,nhc,nvar
-bool do_run)
+std::array<int,3> const &yymmdd, // Date that time_s lies on
+bool init_only)
 {
     GCMCouplerOutput out;
 //    int im = gcm_ovalsE.extent(0);
@@ -197,21 +168,26 @@ bool do_run)
 
     auto &indexingA(regridder.gridA->indexing);
 
-    // domain uses Fortran-order, 0-based indexing...
+    // domain uses alphabetical order, 0-based indexing...
     for (int ihc=icebin_base_hc; ihc < icebin_base_hc + icebin_nhc; ++ihc) {
     for (int j=domainA.base[1]; j != domainA.base[1]+domainA.extent[1]; ++j) {
     for (int i=domainA.base[0]; i != domainA.base[0]+domainA.extent[0]; ++i) {
         // i,j are 0-based indexes.
+        int i_f = i+1
+        int j_f = j+1
+        int ihc_f = ihc+1
 
-        if (modele_f.fhc(i+1,j+1,ihc+1) == 0) continue;    // C2F indexing
+        if (modele_f.fhc(i_f,j_f,ihc_f) == 0) continue;    // C2F indexing
 
+        int ihc_ice = ihc-icebin_base_hc-1   // Use only IceBin HC's, F2C index conversion
         long iE = gcm_regridder->indexingHC.tuple_to_index<2>({
             indexingA.tuple_to_index<2>({i, j}),
-            ihc-icebin_base_hc-1   // Use only IceBin HC's, F2C index conversion
+            ihc_ice
         });
 
-        for (unsigned int ivar=0; ivar<nvar; ++ivar)
-            val[ivar] = gcm_ovalsE(i,j,ihc,ivar);    // Fortran-order
+        for (unsigned int ivar=0; ivar<nvar; ++ivar) {
+            val[ivar] = (*modele_output.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
+        }
 
         gcm_ovalsE_s.add(iE, val);
     }}}
@@ -228,16 +204,10 @@ bool do_run)
         ArraySparseParallelVectors gcm_ovalsE_s(
             to_array(concatenate(every_gcm_ovalsE_s)));
 
-        // Log output from GCM
-        write_gcm_ovalsE(last_time_s, gcm_ovalsE_s);
-
         // every_outs has one item per MPI rank
-        std::vector<GCMCouplerOutput> every_outs(
-            this->couple(time_s,
-                to_array(concatenate(every_gcm_ovalsE_s))));
-
-        // Log input back to GCM
-        this->write_gcm_coupler_outputs(time_s, every_outs);
+        GCMCouplerOutput out(
+            this->couple(time_s, yymmdd,
+                gcm_ovalsE_s, init_only));
 
         // Scatter!
         boost::mpi::scatter(world, every_outs, out, world.root);
@@ -253,34 +223,36 @@ bool do_run)
         boost::mpi::scatter(world, out, world.root);
     }
 
-    // Update gcm_ival variables...
-    for (unsigned iAE=0; iAE<2; ++iAE) {
-        VectorSparseParallelVectors &gcm_ivalsX_s(out.gcm_ivals[iAE]);
-        std::vector<blit::Array<double,3>> &gcm_ivalsX(modele.gcm_ivals[iAE]);
+    // Update gcm_ivalA variables...
+    VectorSparseParallelVectors &gcm_ivalsA_s(out.gcm_ivals[GridAE::A]);
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsA(modele.gcm_ivals[GridAE::A]);
 
-        std::array<int,2> ahc;
-        std::array<int,2> ij;
-        for (size_t i=0; i<out.gcm_ivalsX_s.size(); ++i) {
-            if (iAE == GCMI::A) {
-                long iA = gcm_ivalsX_s.index[i];
-                auto ij(indexingA.index_to_tuple(iA));    // zero-based
-                int const i_f = ij[0]+1;    // C2F
-                int const j_f = ij[1]+1;
-                for (unsigned int ivar=0; ivar<out.nvar; ++ivar) {
-                    gcm_ivalsX[ivar](i_f, j_f) =
-                        out.gcm_ivalsX_s.vals[i*out.nvar + ivar];
-                }
+    for (size_t i=0; i<out.gcm_ivalsA_s.size(); ++i) {
+        long iA = gcm_ivalsA_s.index[i];
+        auto ij(indexingA.index_to_tuple(iA));    // zero-based, alphabetical order
+        int const i_f = ij[0]+1;    // C2F
+        int const j_f = ij[1]+1;
+        for (unsigned int ivar=0; ivar<out.nvar; ++ivar) {
+            (*gcm_ivalsA[ivar])(i_f, j_f) =
+                out.gcm_ivalsA_s.vals[i*out.nvar + ivar];
+        }
+    }
 
-            } else {
-                long iE = gcm_ivalsX_s.index[i];
-                ahc = indexingHC.index_to_tuple(iE);
-                ij = indexingA.index_to_tuple(ahc[0]);
-                int const i_f = ij[0]+1;    // C2F
-                int const j_f = ij[1]+1;
-                int const ihc_f = ahc[1]+icebin_base_hc+1;
-                gcm_ivalsX(i_f, j_f, ihc_f) =
-                    out.gcm_ivalsX_s.vals[i*out.nvar + ivar];
-            }
+    // Update gcm_ivalE variables...
+    VectorSparseParallelVectors &gcm_ivalsE_s(out.gcm_ivals[GridAE::E]);
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsE(modele.gcm_ivals[GridAE::E]);
+
+    for (size_t i=0; i<out.gcm_ivalsE_s.size(); ++i) {
+        long iE = gcm_ivalsE_s.index[i];
+        ijk = indexingE.index_to_tuple(iE);
+        int const i_f = ijk[0]+1;    // C2F
+        int const j_f = ijk[1]+1;
+        int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
+        int const ihc_gcm_f = icebin_base + ihc_ice + 1;    // 1-based, G
+
+        for (unsigned int ivar=0; ivar<out.nvar; ++ivar) {
+            (*gcm_ivalsE[ivar])(i_f, j_f, ihc_gcm_f) =
+                out.gcm_ivalsE_s.vals[i*out.nvar + ivar];
         }
     }
 

@@ -159,7 +159,7 @@ GCMCouplerOutput GCMCoupler::couple(
 double time_s,
 std::array<int,3> const &yymmdd, // Date that time_s lies on
 ArraySparseParallelVectorsE const &gcm_ovalsE,
-bool do_run)
+bool init_only)
 {
     std::string sdate = (boost::format
         ("%04d%02d%02d") % yymmdd[0] % yymmdd[1] % yymmdd[2]).str();
@@ -178,7 +178,7 @@ bool do_run)
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
-        ice_coupler.couple(time_s, gcm_ovalsE, out, do_run);
+        ice_coupler.couple(time_s, yymmdd, gcm_ovalsE, out, init_only);
     }
 
 
@@ -247,34 +247,49 @@ void ncio_dense(
         vname_base);
 }
 // ------------------------------------------------------------
-template<ValT>
-inline append(std::vector<ValT> &out, std::vector<ValT> const &inn)
+std::vector<GCMCouplerOutput> const split_by_domain(
+    GCMCouplerOutput const &out,
+    DomainDecomposer const &domainsA,
+    DomainDecomposer const &domainsE)
 {
-    for (auto ii=inn.begin(); ii != inn.end(); ++ii)
-        out.push_back(*ii);
-}
-GCMCouplerOutput concatenate(std::vector<GCMCouplerOutput> const &outs)
-{
-    GCMCouplerOutput all_out;
+    // Construct the output
+    std::vector<GCMCouplerOutput> outs;
+    outs.reserve(domainsA.size());
+    for (size_t i=0; i<domainsA.size(); ++i)
+        outs.push_back(GCMCouplerOutput(out.nvar));
 
-    if (outs.size() == 0) return all_out;
+    size_t strideb = sizeof(GCMCouplerOutput);
+    typedef MultiDomain<SparseMatrix> MDMatrix;
+    typedef MultiDomain<SparseVector> MDVector;
+    MultiDomain<VectorSparseParallelVectors> MDPVecs;
 
-    for (GridAE iAE=0; iAE<GridAE::count; ++iAE) {
-        append(all_out.gcm_ivals[iAE].index, out.gcm_ivals[iAE].index);
-        append(all_out.gcm_ivals[iAE].vals, out.gcm_ivals[iAE].vals);
+    // Split each element of parallel sparse vectors
+    for (GridAE iAE=0; iAE != GridAE.count; ++iAE) {
+        DomainDecomposer &domainX(domains[iAE]);
+
+        auto ival(out.gcm_ivals[iAE].vals.begin());
+        for (auto iix(out.gcm_ivals[iAE].index.begin());
+            iix != out.gcm_ivals[iAE].index.end(); ++iix)
+        {
+            int idomain = domainX.domain(*iix);
+            auto &outsi(outs[idomain]);
+            outsi.index.push_back(*iix);
+            for (int i=0; i<out.nvar; ++i)
+                outsi.vals.push_back(*ival);
+        }
     }
 
-    all_out = outs[0];
-    for (size_t i=1; i<outs.size(); ++i) {
-        GCMCouplerOutput &out(outs[i]);
+    // Split the standard sparse vectors and matrices
+    MDMatrix E1vE0(&outs.front().E1vE0, 0, domainsE, strideb),
+        copy(E1vE0, out.E1vE0);
+    MDMatrix AvE1(&outs.front().AvE1, 0, domainsA, strideb),
+        copy(AvE1, out.AvE1);
+    MDVector wAvE1(&outs.front().wAvE1, 0, domainsA, strideb),
+        copy(wAvE1, out.wAvE1);
+    MDVector elevE1(&outs.front().elevE1, 0, domainsE, strideb),
+        copy(elevE1, out.elevE1);
 
-        copy(all_out.E1vE0, E1vE0);
-        copy(all_out.AvE1, AvE1);
-        copy(all_out.wAvE1, wAvE1);
-        copy(all_out.elevE1, elevE1);
-    }
-
-    return all_out;
+    return outs;
 }
 // ------------------------------------------------------------
 /** Top-level ncio() to log output from coupler. (coupler->GCM) */

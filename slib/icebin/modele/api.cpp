@@ -457,6 +457,33 @@ extern "C" void icebin_modele_delete(icebin_modele *&api)
     api = 0;
 }
 // -----------------------------------------------------
+extern "C"
+int icebin_modele_add_gcm_outputE(
+icebin_modele *api,
+F90Array<double, 3> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+char const *long_name_f, int long_name_len)
+{
+    std::string field_name(field_name_f, field_name_len);
+    std::string units(units_f, units_len);
+    std::string long_name(long_name_f, long_name_len);
+    auto var(var_f.to_blitz());
+
+    unsigned int flags = 0;
+
+    static double const xnan = std::numeric_limits<double>::quiet_NaN();
+    GCMCoupler_ModelE &gcm_coupler(api->gcm_coupler);
+    gcm_coupler.gcm_outputs.add(
+        field_name, xnan, units, flags, long_name);
+
+    gcm_coupler.modele_outputs.gcm_ovalsE.push_back(var);
+
+    printf("icebin_modele_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
+
+    return ret;
+}
+// -----------------------------------------------------
 /** @para var_nhp Number of elevation points for this variable.
  (equal to 1 for atmosphere variables, or nhp for elevation-grid variables)
 @param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
@@ -466,31 +493,28 @@ icebin_modele *api,
 F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
-char const *grid_f, int grid_len,
 int initial,    // bool
 char const *long_name_f, int long_name_len)
 {
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
-    std::string grid(grid_f, grid_len);
     std::string long_name(long_name_f, long_name_len);
-    auto var(var_f.to_blitz());
+    auto var(new_unique_ptr(var_f.to_blitz());
 
     unsigned int flags = 0;
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    api->gcm_coupler.gcm_inputs[GCMCoupler::GCMI::A].add(
+    GCMCoupler_ModelE &gcm_coupler(api->gcm_coupler);
+    gcm_coupler.gcm_inputs[GridAE::A].add(
         field_name, xnan, units, flags, long_name);
 
-    api->modele.gcm_ivals[GCMCoupler::GCMI::A].push_back(var);
+    gcm_coupler.modele_inputs.gcm_ivals[GridAE::A].push_back(var);
 
-    printf("icebin_modele_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
+    printf("icebin_modele_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), ret);
 
     return ret;
 }
-
-
 
 extern "C"
 int icebin_modele_add_gcm_inputE(
@@ -498,13 +522,11 @@ icebin_modele *api,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
-char const *grid_f, int grid_len,
 int initial,    // bool
 char const *long_name_f, int long_name_len)
 {
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
-    std::string grid(grid_f, grid_len);
     std::string long_name(long_name_f, long_name_len);
     auto var(var_f.to_blitz());
 
@@ -512,12 +534,13 @@ char const *long_name_f, int long_name_len)
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    api->gcm_coupler.gcm_inputs[GCMCoupler::GCMI::E].add(
+    GCMCoupler_ModelE &gcm_coupler(api->gcm_coupler);
+    gcm_coupler.gcm_inputs[GridAE::E].add(
         field_name, xnan, units, flags, long_name);
 
-    api->modele.gcm_ivals[GCMCoupler::GCMI::E].push_back(var);
+    modele_inputs.gcm_ivals[GridAE::E].push_back(var);
 
-    printf("icebin_modele_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
+    printf("icebin_modele_add_gcm_inputE(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), ret);
 
     return ret;
 }
@@ -944,6 +967,16 @@ ibmisc::F90Array<double, 3> &arr_f)
     if (api->gcm_outputs.size() <= field_ix) api->gcm_outputs.resize(field_ix+1);
     blitz::Array<double,3> *arrp = new blitz::Array<double,3>(arr_f.to_blitz());
     api->gcm_outputs[field_ix].reset(arrp);
+}
+
+extern "C"
+void icebin_modele_couple_native(
+    icebin_modele *api,
+    double time_s,
+    int year, int month, int day,
+    bool init_only)
+{
+    api->gcm_coupler.couple_native(time_s, {year, month, day}, init_only);
 }
 
 // ===============================================================

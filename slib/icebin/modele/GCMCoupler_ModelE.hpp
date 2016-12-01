@@ -40,12 +40,20 @@ public:
     ModelE_CouplingType coupling_type;
 };
 
+struct ModelEOutputs
+{
+    // Pointers to arrys within ModelE
+
+    // gcm_ovalsE[ovar](i, j, ihc)    Fortran-order 1-based indexing
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ovalsE;
+};
+
 struct ModelEInputs
 {
     // Pointers to arrys within ModelE
 
-    // gcm_ivalsAI[E/A][ivar](i, j, ihc)    Fortran-order 1-based indexing
-    std::vector<std::vector<blitz::Array<double,3>>> gcm_ivals;
+    // gcm_ivalsAI[A/E][ivar](i, j, ihc)    Fortran-order 1-based indexing
+    std::vector<std::vector<std::unique_ptr<blitz::Array<double,3>>>> gcm_ivals;
 
     // i,j,ihc arrays on Elevation grid
     blitz::Array<double,3> fhc;
@@ -65,12 +73,11 @@ struct ModelEInputs
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
-    // Last time this coupler was called
-    double last_time_s;
+    ModelEOutputs modele_outputs;
 
     // Variables borrowed from ModelE, used to return data to it.
     // All these variables are Fortran-order, 1-based indexing
-    ModelEInputs modele_f;
+    ModelEInputs modele_inputs;
 
     // The first GCM elevation class that is an IceBin class (0-based indexing)
     int icebin_base_hc;
