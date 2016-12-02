@@ -196,20 +196,6 @@ int SMBMsg::compar(void const *a, void const *b)
 // ===================================================
 // GCMCoupler
 
-/** Parameters to the call_ice_coupler() method.  Calls to the
-ice model are planned first, then executed separately. */
-class CallIceCouplerParams {
-public:
-    int sheetix;
-    SMBMsg *begin;
-    SMBMsg *next;
-
-    CallIceCouplerParams() {}
-
-    CallIceCouplerParams(int _sheetix, SMBMsg *_begin, SMBMsg *_next) :
-        sheetix(_sheetix), begin(_begin), next(_next) {}
-};
-
 /** PROTECTED method.  Called by all MPI nodes. */
 void GCMCoupler::call_ice_coupler(
     IceCoupler *model,
@@ -611,7 +597,7 @@ CoupleReturn &ret)
 
 
         // Update elevI and compute IvE for later
-        RegridMatrices rm(ice_coupler.update_elevI());
+        RegridMatrices rm(ice_coupler.get_elevI());
 
         WeightedSparse const &IvE(ice_coupler.IvE);
         WeightedSparse &IvA(rm.regrd("IvA"));
