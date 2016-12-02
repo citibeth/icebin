@@ -18,17 +18,13 @@
 
 #pragma once
 
-#include <functional>
-#include <unordered_set>
-#include <blitz/array.h>
+#include <icebin/IceRegridder.hpp>
 
+#include <functional>
 #include <ibmisc/netcdf.hpp>
-#include <ibmisc/memory.hpp>
 #include <ibmisc/IndexSet.hpp>
-#include <spsparse/eigen.hpp>
 
 #include <icebin/Grid.hpp>
-#include <icebin/sparse.hpp>
 
 
 /** 
@@ -197,95 +193,6 @@ BOOST_ENUM_VALUES( Weighting, int,
 )
 
 
-class GCMRegridder;
-class IceModel;
-
-/** Represents a single ice sheet.
-Produces low-level unscaled matrices *for that single ice sheet*. */
-class IceRegridder {
-    friend class IceModel;
-
-public:
-    typedef Grid::Parameterization Type;
-
-    friend class GCMRegridder;
-    /** Parent pointer; holds the IceRegridder for ALL ice sheets */
-    GCMRegridder const *gcm;
-
-    /** Elevation of grid cells in ice grid (I).
-    This also implies a mask: cells not listed in this SparseVector are masked out. */
-    SparseVector elevI;
-protected:
-
-    Type type;
-    std::string _name;  /// "greenland", "antarctica", etc.
-    std::unique_ptr<Grid> gridI;            /// Ice grid outlines
-    std::unique_ptr<Grid> exgrid;       /// Exchange grid outlines (between GCM and Ice)
-    InterpStyle interp_style;   /// How we interpolate I<-E
-
-    // ---------------------------------
-
-    // Functions used by corresponding functions in GCMRegridder
-    /** Remove unnecessary GCM grid cells. */
-    void filter_cellsA(std::function<bool(long)> const &keepA);
-
-public:
-    std::string const &name() const { return _name; }
-
-    IceRegridder();
-    void clear();
-    void init(
-        std::string const &_name,
-        std::unique_ptr<Grid> &&_gridI,
-        std::unique_ptr<Grid> &&_exgrid,
-        InterpStyle _interp_style,
-        SparseVector &&elevI);
-
-    virtual ~IceRegridder();
-    std::unordered_map<long,double> elevI_hash() const;
-
-    // ------------------------------------------------
-    /** Number of dimensions of ice vector space */
-    virtual size_t nI() const = 0;
-
-    /** Number of dimensions of interpolation grid vector space. */
-    virtual size_t nG() const = 0;
-
-    // ------------------------------------------------
-    // Matrix production subroutines here store their output in
-    // spsparse accumulators (Anything that accepts a series of
-    // (i,j,value) triplets.  The ``SparseTriplets`` class is a
-    // special-purpose accumulator that can then produce Eigen
-    // matrices as output.
-
-
-    /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
-    NOTE: wAvAp == sApvA */
-    void sApvA(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
-
-    /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
-    NOTE: wAvAp == sApvA */
-    void sEpvE(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
-
-    /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
-    virtual void GvEp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
-
-    /** Produces the unscaled matrix [Interpolation or Ice] <-- [Ice] */
-    virtual void GvI(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
-
-    /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
-    virtual void GvAp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
-
-    /** Define, read or write this data structure inside a NetCDF file.
-    @param vname: Variable name (or prefix) to define/read/write it under. */
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
-
-};  // class IceRegridder
-
-std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type);
 
 
 // ----------------------------------------------------
@@ -348,9 +255,9 @@ public:
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> sheets_index;
 
-    typedef std::vector<std::unique_ptr<IceRegridder>> SheetsT;
+    typedef std::vector<std::unique_ptr<IceRegridder>> IceRegriddersT;
     /** Ice sheets stored by index defined in sheets_index */
-    SheetsT ice_regridders;
+    IceRegriddersT ice_regridders;
 
 public:
 
@@ -386,7 +293,7 @@ public:
         printf("Adding IceRegridder: '%s'\n", sheet->name().c_str());
         sheet->gcm = this;
         size_t ix = sheets_index.insert(sheet->name());
-        sheets.push_back(std::move(sheet));
+        ice_regridders.push_back(std::move(sheet));
     }
 
     void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&sheet)
@@ -396,7 +303,7 @@ public:
     }
 
     IceRegridder *sheet(std::string const &name)
-        { return sheets[sheets_index.at(name)].get(); }
+        { return ice_regridders[sheets_index.at(name)].get(); }
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):
@@ -407,12 +314,13 @@ public:
     @param domainA Description of our MPI domain. */
     void filter_cellsA(ibmisc::Domain<int> const &domainA);
 
-    typedef ibmisc::DerefRandomAccessIter<const IceRegridder, typename SheetsT::const_iterator> const_iterator;
+    typedef ibmisc::DerefRandomAccessIter<const IceRegridder,
+        typename IceRegriddersT::const_iterator> const_iterator;
 
     const_iterator begin() const
-        { return const_iterator(sheets.cbegin()); }
+        { return const_iterator(ice_regridders.cbegin()); }
     const_iterator end() const
-        { return const_iterator(sheets.cend()); }
+        { return const_iterator(ice_regridders.cend()); }
 
     // -----------------------------------------
 
@@ -432,41 +340,6 @@ public:
 
 };  // class GCMRegridder
 // ===========================================================
-// -----------------------------------------------------------
-typedef std::function<std::unique_ptr<WeightedSparse>(bool scale, bool correctA)> RegridFunction;
-
-/** Holds the set of "Ur" (original) matrices produced by an
-    IceRegridder for a SINGLE ice sheet. */
-class RegridMatrices {
-public:
-    std::map<std::string, RegridFunction> regrids;
-
-    /** Use this to construct a RegridMatrices instance:
-           GCMRegridder gcm_regridder(...);
-           auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
-           // rm.regrid("AvI", scale=true, correctA=true)
-           auto AvI(rm.regrid("AvI", true, true));
-           AvI.M        // The matrix
-           AvI.weight   // The weight vector
-    */
-    RegridMatrices(IceRegridder *sheet);
-
-    /** Retrieves a final regrid matrix.
-    @param spec_name: The matrix to produce.
-        Should be "AvI", "IvA", "EvI", "IvE", "AvE" or "EvA".
-    @param scale: Produce scaled matrix?
-        true  --> [kg m-2]
-        false --> [kg]
-    @param correctA: Correct for projection error in A or E grids?
-    @return The regrid matrix and weights
-    */
-    std::unique_ptr<WeightedSparse> regrid(
-        std::string const &spec_name,
-        bool scale,
-        bool correctA) const
-    { return (regrids.at(spec_name))(scale, correctA); }
-};
-
 
 
 

@@ -29,7 +29,6 @@
 #include <ibmisc/indexing.hpp>
 
 #include <icebin/error.hpp>
-#include <icebin/sparse.hpp>
 
 namespace icebin {
 

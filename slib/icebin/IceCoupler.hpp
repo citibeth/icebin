@@ -38,7 +38,7 @@ public:
 
 public:
     GCMCoupler const *coupler;      // parent back-pointer
-    IceRegridder *regridder;   // This is not const; see IceCoupler::update_elevI()
+    IceRegridder *ice_regridder;   // This is not const; see IceCoupler::update_elevI()
     std::unique_ptr<WeightedSparse> IvE;    // Regridding matrix made from regridder
 
     std::array<VarSet, 2> contract;     // [INPUT|OUTPUT]
@@ -51,8 +51,8 @@ public:
     std::unique_ptr<IceCoupler_Writer> _iwriter, _owriter;
 
 public:
-    std::string const &name() { return sheet->name(); }
-    Grid const *gridI() { return &*sheet->gridI; }
+    std::string const &name() { return ice_regridder->name(); }
+    Grid const *gridI() { return &*ice_regridder->gridI; }
 
     /** Constants obtained from the GCM */
     ibmisc::ConstantSet ice_constants;
@@ -111,7 +111,7 @@ public:
     IceCoupler(IceCoupler::Type _type) : type(_type) {}
     virtual ~IceCoupler();
 
-    long ndata() const { return sheet->gridI->ndata(); }
+    long ndata() const { return ice_regridder->gridI->ndata(); }
 
     // --------------------------------------------------
 

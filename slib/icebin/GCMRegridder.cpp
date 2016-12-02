@@ -162,7 +162,7 @@ void GCMRegridder::clear()
     gridA.reset();
     hpdefs.clear();
     sheets_index.clear();
-    sheets.clear();
+    ice_regridders.clear();
 }
 
 void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
@@ -198,8 +198,8 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
             add_sheet(*sheet_name, new_ice_regridder(ncio, vn));
         }
     }
-    for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
-        (*sheet)->ncio(ncio, vname + "." + (*sheet)->name());
+    for (auto ice_regridder=ice_regridders.begin(); ice_regridder != ice_regridders.end(); ++ice_regridder) {
+        (*ice_regridder)->ncio(ncio, vname + "." + (*ice_regridder)->name());
     }
 }
 // -------------------------------------------------------------
@@ -240,8 +240,8 @@ void GCMRegridder::filter_cellsA(std::function<bool(long)> const &keepA)
 
     // Now remove cells from the exgrids and gridIs that
     // do not interact with the cells we've kept in grid1.
-    for (auto sheet=sheets.begin(); sheet != sheets.end(); ++sheet) {
-        (*sheet)->filter_cellsA(keepA);
+    for (auto ice_regridder=ice_regridders.begin(); ice_regridder != ice_regridders.end(); ++ice_regridder) {
+        (*ice_regridder)->filter_cellsA(keepA);
     }
 
     gridA->filter_cells(keepA);
@@ -319,19 +319,19 @@ struct UrAE {
 typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrixT;
 typedef SparseSet<long,int> SparseSetT;
 
-static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *sheet, bool scale, bool correctA, UrAE const &AE)
+static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *ice_regridder, bool scale, bool correctA, UrAE const &AE)
 {
     SparseSetT dimA, dimG, dimI;
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     // GvI
     SparseTriplets<SparseMatrix> GvI({&dimG, &dimI});
-    GvI.set_shape({sheet->nG(), sheet->nI()});
-    sheet->GvI(GvI);
+    GvI.set_shape({ice_regridder->nG(), ice_regridder->nI()});
+    ice_regridder->GvI(GvI);
 
     // ApvG
     SparseTriplets<SparseMatrix> GvAp({&dimG, &dimA});
-    GvAp.set_shape({sheet->nG(), AE.nfull});
+    GvAp.set_shape({ice_regridder->nG(), AE.nfull});
     AE.GvAp(GvAp);
 
     // ----- Convert to Eigen and multiply
@@ -390,20 +390,20 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *sheet, bool sc
     return ret;
 }
 
-static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *sheet, bool scale, bool correctA, UrAE const &AE)
+static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *ice_regridder, bool scale, bool correctA, UrAE const &AE)
 {
     SparseSetT dimA, dimG, dimI;
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     // ApvG
     SparseTriplets<SparseMatrix> GvAp({&dimG, &dimA});
-    GvAp.set_shape({sheet->nG(), AE.nfull});
+    GvAp.set_shape({ice_regridder->nG(), AE.nfull});
     AE.GvAp(GvAp);
 
     // GvI
     SparseTriplets<SparseMatrix> GvI({&dimG, &dimI});
-    GvI.set_shape({sheet->nG(), sheet->nI()});
-    sheet->GvI(GvI);
+    GvI.set_shape({ice_regridder->nG(), ice_regridder->nI()});
+    ice_regridder->GvI(GvI);
 
     // ----- Convert to Eigen and multiply
     auto GvAp_e(GvAp.to_eigen('.'));
@@ -449,7 +449,7 @@ static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *sheet, bool sc
     return ret;
 }
 
-static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *sheet, bool scale, bool correctA, UrAE const &E, UrAE const &A)
+static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *ice_regridder, bool scale, bool correctA, UrAE const &E, UrAE const &A)
 {
 
     SparseSetT dimA, dimG, dimE;
@@ -458,12 +458,12 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *sheet, bool sca
 
     // ApvG
     SparseTriplets<SparseMatrix> GvAp({&dimG, &dimA});
-    GvAp.set_shape({sheet->nG(), A.nfull});
+    GvAp.set_shape({ice_regridder->nG(), A.nfull});
     A.GvAp(GvAp);
 
     // GvEp
     SparseTriplets<SparseMatrix> GvEp({&dimG, &dimE});
-    GvEp.set_shape({sheet->nG(), E.nfull});
+    GvEp.set_shape({ice_regridder->nG(), E.nfull});
     E.GvAp(GvEp);
 
 
@@ -532,34 +532,34 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *sheet, bool sca
 }
 
 // ----------------------------------------------------------------
-RegridMatrices::RegridMatrices(IceRegridder *sheet)
+RegridMatrices::RegridMatrices(IceRegridder *ice_regridder)
 {
     printf("===== RegridMatrices Grid geometries:\n");
-    printf("    nA = %d\n", sheet->gcm->nA());
-    printf("    nhp = %d\n", sheet->gcm->nhp());
-    printf("    nE = %d\n", sheet->gcm->nE());
-    printf("    nI = %d\n", sheet->nI());
-    printf("    nG = %d\n", sheet->nG());
+    printf("    nA = %d\n", ice_regridder->gcm->nA());
+    printf("    nhp = %d\n", ice_regridder->gcm->nhp());
+    printf("    nE = %d\n", ice_regridder->gcm->nE());
+    printf("    nI = %d\n", ice_regridder->nI());
+    printf("    nG = %d\n", ice_regridder->nG());
 
-    UrAE urA(sheet->gcm->nA(),
-        std::bind(&IceRegridder::GvAp, sheet, _1),
-        std::bind(&IceRegridder::sApvA, sheet, _1, _2));
+    UrAE urA(ice_regridder->gcm->nA(),
+        std::bind(&IceRegridder::GvAp, ice_regridder, _1),
+        std::bind(&IceRegridder::sApvA, ice_regridder, _1, _2));
 
-    UrAE urE(sheet->gcm->nE(),
-        std::bind(&IceRegridder::GvEp, sheet, _1),
-        std::bind(&IceRegridder::sEpvE, sheet, _1, _2));
+    UrAE urE(ice_regridder->gcm->nE(),
+        std::bind(&IceRegridder::GvEp, ice_regridder, _1),
+        std::bind(&IceRegridder::sEpvE, ice_regridder, _1, _2));
 
     // ------- AvI, IvA
-    regrids.insert(make_pair("AvI", std::bind(&compute_AEvI, sheet, _1, _2, urA) ));
-    regrids.insert(make_pair("IvA", std::bind(&compute_IvAE, sheet, _1, _2, urA) ));
+    regrids.insert(make_pair("AvI", std::bind(&compute_AEvI, ice_regridder, _1, _2, urA) ));
+    regrids.insert(make_pair("IvA", std::bind(&compute_IvAE, ice_regridder, _1, _2, urA) ));
 
     // ------- EvI, IvE
-    regrids.insert(make_pair("EvI", std::bind(&compute_AEvI, sheet, _1, _2, urE) ));
-    regrids.insert(make_pair("IvE", std::bind(&compute_IvAE, sheet, _1, _2, urE) ));
+    regrids.insert(make_pair("EvI", std::bind(&compute_AEvI, ice_regridder, _1, _2, urE) ));
+    regrids.insert(make_pair("IvE", std::bind(&compute_IvAE, ice_regridder, _1, _2, urE) ));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, this, _1, _2, urE, urA) ));
-    regrids.insert(make_pair("EvA", std::bind(&compute_EvA, sheet, _1, _2, urE, urA) ));
-    regrids.insert(make_pair("AvE", std::bind(&compute_EvA, sheet, _1, _2, urA, urE) ));
+    regrids.insert(make_pair("EvA", std::bind(&compute_EvA, ice_regridder, _1, _2, urE, urA) ));
+    regrids.insert(make_pair("AvE", std::bind(&compute_EvA, ice_regridder, _1, _2, urA, urE) ));
 
     // ----- Show what we have!
     printf("Available Regrids:");

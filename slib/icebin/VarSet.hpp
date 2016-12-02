@@ -76,11 +76,6 @@ public:
 
 };
 
-}
-
-// ------------------------------------------------------
-
-
 }   // Namespace
 
 inline std::ostream &operator<<(std::ostream &out, icebin::VarMeta const &cf)
