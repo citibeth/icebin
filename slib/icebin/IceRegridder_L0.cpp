@@ -64,11 +64,9 @@ static int nearest_1d(
 void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
 {
     IceExch dest = interp_grid;
-    std::unordered_map<long,double> const elevIh(elevI_hash());
 
-
-    if (gcm->hpdefs.size() == 0) (*icebin_error)(-1,
-        "IceRegridder_L0::GvEp(): hpdefs is zero-length!");
+    if (gcm->hcdefs.size() == 0) (*icebin_error)(-1,
+        "IceRegridder_L0::GvEp(): hcdefs is zero-length!");
 
     // ---------------------------------------
     // Handle Z_INTERP or ELEV_CLASS_INTERP
@@ -79,27 +77,24 @@ void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
         long const iI = cell->j;        // Ice Grid
         long const iX = cell->index;    // X=Exchange Grid
         long const iG = (dest == IceExch::ICE ? iI : iX);   // G=Interpolation Grid
-        auto ii = elevIh.find(iI);
-        if (ii != elevIh.end()) {
-            double const elev = ii->second;
-
+        if (!std::isnan(elevI(iI))) {
             // This cell not masked: look up elevation point as usual
-            double elevation = std::max(elev, 0.0);
+            double elevation = std::max(elevI(iI), 0.0);
 
             // Interpolate in height points
             switch(interp_style.index()) {
                 case InterpStyle::Z_INTERP : {
                     int ihps[2];
                     double whps[2];
-                    linterp_1d(gcm->hpdefs, elevation, ihps, whps);
-                    ret.add({iG, gcm->indexingHC.tuple_to_index<2>({iA, ihps[0]})},
+                    linterp_1d(gcm->hcdefs, elevation, ihps, whps);
+                    ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[0]})},
                         cell->native_area * whps[0]);
-                    ret.add({iG, gcm->indexingHC.tuple_to_index<2>({iA, ihps[1]})},
+                    ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[1]})},
                         cell->native_area * whps[1]);
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {
-                    int ihps0 = nearest_1d(gcm->hpdefs, elevation);
-                    ret.add({iG, gcm->indexingHC.tuple_to_index<2>({iA, ihps0})},
+                    int ihps0 = nearest_1d(gcm->hcdefs, elevation);
+                    ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps0})},
                         cell->native_area);
                 } break;
             }
@@ -110,8 +105,6 @@ void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
 void IceRegridder_L0::GvI(
     spsparse::SparseTriplets<SparseMatrix> &ret) const
 {
-    std::unordered_map<long,double> const elevIh(elevI_hash());
-
     if (interp_grid == IceExch::ICE) {
         // Ice <- Ice = Indentity Matrix (scaled)
         // But we need this unscaled... so we use the weight of
@@ -119,7 +112,7 @@ void IceRegridder_L0::GvI(
         for (auto cell=gridI->cells.begin(); cell != gridI->cells.end(); ++cell) {
             long iI = cell->index;
 
-            if (elevIh.find(iI) != elevIh.end())
+            if (!std::isnan(elevI(iI)))
                 ret.add({iI, iI}, cell->native_area);
         }
     } else {
@@ -129,9 +122,8 @@ void IceRegridder_L0::GvI(
             long const iI = cell->j;        // index in ice grid
             long const iX = cell->index;    // index in exchange grid
 
-            if (elevIh.find(iI) != elevIh.end()) {
+            if (!std::isnan(elevI(iI)))
                 ret.add({iX,iI}, cell->native_area);
-            }
         }
     }
 }

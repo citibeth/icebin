@@ -264,7 +264,7 @@ public:
 
     /** Conversion between n-dimensional indexing used natively on the
     grid, and 1-D indexing used in IceBin. */
-    ibmisc::Indexing<int, long> indexing;
+    ibmisc::Indexing indexing;
 
     std::string name;
 

@@ -11,10 +11,16 @@
 #include <icebin/GCMPerIceSheetParams.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/VarSet.hpp>
+#include <icebin/multivec.hpp>
+
+namespace ibmisc {
+    class NcIO;
+}
 
 namespace icebin {
 
 class GCMCoupler;
+class GCMCouplerOutput;
 class IceWriter;
 
 class IceCoupler {
@@ -92,8 +98,8 @@ public:
     void couple(
         double time_s,
         // Values from GCM, passed GCM -> Ice
-        ArraySparseParallelVectors const &gcm_ovalsE,
-        GCMCoupleOutput &out,    // Accumulate matrices here...
+        VectorMultivec const &gcm_ovalsE,
+        GCMCouplerOutput &out,    // Accumulate matrices here...
         bool do_run);
 
     /** (4.1) @param index Index of each grid value.
@@ -108,7 +114,7 @@ public:
 // =========================================================
 
 extern
-std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
+std::unique_ptr<IceCoupler> new_ice_coupler(ibmisc::NcIO &ncio, std::string vname,
     GCMCoupler const *_gcm_coupler, IceRegridder *_regridder);
 
 
@@ -128,12 +134,12 @@ class IceWriter
     std::vector<size_t> strides;
 
 public:
-    void IceWriter(
+    IceWriter(
         IceCoupler &_ice_coupler,
         VarSet const *_contract,
-        std::string _output_fname);
+        std::string const &_output_fname);
 
-    void IceWriter::write(double time_s,
+    void write(double time_s,
         blitz::Array<double,2> const &valsI);    // valsI[nI, nvars]
 
 private:

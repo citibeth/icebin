@@ -291,7 +291,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
     get_or_put_att(info_v, ncio.rw, "name", name);
 
     int version = 2;
-    get_or_put_att(info_v, ncio.rw, "version", ncInt, &version, 1);
+    get_or_put_att(info_v, ncio.rw, "version", "int", &version, 1);
     if (ncio.rw == 'r' && version != 2) {
         (*icebin_error)(-1, "Trying to read version %d, I only know how to read version 2 grids from NetCDF", version);
     }
@@ -316,7 +316,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
         "finite difference models will use L0, while finite element "
         "models would use L1 or something else.");
 
-    indexing.ncio(ncio, ncInt, vname + ".indexing");
+    indexing.ncio(ncio, vname + ".indexing");
 
     if (coordinates == Coordinates::XY) {
         get_or_put_att(info_v, ncio.rw, "projection", sproj);
@@ -327,14 +327,14 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
             "for format of these strings.");
     }
 
-    get_or_put_att(info_v, ncio.rw, "cells.nfull", ncInt64, &cells._nfull, 1);
+    get_or_put_att(info_v, ncio.rw, "cells.nfull", "int64", &cells._nfull, 1);
     if (ncio.rw == 'w') info_v.putAtt("cells.nfull.comment",
         "The total theoretical number of grid cells (polygons) in this "
         "grid.  Depending on grid.info:parameterization, either cells or "
         "vertices will correspond to the dimensionality of the grid's "
         "vector space.");
 
-    get_or_put_att(info_v, ncio.rw, "vertices.nfull", ncInt64, &vertices._nfull, 1);
+    get_or_put_att(info_v, ncio.rw, "vertices.nfull", "int64", &vertices._nfull, 1);
     if (ncio.rw == 'w') info_v.putAtt("vertices.nfull.comment",
         "The total theoretical of vertices (of polygons) on this grid.");
 
@@ -357,6 +357,8 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
             "close to the relevant ice sheets.  In this case, all grid "
             "cells are realized.");
 
+        NcDim cells_nfull_d = get_or_add_dim(ncio,
+            vname + ".cells.nfull", cells.nfull());
         NcDim cells_nrealized_d = get_or_add_dim(ncio,
             vname + ".cells.nrealized", cells.nrealized());
         NcDim cells_nrealized_plus_1_d = get_or_add_dim(ncio,
@@ -367,39 +369,39 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
         NcDim three_d = get_or_add_dim(ncio, "three", 3);
 
         // --------- Variables
-        get_or_add_var(ncio, vname + ".vertices.index", ncInt, {vertices_nrealized_d})
+        get_or_add_var(ncio, vname + ".vertices.index", "int", {vertices_nrealized_d})
             .putAtt("comment",
                 "For grids that index on cells (eg, L0): a dense, zero-based "
                 "1D index used to identify each realized cell.  This will be "
                 "used for vectors representing fields on the grid.");
 
-        get_or_add_var(ncio, vname + ".vertices.xy", ncDouble, {vertices_nrealized_d, two_d});
+        get_or_add_var(ncio, vname + ".vertices.xy", "double", {vertices_nrealized_d, two_d});
 
-        get_or_add_var(ncio, vname + ".cells.index", ncInt, {cells_nrealized_d})
+        get_or_add_var(ncio, vname + ".cells.index", "int", {cells_nrealized_d})
             .putAtt("comment",
                 "For grids that index on vertices (eg, L1): a dense, zero-based "
                 "1D index used to identify each realized vertex.  This will be "
                 "used for vectors representing fields on the grid.");
 
-        get_or_add_var(ncio, vname + ".cells.ijk", ncInt, {cells_nrealized_d, three_d})
+        get_or_add_var(ncio, vname + ".cells.ijk", "int", {cells_nrealized_d, three_d})
             .putAtt("comment",
                 "OPTIONAL: Up to 3 dimensions can be used to assign a 'real-world' "
                 "index to each grid cell.  If grid.info:type = EXCHANGE, then i and "
                 "j correspond to grid.vertices.index of the two overlapping source cells.");
 
-        get_or_add_var(ncio, vname + ".cells.native_area", ncDouble, {cells_nrealized_d})
+        get_or_add_var(ncio, vname + ".cells.native_area", "double", {cells_nrealized_d})
             .putAtt("comment",
                 "Area of each cell in its native (non-projected) coordinate system.  "
                 "We can compute the projected area on the fly.");
 
 
-        // nc.add_var((vname + ".cells.area").c_str(), ncDouble, ncells_dim);
+        // nc.add_var((vname + ".cells.area").c_str(), "double", ncells_dim);
 
-        get_or_add_var(ncio, vname + ".cells.vertex_refs", ncInt, {nvrefs_d})
+        get_or_add_var(ncio, vname + ".cells.vertex_refs", "int", {nvrefs_d})
             .putAtt("comment",
                 "A list of cell indices.  Used to form grid cell polygons.");
 
-        get_or_add_var(ncio, vname + ".cells.vertex_refs_start", ncInt, {cells_nrealized_plus_1_d})
+        get_or_add_var(ncio, vname + ".cells.vertex_refs_start", "int", {cells_nrealized_plus_1_d})
             .putAtt("comment",
                 "Index into vertex_refs of the start of each polygon.");
 
@@ -464,20 +466,20 @@ void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     auto xb_d = get_or_add_dim(ncio,
         vname + ".x_boundaries.length", this->xb.size());
     ncio_vector(ncio, this->xb, true,
-        vname + ".x_boundaries", ncDouble, {xb_d});
+        vname + ".x_boundaries", "double", {xb_d});
 
     auto yb_d = get_or_add_dim(ncio,
         vname + ".y_boundaries.length", this->yb.size());
     ncio_vector(ncio, this->yb, true,
-        vname + ".y_boundaries", ncDouble, {yb_d});
+        vname + ".y_boundaries", "double", {yb_d});
 
-    NcVar info_v = get_or_add_var(ncio, vname + ".info", ncInt, {});
+    NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     if (ncio.rw == 'w') {
         int n;
         n = nx();
-        get_or_put_att(info_v, ncio.rw, "nx", ncInt, &n, 1);
+        get_or_put_att(info_v, ncio.rw, "nx", "int", &n, 1);
         n = ny();
-        get_or_put_att(info_v, ncio.rw, "ny", ncInt, &n, 1);
+        get_or_put_att(info_v, ncio.rw, "ny", "int", &n, 1);
     }
 
     Grid::ncio(ncio, vname);
@@ -489,23 +491,23 @@ void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     auto lonb_d = get_or_add_dim(ncio,
         vname + ".lon_boundaries.length", this->lonb.size());
     ncio_vector(ncio, this->lonb, true,
-        vname + ".lon_boundaries", ncDouble, {lonb_d});
+        vname + ".lon_boundaries", "double", {lonb_d});
 
     auto latb_d = get_or_add_dim(ncio,
         vname + ".lat_boundaries.length", this->latb.size());
     ncio_vector(ncio, this->latb, true,
-        vname + ".lat_boundaries", ncDouble, {latb_d});
+        vname + ".lat_boundaries", "double", {latb_d});
 
-    NcVar info_v = get_or_add_var(ncio, vname + ".info", ncInt, {});
+    NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     get_or_put_att(info_v, ncio.rw, "north_pole_cap", north_pole);
     get_or_put_att(info_v, ncio.rw, "south_pole_cap", south_pole);
-    get_or_put_att(info_v, ncio.rw, "points_in_side", ncInt, &points_in_side, 1);
+    get_or_put_att(info_v, ncio.rw, "points_in_side", "int", &points_in_side, 1);
     if (ncio.rw == 'w') {
         int n;
         n = nlon();
-        get_or_put_att(info_v, ncio.rw, "nlon", ncInt, &n, 1);
+        get_or_put_att(info_v, ncio.rw, "nlon", "int", &n, 1);
         n = nlat();
-        get_or_put_att(info_v, ncio.rw, "nlat", ncInt, &n, 1);
+        get_or_put_att(info_v, ncio.rw, "nlat", "int", &n, 1);
     }
 
     Grid::ncio(ncio, vname);

@@ -132,8 +132,8 @@ static std::array<std::string, 2> _writer_ofname = {"ice_model_in.nc", "ice_mode
 void IceCoupler::couple(
 double time_s,
 // Values from GCM, passed GCM -> Ice
-ArraySparseParallelVectorsE const &gcm_ovalsE,
-GCMCoupleOutput &out,    // Accumulate matrices here...
+VectorMultivec const &gcm_ovalsE,
+GCMCouplerOutput &out,    // Accumulate matrices here...
 bool do_run)
 {
     // Store regridding matrices for the last timestep, which we will
@@ -215,6 +215,7 @@ bool do_run)
 
     // ========== Update regridding matrices
     auto elevI(get_elevI());    // blitz
+    ice_regridder.set_elevI(to_spsparse(elevI));
     RegridMatrices rm(regridder);
 
     // Compute IvE (for next timestep)

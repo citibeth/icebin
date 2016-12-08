@@ -33,6 +33,7 @@ add_custom_command(
 set(icebin_SOURCES
     icebin/error.cpp
     icebin/Grid.cpp
+    icebin/IceRegridder.cpp
     icebin/GCMRegridder.cpp
     icebin/IceRegridder_L0.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
@@ -41,6 +42,7 @@ set(icebin_SOURCES
 if (BUILD_COUPLER)
     list(APPEND icebin_SOURCES
         # Coupler...
+        icebin/multivec.cpp
         icebin/GCMParams.cpp
         icebin/GCMCoupler.cpp
         icebin/IceModel_Writer.cpp

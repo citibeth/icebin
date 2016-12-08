@@ -75,7 +75,7 @@ public:
         { return data[index.at(name)]; }
 
     /** Defines each variable in the DimSet, according to a set of dimensions. */
-    NcVar ncdefine(NcIO &ncio,
+    netCDF::NcVar ncdefine(ibmisc::NcIO &ncio,
         std::vector<netCDF::NcDim> const &dims,
         std::string vname_base)
     {
@@ -86,14 +86,6 @@ public:
     }
 
 };
-
-
-
-
-
-}
-
-// ------------------------------------------------------
 
 
 }   // Namespace

@@ -247,51 +247,6 @@ void ncio_dense(
         vname_base);
 }
 // ------------------------------------------------------------
-std::vector<GCMCouplerOutput> const split_by_domain(
-    GCMCouplerOutput const &out,
-    DomainDecomposer const &domainsA,
-    DomainDecomposer const &domainsE)
-{
-    // Construct the output
-    std::vector<GCMCouplerOutput> outs;
-    outs.reserve(domainsA.size());
-    for (size_t i=0; i<domainsA.size(); ++i)
-        outs.push_back(GCMCouplerOutput(out.nvar));
-
-    size_t strideb = sizeof(GCMCouplerOutput);
-    typedef MultiDomain<SparseMatrix> MDMatrix;
-    typedef MultiDomain<SparseVector> MDVector;
-    MultiDomain<VectorSparseParallelVectors> MDPVecs;
-
-    // Split each element of parallel sparse vectors
-    for (GridAE iAE=0; iAE != GridAE.count; ++iAE) {
-        DomainDecomposer &domainX(domains[iAE]);
-
-        auto ival(out.gcm_ivals[iAE].vals.begin());
-        for (auto iix(out.gcm_ivals[iAE].index.begin());
-            iix != out.gcm_ivals[iAE].index.end(); ++iix)
-        {
-            int idomain = domainX.domain(*iix);
-            auto &outsi(outs[idomain]);
-            outsi.index.push_back(*iix);
-            for (int i=0; i<out.nvar; ++i)
-                outsi.vals.push_back(*ival);
-        }
-    }
-
-    // Split the standard sparse vectors and matrices
-    MDMatrix E1vE0(&outs.front().E1vE0, 0, domainsE, strideb),
-        copy(E1vE0, out.E1vE0);
-    MDMatrix AvE1(&outs.front().AvE1, 0, domainsA, strideb),
-        copy(AvE1, out.AvE1);
-    MDVector wAvE1(&outs.front().wAvE1, 0, domainsA, strideb),
-        copy(wAvE1, out.wAvE1);
-    MDVector elevE1(&outs.front().elevE1, 0, domainsE, strideb),
-        copy(elevE1, out.elevE1);
-
-    return outs;
-}
-// ------------------------------------------------------------
 /** Top-level ncio() to log output from coupler. (coupler->GCM) */
 void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     GCMCouplerOutput &out,        // All MPI ranks included here
@@ -325,5 +280,6 @@ void GCMCoupler::ncio_gcm_output(NcIO &ncio,
         regridder.indexingE, vname_base);
 }
 // ------------------------------------------------------------
+// ======================================================================
 
 }       // namespace

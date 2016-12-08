@@ -87,7 +87,7 @@ INTERFACE
         initial, &
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
-    use f90blitz
+    use icebin_f90blitz
         type(c_ptr), value :: api
         type(arr_spec_2) :: var_f
         character(c_char) :: field_f(*)
@@ -110,7 +110,7 @@ INTERFACE
         initial, &
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
-    use f90blitz
+    use icebin_f90blitz
         type(c_ptr), value :: api
         type(arr_spec_3) :: var_f
         character(c_char) :: field_f(*)

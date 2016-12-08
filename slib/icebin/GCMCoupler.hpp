@@ -33,144 +33,18 @@
 
 namespace icebin {
 
-class VectorSparseParallelVectors {
-public:
-    typedef long index_type;
-    typedef std::vector<double> val_type;
-    static const int rank = 1;
 
-    // Stores a bunch of parallel sparse vectors
-    // Index of each element in the parallel vectors
-    std::vector<long> index;
-    // Values of for each element in the vectors.  
-    std::vector<double> vals;
-    // Number of _vals element per _ix element
-    int nvar;
-
-    VectorParallelVectors(int _nvar) : nvar(_nvar) {}
-
-    inline size_t size() { return index.size(); }
-
-    friend class boost::serialization::access;
-    template<typename ArchiveT>
-    void serialize(ArchiveT& ar, const unsigned version) {
-        ar & index;
-        ar & vals;
-        ar & nvar;
-    }
-
-
-
-    VectorParallelVectors(int _nvar) : nvar(_nvar) {}
-
-    void add(long ix, std::vector<double> const &val)
-    {
-        index.push_back(ix);
-        for (int i=0; i<nvar; ++i) vals.push_back(val[i]);
-    }
-
-};
-
-VectorParallelVectors concatenate(std::vector<VectorParallelVectors> const &vecs)
-{
-    VectorParallelVectors ret;
-
-    if (len(vecs) == 0) (*icebin_error)(-1,
-        "Must concatenate at least one vector");
-
-    ret.nvar = vecs[0].nvar;
-
-    for (auto ii=vecs.begin(); ii != vecs.end(); ++ii) {
-        ret.insert(ret.index.end(), ii->index.begin(), ii->index.end());
-        ret.insert(ret.vals.end(), ii->vals.begin(), ii->vals.end());
-
-        if (ret.nvar != ii->nvar) (*icebin_error)(-1,
-            "Inconsistant nvar: %d vs %d", ret.nvar, ii->nvar);
-    }
-    return ret;
-}
-
-
-struct ArraySparseParallelVectors {
-    // Stores a bunch of parallel sparse vectors
-    // Index of each element in the parallel vectors
-    blitz::Array<long,1> index;
-    std::vector<blitz::Array<double,1>> values;
-};
-
-ArraySparseParallelVectors to_array(VectorSparseParallelVectors &vecs)
-{
-    ArraySparseParallelVectors ret;
-
-    // make_array(address, nele, stride)
-    vecs.ixA.reference(make_array(&vecs.index[0], vecs.index.size(), 1));
-
-    ret.values.reserve(vecs.nvar);
-    size_t nele = vecs.values.size() / vecs.nvar;
-    for (int ivar=0; ivar<nvar; ++ivar) {
-        ret.values.push_back(make_array(&vecs.values[i], nele, nvar));
-    }
-
-    return ret;
-}
-
-
-
-// extern ArraySparseParallelVectors vector_to_array(VectorSparseParallelVectors vecs);
-
-/** Stores an array of spsparse structures, one per MPI domain.  In
-    preparation for an MPI scatter... */
-template<class AccumulatorT>
-class MultiDomain {
-    typedef typename AccumulatorT::index_type SparseIndexT;
-    typedef typename AccumulatorT::val_type ValT;
-    static const int rank = AccumulatorT::rank;
-
-    /** Distinguishes between our domains */
-    DomainDecomposer const *domains;
-
-    /** Which dimension of stuff being fed to the accumulator is used
-        to discriminate on domain. */
-    int domain_dim;
-
-    AccumulatorT *rank0;    // Our rank=0 accumulator
-    size_t stride_bytes;    // Distance to next accumulator
-
-    void MultiDomain(AccumulatorT *_rank0, int _domain_dim, 
-        DomainDecomposer const *_domains, size_t _stride_bytes)
-        : domains(_domains), domain_dim(_domain_dim),
-        rank0(_rank0), stride_bytes(_stride_bytes)
-    {}
-
-    /** Adds an item. */
-    inline void add(std::array<SparseIndexT, rank> const index,
-        ValT const &val)
-    {
-        int rank = domains->get_rank(index[domain_dim]);
-        (*this)[rank].add(index, val);
-    }
-
-    AccumulatorT operator[](int ix)
-        { return *sparse_arrays[ix]; }
-    AccumulatorT const &operator[](int ix) const
-        { return sparse_arrays[ix]; }
-};
-
-class DomainDecomposer {
-public:
-
-    /** Returns the MPI rank of grid cell in a domain spread over
-        multiple MPI ranks. */
-    int get_domain(long index);
-}
 
 struct GCMCouplerOutput {
+    typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
+    typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
+
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
 
     // Mapping from the index of a variable in gcm_ivalsE/gcm_ivalsA
     // and the index within the GCMCoupler::gcm_inputs
-    std::array<VectorSparseParallelVectors, GridAE::count> gcm_ivals;
+    std::array<VectorMultivec<IndexAT,double>, GridAE::count> gcm_ivalsAE;
 
     // Values required to update TOPO, etc. in ModelE
     // (see add_fhc.py for how these are to be used)
@@ -193,10 +67,12 @@ struct GCMCouplerOutput {
 
     GCMCouplerOutput(int nvar) :
         gcm_ivals({
-            VectorSparseParallelVectors(nvar),
-            VectorSparseParallelVectors(nvar),
+            SparseMutlivec(nvar),
+            SparseMultivec(nvar),
         }) {}
     }
+
+    size_t nvar() { return gcm_ivals[0].nvar; }
 
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
@@ -206,54 +82,6 @@ struct GCMCouplerOutput {
         ar & AvE1;
         ar & wAvE1;
         ar & elevE1;
-    }
-};
-
-/** Used to write to an array od GCMCouplerOutput */
-struct MultiDomainGCMCouplerOutput {
-
-    std::array<DomainDecomposer const *, 2> domains;    // domainsE, domainsA
-
-    // GCMCouplerOutput for each MPI rank
-    std::unique_ptr<std::vector<GCMCouplerOutput>> single_outs;
-
-    std::array<MultiDomain<VectorSparseParallelVectors>,2> gcm_ivalsE;
-
-    std::array<MultiDomain<VectorSparseParallelVectors &, 2>> gcm_ivals;
-
-    MultiDomain<SparseMatrix,0> E1vE0;
-    MultiDomain<SparseMatrix,1> AvE1;
-    MultiDomain<SparseVector,1> wAvE1;
-    MultiDomain<SparseVector,0> elevE1;
-
-    std::unique_ptr<std::vector<GCMCouplerOutput>> _init_single_outs(
-        int ndomain, int nvar)
-    {
-        std::unique_ptr<std::vector<GCMCouplerOutput>> ret(
-            new std::vector<GCMCouplerOutput>());
-        ret->reserve(ndomain);
-        for (size_t i=0; i<ndomain; ++i)
-            ret->push_back(GCMCouplerOutput(nvar));
-
-        return ret;
-    }
-
-
-    MultiDomainGCMCouplerOutput(
-        DomainDecomposer const *domainsA
-        DomainDecomposer const *domainsE,
-        int nvar
-    ) :    // domainsE, domainsA
-        domains({domainsA, domainsE}),
-        single_outs(_init_single_outs(domainsA->size(), nvar)),
-        gcm_ivalsE(&single_outs->front().gcm_ivalsE, 0, domainsE, sizeof(GCMCouplerOutput)),
-        gcm_ivalsA(&single_outs->front().gcm_ivalsE, 0, domainsA, sizeof(GCMCouplerOutput)),
-        gcm_ivals({gcm_ivalsA, gcm_ivalsE}),
-        E1vE0(&single_outs->front().E1vE0, 0, domainsE, sizeof(GCMCouplerOutput)),
-        AvE1(&single_outs->front().AvE1, 0, domainsA, sizeof(GCMCouplerOutput)),
-        wAvE1(&single_outs->front().wAvE1, 0, domainsA, sizeof(GCMCouplerOutput)),
-        elevE1(&single_outs->front().elevE1, 0, domainsE, sizeof(GCMCouplerOutput)),
-    {
     }
 };
 
@@ -411,5 +239,10 @@ MultiDomainGCMCoupleOutput &out,
 bool do_run)
 
 };
+
+std::vector<GCMCouplerOutput> split_by_domain(
+    GCMCouplerOutput const &out,
+    DomainDecomposer const &domainsA,
+    DomainDecomposer const &domainsE);
 
 }

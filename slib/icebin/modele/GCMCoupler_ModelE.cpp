@@ -21,6 +21,7 @@
 #include <ibmisc/ncfile.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/contracts/contracts.hpp>
+#include <icebin/domain_splitter.hpp>
 
 // See here to serialize objects with non-default constructor
 //    http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
@@ -44,6 +45,36 @@ namespace modele {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 using namespace icebin::contracts;
 
+// ======================================================================
+
+DomainDecomposer_ModelE::DomainDecomposer_ModelE(std::vector<int> const &endj, im_world, jm_world) :    // Starts from ModelE; j indexing base=1
+    rank_of_j(endj[endj.size()]),    // 0-based indexing
+    im_world(_im_world), jm_world(_jm_world);
+{
+    ndomain = endj.size();    // startj contains an extra sentinel item at the end
+    int j=0;
+    for (int irank=0; irank<ndomain; ++irank) {
+        for (; j < endj[irank]; ++j)
+            rank_of_j(j) = rank;    // zero-based indexing for j
+}
+
+/** Creates (on root) a picture of the full domain decomposition */
+std::unique_ptr<DomainDecomposer_ModelE> new_domain_decomposer(
+    ibmisc::Domain domainA_global,    // alphabetical order, zero-based indexing
+    ibmisc::Domain domainA)
+{
+    std::vector<int> endj;
+    boost::mpi::gather(world, domainA.high[1], endj, 0);
+    
+    std::unique_ptr<DomainDecomposer_ModelE> ret;
+    if (am_i_root) {
+        ret.reset(new DomainDecomposer_ModelE(endj, domainA_global.high[0], domainA_global.high[1]));
+    }
+    return ret;
+}
+
+
+// ======================================================================
 // ---------------------------------------------------------------
 GCMCoupler_ModelE::GCMCoupler_ModelE() :
     GCMCoupler(GCMCoupler::Type::MODELE)
@@ -85,38 +116,10 @@ GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
     return static_cast_unique_ptr<GCMPerIceSheetParams>(params);
 }
 // ---------------------------------------------------------------
-struct ModelEMsg {
-    int iA, ihp;    // Indices into ModelE
-    double vals[1];     // Always at least one val; but this could be extended, based on # of inputs
-
-    double &operator[](int i) { return *(vals + i); }
-
-    /** @return size of the struct, given a certain number of values */
-    static size_t size(int nfields)
-        { return sizeof(ModelEMsg) + (nfields-1) * sizeof(double); }
-
-    static MPI_Datatype new_MPI_struct(int nfields);
-
-    /** for use with qsort */
-//  static int compar(void const * a, void const * b);
-
-};
-
-MPI_Datatype ModelEMsg::new_MPI_struct(int nfields)
+void GCMCoupler_ModelE::realize()
 {
-    int nele = 3 + nfields;
-    int blocklengths[] = {1, 1, 1, nfields};
-    MPI_Aint displacements[] = {offsetof(ModelEMsg,i), offsetof(ModelEMsg,j), offsetof(ModelEMsg,k), offsetof(ModelEMsg, vals)};
-    MPI_Datatype types[] = {MPI_INT, MPI_INT, MPI_INT, MPI_DOUBLE};
-    MPI_Datatype ret;
-    MPI_Type_create_struct(4, blocklengths, displacements, types, &ret);
-    MPI_Type_commit(&ret);
-    return ret;
+    $$$ Get new DomainDecomoser
 }
-// -----------------------------------------------------
-
-
-
 // -----------------------------------------------------
 /**
 This will:
@@ -200,14 +203,17 @@ bool init_only)
         std::vector<VectorSparseParallelVectors> every_gcm_ovalsE_s;
         boost::mpi::gather(world, gcm_ovalsE_s, every_gcm_ovalsE_s, world.root);
 
-        // Concatenate them all
+        // Concatenate coupler inputs
         ArraySparseParallelVectors gcm_ovalsE_s(
             to_array(concatenate(every_gcm_ovalsE_s)));
 
-        // every_outs has one item per MPI rank
+        // Couple on root!
         GCMCouplerOutput out(
             this->couple(time_s, yymmdd,
                 gcm_ovalsE_s, init_only));
+
+        // Split up the output (and 
+        std::vector<GCMCouplerOutput<3>> every_outs(split_by_domain(out, domains));
 
         // Scatter!
         boost::mpi::scatter(world, every_outs, out, world.root);

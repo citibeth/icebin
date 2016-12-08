@@ -70,6 +70,25 @@ struct ModelEInputs
 
 
 
+class DomainDecomposer_ModelE {
+    size_t ndomain;
+    blitz::Array<int,1> rank_of_j;    // indexing base=1
+public:
+
+    DomainDecomposer_ModelE(std::vector<int> const &startj, im_world, jm_world) :    // Starts from ModelE; j indexing base=1
+        rank_of_j(startj[startj.size()-1], blitz::fortranArray),    // 1-based indexing
+        im_world(_im_world), jm_world(_jm_world);
+
+    /** Number of domains */
+    size_t size() { return ndomain; }
+
+    /** Returns the MPI rank of grid cell */
+    int get_rank(long ix) {    // zero-based
+        int j = (ix / im_world) % jm_world;    // +0 for 0-based indexing
+        return rank_of_j(ix);
+    }
+}
+
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
@@ -83,11 +102,12 @@ class GCMCoupler_ModelE : public GCMCoupler
     int icebin_base_hc;
     int icebin_nhc;    // Number of elevation classes used by IceBin
 
-    // Low and high indices for this MPI node.
+    // Low and high indices for this MPI rank.
     // Indices are in Fortran order (im, jm) with zero-based indexing
-    ibmisc::Domain<int> domainA;
+    ibmisc::Domain domainA;
     // Low and high indices for global domain (Fortran order, 0-based)
-    ibmisc::Domain<int> domainA_global;
+    ibmisc::Domain domainA_global;
+
 
 public:
     GCMCoupler_ModelE();

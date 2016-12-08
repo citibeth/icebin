@@ -27,8 +27,7 @@
 #include <ibmisc/IndexSet.hpp>
 #include <spsparse/eigen.hpp>
 
-#include <icebin/Grid.hpp>
-#include <icebin/sparse.hpp>
+#include <icebin/IceRegridder.hpp>
 
 
 /** 
@@ -184,155 +183,12 @@ structure.
 
 namespace icebin {
 
-/** Controls how we interpolate from elevation class space to the ice grid */
-BOOST_ENUM_VALUES( InterpStyle, int,
-    (Z_INTERP)          (0)
-    (ELEV_CLASS_INTERP) (1)
-)
-
-BOOST_ENUM_VALUES( Weighting, int,
-    (NONE)  (0)
-    (WHOLE_CELL)    (1)
-    (PARTIAL_CELL)  (2)
-)
-
-
 class GCMRegridder;
 class IceModel;
 
-/** Represents a single ice sheet.
-Produces low-level unscaled matrices *for that single ice sheet*. */
-class IceRegridder {
-    friend class IceModel;
-
-public:
-    typedef Grid::Parameterization Type;
-
-    friend class GCMRegridder;
-    /** Parent pointer; holds the IceRegridder for ALL ice sheets */
-    GCMRegridder const *gcm;
-
-    /** Elevation of grid cells in ice grid (I).
-    This also implies a mask: cells not listed in this SparseVector are masked out. */
-    SparseVector elevI;
-protected:
-
-    Type type;
-    std::string _name;  /// "greenland", "antarctica", etc.
-    std::unique_ptr<Grid> gridI;            /// Ice grid outlines
-    std::unique_ptr<Grid> exgrid;       /// Exchange grid outlines (between GCM and Ice)
-    InterpStyle interp_style;   /// How we interpolate I<-E
-
-    // ---------------------------------
-
-    // Functions used by corresponding functions in GCMRegridder
-    /** Remove unnecessary GCM grid cells. */
-    void filter_cellsA(std::function<bool(long)> const &keepA);
-
-public:
-    std::string const &name() const { return _name; }
-
-    IceRegridder();
-    void clear();
-    void init(
-        std::string const &_name,
-        std::unique_ptr<Grid> &&_gridI,
-        std::unique_ptr<Grid> &&_exgrid,
-        InterpStyle _interp_style,
-        SparseVector &&elevI);
-
-    virtual ~IceRegridder();
-    std::unordered_map<long,double> elevI_hash() const;
-
-    // ------------------------------------------------
-    /** Number of dimensions of ice vector space */
-    virtual size_t nI() const = 0;
-
-    /** Number of dimensions of interpolation grid vector space. */
-    virtual size_t nG() const = 0;
-
-    // ------------------------------------------------
-    // Matrix production subroutines here store their output in
-    // spsparse accumulators (Anything that accepts a series of
-    // (i,j,value) triplets.  The ``SparseTriplets`` class is a
-    // special-purpose accumulator that can then produce Eigen
-    // matrices as output.
-
-
-    /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
-    NOTE: wAvAp == sApvA */
-    void sApvA(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
-
-    /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
-    NOTE: wAvAp == sApvA */
-    void sEpvE(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
-
-    /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
-    virtual void GvEp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
-
-    /** Produces the unscaled matrix [Interpolation or Ice] <-- [Ice] */
-    virtual void GvI(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
-
-    /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
-    virtual void GvAp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
-
-    /** Define, read or write this data structure inside a NetCDF file.
-    @param vname: Variable name (or prefix) to define/read/write it under. */
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
-
-};  // class IceRegridder
-
-std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type);
 
 
 // ----------------------------------------------------
-
-/** Gives weights for linear interpolation with a bunch of points.  If
-our point is off the end of the range, just continue the slope in
-extrapolation.
-
-For example, if:
-    xpoints = {3, 5, 6, 8}
-    xx = 6.5
-Then this subroutine will set:
-    indices = {2,3}
-    weights = {.75, .25}
-
-@param xpoints The points between which we will interpolate.
-    NOTE: this is not blitz::Array<double,1> because Blitz++ does not
-          (yet) implement STL-compatible iterators.
-@param xx The point for which we want an interpolation formula
-@param indices Place to store indices for the interpolation formula.
-    Array of exactly two elements.
-@param weights Place to store weights for the interpolation formula.
-    Array of exactly two elements.
-*/
-extern void linterp_1d(
-    std::vector<double> const &xpoints,
-    double xx,
-    int *indices, double *weights); // Size-2 arrays
-
-// ================================================
-/** The sparse vector and matrix data types we'll use in IceBin. */
-typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
-typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
-
-typedef blitz::Array<double,1> DenseVector;
-typedef blitz::Array<double,2> DenseMatrix;
-
-typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrix;
-
-/** Return value of a sparse matrix *//
-struct WeightedSparse {
-    SparseSetT dims[2];    // Dense-to-sparse mapping for the dimensions
-    std::unique_ptr<EigenSparseMatrixT> M;
-    std::Array<double,1> weight;
-};
-
-typedef spsparse::SparseSet<long,int> SparseSet;
 
 
 
@@ -348,7 +204,7 @@ class GCMRegridder
 public:
     std::unique_ptr<Grid> gridA;
 
-//  ibmisc::Domain<int> domainA;                // What's in our MPI halo?
+//  ibmisc::Domain domainA;                // What's in our MPI halo?
 
     /** Should we correct for projection and geometric error?
     NOTE: This is read out of the IceBin file on disk, but not used
@@ -366,14 +222,16 @@ public:
 
         (iA, iHP) zero-based
     */
-    ibmisc::Indexing<long,long> indexingHC;
+    ibmisc::Indexing indexingHC;
 
     // Derived from gridA.indexing and indexingHC
     // (im,jm,...,ihp) zero-based indices
-    ibmisc::Indexing<int, long> indexingE;
+    ibmisc::Indexing indexingE;
 
-    ibmisc::Indexing<int, long> &indexing(GridAE iAE)
-        { return (iAE == GridAE::A ? gridA.indexing : indexingE); }
+    /** Selection function so aid when A/E stuff uses the same code,
+        indexed by GridAE::A or ::E. */
+    ibmisc::Indexing &indexing(GridAE iAE)
+        { return (iAE == GridAE::A ? gridA->indexing : indexingE); }
 
     /** Position of height points in elevation space (same for all GCM
     grid cells) */
@@ -382,9 +240,9 @@ public:
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> sheets_index;
 
-    typedef std::vector<std::unique_ptr<IceRegridder>> SheetsT;
+    typedef std::vector<std::unique_ptr<IceRegridder>> RegriddersT;
     /** Ice sheets stored by index defined in sheets_index */
-    SheetsT ice_regridders;
+    RegriddersT ice_regridders;
 
 public:
 
@@ -407,30 +265,30 @@ public:
         How to convert (iA, iHP) <--> (iE) */
     void init(
         std::unique_ptr<Grid> &&_gridA,
-//      ibmisc::Domain<int> &&_domainA,     // Tells us which cells in gridA to keep...
+//      ibmisc::Domain &&_domainA,     // Tells us which cells in gridA to keep...
         std::vector<double> &&_hcdefs,
-        ibmisc::Indexing<long,long> &&_indexingHC,
+        ibmisc::Indexing &&_indexingHC,
         bool _correctA);
 
     // -----------------------------------------
     // These subroutines used for initial construction...
 
-    void add_sheet(std::unique_ptr<IceRegridder> &&sheet)
+    void add_sheet(std::unique_ptr<IceRegridder> &&regridder)
     {
-        printf("Adding IceRegridder: '%s'\n", sheet->name().c_str());
-        sheet->gcm = this;
-        size_t ix = sheets_index.insert(sheet->name());
-        sheets.push_back(std::move(sheet));
+        printf("Adding IceRegridder: '%s'\n", regridder->name().c_str());
+        regridder->gcm = this;
+        size_t ix = sheets_index.insert(regridder->name());
+        ice_regridders.push_back(std::move(regridder));
     }
 
-    void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&sheet)
+    void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&regridder)
     {
-        sheet->_name = name;
-        add_sheet(std::move(sheet));
+        regridder->_name = name;
+        add_sheet(std::move(regridder));
     }
 
-    IceRegridder *sheet(std::string const &name)
-        { return sheets[sheets_index.at(name)].get(); }
+    IceRegridder *ice_regridder(std::string const &name)
+        { return ice_regridders[sheets_index.at(name)].get(); }
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):
@@ -440,14 +298,14 @@ public:
     /** Higher-level filter, filter out cells not in our MPI domain.
     @param domainA Description of our MPI domain.
     Indices are in C order with 0-based indexing. */
-    void filter_cellsA(ibmisc::Domain<int> const &domainA);
+    void filter_cellsA(ibmisc::Domain const &domainA);
 
-    typedef ibmisc::DerefRandomAccessIter<const IceRegridder, typename SheetsT::const_iterator> const_iterator;
+    typedef ibmisc::DerefRandomAccessIter<const IceRegridder, typename RegriddersT::const_iterator> const_iterator;
 
     const_iterator begin() const
-        { return const_iterator(sheets.cbegin()); }
+        { return const_iterator(ice_regridders.cbegin()); }
     const_iterator end() const
-        { return const_iterator(sheets.cend()); }
+        { return const_iterator(ice_regridders.cend()); }
 
     // -----------------------------------------
 
@@ -467,42 +325,6 @@ public:
 
 };  // class GCMRegridder
 // ===========================================================
-
-// -----------------------------------------------------------
-typedef std::function<std::unique_ptr<WeightedSparse>(bool scale, bool correctA)> RegridFunction;
-
-/** Holds the set of "Ur" (original) matrices produced by an
-    IceRegridder for a SINGLE ice sheet. */
-class RegridMatrices {
-public:
-    std::map<std::string, RegridFunction> regrids;
-
-    /** Use this to construct a RegridMatrices instance:
-           GCMRegridder gcm_regridder(...);
-           auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
-           // rm.regrid("AvI", scale=true, correctA=true)
-           auto AvI(rm.regrid("AvI", true, true));
-           AvI.M        // The matrix
-           AvI.weight   // The weight vector
-    */
-    RegridMatrices(IceRegridder *sheet);
-
-    /** Retrieves a final regrid matrix.
-    @param spec_name: The matrix to produce.
-        Should be "AvI", "IvA", "EvI", "IvE", "AvE" or "EvA".
-    @param scale: Produce scaled matrix?
-        true  --> [kg m-2]
-        false --> [kg]
-    @param correctA: Correct for projection error in A or E grids?
-    @return The regrid matrix and weights
-    */
-    std::unique_ptr<WeightedSparse> regrid(
-        std::string const &spec_name,
-        bool scale,
-        bool correctA) const
-    { return (regrids.at(spec_name))(scale, correctA); }
-};
-
 
 
 
