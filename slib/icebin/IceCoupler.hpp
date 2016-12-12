@@ -84,7 +84,7 @@ public:
         ibmisc::time::tm const &time_base,
         double time_start_s);
 
-    /** (3) Sets elevI based on the latest state from the ice model. */
+    /** (3) Returns elevI based on the latest state from the ice model. */
     virtual blitz::Array<double,1> get_elevI() = 0;
 
     /** (4) Run the ice model for one coupling timestep.

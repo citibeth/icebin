@@ -62,15 +62,14 @@ ArraySparseParallelVectors vector_to_array(VectorSparseParallelVectors vecs)
 // ==========================================================
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
-    std::string const &_fname,
-    std::string const &_vname,
-    ibmisc::Domain<int> &&_domainA)
+    std::string const &_fname,        // comes from this->gcm_params
+    std::string const &_vname,        // comes from this->gcm_params
+    ibmisc::Domain const &domainA)    // comes from this->gcm_params
 {
     printf("BEGIN GCMCoupler::read_from_netcdf() %s\n", vname.c_str());
 
     fname = _fname;
     vname = _vname;
-    domainA = std::move(_domainA);
 
     NcIO ncio(fname, NcFile::read);
 

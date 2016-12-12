@@ -50,6 +50,13 @@ struct ModelEOutputs
 
 struct ModelEInputs
 {
+    std::vector<HCSegmentData> hc_segments;
+    SegmentData *icebin_segment;    // The segment with IceBin-generated elevation classes
+
+    // Relationship between elevation classes in ModelE and elevation classes in IceBin
+    int const icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
+    int const nhc_gcm;    // Number of elevation classes used by ModelE
+
     // Pointers to arrys within ModelE
 
     // gcm_ivalsAI[A/E][ivar](i, j, ihc)    Fortran-order 1-based indexing
@@ -65,7 +72,7 @@ struct ModelEInputs
     blitz::Array<double,2> fgrnd;    // Alt: fearth0
     blitz::Array<double,2> fgice;    // Alt: flice
     blitz::Array<double,2> zatmo;      // i,j
-    
+
 };
 
 
@@ -92,15 +99,13 @@ public:
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
+    std::unique_ptr<boost::mpi::communicator> world;
+
     ModelEOutputs modele_outputs;
 
     // Variables borrowed from ModelE, used to return data to it.
     // All these variables are Fortran-order, 1-based indexing
     ModelEInputs modele_inputs;
-
-    // The first GCM elevation class that is an IceBin class (0-based indexing)
-    int icebin_base_hc;
-    int icebin_nhc;    // Number of elevation classes used by IceBin
 
     // Low and high indices for this MPI rank.
     // Indices are in Fortran order (im, jm) with zero-based indexing
@@ -110,7 +115,7 @@ class GCMCoupler_ModelE : public GCMCoupler
 
 
 public:
-    GCMCoupler_ModelE();
+    GCMCoupler_ModelE(GCMParams const &params);
 
     /** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
     std::unique_ptr<GCMPerIceSheetParams>

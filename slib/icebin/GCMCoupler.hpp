@@ -46,6 +46,8 @@ struct GCMCouplerOutput {
     // and the index within the GCMCoupler::gcm_inputs
     std::array<VectorMultivec<IndexAT,double>, GridAE::count> gcm_ivalsAE;
 
+    // This is all for elevation classes in ICE space (ice_nhc, not gcm_nhc)
+
     // Values required to update TOPO, etc. in ModelE
     // (see add_fhc.py for how these are to be used)
     // We can get these from AvE
@@ -178,6 +180,14 @@ public:
     through to the ice model.  These parameters cannot be specific to
     either the ice model or the GCM. */
     GCMParams gcm_params;
+
+    /** Number of elevation classes the GCM sees */
+    int _nhc_gcm = -1;
+    int nhc() {
+        if (_nhc_gcm < 0) _nhc_gcm = get_nhc_gcm();
+        return nhc_gcm();
+    }
+    virtual int get_nhc_gcm();
 
     /** See regridder.sheets_index */
     std::vector<std::unique_ptr<IceCoupler>> ice_couplers;

@@ -47,7 +47,8 @@ using namespace icebin::contracts;
 
 // ======================================================================
 
-DomainDecomposer_ModelE::DomainDecomposer_ModelE(std::vector<int> const &endj, im_world, jm_world) :    // Starts from ModelE; j indexing base=1
+/** @param endj Last(+1) element of each domain (0-based indexing) */
+DomainDecomposer_ModelE::DomainDecomposer_ModelE(std::vector<int> const &lastj, im_world, jm_world) :    // Starts from ModelE; j indexing base=1
     rank_of_j(endj[endj.size()]),    // 0-based indexing
     im_world(_im_world), jm_world(_jm_world);
 {
@@ -55,17 +56,18 @@ DomainDecomposer_ModelE::DomainDecomposer_ModelE(std::vector<int> const &endj, i
     int j=0;
     for (int irank=0; irank<ndomain; ++irank) {
         for (; j < endj[irank]; ++j)
-            rank_of_j(j) = rank;    // zero-based indexing for j
+            rank_of_j(j) = irank;    // zero-based indexing for j
 }
 
-/** Creates (on root) a picture of the full domain decomposition */
-std::unique_ptr<DomainDecomposer_ModelE> new_domain_decomposer(
-    ibmisc::Domain domainA_global,    // alphabetical order, zero-based indexing
-    ibmisc::Domain domainA)
+/** Creates (on root) a picture of the full domain decomposition.
+Called from all MPI ranks... */
+std::unique_ptr<DomainDecomposer_ModelE> new_domain_decomposer_mpi(
+    ibmisc::Domain const &domainA_global,    // alphabetical order, zero-based indexing
+    ibmisc::Domain const &domainA)
 {
     std::vector<int> endj;
-    boost::mpi::gather(world, domainA.high[1], endj, 0);
-    
+    boost::mpi::gather(world, domainA.end[1], endj, 0);
+
     std::unique_ptr<DomainDecomposer_ModelE> ret;
     if (am_i_root) {
         ret.reset(new DomainDecomposer_ModelE(endj, domainA_global.high[0], domainA_global.high[1]));
@@ -76,8 +78,8 @@ std::unique_ptr<DomainDecomposer_ModelE> new_domain_decomposer(
 
 // ======================================================================
 // ---------------------------------------------------------------
-GCMCoupler_ModelE::GCMCoupler_ModelE() :
-    GCMCoupler(GCMCoupler::Type::MODELE)
+GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_gcm_params) :
+    GCMCoupler(GCMCoupler::Type::MODELE, std::move(_gcm_params))
 {
 
     // ----------------- Scalars provided by the GCM
@@ -91,8 +93,46 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
     scalars.add_field("unit", nan, "", 0, "Dimensionless identity");
 //  gcm_input_scalars.add_field("unit", nan, "", 0, "Dimensionless identity");
 
+
+    gcm_params = std::move(_gcm_params);
+    world.reference(new boost::mpi::communicator(gcm_params.comm, boost::mpi::comm_attach));
+
 }
 // ---------------------------------------------------------------
+/* Tells ModelE how many elevation classes it needs **/
+extern "C"
+int GCMCoupler_ModelE::get_nhc_gcm()
+{
+    NcIO ncio(gcm_params.icebin_config_fname, 'r');
+    int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
+
+    // Find the "ec" segment and set its size now...
+    auto &ec(gcm_params.ec_segment());
+    ec.size = nhc_ice;
+    return ec.base + ec.size;
+
+    // Destructor closes...
+}
+// ---------------------------------------------------------------
+/** Called from within LISheetIceBin::allocate() */
+void GCMCoupler_ModelE::allocate()
+{
+    ncread(gcm_params.icebin_config_fname.string(), "m", gcm_params.domainA);
+
+    // Check bounds on the IceSheets, set up any state, etc.
+    // This is done AFTER setup of gcm_coupler because gcm_coupler.read_from_netcdf()
+    // might change the IceSheet, in certain cases.
+    // (for example, if PISM is used, elev2 and mask2 will be read from related
+    // PISM input file, and the version in the ICEBIN file will be ignored)
+
+    domains = std::move(new_domain_decomposer_mpi(domainA_global, domainA));
+
+}
+// ---------------------------------------------------------------
+
+
+
+
 std::unique_ptr<GCMPerIceSheetParams>
 GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
     ibmisc::NcIO &ncio,
@@ -114,11 +154,6 @@ GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
         giss::get_att(gcm_var, "coupling_type")->as_string(0));
 
     return static_cast_unique_ptr<GCMPerIceSheetParams>(params);
-}
-// ---------------------------------------------------------------
-void GCMCoupler_ModelE::realize()
-{
-    $$$ Get new DomainDecomoser
 }
 // -----------------------------------------------------
 /**
@@ -229,6 +264,21 @@ bool init_only)
         boost::mpi::scatter(world, out, world.root);
     }
 
+    // 1. Copies values back into modele.gcm_ivals
+    modele.update_gcm_ivals(out);
+    // 2. Sets icebin_nhc, 
+    // 3. Updates FHC, ZATMO, etc.
+    modele.update_modele_vars(out);
+}
+// ===============================================================
+
+/** Called from MPI rank */
+void ModelEInputs::update_gcm_ivals(GCMCouplerOutput const &out)
+{
+    // Update ModelE variables (zatmo, fhc, etc);
+    // also icebin_base_hc and icebin_nhc
+    update_modele_vars(out);
+
     // Update gcm_ivalA variables...
     VectorSparseParallelVectors &gcm_ivalsA_s(out.gcm_ivals[GridAE::A]);
     std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsA(modele.gcm_ivals[GridAE::A]);
@@ -261,11 +311,11 @@ bool init_only)
                 out.gcm_ivalsE_s.vals[i*out.nvar + ivar];
         }
     }
-
-    // Update FHC, TOPO, etc.
-    // TODO: Nothing for now
 }
-// ===============================================================
+
+
+
+
 // NetCDF Logging Stuff
 
 
