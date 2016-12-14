@@ -158,7 +158,7 @@ GCMCouplerOutput GCMCoupler::couple(
 double time_s,
 std::array<int,3> const &yymmdd, // Date that time_s lies on
 ArraySparseParallelVectorsE const &gcm_ovalsE,
-bool init_only)
+bool run_ice)
 {
     std::string sdate = (boost::format
         ("%04d%02d%02d") % yymmdd[0] % yymmdd[1] % yymmdd[2]).str();
@@ -177,7 +177,7 @@ bool init_only)
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
-        ice_coupler.couple(time_s, yymmdd, gcm_ovalsE, out, init_only);
+        ice_coupler.couple(time_s, yymmdd, gcm_ovalsE, out, run_ice);
     }
 
 
@@ -197,7 +197,7 @@ static ncwrite_dense(
     NcFile *nc,
     ArraySparseParallelVectors *vecs,
     VarSet *contract,
-    ibmisc::IndexingBase const *indexing,
+    ibmisc::Indexing const *indexing,
     std::string const &vname_base)
 {
     // im,jm,ihc  0-based

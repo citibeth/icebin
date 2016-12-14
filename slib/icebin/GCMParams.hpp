@@ -43,11 +43,15 @@ struct GCMParams {
     int gcm_root;
 
     // Rundeck parameters
-    boost::filesystem::path icebin_config_fname;
-    boost::filesystem::path config_dir; // Where to look for Ice Model configuration files
-    boost::filesystem::path run_dir;    // The ModelE run directory
+    std::string icebin_config_fname;
+    std::string config_dir; // Where to look for Ice Model configuration files
+    std::string run_dir;    // The GCM run directory
 
     bool icebin_logging = true ;    // Should IceBin log input & output?
+
+    // Should IceBin update topography?
+    bool dynamic_topo = false;
+
     std::vector<HCSegmentData> hc_segments {
         HCSegmentData("legacy", 0, 1),
         HCSegmentData("sealand", 1, 2),

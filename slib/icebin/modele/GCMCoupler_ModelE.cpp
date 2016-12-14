@@ -48,7 +48,7 @@ using namespace icebin::contracts;
 // ======================================================================
 
 /** @param endj Last(+1) element of each domain (0-based indexing) */
-DomainDecomposer_ModelE::DomainDecomposer_ModelE(std::vector<int> const &lastj, im_world, jm_world) :    // Starts from ModelE; j indexing base=1
+DomainDecomposer_ModelE::DomainDecomposer_ModelE(std::vector<int> const &lastj, im_world, jm_world) :    // Starts from ModelE; j indexing base=0
     rank_of_j(endj[endj.size()]),    // 0-based indexing
     im_world(_im_world), jm_world(_jm_world);
 {
@@ -77,7 +77,9 @@ std::unique_ptr<DomainDecomposer_ModelE> new_domain_decomposer_mpi(
 
 
 // ======================================================================
-// ---------------------------------------------------------------
+// ======================================================================
+// ======================================================================
+// Called from LISnow::allocate()
 GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_gcm_params) :
     GCMCoupler(GCMCoupler::Type::MODELE, std::move(_gcm_params))
 {
@@ -98,64 +100,230 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_gcm_params) :
     world.reference(new boost::mpi::communicator(gcm_params.comm, boost::mpi::comm_attach));
 
 }
-// ---------------------------------------------------------------
-/* Tells ModelE how many elevation classes it needs **/
-extern "C"
-int GCMCoupler_ModelE::get_nhc_gcm()
-{
-    NcIO ncio(gcm_params.icebin_config_fname, 'r');
-    int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
+// -----------------------------------------------------
+// Called from LISnow::allocate()
+extern "C" void *gcmce_new(
 
-    // Find the "ec" segment and set its size now...
-    auto &ec(gcm_params.ec_segment());
-    ec.size = nhc_ice;
-    return ec.base + ec.size;
+    // Info about the global grid
+    int im, int jm,
 
-    // Destructor closes...
-}
-// ---------------------------------------------------------------
-/** Called from within LISheetIceBin::allocate() */
-void GCMCoupler_ModelE::allocate()
+    // Info about the local grid (1-based indexing)
+    int i0, int i1, int j0, int j1,
+
+    // MPI Stuff
+    MPI_Fint comm_f, int root)
 {
-    ncread(gcm_params.icebin_config_fname.string(), "m", gcm_params.domainA);
+    GCMParams _gcm_params;
+
+    // Domains and indexing are alphabetical indexes, zero-based
+    _gcm_params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
+    _gcm_params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
+    _gcm_params.gcm_comm = MPI_Comm_f2c(comm_f);
+    _gcm_params.gcm_root = root;
+
+    _gcm_params.icebin_config_fname = boost::filesystem::absolute("./ICEBIN_IN");
+    _gcm_params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR");
+    _gcm_params.run_dir = boost::filesystem::absolute(".");
+
+    std::unique_ptr<GCMCoupler_ModelE> gcm_coupler(
+        new GCMCoupler_ModelE(std::move(_gcm_params)));
+
+    GCMParams &gcm_params(gcm_coupler->gcm_params);
+
+    // Read the coupler, along with ice model proxies
+    gcm_coupler->ncread(gcm_params.icebin_config_fname, "m", gcm_params.domainA);
 
     // Check bounds on the IceSheets, set up any state, etc.
-    // This is done AFTER setup of gcm_coupler because gcm_coupler.read_from_netcdf()
+    // This is done AFTER setup of gcm_coupler because self->read_from_netcdf()
     // might change the IceSheet, in certain cases.
     // (for example, if PISM is used, elev2 and mask2 will be read from related
     // PISM input file, and the version in the ICEBIN file will be ignored)
 
     domains = std::move(new_domain_decomposer_mpi(domainA_global, domainA));
 
+    // TODO: Test that im and jm are consistent with the grid read.
+    return gcm_coupler.release();
+}
+// ==========================================================
+// Called from LISheetIceBin::read_nhc_gcm()
+
+/* Tells ModelE how many elevation classes it needs **/
+extern "C"
+int gcmce_read_nhc_gcm(GCMCoupler_ModelE *self)
+{
+    NcIO ncio(self->gcm_params.icebin_config_fname, 'r');
+    int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
+
+    // Find the "ec" segment and set its size now...
+    auto &ec(self->gcm_params.ec_segment());
+    ec.size = nhc_ice;
+    return ec.base + ec.size;
+
+    // NcIO Destructor closes...
 }
 // ---------------------------------------------------------------
+// ==========================================================
+// Called from LISheetIceBin::allocate()
 
-
-
-
-std::unique_ptr<GCMPerIceSheetParams>
-GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
-    ibmisc::NcIO &ncio,
-    std::string const &sheet_vname)
+/** Set a single constant value in Icebin.  This is a callback, to be called
+from ModelE's (Fortran code) constant_set::set_all_constants() */
+/** Called from within LISheetIceBin::allocate() */
+void gcmce_set_constant(
+    GCMCoupler_ModelE *self,
+    char const *name_f, int name_len,
+    double val,
+    char const *units_f, int units_len,
+    char const *description_f, int description_len)
 {
+    self->gcm_constants.set(
+        std::string(name_f, name_len),
+        val,
+        std::string(units_f, units_len),
+        std::string(description_f, description_len));
+}
 
+// ---------------------------------------------------------------
+extern "C"
+int gcmce_add_gcm_outputE(
+GCMCoupler_ModelE *self,
+F90Array<double, 3> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+char const *long_name_f, int long_name_len)
+{
+    std::string field_name(field_name_f, field_name_len);
+    std::string units(units_f, units_len);
+    std::string long_name(long_name_f, long_name_len);
+    auto var(var_f.to_blitz());
 
-    // Read GCM-specific coupling parameters
-    // Set the contract for each ice sheet, based on:
-    //   (a) GCM-specific coupling parameters (to be read),
-    //   (b) The type of ice model
+    unsigned int flags = 0;
 
-    auto gcm_var = giss::get_var_safe(nc, (sheet_vname + ".modele").c_str());
+    static double const xnan = std::numeric_limits<double>::quiet_NaN();
+    self->gcm_outputs.add(
+        field_name, xnan, units, flags, long_name);
 
-    std::unique_ptr<GCMPerIceSheetParams_ModelE> params(
-        new GCMPerIceSheetParams_ModelE());
+    self->modele_outputs.gcm_ovalsE.push_back(var);
 
-    params->coupling_type = giss::parse_enum<ModelE_CouplingType>(
-        giss::get_att(gcm_var, "coupling_type")->as_string(0));
+    printf("gcmce_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
 
-    return static_cast_unique_ptr<GCMPerIceSheetParams>(params);
+    return ret;
 }
 // -----------------------------------------------------
+/** @para var_nhp Number of elevation points for this variable.
+ (equal to 1 for atmosphere variables, or nhp for elevation-grid variables)
+@param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
+extern "C"
+int gcmce_add_gcm_inputA(
+GCMCoupler_ModelE *self,
+F90Array<double, 2> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+int initial,    // bool
+char const *long_name_f, int long_name_len)
+{
+    std::string field_name(field_name_f, field_name_len);
+    std::string units(units_f, units_len);
+    std::string long_name(long_name_f, long_name_len);
+    auto var(new_unique_ptr(var_f.to_blitz());
+
+    unsigned int flags = 0;
+    if (initial) flags |= contracts::INITIAL;
+
+    static double const xnan = std::numeric_limits<double>::quiet_NaN();
+    self->gcm_inputs[GridAE::A].add(
+        field_name, xnan, units, flags, long_name);
+
+    self->modele_inputs.gcm_ivals[GridAE::A].push_back(var);
+
+    printf("gcmce_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), ret);
+
+    return ret;
+}
+// -----------------------------------------------------
+extern "C"
+int gcmce_add_gcm_inputE(
+GCMCoupler_ModelE *self,
+F90Array<double, 3> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+int initial,    // bool
+char const *long_name_f, int long_name_len)
+{
+    std::string field_name(field_name_f, field_name_len);
+    std::string units(units_f, units_len);
+    std::string long_name(long_name_f, long_name_len);
+    auto var(var_f.to_blitz());
+
+    unsigned int flags = 0;
+    if (initial) flags |= contracts::INITIAL;
+
+    static double const xnan = std::numeric_limits<double>::quiet_NaN();
+    self->gcm_inputs[GridAE::E].add(
+        field_name, xnan, units, flags, long_name);
+
+    self->modele_inputs.gcm_ivals[GridAE::E].push_back(var);
+
+    printf("gcmce_add_gcm_inputE(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), ret);
+
+    return ret;
+}
+// -----------------------------------------------------
+// ==========================================================
+// Called from LIShetIceBin::reference_globals()
+
+extern "C"
+void gcmce_reference_globals(
+    F90Array<double, 3> &fhc,
+    F90Array<double, 3> &elevE,
+    F90Array<double, 2> &focean,
+    F90Array<double, 2> &flake,
+    F90Array<double, 2> &fgrnd,
+    F90Array<double, 2> &fgice,
+    F90Array<double, 2> &zatmo)
+{
+    auto &modele(api->gcm_coupler.modele);
+    modele.fhc.reference(fhc.to_blitz());
+    modele.elevI.reference(elevI.to_blitz());
+    modele.focean.reference(focean.to_blitz());
+    modele.flake.reference(flake.to_blitz());
+    modele.fgrnd.reference(fgrnd.to_blitz());
+    modele.fgice.reference(fgice.to_blitz());
+    modele.zatmo.reference(zatmo.to_blitz());
+}
+
+// ===========================================================
+// Called from LISheetIceBin::io_rsf()   (warm starts)
+
+/** Only called from MPI Root */
+extern "C"
+void gcmce_io_rsf(GCMCoupler_ModelE *self,
+    char *fname_c, int fname_n)
+{
+    std::string fname(fname_c, fname_n);
+    // TODO: Get ice model to save/restore state
+    // We must figure out how to get an appropriate filename
+}
+// ===========================================================
+// Called from LISheetIceBin::cold_start()
+
+extern "C"
+void gcmce_cold_start(GCMCoupler_ModelE *self, int itimei, double dtsrc)
+{
+    // a) Cold-start initial conditions of dynamic ice model
+TODO...
+
+    // b) Compute fhc, elevE
+    // c) Compute ZATMO, FGICE, etc.
+    if (self->gcm_params.dynamic_topo) {
+        // TODO...
+    }
+
+    // d) Sync with dynamic ice model
+    gcmce_couple_native(self, itime, dtsrc, false);
+}
+
+// =======================================================
+// Called from LISheetIceBin::couple()
 /**
 This will:
 1. Simultaneously:
@@ -184,11 +352,15 @@ Put elsewhere in the Fortran code:
 @param hc_offset Offset of first IceBin elevation class in GCM's set
     of EC's (zero-based).
 */
-void GCMCoupler_ModelE::couple_native(
-double time_s,
-std::array<int,3> const &yymmdd, // Date that time_s lies on
-bool init_only)
+//void GCMCoupler_ModelE::couple_native(
+void gcmce_couple_native(GCMCoupler_ModelE *self,
+int itime, double dtsrc,
+int yy, int mm, int dd, // Date that time_s lies on
+//std::array<int,3> const &yymmdd, // Date that time_s lies on
+bool run_ice)    // if false, only initialize
 {
+    double time_s = itime * dtsrc;
+
     GCMCouplerOutput out;
 //    int im = gcm_ovalsE.extent(0);
 //    int jm = gcm_ovalsE.extent(1);
@@ -245,7 +417,7 @@ bool init_only)
         // Couple on root!
         GCMCouplerOutput out(
             this->couple(time_s, yymmdd,
-                gcm_ovalsE_s, init_only));
+                gcm_ovalsE_s, run_ice));
 
         // Split up the output (and 
         std::vector<GCMCouplerOutput<3>> every_outs(split_by_domain(out, domains));
@@ -270,6 +442,34 @@ bool init_only)
     // 3. Updates FHC, ZATMO, etc.
     modele.update_modele_vars(out);
 }
+// =======================================================
+// =======================================================
+// =======================================================
+
+/** Callback from new_ice_coupler() */
+std::unique_ptr<GCMPerIceSheetParams>
+GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
+    ibmisc::NcIO &ncio,
+    std::string const &sheet_vname)
+{
+
+
+    // Read GCM-specific coupling parameters
+    // Set the contract for each ice sheet, based on:
+    //   (a) GCM-specific coupling parameters (to be read),
+    //   (b) The type of ice model
+
+    auto gcm_var = giss::get_var_safe(nc, (sheet_vname + ".modele").c_str());
+
+    std::unique_ptr<GCMPerIceSheetParams_ModelE> params(
+        new GCMPerIceSheetParams_ModelE());
+
+    params->coupling_type = giss::parse_enum<ModelE_CouplingType>(
+        giss::get_att(gcm_var, "coupling_type")->as_string(0));
+
+    return static_cast_unique_ptr<GCMPerIceSheetParams>(params);
+}
+// -----------------------------------------------------
 // ===============================================================
 
 /** Called from MPI rank */
