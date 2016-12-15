@@ -1,6 +1,9 @@
+#ifndef ICEBIN_DOMAIN_SPLITTER_HPP
+#define ICEBIN_DOMAIN_SPLITTER_HPP
+
 #include <icebin/GCMCoupler.hpp>
 
-
+namespace icebin {
 
 // ----------------------------------------------------------------
 // SAMPLE to go in DomainDecomposerT
@@ -118,4 +121,5 @@ std::vector<GCMCouplerOutput> split_by_domain(
     return outs;
 }
 
-// ------------------------------------------------------------
+}    // namespace icebin
+#endif

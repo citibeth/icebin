@@ -195,7 +195,7 @@ class IceModel;
 // ----------------------------------------------------
 
 /** Used to index arrays that are done for A and E grids */
-enum class GridAE { A, E, count };
+enum GridAE { A, E, count };
 
 /** Generates the matrices required in the GCM */
 class GCMRegridder

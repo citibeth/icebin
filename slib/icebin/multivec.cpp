@@ -3,8 +3,7 @@
 
 namespace icebin {
 
-template<class IndexT, class ValT>
-void VectorMultivec::add(IndexT const &ix, ValT const *val)
+void VectorMultivec::add(long ix, double const *val)
 {
     index.push_back(ix);
     for (int i=0; i<nvar; ++i) vals.push_back(val[i]);

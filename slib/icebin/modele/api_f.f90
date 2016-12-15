@@ -17,15 +17,19 @@
 module icebin_modele
 use icebin_f90blitz
 use iso_c_binding
-!use MpiSupport_mod
 implicit none
+
+
+
+
 
 ! Parameters read out of the ModelE rundeck and sent to IceBin
 ! These are later incorporated in gcmce_new()
-type ModelEParams
+integer, parameter :: MAX_CHAR_LEN = 128   ! From ModelE's Dictionary_mod.F90
+type, bind(c) :: ModelEParams
 
     ! Segment specs: to be further parsed.
-    character(c_char)*(MAX_CHAR_LEN) :: icebin_segments = 'legacy,sealand,ec'
+    character(MAX_CHAR_LEN, kind=c_char) :: icebin_segments = 'legacy,sealand,ec'
     real(c_double) :: dtsrc
     integer(c_int) :: yeari
 end type ModelEParams
@@ -42,20 +46,19 @@ INTERFACE
 
 
     ! Called from lisheeticebin%allocate()
-    function gcmce_new(
+    function gcmce_new( &
         rdparams, &
         im,jm, &
         i0,i1,j0,j1, &
         comm_f, root) bind(c)
     use iso_c_binding
+    import ModelEParams
         type(c_ptr) :: gcmce_new
         type(ModelEParams) :: rdparams
         integer(c_int), value :: im, jm
-        integer(c_int), value :: i0h,i1h,j0h,j1h
         integer(c_int), value :: i0,i1,j0,j1
-        integer(c_int), value :: j0s,j1s
         integer(c_int), value :: comm_f, root
-    end subroutine
+    end function gcmce_new
 
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs)
@@ -63,7 +66,7 @@ INTERFACE
     use iso_c_binding
         type(c_ptr), value :: api
         integer(c_int) :: gcmce_read_nhc_gcm
-    end function gcmce_gcm_inputs_nhp
+    end function gcmce_read_nhc_gcm
 
     ! Called from lisheeticebin%allocate()
     subroutine gcmce_set_const(api, &
@@ -80,7 +83,7 @@ INTERFACE
         integer(c_int), value :: units_len
         character(c_char) :: description_f(*)
         integer(c_int), value :: description_len
-    end subroutine
+    end subroutine gcmce_set_const
 
 
 
@@ -108,7 +111,7 @@ INTERFACE
         integer(c_int), value :: grid_len
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: long_name_len
-    end function
+    end function gcmce_add_gcm_outputE
 
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
@@ -132,7 +135,7 @@ INTERFACE
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: initial
         integer(c_int), value :: long_name_len
-    end function
+    end function gcmce_add_gcm_inputA
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
     function gcmce_add_gcm_inputE(api, &
@@ -155,10 +158,10 @@ INTERFACE
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: initial
         integer(c_int), value :: long_name_len
-    end function
+    end function gcmce_add_gcm_inputE
 
     subroutine gcmce_reference_globals(api, &
-        fhc, elevE,
+        fhc, elevE, &
         focean, flake, fgrnd, fgice, zatmo)
     use iso_c_binding
     use icebin_f90blitz
@@ -192,84 +195,6 @@ INTERFACE
         type(arr_spec_3) :: gcm_inputs_d_f
     end subroutine
 
-
-
-
-    ! ------------------------------------------------------
-
-
-
-
-
-
-
-    subroutine gcmce_delete(api) bind(c)
-        use iso_c_binding
-        use icebin_f90blitz
-        type(c_ptr) :: api      ! NOT VALUE here.
-    end subroutine
-
-
-    ! -------------------------------------------
-    subroutine gcmce_init_hp_to_ices(api) bind(c)
-    use iso_c_binding
-    use icebin_f90blitz
-        type(c_ptr), value :: api
-    end subroutine
-
-    subroutine gcmce_get_initial_state_c(api, itime, gcm_inputs_d_f) bind(c)
-    use iso_c_binding
-    use icebin_f90blitz
-        type(c_ptr), value :: api
-        integer(c_int), value :: itime
-        type(arr_spec_3) :: gcm_inputs_d_f
-    end subroutine
-
-    subroutine gcmce_set_gcm_output_c(api, &
-        field_name_f, field_name_len, arr_f) bind(c)
-    use iso_c_binding
-    use icebin_f90blitz
-        type(c_ptr), value :: api
-        character(c_char) :: field_name_f(*)
-        integer(c_int), value :: field_name_len
-        type(arr_spec_3) :: arr_f
-    end subroutine
-
 END INTERFACE
-
-!include 'mpif.h'
-
-! ================================================
-
-
-contains
-
-! ---------------------------------------------------
-subroutine gcmce_set_gcm_output(api, field_name, arr, i0, j0, k0)
-    type(c_ptr), value :: api
-    character(*) :: field_name
-    real*8, dimension(:,:,:), target :: arr
-    integer :: i0,j0,k0
-    ! --------- Locals
-    type(arr_spec_3) :: arr_f
-
-    call get_spec_double_3(arr, i0,j0,k0, arr_f)
-    call gcmce_set_gcm_output_c(api, &
-        field_name, len(field_name), arr_f)
-
-end subroutine gcmce_set_gcm_output
-
-
-! ! Go from a VectorSparseVector<int, double> output from GCMCoupler, to
-! ! a fully scattered array
-! subroutine VectorSparseVector_to_Scattered2(grid, vsv_indices, vsv_vals, nvals, scat) bind(c)
-! type(dist_grid), intent(in) :: grid
-! integer(c_int) :: vsv_indices(*)
-! real(c_double) :: vsv_vals(*)
-! integer(c_int), value :: nvals
-! real*8, dimension(:,:) :: scat
-!
-! end subroutine VectorSparseVector_to_Scattered2
-
 
 end module

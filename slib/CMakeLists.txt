@@ -43,7 +43,6 @@ if (BUILD_COUPLER)
     list(APPEND icebin_SOURCES
         # Coupler...
         icebin/multivec.cpp
-        icebin/GCMParams.cpp
         icebin/GCMCoupler.cpp
         icebin/IceWriter.cpp
         icebin/contracts/contracts.cpp
@@ -51,7 +50,6 @@ if (BUILD_COUPLER)
 
     if (USE_MODELE)
         list(APPEND icebin_SOURCES
-            icebin/modele/api.cpp
             icebin/modele/api_f.f90
             icebin/modele/GCMCoupler_ModelE.cpp
         )

@@ -19,7 +19,9 @@
 #pragma once
 
 #include <boost/filesystem.hpp>
+#include <icebin/error.hpp>
 #include <ibmisc/time.hpp>
+#include <ibmisc/indexing.hpp>
 
 namespace icebin {
 
@@ -31,7 +33,7 @@ struct HCSegmentData {
 
     HCSegmentData(std::string const &_name, int _base, int _size)
         : name(_name), base(_base), size(_size) {}
-}
+};
 
 /** Parameters passed from the GCM through to the ice model.
 These parameters cannot be specific to either the ice model or the GCM.
@@ -55,8 +57,6 @@ struct GCMParams {
         HCSegmentData("legacy", 0, 1),
         HCSegmentData("sealand", 1, 2),
         HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
-
-
 
     HCSegmentData &ec_segment()
     {

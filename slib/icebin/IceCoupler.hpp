@@ -63,9 +63,9 @@ public:
     std::unique_ptr<GCMPerIceSheetParams> gcm_per_ice_sheet_params;
 
 public:
-    std::string const &name() { return regridder->name(); }
-    Grid const *gridI() { return &*regridder->gridI; }
-    long ndata() const { return regridder->gridI->ndata(); }
+    std::string const &name() { return ice_regridder->name(); }
+    Grid const *gridI() { return &*ice_regridder->gridI; }
+    long ndata() const { return ice_regridder->gridI->ndata(); }
 
     // ======================================================
 

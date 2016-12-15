@@ -1,3 +1,6 @@
+#ifndef ICEBIN_MULTIVEC_HPP
+#define ICEBIN_MULTIVEC_HPP
+
 #include <cstddef>
 #include <vector>
 
@@ -8,6 +11,7 @@ namespace serialization {
 
 namespace icebin {
 
+/** Stores multiple sparse vectors that use the same grid cells. */
 class VectorMultivec {
     friend class boost::serialization::access;
 public:
@@ -39,7 +43,9 @@ public:
 
 };
 
-VectorMultivec concatenate(std::vector<VectorMultivec<IndexT,ValT>> const &vecs);
+VectorMultivec concatenate(std::vector<VectorMultivec> const &vecs);
 
 
-}
+}    // namespace icebin
+
+#endif

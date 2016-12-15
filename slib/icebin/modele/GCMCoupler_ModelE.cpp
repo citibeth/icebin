@@ -132,10 +132,12 @@ extern "C" void *gcmce_new(
     params.run_dir = boost::filesystem::absolute(".");
 
     params.hc_segments = parse_hc_segments(f_to_cpp(
-        rundeck.icebin_segments, sizeof(rundeck.icebin_segments)));
+        rdparams.icebin_segments, sizeof(rundeck.icebin_segments)));
 
     // Read the coupler, along with ice model proxies
-    gcm_coupler->ncread(gcm_params.icebin_config_fname, "m", gcm_params.domainA);
+    if (am_i_root()) {
+        ncread(gcm_params.icebin_config_fname, "m", gcm_params.domainA_global);
+    }
 
     // Check bounds on the IceSheets, set up any state, etc.
     // This is done AFTER setup of gcm_coupler because self->read_from_netcdf()
@@ -389,7 +391,6 @@ extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,
 int itime,
 int yy, int mm, int dd, // Date that time_s lies on
-//std::array<int,3> const &yymmdd, // Date that time_s lies on
 bool run_ice)    // if false, only initialize
 {
     double time_s = itime * dtsrc;
@@ -440,16 +441,15 @@ bool run_ice)    // if false, only initialize
     // boost::mpi::communicator &gcm_world(world);
     GCMCouplerOutput out;
     if (world.am_i_root()) {
-        std::vector<VectorSparseParallelVectors> every_gcm_ovalsE_s;
+        std::vector<VectorMultivec> every_gcm_ovalsE_s;
         boost::mpi::gather(world, gcm_ovalsE_s, every_gcm_ovalsE_s, world.root);
 
         // Concatenate coupler inputs
-        ArraySparseParallelVectors gcm_ovalsE_s(
-            to_array(concatenate(every_gcm_ovalsE_s)));
+        VectorMultivec gcm_ovalsE_s(concatenate(every_gcm_ovalsE_s));
 
         // Couple on root!
         GCMCouplerOutput out(
-            this->couple(time_s, yymmdd,
+            this->couple(time_s,
                 gcm_ovalsE_s, run_ice));
 
         // Split up the output (and 

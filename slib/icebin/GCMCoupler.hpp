@@ -30,6 +30,7 @@
 #include <icebin/GCMPerIceSheetParams.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/VarSet.hpp>
+#include <icebin/multivec.hpp>
 
 namespace icebin {
 
@@ -38,13 +39,14 @@ namespace icebin {
 struct GCMCouplerOutput {
     typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
     typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
+    typedef VectorMultivec SparseMultivec;
 
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
 
     // Mapping from the index of a variable in gcm_ivalsE/gcm_ivalsA
     // and the index within the GCMCoupler::gcm_inputs
-    std::array<VectorMultivec<IndexAT,double>, GridAE::count> gcm_ivalsAE;
+    std::array<VectorMultivec, GridAE::count> gcm_ivalsAE;
 
     // This is all for elevation classes in ICE space (ice_nhc, not gcm_nhc)
 
@@ -68,95 +70,24 @@ struct GCMCouplerOutput {
     SparseVector elevE1;
 
     GCMCouplerOutput(int nvar) :
-        gcm_ivals({
-            SparseMutlivec(nvar),
+        gcm_ivalsAE({
             SparseMultivec(nvar),
-        }) {}
-    }
+            SparseMultivec(nvar),
+        })
+    {}
 
-    size_t nvar() { return gcm_ivals[0].nvar; }
+//    size_t nvar() { return gcm_ivals[0].nvar; }
 
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
     {
-        ar & gcm_ivals;
+        ar & gcm_ivalsAE;
         ar & E1vE0;
         ar & AvE1;
         ar & wAvE1;
         ar & elevE1;
     }
 };
-
-
-
-
-struct IceOutMsgE {
-    int index[3];    // i,j,ihp
-
-    double vals[1];     // Always at least one val; but this could be extended, based on # of inputs
-
-    double &operator[](int i) { return *(vals + i); }
-
-    /** @return size of the struct, given a certain number of values */
-    static size_t size(int nfields)
-        { return sizeof(ModelEMsg) + (nfields-1) * sizeof(double); }
-
-    static MPI_Datatype new_MPI_struct(int nfields);
-
-    /** for use with qsort */
-//  static int compar(void const * a, void const * b);
-
-};
-
-//struct IceCouplerOutput {
-//    // Mapping between sparse and dense dimensions for E and A grids
-//    std::array<SparseSet, GridAE::count> dims;
-//
-//    // Dense array with sparse indices represented in dims
-//    // gcm_ivals[E/A](nE/nA, nvar)
-//    std::array<blitz::Array<double,GridAE::count>> gcm_ivals;    // gcm_ivalsE1, gcm_ivalsA
-//
-//
-//    // Values required to update TOPO, etc. in ModelE
-//    // (see add_fhc.py for how these are to be used)
-//    // We can get these from AvE
-//    // SparseVector wAvE;     // Area of A grid cells that overlap ice
-//    //SparseVector areaA;    // Total (native) area of A grid cells
-//    //SparseVector elevA;    // Used for atmosphere orography (ZATMO in ModelE)
-//
-//    // Regrid matrix to go from last step's elevation classes to this
-//    // step's elevation classes.
-//    SparseSet dimE0;
-//    EigenSparseMatrix E1vE0;
-//
-//    // Regrid matrix to convert to atmosphere.
-//    // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
-//    WeightedSparse AvE1;
-//
-//    // Used for temperature downscaling according to a lapse rate
-//    blitz::Array<double,1> elevE1;
-//};
-//
-//struct IceOutMsgE {
-//    int index[3];    // i,j,ihp
-//
-//    double vals[1];     // Always at least one val; but this could be extended, based on # of inputs
-//
-//    double &operator[](int i) { return *(vals + i); }
-//
-//    /** @return size of the struct, given a certain number of values */
-//    static size_t size(int nfields)
-//        { return sizeof(ModelEMsg) + (nfields-1) * sizeof(double); }
-//
-//    static MPI_Datatype new_MPI_struct(int nfields);
-//
-//    /** for use with qsort */
-////  static int compar(void const * a, void const * b);
-//
-//};
-
-
-
 
 class GCMCoupler {
 public:
@@ -174,7 +105,7 @@ public:
     std::string icebin_in;
 
     /** Main access to the core regridding of Icebin */
-    GCMRegridder regridder;
+    GCMRegridder gcm_regridder;
 
     /** Parameters (not physical constants) passed from the GCM
     through to the ice model.  These parameters cannot be specific to
@@ -185,7 +116,7 @@ public:
     int _nhc_gcm = -1;
     int nhc() {
         if (_nhc_gcm < 0) _nhc_gcm = get_nhc_gcm();
-        return nhc_gcm();
+        return _nhc_gcm;
     }
     virtual int get_nhc_gcm();
 
@@ -199,7 +130,7 @@ public:
     VarSet gcm_outputsE;
 
     /** Description of fields to send back to the GCM; some on E, some on A */
-    std::array<VarSet, GridAE::count> gcm_inputs;    // gcm_inputsE, gcm_inputsA
+    std::array<VarSet, GridAE::count> gcm_inputsAE;    // gcm_inputsE, gcm_inputsA
 
     /** Names of items used in the SCALARS dimension of VarTranslator.
     Used for ice_input and gcm_inputs.
@@ -226,33 +157,19 @@ public:
 
     virtual ~GCMCoupler() {}
 
-    /** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
-    virtual std::unique_ptr<GCMPerIceSheetParams>
-    read_gcm_per_ice_sheet_params(
-        ibmisc::NcIO &ncio,
-        std::string const &sheet_vname) const = 0;
-
     virtual void ncread(
         std::string const &fname,
-        std::string const &vname,
-        ibmisc::Domain<int> &&domainA);
+        std::string const &vname);
 
     void set_start_time(
         ibmisc::time::tm const &time_base,
         double time_start_s);
 
-void GCMCoupler::couple(
-// Simulation time [s]
-double time_s,
-ArraySparseParallelVectorsE const &gcm_ovalsE,
-MultiDomainGCMCoupleOutput &out,
-bool do_run)
+    GCMCouplerOutput couple(
+        double time_s,        // Simulation time [s]
+        VectorMultivec const &gcm_ovalsE,
+        bool run_ice);
 
 };
-
-std::vector<GCMCouplerOutput> split_by_domain(
-    GCMCouplerOutput const &out,
-    DomainDecomposer const &domainsA,
-    DomainDecomposer const &domainsE);
 
 }
