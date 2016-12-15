@@ -24,7 +24,7 @@
 namespace icebin {
 
 class GCMCoupler;
-class IceModel;
+class IceCoupler;
 
 namespace contracts {
 
@@ -34,9 +34,9 @@ const unsigned INITIAL = 1;
 extern std::string to_str(unsigned int flags);
 
 // =====================================================
-// Virtual Functions that dispatch on GCMCoupler and IceModel
+// Virtual Functions that dispatch on GCMCoupler and IceCoupler
 
-extern void setup(GCMCoupler const &coupler, IceModel &model);
+extern void setup(GCMCoupler const &gcm_coupler, IceCoupler &ice_coupler);
 // ======================================================
 
 

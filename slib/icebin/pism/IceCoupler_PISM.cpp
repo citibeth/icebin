@@ -59,7 +59,7 @@ static double const nan = std::numeric_limits<double>::quiet_NaN();
 //     IceCoupler.cpp: new_ice_coupler()
 
 IceCoupler_PISM::IceCoupler_PISM()
-    : IceModel(IceModel::Type::PISM),
+    : IceModel(IceCoupler::Type::PISM),
     write_pism_inputs(true)
 {
 }
@@ -79,7 +79,7 @@ static std::map<std::string, std::string> path_args = {
 
 void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet)
 {
-    IceModel::ncread(ncio, vname_sheet);
+    IceCoupler::ncread(ncio, vname_sheet);
 
     printf("BEGIN IceCoupler_PISM::ncread()\n");
     GCMParams const &_gcm_params(coupler->gcm_params);
@@ -249,9 +249,9 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 //printf("end = %f\n", pism_grid->time->end());
 
     // This has the following stack trace:
-    //  IceModel::init()                    [iceModel.cc]
-    //  IceModel::model_state_setup()       [iMinit.cc]
-    //  IceModel::init_couplers()           [iMinit.cc]
+    //  IceCoupler::init()                    [iceModel.cc]
+    //  IceCoupler::model_state_setup()       [iMinit.cc]
+    //  IceCoupler::init_couplers()           [iMinit.cc]
     //  surface->init()
     pism_ice_model->init();
 
@@ -457,10 +457,10 @@ void IceCoupler_PISM::run_timestep(double time_s,
         pism_ovars.size(),
         ice_ivalsI.extent(0)};
     extents1 = std::array<long,3>{
-        contract[IceModel::INPUT].size(),
-        contract[IceModel::INPUT].size(),
-        contract[IceModel::OUTPUT].size(),
-        contract[IceModel::OUTPUT].size(),
+        contract[IceCoupler::INPUT].size(),
+        contract[IceCoupler::INPUT].size(),
+        contract[IceCoupler::OUTPUT].size(),
+        contract[IceCoupler::OUTPUT].size(),
         ice_ovalsI.extent(0)};
     if (extents0 != extents1) (*icebin_error)(-1,
         "Extents mismatch (%d=%d), (%d=%d), (%d=%d), (%d=%d), (%d=%d)",
@@ -482,8 +482,8 @@ void IceCoupler_PISM::run_timestep(double time_s,
         // Fill pism_ivars[i] <-- iceIvals[:,i]
         // pism_ivars are distributed (global) vectors.
         blitz::Array<PetscScalar,1> g2_y(nconsolidated);
-        for (unsigned int ivar=0; i<contract[IceModel::INPUT].size(); ++ivar) {
-            VarMeta &cf(contract[IceModel::INPUT][ivar]);
+        for (unsigned int ivar=0; i<contract[IceCoupler::INPUT].size(); ++ivar) {
+            VarMeta &cf(contract[IceCoupler::INPUT][ivar]);
 
             // Get matching input (val) and output (pism_var) variables
             IceModelVec2S *pism_var = pism_ivars[ivar];
@@ -560,7 +560,7 @@ the Icebin-supplied variables (on the root node).
 void IceCoupler_PISM::get_state(unsigned int mask)
 {
     printf("BEGIN IceCoupler_PISM::get_state: %ld\n", pism_ovars.size());
-    VarSet const &ocontract(contract[IceModel::OUTPUT]);
+    VarSet const &ocontract(contract[IceCoupler::OUTPUT]);
 
     // Copy the outputs to the blitz arrays
     if (am_i_root()) allocate_ice_ovals_I();        // ROOT in PISM communicator
