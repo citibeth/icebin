@@ -20,6 +20,18 @@ use iso_c_binding
 !use MpiSupport_mod
 implicit none
 
+! Parameters read out of the ModelE rundeck and sent to IceBin
+! These are later incorporated in gcmce_new()
+type ModelEParams
+
+    ! Segment specs: to be further parsed.
+    character(c_char)*(MAX_CHAR_LEN) :: icebin_segments = 'legacy,sealand,ec'
+    real(c_double) :: dtsrc
+    integer(c_int) :: yeari
+end type ModelEParams
+
+
+
 ! ================================================
 ! Stuff from icebin_modele.cpp
 
@@ -28,14 +40,33 @@ INTERFACE
     ! ------------------------------------------------------
     ! ------------- LISheetIceBin::allocate()
 
-    ! Called from lisheeticebin%allocate()
-    function new_icebin_modele_c() result(ret) bind(c)
-    use iso_c_binding
-        type(c_ptr) :: ret
-    end function
 
     ! Called from lisheeticebin%allocate()
-    subroutine icebin_modele_set_const(api, &
+    function gcmce_new(
+        rdparams, &
+        im,jm, &
+        i0,i1,j0,j1, &
+        comm_f, root) bind(c)
+    use iso_c_binding
+        type(c_ptr) :: gcmce_new
+        type(ModelEParams) :: rdparams
+        integer(c_int), value :: im, jm
+        integer(c_int), value :: i0h,i1h,j0h,j1h
+        integer(c_int), value :: i0,i1,j0,j1
+        integer(c_int), value :: j0s,j1s
+        integer(c_int), value :: comm_f, root
+    end subroutine
+
+
+    ! Called from lisheeticebin%allocate() (via setup_gcm_inputs)
+    function gcmce_read_nhc_gcm(api) bind(c)
+    use iso_c_binding
+        type(c_ptr), value :: api
+        integer(c_int) :: gcmce_read_nhc_gcm
+    end function gcmce_gcm_inputs_nhp
+
+    ! Called from lisheeticebin%allocate()
+    subroutine gcmce_set_const(api, &
         name_f, name_len, &
         val, &
         units_f, units_len, &
@@ -52,35 +83,36 @@ INTERFACE
     end subroutine
 
 
-    ! Called from lisheeticebin%allocate()
-    subroutine icebin_modele_init0(api, &
-        run_dir_f, run_dir_len, &
-        maker_fname_f, maker_fname_len, &
-        maker_vname_f, maker_vname_len, &
-        im,jm, &
-        i0h,i1h,j0h,j1h, &
-        i0,i1,j0,j1, &
-        j0s,j1s, &
-        comm_f, root, &
-        write_constants) bind(c)
+
+
+    function new_gcmce_c() result(ret) bind(c)
     use iso_c_binding
+        type(c_ptr) :: ret
+    end function
+
+    function gcmce_add_gcm_outputE(api, &
+        field_f, field_len, &
+        units_f, units_len, &
+        grid_f, grid_len, &
+        long_name_f, long_name_len) bind(c)
+    use iso_c_binding
+    use icebin_f90blitz
+        integer(c_int) :: gcmce_add_gcm_outputE
         type(c_ptr), value :: api
-        character(c_char) :: run_dir_f(*)
-        integer(c_int), value :: run_dir_len
-        character(c_char) :: maker_fname_f(*)
-        integer(c_int), value :: maker_fname_len
-        character(c_char) :: maker_vname_f(*)
-        integer(c_int), value :: maker_vname_len
-        integer(c_int), value :: im, jm
-        integer(c_int), value :: i0h,i1h,j0h,j1h
-        integer(c_int), value :: i0,i1,j0,j1
-        integer(c_int), value :: j0s,j1s
-        integer(c_int), value :: comm_f, root
-        integer(c_int), value :: write_constants
-    end subroutine
+        type(arr_spec_3) :: var_f
+        character(c_char) :: field_f(*)
+        integer(c_int), value :: field_len
+        character(c_char) :: units_f(*)
+        integer(c_int), value :: units_len
+        character(c_char) :: grid_f(*)
+        integer(c_int), value :: grid_len
+        character(c_char) :: long_name_f(*)
+        integer(c_int), value :: long_name_len
+    end function
+
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
-    function icebin_modele_add_gcm_inputA(api, &
+    function gcmce_add_gcm_inputA(api, &
         field_f, field_len, &
         units_f, units_len, &
         grid_f, grid_len, &
@@ -88,6 +120,7 @@ INTERFACE
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
     use icebin_f90blitz
+        integer(c_int) :: gcmce_add_gcm_inputA
         type(c_ptr), value :: api
         type(arr_spec_2) :: var_f
         character(c_char) :: field_f(*)
@@ -99,11 +132,10 @@ INTERFACE
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: initial
         integer(c_int), value :: long_name_len
-        integer(c_int) :: icebin_modele_add_gcm_input
     end function
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
-    function icebin_modele_add_gcm_inputE(api, &
+    function gcmce_add_gcm_inputE(api, &
         field_f, field_len, &
         units_f, units_len, &
         grid_f, grid_len, &
@@ -111,6 +143,7 @@ INTERFACE
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
     use icebin_f90blitz
+        integer(c_int) :: gcmce_add_gcm_inputE
         type(c_ptr), value :: api
         type(arr_spec_3) :: var_f
         character(c_char) :: field_f(*)
@@ -122,46 +155,34 @@ INTERFACE
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: initial
         integer(c_int), value :: long_name_len
-        integer(c_int) :: icebin_modele_add_gcm_input
     end function
 
-    ! Called from lisheeticebin%allocate() (via setup_gcm_inputs)
-    function icebin_modele_gcm_inputs_nhp(api) bind(c)
+    subroutine gcmce_reference_globals(api, &
+        fhc, elevE,
+        focean, flake, fgrnd, fgice, zatmo)
+    use iso_c_binding
+    use icebin_f90blitz
+        type(c_ptr), value :: api
+        type(arr_spec_3) :: fhc, elevE
+        type(arr_spec_2) :: focean, flake, fgrnd, fgice, zatmo
+    end subroutine gcmce_reference_globals
+
+    subroutine gcmce_io_rsf(api, &
+        fname_f, fname_len)
     use iso_c_binding
         type(c_ptr), value :: api
-        integer(c_int) :: icebin_modele_gcm_inputs_nhp
-    end function icebin_modele_gcm_inputs_nhp
+        character(c_char) :: fname_f(*)
+        integer(c_int), value :: fname_len
+    end subroutine gcmce_io_rsf
 
-    ! ------------------------------------------------------
-
-
-
-
-
-
-
-    subroutine icebin_modele_delete(api) bind(c)
-        use iso_c_binding
-        use icebin_f90blitz
-        type(c_ptr) :: api      ! NOT VALUE here.
-    end subroutine
-
-    subroutine icebin_modele_set_start_time(api, iyear1, itimei, dtsrc) bind(c)
+    subroutine gcmce_cold_start(api, itimei, dtsrc) bind(c)
         use iso_c_binding
         type(c_ptr), value :: api
-        integer(c_int), value :: iyear1
         integer(c_int), value :: itimei
         real(c_double), value :: dtsrc
     end subroutine
 
-    ! -------------------------------------------
-    subroutine icebin_modele_init_hp_to_ices(api) bind(c)
-    use iso_c_binding
-    use icebin_f90blitz
-        type(c_ptr), value :: api
-    end subroutine
-
-    subroutine icebin_modele_couple_to_ice_c(api, itime, &
+    subroutine gcmce_couple_native(api, itime, &
         gcm_inputs_d_f) bind(c)
     use iso_c_binding
     use icebin_f90blitz
@@ -171,7 +192,32 @@ INTERFACE
         type(arr_spec_3) :: gcm_inputs_d_f
     end subroutine
 
-    subroutine icebin_modele_get_initial_state_c(api, itime, gcm_inputs_d_f) bind(c)
+
+
+
+    ! ------------------------------------------------------
+
+
+
+
+
+
+
+    subroutine gcmce_delete(api) bind(c)
+        use iso_c_binding
+        use icebin_f90blitz
+        type(c_ptr) :: api      ! NOT VALUE here.
+    end subroutine
+
+
+    ! -------------------------------------------
+    subroutine gcmce_init_hp_to_ices(api) bind(c)
+    use iso_c_binding
+    use icebin_f90blitz
+        type(c_ptr), value :: api
+    end subroutine
+
+    subroutine gcmce_get_initial_state_c(api, itime, gcm_inputs_d_f) bind(c)
     use iso_c_binding
     use icebin_f90blitz
         type(c_ptr), value :: api
@@ -179,7 +225,7 @@ INTERFACE
         type(arr_spec_3) :: gcm_inputs_d_f
     end subroutine
 
-    subroutine icebin_modele_set_gcm_output_c(api, &
+    subroutine gcmce_set_gcm_output_c(api, &
         field_name_f, field_name_len, arr_f) bind(c)
     use iso_c_binding
     use icebin_f90blitz
@@ -199,7 +245,7 @@ END INTERFACE
 contains
 
 ! ---------------------------------------------------
-subroutine icebin_modele_set_gcm_output(api, field_name, arr, i0, j0, k0)
+subroutine gcmce_set_gcm_output(api, field_name, arr, i0, j0, k0)
     type(c_ptr), value :: api
     character(*) :: field_name
     real*8, dimension(:,:,:), target :: arr
@@ -208,10 +254,10 @@ subroutine icebin_modele_set_gcm_output(api, field_name, arr, i0, j0, k0)
     type(arr_spec_3) :: arr_f
 
     call get_spec_double_3(arr, i0,j0,k0, arr_f)
-    call icebin_modele_set_gcm_output_c(api, &
+    call gcmce_set_gcm_output_c(api, &
         field_name, len(field_name), arr_f)
 
-end subroutine icebin_modele_set_gcm_output
+end subroutine gcmce_set_gcm_output
 
 
 ! ! Go from a VectorSparseVector<int, double> output from GCMCoupler, to

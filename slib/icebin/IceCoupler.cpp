@@ -37,7 +37,7 @@ namespace icebin {
 
 
 std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
-    GCMCoupler const *_gcm_coupler, IceRegridder *_regridder)
+    GCMCoupler const *_gcm_coupler, IceRegridder *_ice_regridder)
 {
     std::string vn(vname + ".info");
     auto info_v = get_or_add_var(ncio, vn, "int64", {});
@@ -64,8 +64,8 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
 
 
     // Do basic initialization...
-    ice_coupler->coupler = _coupler;
-    ice_coupler->sheet = _sheet;
+    ice_coupler->gcm_coupler = _gcm_coupler;
+    ice_coupler->ice_regridder = _ice_regridder;
 //    ice_coupler->ice_constants.init(&_coupler->ut_system);
 
     ice_coupler->gcm_per_ice_sheet_params =
@@ -134,7 +134,7 @@ double time_s,
 // Values from GCM, passed GCM -> Ice
 VectorMultivec const &gcm_ovalsE,
 GCMCouplerOutput &out,    // Accumulate matrices here...
-bool do_run)
+bool run_ice)
 {
     // Store regridding matrices for the last timestep, which we will
     // need to create ice_ivals
@@ -210,7 +210,7 @@ bool do_run)
 
     // ========= Step the ice model forward
     if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
-    run_timestep(time_s, ice_ivalsI, ice_ovalsI, do_run);
+    run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
     if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
 
     // ========== Update regridding matrices

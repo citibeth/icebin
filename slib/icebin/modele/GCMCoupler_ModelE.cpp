@@ -22,6 +22,7 @@
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/domain_splitter.hpp>
+#include <boost/algorithm/string.hpp>
 
 // See here to serialize objects with non-default constructor
 //    http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
@@ -80,8 +81,8 @@ std::unique_ptr<DomainDecomposer_ModelE> new_domain_decomposer_mpi(
 // ======================================================================
 // ======================================================================
 // Called from LISnow::allocate()
-GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_gcm_params) :
-    GCMCoupler(GCMCoupler::Type::MODELE, std::move(_gcm_params))
+GCMCoupler_ModelE::GCMCoupler_ModelE() :
+    GCMCoupler(GCMCoupler::Type::MODELE)
 {
 
     // ----------------- Scalars provided by the GCM
@@ -96,13 +97,11 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_gcm_params) :
 //  gcm_input_scalars.add_field("unit", nan, "", 0, "Dimensionless identity");
 
 
-    gcm_params = std::move(_gcm_params);
-    world.reference(new boost::mpi::communicator(gcm_params.comm, boost::mpi::comm_attach));
-
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()
 extern "C" void *gcmce_new(
+    ModelEParams const &_rdparams,
 
     // Info about the global grid
     int im, int jm,
@@ -113,22 +112,27 @@ extern "C" void *gcmce_new(
     // MPI Stuff
     MPI_Fint comm_f, int root)
 {
-    GCMParams _gcm_params;
+    std::unique_ptr<GCMCoupler_ModelE> gcm_coupler(
+        new GCMCoupler_ModelE());
+
+    ModelEParams &rdparams(gcm_coupler->rdparams);
+    rdparams = rdparams;
+    GCMParams &params(gcm_coupler->gcm_params);
 
     // Domains and indexing are alphabetical indexes, zero-based
-    _gcm_params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
-    _gcm_params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
-    _gcm_params.gcm_comm = MPI_Comm_f2c(comm_f);
-    _gcm_params.gcm_root = root;
+    params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
+    params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
+    params.gcm_comm = MPI_Comm_f2c(comm_f);
+    gcm_coupler->world.reference(new boost::mpi::communicator(
+        gcm_params.comm, boost::mpi::comm_attach));
+    params.gcm_root = root;
 
-    _gcm_params.icebin_config_fname = boost::filesystem::absolute("./ICEBIN_IN");
-    _gcm_params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR");
-    _gcm_params.run_dir = boost::filesystem::absolute(".");
+    params.icebin_config_fname = boost::filesystem::absolute("./ICEBIN_IN");
+    params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR");
+    params.run_dir = boost::filesystem::absolute(".");
 
-    std::unique_ptr<GCMCoupler_ModelE> gcm_coupler(
-        new GCMCoupler_ModelE(std::move(_gcm_params)));
-
-    GCMParams &gcm_params(gcm_coupler->gcm_params);
+    params.hc_segments = parse_hc_segments(f_to_cpp(
+        rundeck.icebin_segments, sizeof(rundeck.icebin_segments)));
 
     // Read the coupler, along with ice model proxies
     gcm_coupler->ncread(gcm_params.icebin_config_fname, "m", gcm_params.domainA);
@@ -139,10 +143,31 @@ extern "C" void *gcmce_new(
     // (for example, if PISM is used, elev2 and mask2 will be read from related
     // PISM input file, and the version in the ICEBIN file will be ignored)
 
-    domains = std::move(new_domain_decomposer_mpi(domainA_global, domainA));
+    gcm_coupler.domains = std::move(new_domain_decomposer_mpi(domainA_global, domainA));
 
     // TODO: Test that im and jm are consistent with the grid read.
     return gcm_coupler.release();
+}
+
+static std::string parse_hc_segments(std::string const &str)
+{
+    std::vector<HCSegmentData> ret;
+
+    // TDOO: Parse for real later
+    std::vector<std::string> segment_names;
+    boost::algorithm::split(segment_names, str, boost::is_any_of(","));
+    int base = 0;
+    for (auto &seg : segment_names) {
+        boost::algorithm::trim(seg);
+        int len;
+        if (seg == "legacy") len = 1;
+        else if (seg == "sealand") len = 2;
+        else len = -1;
+
+        ret.push_back(HCSegmentData(seg, base, len));
+        base += len;
+    }
+    return ret;
 }
 // ==========================================================
 // Called from LISheetIceBin::read_nhc_gcm()
@@ -273,6 +298,7 @@ char const *long_name_f, int long_name_len)
 
 extern "C"
 void gcmce_reference_globals(
+    GCMCoupler_ModelE *self,
     F90Array<double, 3> &fhc,
     F90Array<double, 3> &elevE,
     F90Array<double, 2> &focean,
@@ -303,6 +329,9 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
     // TODO: Get ice model to save/restore state
     // We must figure out how to get an appropriate filename
 }
+
+
+
 // ===========================================================
 // Called from LISheetIceBin::cold_start()
 
@@ -320,6 +349,10 @@ TODO...
 
     // d) Sync with dynamic ice model
     gcmce_couple_native(self, itime, dtsrc, false);
+
+    // Inits files used to dump gcm_in and gcm_out
+    if (self->gcm_params.gcm_dump_dir.size() > 0)
+        mkdir(self->gcm_params.gcm_dump_dir);
 }
 
 // =======================================================
@@ -352,9 +385,9 @@ Put elsewhere in the Fortran code:
 @param hc_offset Offset of first IceBin elevation class in GCM's set
     of EC's (zero-based).
 */
-//void GCMCoupler_ModelE::couple_native(
+extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,
-int itime, double dtsrc,
+int itime,
 int yy, int mm, int dd, // Date that time_s lies on
 //std::array<int,3> const &yymmdd, // Date that time_s lies on
 bool run_ice)    // if false, only initialize
@@ -446,6 +479,7 @@ bool run_ice)    // if false, only initialize
 // =======================================================
 // =======================================================
 
+#if 0
 /** Callback from new_ice_coupler() */
 std::unique_ptr<GCMPerIceSheetParams>
 GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
@@ -469,6 +503,7 @@ GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
 
     return static_cast_unique_ptr<GCMPerIceSheetParams>(params);
 }
+#endif
 // -----------------------------------------------------
 // ===============================================================
 

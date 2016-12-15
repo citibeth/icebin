@@ -39,7 +39,7 @@ public:
 
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
-    IceRegridder *regridder;   // This is not const; see IceCoupler::update_elevI()
+    IceRegridder *ice_regridder;   // This is not const; see IceCoupler.IceRegridder::set_elevI()
     std::unique_ptr<WeightedSparse> IvE;    // Regridding matrix made from regridder
 
     EigenSparseMatrix IvE0;
@@ -69,21 +69,40 @@ public:
 
     // ======================================================
 
-    IceCoupler(IceCoupler::Type _type) : type(_type) {}
     virtual ~IceCoupler();
 
 public:
     // Lifecycle
 
+    // ========= Called by
+    //     **** PART 1: Allocate
+    //     ATM_DRV.f: alloc_drv_atm()
+    //     LISnow%allocate()
+    //     GCMCoupler_ModelE: gcmce_new()
+    //     GCMCoupler::ncread()
+    //     IceCoupler.cpp: new_ice_coupler()
+    IceCoupler(IceCoupler::Type _type) : type(_type) {}
+
     /** (1) Initialize any grid information, etc. from the IceSheet struct.
     @param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
     virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet) {}
 
+
+    // ========= Called by
+    //     LANDICE_DRV.f: init_LI(istart_fixup)
+    //     lisnow%set_start_time()  (if cold start)
+    //     lisheet%set_start_time()  [currently missing...?]
+    //     GCMCoupler::set_start_time()
+    //         <this>
+    //     [calls IceCoupler::set_start_time()]
     /** (2) Event handler to let IceCouplers know the start time is (finally) set */
     virtual void set_start_time(
         ibmisc::time::tm const &time_base,
         double time_start_s);
 
+
+    // ========= Called by
+    //     IceCoupler::couple()
     /** (3) Returns elevI based on the latest state from the ice model. */
     virtual blitz::Array<double,1> get_elevI() = 0;
 

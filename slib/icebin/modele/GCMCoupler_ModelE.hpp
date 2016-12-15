@@ -23,7 +23,8 @@
 namespace icebin {
 namespace modele {
 
-
+#if 0
+// Don't need this for now...
 BOOST_ENUM_VALUES( ModelE_CouplingType, int,
     /** GCM reports top T boundary condition to ice sheet.  This is
     always available. */
@@ -38,6 +39,17 @@ BOOST_ENUM_VALUES( ModelE_CouplingType, int,
 class GCMPerIceSheetParams_ModelE : public icebin::GCMPerIceSheetParams {
 public:
     ModelE_CouplingType coupling_type;
+};
+#endif
+
+
+// Parameters read from the ModelE rundeck
+static int const MAX_CHAR_LEN = 128;    // From Dictionary_mod.F90
+struct ModelEParams
+{
+    char icebin_segments[MAX_CHAR_LEN];
+    double dtsrc;
+    int yeari;
 };
 
 struct ModelEOutputs
@@ -59,9 +71,11 @@ struct ModelEInputs
 
     // Pointers to arrys within ModelE
 
+    // --------- Flux stuff
     // gcm_ivalsAI[A/E][ivar](i, j, ihc)    Fortran-order 1-based indexing
     std::vector<std::vector<std::unique_ptr<blitz::Array<double,3>>>> gcm_ivals;
 
+    // --------- State variables we can update inside ModelE
     // i,j,ihc arrays on Elevation grid
     blitz::Array<double,3> fhc;
     blitz::Array<double,3> elevE;
@@ -73,6 +87,7 @@ struct ModelEInputs
     blitz::Array<double,2> fgice;    // Alt: flice
     blitz::Array<double,2> zatmo;      // i,j
 
+    void ModelEInputs::update_gcm_ivals(GCMCouplerOutput const &out);
 };
 
 
@@ -99,6 +114,7 @@ public:
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
+public:
     std::unique_ptr<boost::mpi::communicator> world;
 
     ModelEOutputs modele_outputs;
@@ -115,14 +131,20 @@ class GCMCoupler_ModelE : public GCMCoupler
 
 
 public:
-    GCMCoupler_ModelE(GCMParams const &params);
+    // Called from LISnow::allocate()
+    GCMCoupler_ModelE();
 
+    // The gcmce_xxx() functions do not need to be declared here
+    // because everything in this class is public.
+
+#if 0
     /** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
     std::unique_ptr<GCMPerIceSheetParams>
     read_gcm_per_ice_sheet_params(
         ibmisc::NcIO &ncio,
         std::string const &sheet_vname);
-};
+#endif
+};    // class GCMCouler_ModelE
 
 
 }}

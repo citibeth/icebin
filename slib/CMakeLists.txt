@@ -45,9 +45,7 @@ if (BUILD_COUPLER)
         icebin/multivec.cpp
         icebin/GCMParams.cpp
         icebin/GCMCoupler.cpp
-        icebin/IceModel_Writer.cpp
-#        icebin/IceModel_Decode.cpp
-#       icebin/IceModel_DISMAL.cpp
+        icebin/IceWriter.cpp
         icebin/contracts/contracts.cpp
     )
 
@@ -61,7 +59,7 @@ if (BUILD_COUPLER)
 
     if (USE_PISM)
         list(APPEND icebin_SOURCES
-            icebin/pism/IceModel_PISM.cpp
+            icebin/pism/IceCoupler_PISM.cpp
         )
         if (USE_MODELE)
             list(APPEND icebin_SOURCES
@@ -82,75 +80,6 @@ if (BUILD_GRIDGEN)
     )
 endif()
 
-
-# set(icebin_SOURCES 
-#   libicebin_refaddr.cpp
-#   galahad/qpt_c.cpp
-#   galahad/zd11_c.cpp
-#   giss/DynamicEnum.cpp
-#   giss/IndexTranslator.cpp
-#   giss/IndexTranslator2.cpp
-#   giss/Proj2.cpp
-#   giss/SparseMatrix.cpp
-#   giss/cfnames.cpp
-#   giss/cfnames_data.cpp
-#   giss/geodesy.cpp
-#   giss/ncutil.cpp
-#   giss/sparsemult.cpp
-#   giss/udunits2.cpp
-#   giss/exit.cpp
-#   giss/exit_f.F90
-#   giss/VarTransformer.cpp
-#   icebin/contracts/contracts.cpp
-#   icebin/contracts/modele_pism.cpp
-#   icebin/contracts/modele_dismal.cpp
-#   giss/ConstantSet.cpp
-#   giss/CouplingContract.cpp
-#   icebin/ExchangeGrid.cpp
-#   icebin/GCMCoupler.cpp
-#   icebin/GCMParams.cpp
-#   icebin/Grid.cpp
-#   icebin/GridDomain.cpp
-#   icebin/GridDomain_Listed.cpp
-#   icebin/Grid_LonLat.cpp
-#   icebin/Grid_XY.cpp
-#   icebin/HCIndex.cpp
-#   icebin/HeightClassifier.cpp
-#   icebin/IceModel.cpp
-#   icebin/IceModel_DISMAL.cpp
-#   icebin/IceModel_Writer.cpp
-#   icebin/IceModel_Decode.cpp
-#   icebin/IceSheet.cpp
-#   icebin/IceSheet_L0.cpp
-#   icebin/MatrixMaker.cpp
-#   icebin/MultiMatrix.cpp
-#   icebin/clippers.cpp
-#   icebin/gridutil.cpp
-#   icebin/matrix_ops.cpp
-#   icebin/contracts/modele_pism.cpp
-#   icebin/modele/icebin_modele.cpp
-#   icebin/modele/GCMCoupler_ModelE.cpp
-#   icebin/modele/grids_ll.cpp
-#   icebin/pism/VecBundleWriter.cpp
-#   icebin/pism/IceModel_PISM.cpp
-#   icebin/pism/NullTransportHydrology.cpp
-#   icebin/pism/MassEnergyBudget.cpp
-#   icebin/pism/PISMIceModel.cpp
-#   icebin/pism/PSConstantICEBIN.cpp
-#   icebin/pism/ICEBINEnthalpyConverter.cpp
-#   icebin/read_grid.cpp
-#   icebin/read_icemodel.cpp
-#   icebin/read_matrixmaker.cpp
-#   giss/f90blitz_f.f90
-#   icebin/modele/icebin_modele_f.f90
-#   # GALAHAD sources: turn off if USE_GALAHAD
-#   galahad/eqp_f.f90
-#   galahad/ncutil_f.f90
-#   galahad/qpt_f.f90
-#   galahad/x_loc_f.f90
-#   galahad/zd11_f.f90
-#   galahad/zd11_c.cpp
-#   galahad/qpt_c.cpp)
 
 if (USE_EVERYTRACE)
     if (BUILD_COUPLER)

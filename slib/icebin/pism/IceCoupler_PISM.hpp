@@ -52,7 +52,7 @@ namespace gpism {
 // =================================================
 
 
-class IceModel_PISM : public IceModel
+class IceCoupler_PISM : public IceCoupler
 {
     icebin::Grid_XY const *icebin_gridI;
     MPI_Comm pism_comm;         // Commnicator used by ice model
@@ -69,7 +69,7 @@ private:
     std::vector<std::string> pism_args;
 
     /** Should we write inputs to PISM via PISM's dump() functionality?
-    This is (almost certainly) supercede by the IceModel_Writer class,
+    This is (almost certainly) supercede by the IceCoupler_Writer class,
     except in cases of extreme debugging. */
     const bool write_pism_inputs = false;
 
@@ -112,7 +112,7 @@ private:
     bool update_elevation = true;
 
     // NetCDF output files
-    std::unique_ptr<pism::icebin::VecBundleWriter> pism_in_nc, pism_out_nc;
+//    std::unique_ptr<pism::icebin::VecBundleWriter> pism_in_nc, pism_out_nc;
 
     // ------------------------
 public:
@@ -131,21 +131,19 @@ public:
 
     void update_ice_sheet(ibmisc::NcIO &ncio, std::string const &vname);
 
-    IceModel_PISM();
+    IceCoupler_PISM();
 
-    virtual ~IceModel_PISM()
+    virtual ~IceCoupler_PISM()
         { deallocate(); }
 
 protected:
 
-    void allocate();
-
     void deallocate();
 
 public:
-    /** Event handler to let IceModels know the start time is (finally) set */
-    void start_time_set()
-        { allocate(); }
+    virtual void set_start_time(
+        ibmisc::time::tm const &time_base,
+        double time_start_s);
 
     void setup_contracts_modele();
 

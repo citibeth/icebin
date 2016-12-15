@@ -128,7 +128,6 @@ void GCMCoupler::ncread(
         std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio, vname_sheet, this, sheet));
 
         contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
-        ice_coupler->update_ice_sheet(ncio, vname_sheet);
 
         ice_couplers.push_back(std::move(ice_coupler));
     }
@@ -182,9 +181,9 @@ bool run_ice)
 
 
     if (gcm_params.icebin_logging) {
-        std::string fname = "gcm-out-" + sdate;
+        std::string fname = "gcm-in-" + sdate;
         NcIO ncio(fname, 'r');
-        ncio_gcm_input(ncio, gcm_ovalsE, {last_time_s, time_s},
+        ncio_gcm_input(ncio, gcm_ivalsE, {last_time_s, time_s},
             gcm_params.time_units, "");
         ncio();
     }

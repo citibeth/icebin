@@ -42,7 +42,6 @@ struct GCMParams {
     MPI_Comm gcm_comm;
     int gcm_root;
 
-    // Rundeck parameters
     std::string icebin_config_fname;
     std::string config_dir; // Where to look for Ice Model configuration files
     std::string run_dir;    // The GCM run directory
