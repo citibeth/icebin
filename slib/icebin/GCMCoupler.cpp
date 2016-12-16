@@ -17,9 +17,11 @@
  */
 
 #include <mpi.h>        // Intel MPI wants to be first
+#include <boost/format.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/memory.hpp>
 #include <ibmisc/blitz.hpp>
+#include <ibmisc/datetime.hpp>
 #include <icebin/GCMCoupler.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/contracts/contracts.hpp>
@@ -36,29 +38,6 @@ using namespace netCDF;
 
 namespace icebin {
 
-// ==========================================================
-
-#if 0
-/** Converts a VectorSparseParallelVectors structure to an
-    ArraySparseParallelVectors (used as arg to functions). */
-ArraySparseParallelVectors vector_to_array(VectorSparseParallelVectors vecs)
-{
-    ArraySparseParallelVectors ret;
-    ret.index.reference(to_blitz(vecs.index));
-
-    blitz::TinyVector<int,1> shape(0);
-    blitz::TinyVector<int,1> strides(0);
-
-    shape[0] = vec.size();
-    strides[0] = vecs.nvar;     /* Blitz++ strides in sizeof(T) units */
-
-    for (int i=0; i<vecs.nvar; ++i) {
-        ret.vals.push_back(&vec[i], shape, strides,
-            blitz::neverDeleteData)
-    }
-    return ret;
-}
-#endif
 // ==========================================================
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
@@ -92,7 +71,7 @@ void GCMCoupler::ncread(
         std::string vname_sheet = vname + "." + ice_regridder->name();
 
         // Create an IceCoupler corresponding to this IceSheet.
-        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio, vname_sheet, this, sheet));
+        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio, vname_sheet, this, ice_regridder));
 
         contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
 
@@ -106,10 +85,12 @@ void GCMCoupler::ncread(
 
 
 void GCMCoupler::set_start_time(
-    ibmisc::time::tm const &time_base,
-    double time_start_s)
+    ibmisc::Datetime _time_base,
+    double _time_start_s)
 {
-    gcm_params.set_start_time(time_base, time_start_s);
+    time_base = _time_base;
+    time_start_s = _time_start_s;
+    time_unit = TimeUnit(&cal365, time_base, TimeUnit::SECOND);
     last_time_s = time_start_s;
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
@@ -119,36 +100,40 @@ void GCMCoupler::set_start_time(
 }
 // ------------------------------------------------------------
 
-GCMCouplerOutput GCMCoupler::couple(
+GCMInput GCMCoupler::couple(
 double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
 bool run_ice)
 {
+    // Figure out our calendar day to format filenames
+    ibmisc::Datetime dt(time_unit.to_datetime(time_s));
+
     std::string sdate = (boost::format
-        ("%04d%02d%02d") % yymmdd[0] % yymmdd[1] % yymmdd[2]).str();
+        ("%04d%02d%02d") % dt[0] % dt[1] % dt[2]).str();
     std::string log_dir = "icebin";
 
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-out-" + sdate;
         NcIO ncio(fname, 'w');
-        ncio_gcm_output(ncio, gcm_ovalsE, {last_time_s, time_s},
-            gcm_params.time_units, "");
+        ncio_gcm_output(ncio, gcm_ovalsE,
+            ibmisc::make_array(last_time_s, time_s),
+            time_unit.to_cf(), "");
         ncio();
     }
 
     // Initialize output
-    GCMCouplerOutput out(gcm_inputs[i].size());
+    GCMInput out({gcm_inputsAE[0].size(), gcm_inputsAE[1].size()});
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
-        ice_coupler.couple(time_s, yymmdd, gcm_ovalsE, out, run_ice);
+        ice_coupler->couple(time_s, yymmdd, gcm_ovalsE, out, run_ice);
     }
 
 
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-in-" + sdate;
         NcIO ncio(fname, 'r');
-        ncio_gcm_input(ncio, gcm_ivalsE, {last_time_s, time_s},
+        ncio_gcm_input(ncio, out, {last_time_s, time_s},
             gcm_params.time_units, "");
         ncio();
     }
@@ -159,7 +144,7 @@ bool run_ice)
 // ------------------------------------------------------------
 static ncwrite_dense(
     NcFile *nc,
-    ArraySparseParallelVectors *vecs,
+    VectorMultivec const *vecs,
     VarSet *contract,
     ibmisc::Indexing const *indexing,
     std::string const &vname_base)
@@ -190,15 +175,15 @@ static ncwrite_dense(
 }
 
 /** Densifies the sparse vectors, and then writes them out to netCDF */
-void ncio_dense(
+static void ncio_dense(
     NcIO &ncio,
-    ArraySparseParallelVectors &vec,    
+    VectorMultivec const &vec,    
     VarSet &contract,
     ibmisc::IndexingBase const &indexing,
     std::string const &vname_base = "")
 {
     if (ncio.rw != 'w') (*icebin_error)(-1,
-        "ncio_dense(ArraySparseParallelVectors) only writes, no read.");
+        "ncio_dense(VectorMultivec) only writes, no read.");
 
     // Create the variables
     NcDimSpec dim_spec({"time"}, {-1});
@@ -212,9 +197,9 @@ void ncio_dense(
 // ------------------------------------------------------------
 /** Top-level ncio() to log output from coupler. (coupler->GCM) */
 void GCMCoupler::ncio_gcm_input(NcIO &ncio,
-    GCMCouplerOutput &out,        // All MPI ranks included here
+    GCMInput &out,        // All MPI ranks included here
     std::array<double,2> const &timespan,    // timespan[1] = current time_s
-    std::string time_units,
+    std::string const &time_units,
     std::string const &vname_base)
 {
     ncio_timespan(ncio, timespan, time_units, vname_base);
@@ -232,9 +217,9 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
 
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */
 void GCMCoupler::ncio_gcm_output(NcIO &ncio,
-    ArraySparseParallelVectors &gcm_ovalsE,
+    VectorMultivec const &gcm_ovalsE,
     std::array<double,2> const &timespan,    // timespan[1] = current time_s
-    std::string time_units,
+    std::string const &time_units,
     std::string const &vname_base)
 {
     ncio_timespan(ncio, timespan, time_units, vname_base);

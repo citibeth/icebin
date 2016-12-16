@@ -142,7 +142,7 @@ protected:
 
 public:
     virtual void set_start_time(
-        ibmisc::time::tm const &time_base,
+        ibmisc::Datetime const &time_base,
         double time_start_s);
 
     void setup_contracts_modele();

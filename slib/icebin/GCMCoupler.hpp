@@ -36,7 +36,7 @@ namespace icebin {
 
 
 
-struct GCMCouplerOutput {
+struct GCMInput {
     typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
     typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
     typedef VectorMultivec SparseMultivec;
@@ -69,10 +69,10 @@ struct GCMCouplerOutput {
     // Used for temperature downscaling according to a lapse rate
     SparseVector elevE1;
 
-    GCMCouplerOutput(int nvar) :
+    GCMInput(std::array<int, GridAE::count> const &nvar) :
         gcm_ivalsAE({
-            SparseMultivec(nvar),
-            SparseMultivec(nvar),
+            SparseMultivec(nvar[0]),
+            SparseMultivec(nvar[1]),
         })
     {}
 
@@ -97,6 +97,12 @@ public:
         (CESM)          (1)
     );
     Type const type;
+
+    // ------- Set in GCMCoupler::set_start_time()
+    ibmisc::Datetime time_base;    // yy,mm,dd,hh,mm,ss
+    ibmisc::TimeUnit time_unit;    // Equiv. to CF-compliant time unit string
+    double time_start_s;        // Start of simulation, as far as ice model is concerned (seconds since time_base).
+
 
     // Last time this coupler was called
     double last_time_s;
@@ -162,13 +168,27 @@ public:
         std::string const &vname);
 
     void set_start_time(
-        ibmisc::time::tm const &time_base,
+        ibmisc::Datetime _time_base,
         double time_start_s);
 
-    GCMCouplerOutput couple(
+    GCMInput couple(
         double time_s,        // Simulation time [s]
         VectorMultivec const &gcm_ovalsE,
         bool run_ice);
+
+    /** Top-level ncio() to log output from coupler. (coupler->GCM) */
+    void ncio_gcm_input(ibmisc::NcIO &ncio,
+        GCMInput &out,        // All MPI ranks included here
+        std::array<double,2> const &timespan,    // timespan[1] = current time_s
+        std::string const &time_units,
+        std::string const &vname_base);
+
+    /** Top-level ncio() to log input to coupler. (GCM->coupler) */
+    void ncio_gcm_output(ibmisc::NcIO &ncio,
+        VectorMultivec const &gcm_ovalsE,
+        std::array<double,2> const &timespan,    // timespan[1] = current time_s
+        std::string const &time_units,
+        std::string const &vname_base);
 
 };
 

@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 
+#include <ibmisc/datetime.hpp>
 #include <ibmisc/VarTransformer.hpp>
 #include <ibmisc/DynArray.hpp>
 #include <ibmisc/udunits2.hpp>
@@ -97,7 +98,7 @@ public:
     //     [calls IceCoupler::set_start_time()]
     /** (2) Event handler to let IceCouplers know the start time is (finally) set */
     virtual void set_start_time(
-        ibmisc::time::tm const &time_base,
+        ibmisc::Datetime const &time_base,
         double time_start_s);
 
 

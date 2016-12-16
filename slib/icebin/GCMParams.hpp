@@ -20,7 +20,6 @@
 
 #include <boost/filesystem.hpp>
 #include <icebin/error.hpp>
-#include <ibmisc/time.hpp>
 #include <ibmisc/indexing.hpp>
 
 namespace icebin {
@@ -65,18 +64,6 @@ struct GCMParams {
             "The last elevation class segment must be called 'ec'");
         return ec;
     }
-};
-
-// TODO: These should not be GCMParams; they are set and used later...
-struct NotGCMParams {
-    // ------- Set in GCMCoupler::set_start_time()
-    ibmisc::time::tm time_base; // Corresponds to time_s == 0
-    std::string time_units;     // CF-compliant string describing the time units
-    double time_start_s;        // Start of simulation, as far as ice model is concerned (seconds since time_base).
-
-    void set_start_time(
-        ibmisc::time::tm const &_time_base,
-        double time_start_s);
 };
 
 
