@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <boost/mpi.hpp>
 #include <icebin/GCMCoupler.hpp>
 
 namespace icebin {
@@ -62,18 +63,12 @@ struct ModelEOutputs
 
 struct ModelEInputs
 {
-    std::vector<HCSegmentData> hc_segments;
-    SegmentData *icebin_segment;    // The segment with IceBin-generated elevation classes
-
-    // Relationship between elevation classes in ModelE and elevation classes in IceBin
-    int const icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
-    int const nhc_gcm;    // Number of elevation classes used by ModelE
-
     // Pointers to arrys within ModelE
 
     // --------- Flux stuff
     // gcm_ivalsAI[A/E][ivar](i, j, ihc)    Fortran-order 1-based indexing
-    std::vector<std::vector<std::unique_ptr<blitz::Array<double,3>>>> gcm_ivals;
+    std::vector<std::unique_ptr<blitz::Array<double,2>>> gcm_ivalsA;
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ivalsE;
 
     // --------- State variables we can update inside ModelE
     // i,j,ihc arrays on Elevation grid
@@ -87,35 +82,41 @@ struct ModelEInputs
     blitz::Array<double,2> fgice;    // Alt: flice
     blitz::Array<double,2> zatmo;      // i,j
 
-    void ModelEInputs::update_gcm_ivals(GCMCouplerOutput const &out);
+    void update_gcm_ivals(GCMInput const &out);
 };
 
 
 
 class DomainDecomposer_ModelE {
+    ibmisc::Domain domainA_global;
     size_t ndomain;
     blitz::Array<int,1> rank_of_j;    // indexing base=1
 public:
 
-    DomainDecomposer_ModelE(std::vector<int> const &startj, im_world, jm_world) :    // Starts from ModelE; j indexing base=1
-        rank_of_j(startj[startj.size()-1], blitz::fortranArray),    // 1-based indexing
-        im_world(_im_world), jm_world(_jm_world);
+    DomainDecomposer_ModelE(std::vector<int> const &endj, ibmisc::Domain const &_domainA_global);
 
     /** Number of domains */
     size_t size() { return ndomain; }
 
     /** Returns the MPI rank of grid cell */
-    int get_rank(long ix) {    // zero-based
+    int get_domain(long ix) {    // zero-based
+        auto im_world(domainA_global[0].end);
+        auto jm_world(domainA_global[1].end);
+
         int j = (ix / im_world) % jm_world;    // +0 for 0-based indexing
         return rank_of_j(ix);
     }
-}
+};
 
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
 public:
+    ModelEParams rdparams;    // Params straight from the rundeck
     std::unique_ptr<boost::mpi::communicator> world;
+
+    /** On root: separate global stuff back into individual domains. */
+    std::unique_ptr<DomainDecomposer_ModelE> domains;
 
     ModelEOutputs modele_outputs;
 
@@ -133,6 +134,8 @@ public:
 public:
     // Called from LISnow::allocate()
     GCMCoupler_ModelE();
+
+    int read_nhc_gcm();
 
     // The gcmce_xxx() functions do not need to be declared here
     // because everything in this class is public.

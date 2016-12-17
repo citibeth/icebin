@@ -77,7 +77,7 @@ public:
     /** Defines each variable in the DimSet, according to a set of dimensions. */
     netCDF::NcVar ncdefine(ibmisc::NcIO &ncio,
         std::vector<netCDF::NcDim> const &dims,
-        std::string vname_base)
+        std::string vname_base) const
     {
         for (size_t i=0; i<size(); ++i) {
             auto &var((*this)[i]);

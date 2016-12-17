@@ -19,9 +19,12 @@
 #include <mpi.h>        // Intel MPI wants to be first
 #include <ibmisc/memory.hpp>
 #include <ibmisc/ncfile.hpp>
+#include <ibmisc/string.hpp>
+#include <ibmisc/f90blitz.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/domain_splitter.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
 // See here to serialize objects with non-default constructor
@@ -38,7 +41,7 @@
 #include <boost/serialization/export.hpp>
 
 
-use namespace ibmisc;
+using namespace ibmisc;
 
 namespace icebin {
 namespace modele {
@@ -49,33 +52,20 @@ using namespace icebin::contracts;
 // ======================================================================
 
 /** @param endj Last(+1) element of each domain (0-based indexing) */
-DomainDecomposer_ModelE::DomainDecomposer_ModelE(std::vector<int> const &lastj, im_world, jm_world) :    // Starts from ModelE; j indexing base=0
-    rank_of_j(endj[endj.size()]),    // 0-based indexing
-    im_world(_im_world), jm_world(_jm_world);
+DomainDecomposer_ModelE::DomainDecomposer_ModelE(
+    std::vector<int> const &endj,
+    ibmisc::Domain const &_domainA_global) :    // Starts from ModelE; j indexing base=1
+domainA_global(_domainA_global),
+rank_of_j(endj[endj.size()-1], blitz::fortranArray)    // Allocate for 1-based indexing
 {
     ndomain = endj.size();    // startj contains an extra sentinel item at the end
     int j=0;
     for (int irank=0; irank<ndomain; ++irank) {
         for (; j < endj[irank]; ++j)
             rank_of_j(j) = irank;    // zero-based indexing for j
-}
 
-/** Creates (on root) a picture of the full domain decomposition.
-Called from all MPI ranks... */
-std::unique_ptr<DomainDecomposer_ModelE> new_domain_decomposer_mpi(
-    ibmisc::Domain const &domainA_global,    // alphabetical order, zero-based indexing
-    ibmisc::Domain const &domainA)
-{
-    std::vector<int> endj;
-    boost::mpi::gather(world, domainA.end[1], endj, 0);
-
-    std::unique_ptr<DomainDecomposer_ModelE> ret;
-    if (am_i_root) {
-        ret.reset(new DomainDecomposer_ModelE(endj, domainA_global.high[0], domainA_global.high[1]));
     }
-    return ret;
 }
-
 
 // ======================================================================
 // ======================================================================
@@ -91,67 +81,17 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
     // can be computed at or before contract initialization time can
     // be placed directly into the VarTransformer.
 
-    scalars.add_field("by_dt", nan, "s-1", 1., "Inverse of coupling timestep");
+    scalars.add("by_dt", nan, "s-1", 1., "Inverse of coupling timestep");
 
-    scalars.add_field("unit", nan, "", 0, "Dimensionless identity");
+    scalars.add("unit", nan, "", 0, "Dimensionless identity");
 //  gcm_input_scalars.add_field("unit", nan, "", 0, "Dimensionless identity");
 
 
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()
-extern "C" void *gcmce_new(
-    ModelEParams const &_rdparams,
 
-    // Info about the global grid
-    int im, int jm,
-
-    // Info about the local grid (1-based indexing)
-    int i0, int i1, int j0, int j1,
-
-    // MPI Stuff
-    MPI_Fint comm_f, int root)
-{
-    std::unique_ptr<GCMCoupler_ModelE> gcm_coupler(
-        new GCMCoupler_ModelE());
-
-    ModelEParams &rdparams(gcm_coupler->rdparams);
-    rdparams = rdparams;
-    GCMParams &params(gcm_coupler->gcm_params);
-
-    // Domains and indexing are alphabetical indexes, zero-based
-    params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
-    params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
-    params.gcm_comm = MPI_Comm_f2c(comm_f);
-    gcm_coupler->world.reference(new boost::mpi::communicator(
-        gcm_params.comm, boost::mpi::comm_attach));
-    params.gcm_root = root;
-
-    params.icebin_config_fname = boost::filesystem::absolute("./ICEBIN_IN");
-    params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR");
-    params.run_dir = boost::filesystem::absolute(".");
-
-    params.hc_segments = parse_hc_segments(f_to_cpp(
-        rdparams.icebin_segments, sizeof(rundeck.icebin_segments)));
-
-    // Read the coupler, along with ice model proxies
-    if (am_i_root()) {
-        ncread(gcm_params.icebin_config_fname, "m", gcm_params.domainA_global);
-    }
-
-    // Check bounds on the IceSheets, set up any state, etc.
-    // This is done AFTER setup of gcm_coupler because self->read_from_netcdf()
-    // might change the IceSheet, in certain cases.
-    // (for example, if PISM is used, elev2 and mask2 will be read from related
-    // PISM input file, and the version in the ICEBIN file will be ignored)
-
-    gcm_coupler.domains = std::move(new_domain_decomposer_mpi(domainA_global, domainA));
-
-    // TODO: Test that im and jm are consistent with the grid read.
-    return gcm_coupler.release();
-}
-
-static std::string parse_hc_segments(std::string const &str)
+static std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
 {
     std::vector<HCSegmentData> ret;
 
@@ -171,18 +111,86 @@ static std::string parse_hc_segments(std::string const &str)
     }
     return ret;
 }
+
+
+extern "C" void *gcmce_new(
+    ModelEParams const &_rdparams,
+
+    // Info about the global grid
+    int im, int jm,
+
+    // Info about the local grid (1-based indexing)
+    int i0, int i1, int j0, int j1,
+
+    // MPI Stuff
+    MPI_Fint comm_f, int root)
+{
+    std::unique_ptr<GCMCoupler_ModelE> self(
+        new GCMCoupler_ModelE());
+
+    ModelEParams &rdparams(self->rdparams);
+    rdparams = _rdparams;
+    GCMParams &params(self->gcm_params);
+
+    // Domains and indexing are alphabetical indexes, zero-based
+    params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
+    params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
+    params.gcm_comm = MPI_Comm_f2c(comm_f);
+    MPI_Comm_rank(params.gcm_comm, &params.gcm_rank);
+    self->world.reset(new boost::mpi::communicator(
+        params.gcm_comm, boost::mpi::comm_attach));
+    params.gcm_root = root;
+
+    params.icebin_config_fname = boost::filesystem::absolute("./ICEBIN_IN").string();
+    params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR").string();
+    params.run_dir = boost::filesystem::absolute(".").string();
+    params.gcm_dump_dir = boost::filesystem::absolute("ibdump").string();
+
+    params.hc_segments = parse_hc_segments(f_to_cpp(
+        rdparams.icebin_segments, sizeof(rdparams.icebin_segments)));
+    params.icebin_base_hc = params.ec_segment().base;
+
+
+
+    // Read the coupler, along with ice model proxies
+    if (params.am_i_root()) self->ncread(params.icebin_config_fname, "m");
+
+    // Check bounds on the IceSheets, set up any state, etc.
+    // This is done AFTER setup of self because self->read_from_netcdf()
+    // might change the IceSheet, in certain cases.
+    // (for example, if PISM is used, elev2 and mask2 will be read from related
+    // PISM input file, and the version in the ICEBIN file will be ignored)
+
+
+    /** Creates (on root) a picture of the full domain decomposition.
+    Run from all MPI ranks... */
+    std::vector<int> endj;
+    int endme = params.domainA[1].end;
+    boost::mpi::gather<int>(*self->world,
+        &endme, 1,    // In-values
+        endj, 0);                    // Out-values, root
+    if (params.am_i_root()) {
+        self->domains.reset(new DomainDecomposer_ModelE(endj, params.domainA_global));
+    }
+
+    // TODO: Test that im and jm are consistent with the grid read.
+    return self.release();
+}
 // ==========================================================
 // Called from LISheetIceBin::read_nhc_gcm()
 
 /* Tells ModelE how many elevation classes it needs **/
 extern "C"
-int gcmce_read_nhc_gcm(GCMCoupler_ModelE *self)
+int gcmce_nhc_gcm(GCMCoupler_ModelE *self)
+    { return self->nhc_gcm(); }
+
+int GCMCoupler_ModelE::read_nhc_gcm()
 {
-    NcIO ncio(self->gcm_params.icebin_config_fname, 'r');
+    NcIO ncio(this->gcm_params.icebin_config_fname, 'r');
     int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
 
     // Find the "ec" segment and set its size now...
-    auto &ec(self->gcm_params.ec_segment());
+    auto &ec(this->gcm_params.ec_segment());
     ec.size = nhc_ice;
     return ec.base + ec.size;
 
@@ -211,7 +219,7 @@ void gcmce_set_constant(
 
 // ---------------------------------------------------------------
 extern "C"
-int gcmce_add_gcm_outputE(
+void gcmce_add_gcm_outputE(
 GCMCoupler_ModelE *self,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
@@ -221,26 +229,23 @@ char const *long_name_f, int long_name_len)
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
-    auto var(var_f.to_blitz());
+    std::unique_ptr<blitz::Array<double,3>> var(
+        new blitz::Array<double,3>(var_f.to_blitz()));
 
     unsigned int flags = 0;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    self->gcm_outputs.add(
+    self->gcm_outputsE.add(
         field_name, xnan, units, flags, long_name);
 
     self->modele_outputs.gcm_ovalsE.push_back(var);
-
-    printf("gcmce_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), grid.c_str(), ret);
-
-    return ret;
 }
 // -----------------------------------------------------
 /** @para var_nhp Number of elevation points for this variable.
  (equal to 1 for atmosphere variables, or nhp for elevation-grid variables)
 @param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
 extern "C"
-int gcmce_add_gcm_inputA(
+void gcmce_add_gcm_inputA(
 GCMCoupler_ModelE *self,
 F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
@@ -251,24 +256,21 @@ char const *long_name_f, int long_name_len)
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
-    auto var(new_unique_ptr(var_f.to_blitz());
+    std::unique_ptr<blitz::Array<double,2>> var(
+        new blitz::Array<double,2>(var_f.to_blitz()));
 
     unsigned int flags = 0;
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    self->gcm_inputs[GridAE::A].add(
+    self->gcm_inputsAE[GridAE::A].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivals[GridAE::A].push_back(var);
-
-    printf("gcmce_add_gcm_inputA(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), ret);
-
-    return ret;
+    self->modele_inputs.gcm_ivalsA.push_back(var);
 }
 // -----------------------------------------------------
 extern "C"
-int gcmce_add_gcm_inputE(
+void gcmce_add_gcm_inputE(
 GCMCoupler_ModelE *self,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
@@ -279,20 +281,17 @@ char const *long_name_f, int long_name_len)
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
-    auto var(var_f.to_blitz());
+    std::unique_ptr<blitz::Array<double,3>> var(
+        new blitz::Array<double,3>(var_f.to_blitz()));
 
     unsigned int flags = 0;
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    self->gcm_inputs[GridAE::E].add(
+    self->gcm_inputsAE[GridAE::E].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivals[GridAE::E].push_back(var);
-
-    printf("gcmce_add_gcm_inputE(%s, %s, %s) --> %d\n", field_name.c_str(), units.c_str(), ret);
-
-    return ret;
+    self->modele_inputs.gcm_ivalsE.push_back(var);
 }
 // -----------------------------------------------------
 // ==========================================================
@@ -309,14 +308,14 @@ void gcmce_reference_globals(
     F90Array<double, 2> &fgice,
     F90Array<double, 2> &zatmo)
 {
-    auto &modele(api->gcm_coupler.modele);
-    modele.fhc.reference(fhc.to_blitz());
-    modele.elevI.reference(elevI.to_blitz());
-    modele.focean.reference(focean.to_blitz());
-    modele.flake.reference(flake.to_blitz());
-    modele.fgrnd.reference(fgrnd.to_blitz());
-    modele.fgice.reference(fgice.to_blitz());
-    modele.zatmo.reference(zatmo.to_blitz());
+    auto &modele_inputs(self->modele_inputs);
+    modele_inputs.fhc.reference(fhc.to_blitz());
+    modele_inputs.elevE.reference(elevE.to_blitz());
+    modele_inputs.focean.reference(focean.to_blitz());
+    modele_inputs.flake.reference(flake.to_blitz());
+    modele_inputs.fgrnd.reference(fgrnd.to_blitz());
+    modele_inputs.fgice.reference(fgice.to_blitz());
+    modele_inputs.zatmo.reference(zatmo.to_blitz());
 }
 
 // ===========================================================
@@ -338,10 +337,17 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
 // Called from LISheetIceBin::cold_start()
 
 extern "C"
-void gcmce_cold_start(GCMCoupler_ModelE *self, int itimei, double dtsrc)
+void gcmce_couple_native(GCMCoupler_ModelE *self,
+int itime,
+bool run_ice);    // if false, only initialize
+
+extern "C"
+void gcmce_cold_start(GCMCoupler_ModelE *self, int itimei)
 {
-    // a) Cold-start initial conditions of dynamic ice model
-TODO...
+    // This will cold-start initial conditions of the dynamic ice model
+    self->cold_start(
+        ibmisc::Datetime(self->rdparams.yeari,1,1),
+        itimei * self->rdparams.dtsrc);
 
     // b) Compute fhc, elevE
     // c) Compute ZATMO, FGICE, etc.
@@ -350,11 +356,11 @@ TODO...
     }
 
     // d) Sync with dynamic ice model
-    gcmce_couple_native(self, itime, dtsrc, false);
+    gcmce_couple_native(self, itimei, false);
 
     // Inits files used to dump gcm_in and gcm_out
     if (self->gcm_params.gcm_dump_dir.size() > 0)
-        mkdir(self->gcm_params.gcm_dump_dir);
+        boost::filesystem::create_directory(self->gcm_params.gcm_dump_dir);
 }
 
 // =======================================================
@@ -390,57 +396,49 @@ Put elsewhere in the Fortran code:
 extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,
 int itime,
-int yy, int mm, int dd, // Date that time_s lies on
 bool run_ice)    // if false, only initialize
 {
-    double time_s = itime * dtsrc;
-
-    GCMCouplerOutput out;
-//    int im = gcm_ovalsE.extent(0);
-//    int jm = gcm_ovalsE.extent(1);
-
-    int nhc_gcm = gcm_ovalsE.extent(2);
-    int nvar = gcm_ovalsE.extent(3);
-
-    // Allocate buffer for that amount of stuff
-    ibmisc::DynArray<ModelEMsg> sbuf(ModelEMsg::size(nvar), nele_l);
-
+    double time_s = itime * self->rdparams.dtsrc;
 
     // Fill it in...
-    VectorSparseParallelVectors gcm_ovalsE_s(nvar);
-    std::vector<double> val(nvar);
+    VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());
 
-    auto &indexingA(regridder.gridA->indexing);
+    auto &indexingA(self->gcm_regridder.gridA->indexing);
 
     // domain uses alphabetical order, 0-based indexing...
-    for (int ihc=icebin_base_hc; ihc < icebin_base_hc + icebin_nhc; ++ihc) {
-    for (int j=domainA.base[1]; j != domainA.base[1]+domainA.extent[1]; ++j) {
-    for (int i=domainA.base[0]; i != domainA.base[0]+domainA.extent[0]; ++i) {
+    const auto base_hc(self->gcm_params.icebin_base_hc);
+    const auto nhc_ice(self->gcm_regridder.nhc(0));
+    std::vector<double> val(self->gcm_outputsE.size());    // Temporary
+
+    auto &domainA(self->domainA);
+    for (int ihc=base_hc; ihc < base_hc + nhc_ice; ++ihc) {
+    for (int j=domainA[1].begin; j < domainA[1].end; ++j) {
+    for (int i=domainA[0].begin; i < domainA[0].end; ++i) {
         // i,j are 0-based indexes.
-        int i_f = i+1
-        int j_f = j+1
-        int ihc_f = ihc+1
+        int i_f = i+1;
+        int j_f = j+1;
+        int ihc_f = ihc+1;
 
-        if (modele_f.fhc(i_f,j_f,ihc_f) == 0) continue;    // C2F indexing
+        if (self->modele_inputs.fhc(i_f,j_f,ihc_f) == 0) continue;    // C2F indexing
 
-        int ihc_ice = ihc-icebin_base_hc-1   // Use only IceBin HC's, F2C index conversion
-        long iE = gcm_regridder->indexingHC.tuple_to_index<2>({
-            indexingA.tuple_to_index<2>({i, j}),
-            ihc_ice
-        });
+        int ihc_ice = ihc - base_hc - 1;   // Use only IceBin HC's, F2C index conversion
 
-        for (unsigned int ivar=0; ivar<nvar; ++ivar) {
-            val[ivar] = (*modele_output.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
+        long iE = self->gcm_regridder.indexingE.tuple_to_index(
+            make_array(i, j, ihc_ice));
+
+        for (unsigned int ivar=0; ivar<self->gcm_outputsE.size(); ++ivar) {
+            val[ivar] = (*self->modele_outputs.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
         }
 
-        gcm_ovalsE_s.add(iE, val);
+        gcm_ovalsE_s.add({iE}, val);
     }}}
 
 
     // Gather it to root
     // boost::mpi::communicator &gcm_world(world);
-    GCMCouplerOutput out;
-    if (world.am_i_root()) {
+    // Init our output struct based on number of A and E variables.
+    GCMInput out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
+    if (params.am_i_root()) {
         std::vector<VectorMultivec> every_gcm_ovalsE_s;
         boost::mpi::gather(world, gcm_ovalsE_s, every_gcm_ovalsE_s, world.root);
 
@@ -448,12 +446,12 @@ bool run_ice)    // if false, only initialize
         VectorMultivec gcm_ovalsE_s(concatenate(every_gcm_ovalsE_s));
 
         // Couple on root!
-        GCMCouplerOutput out(
+        GCMInput out(
             this->couple(time_s,
                 gcm_ovalsE_s, run_ice));
 
         // Split up the output (and 
-        std::vector<GCMCouplerOutput<3>> every_outs(split_by_domain(out, domains));
+        std::vector<GCMInput<3>> every_outs(split_by_domain(out, domains));
 
         // Scatter!
         boost::mpi::scatter(world, every_outs, out, world.root);
@@ -508,7 +506,7 @@ GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
 // ===============================================================
 
 /** Called from MPI rank */
-void ModelEInputs::update_gcm_ivals(GCMCouplerOutput const &out)
+void ModelEInputs::update_gcm_ivals(GCMInput const &out)
 {
     // Update ModelE variables (zatmo, fhc, etc);
     // also icebin_base_hc and icebin_nhc

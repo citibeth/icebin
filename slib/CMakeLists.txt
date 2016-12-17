@@ -44,7 +44,6 @@ if (BUILD_COUPLER)
         # Coupler...
         icebin/multivec.cpp
         icebin/GCMCoupler.cpp
-        icebin/IceWriter.cpp
         icebin/contracts/contracts.cpp
     )
 

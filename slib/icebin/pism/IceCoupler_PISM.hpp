@@ -141,7 +141,7 @@ protected:
     void deallocate();
 
 public:
-    virtual void set_start_time(
+    virtual void cold_start(
         ibmisc::Datetime const &time_base,
         double time_start_s);
 

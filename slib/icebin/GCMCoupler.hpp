@@ -76,7 +76,12 @@ struct GCMInput {
         })
     {}
 
-//    size_t nvar() { return gcm_ivals[0].nvar; }
+    std::array<int, GridAE::count> nvar() const
+    {
+        std::array<int, GridAE::count> ret;
+        for (int i=0; i<GridAE::count; ++i) ret[i] = gcm_ivalsAE[i].nvar;
+        return ret;
+    }
 
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
@@ -98,7 +103,7 @@ public:
     );
     Type const type;
 
-    // ------- Set in GCMCoupler::set_start_time()
+    // ------- Set in GCMCoupler::cold_start()
     ibmisc::Datetime time_base;    // yy,mm,dd,hh,mm,ss
     ibmisc::TimeUnit time_unit;    // Equiv. to CF-compliant time unit string
     double time_start_s;        // Start of simulation, as far as ice model is concerned (seconds since time_base).
@@ -120,12 +125,14 @@ public:
 
     /** Number of elevation classes the GCM sees */
     int _nhc_gcm = -1;
-    int nhc() {
-        if (_nhc_gcm < 0) _nhc_gcm = get_nhc_gcm();
+    int nhc_gcm() {
+        if (_nhc_gcm < 0) _nhc_gcm = read_nhc_gcm();
         return _nhc_gcm;
     }
-    virtual int get_nhc_gcm();
+protected:
+    virtual int read_nhc_gcm();
 
+public:
     /** See regridder.sheets_index */
     std::vector<std::unique_ptr<IceCoupler>> ice_couplers;
 
@@ -167,7 +174,8 @@ public:
         std::string const &fname,
         std::string const &vname);
 
-    void set_start_time(
+    /** Private; called from gcmce_cold_start() */
+    void cold_start(
         ibmisc::Datetime _time_base,
         double time_start_s);
 
@@ -179,14 +187,14 @@ public:
     /** Top-level ncio() to log output from coupler. (coupler->GCM) */
     void ncio_gcm_input(ibmisc::NcIO &ncio,
         GCMInput &out,        // All MPI ranks included here
-        std::array<double,2> const &timespan,    // timespan[1] = current time_s
+        std::array<double,2> &timespan,    // timespan[1] = current time_s
         std::string const &time_units,
         std::string const &vname_base);
 
     /** Top-level ncio() to log input to coupler. (GCM->coupler) */
     void ncio_gcm_output(ibmisc::NcIO &ncio,
         VectorMultivec const &gcm_ovalsE,
-        std::array<double,2> const &timespan,    // timespan[1] = current time_s
+        std::array<double,2> &timespan,    // timespan[1] = current time_s
         std::string const &time_units,
         std::string const &vname_base);
 

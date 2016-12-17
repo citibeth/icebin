@@ -195,7 +195,11 @@ class IceModel;
 // ----------------------------------------------------
 
 /** Used to index arrays that are done for A and E grids */
-enum GridAE { A, E, count };
+namespace GridAE {
+    static const int A = 0;
+    static const int E = 1;
+    static const int count = 2;
+}
 
 /** Generates the matrices required in the GCM */
 class GCMRegridder
@@ -230,12 +234,12 @@ public:
 
     /** Selection function so aid when A/E stuff uses the same code,
         indexed by GridAE::A or ::E. */
-    ibmisc::Indexing &indexing(GridAE iAE)
+    ibmisc::Indexing &indexing(int iAE)
         { return (iAE == GridAE::A ? gridA->indexing : indexingE); }
 
     /** Position of height points in elevation space (same for all GCM
     grid cells) */
-    std::vector<double> hcdefs; // [nhp]
+    std::vector<double> hcdefs; // [nhc]
 
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> sheets_index;
@@ -314,12 +318,12 @@ public:
     void wA(SparseVector &w) const;
 
     /** @return Number of elevation points for a given grid cell */
-    unsigned int nhp(int i1) const { return hcdefs.size(); }
+    unsigned int nhc(int i1) const { return hcdefs.size(); }
 
     /** @return Number of elevation points for grid cells in general */
-    unsigned int nhp() const { return nhp(-1); }
+    unsigned int nhc() const { return nhc(-1); }
     unsigned long nA() const { return gridA->ndata(); }
-    unsigned long nE() const { return nA() * nhp(-1); }
+    unsigned long nE() const { return nA() * nhc(-1); }
 
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 

@@ -127,44 +127,45 @@ void setup_modele_pism(GCMCoupler const &_coupler, IceModel &_model)
     // ============== Ice -> GCM
     VarSet &ice_output(model->contract[IceModel::OUTPUT]);
 
+    // All these outputs are on the ICE grid.
     // Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
 
-    ice_output.add("ice_surface_elevation", nan, "m", contracts::ICE|contracts::INITIAL, "ice upper surface elevation");
-    ice_output.add("ice_thickness", nan, "m", contracts::ICE|contracts::INITIAL, "thickness of ice");
-    ice_output.add("bed_topography", nan, "m", contracts::ICE|contracts::INITIAL, "topography of bedrock");
+    ice_output.add("ice_surface_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
+    ice_output.add("ice_thickness", nan, "m", contracts::INITIAL, "thickness of ice");
+    ice_output.add("bed_topography", nan, "m", contracts::INITIAL, "topography of bedrock");
 
 
-    ice_output.add("mask", nan, "", contracts::ICE|contracts::INITIAL, "PISM land surface type");
+    ice_output.add("mask", nan, "", contracts::INITIAL, "PISM land surface type");
 
-    ice_output.add("M1", nan, "kg m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add("M2", nan, "kg m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add("H1", nan, "J m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add("H2", nan, "J m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add("V1", nan, "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
-    ice_output.add("V2", nan, "m^3 m-2", contracts::ICE|contracts::INITIAL, "");
+    ice_output.add("M1", nan, "kg m-2", contracts::INITIAL, "");
+    ice_output.add("M2", nan, "kg m-2", contracts::INITIAL, "");
+    ice_output.add("H1", nan, "J m-2", contracts::INITIAL, "");
+    ice_output.add("H2", nan, "J m-2", contracts::INITIAL, "");
+    ice_output.add("V1", nan, "m^3 m-2", contracts::INITIAL, "");
+    ice_output.add("V2", nan, "m^3 m-2",contracts::INITIAL, "");
 
-    ice_output.add("basal_frictional_heating", nan, "W m-2", contracts::ICE, "");
-    ice_output.add("strain_heating", nan, "W m-2", contracts::ICE, "");
-    ice_output.add("geothermal_flux", nan, "W m-2", contracts::ICE, "");
-    ice_output.add("upward_geothermal_flux", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("basal_frictional_heating", nan, "W m-2", 0, "");
+    ice_output.add("strain_heating", nan, "W m-2", 0, "");
+    ice_output.add("geothermal_flux", nan, "W m-2", 0, "");
+    ice_output.add("upward_geothermal_flux", nan, "W m-2", 0, "");
 
-    ice_output.add("calving.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add("calving.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add("icebin_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add("icebin_smb.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add("pism_smb.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("calving.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("calving.enth", nan, "W m-2", 0, "");
+    ice_output.add("icebin_smb.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("icebin_smb.enth", nan, "W m-2", 0, "");
+    ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("pism_smb.enth", nan, "W m-2", 0, "");
 
     // basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
-    ice_output.add("melt_grounded.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add("melt_grounded.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add("melt_floating.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add("melt_floating.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("melt_grounded.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("melt_grounded.enth", nan, "W m-2", 0, "");
+    ice_output.add("melt_floating.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("melt_floating.enth", nan, "W m-2", 0, "");
 
-    ice_output.add("internal_advection.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add("internal_advection.enth", nan, "W m-2", contracts::ICE, "");
-    ice_output.add("epsilon.mass", nan, "kg m-2 s-1", contracts::ICE, "");
-    ice_output.add("epsilon.enth", nan, "W m-2", contracts::ICE, "");
+    ice_output.add("internal_advection.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("internal_advection.enth", nan, "W m-2", 0, "");
+    ice_output.add("epsilon.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("epsilon.enth", nan, "W m-2", 0, "");
 
     ice_output.add("unit", nan, "", 0, "Dimensionless identity");
 

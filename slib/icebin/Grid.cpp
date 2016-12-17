@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <icebin/Grid.hpp>
 #include <ibmisc/netcdf.hpp>
-#include <boost/bind.hpp>
+//#include <boost/bind.hpp>
 //#include <giss/constant.hpp>
 #include <icebin/error.hpp>
 

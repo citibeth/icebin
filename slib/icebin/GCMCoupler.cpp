@@ -17,8 +17,10 @@
  */
 
 #include <mpi.h>        // Intel MPI wants to be first
+#include <functional>
 #include <boost/format.hpp>
 #include <ibmisc/netcdf.hpp>
+#include <ibmisc/ncfile.hpp>
 #include <ibmisc/memory.hpp>
 #include <ibmisc/blitz.hpp>
 #include <ibmisc/datetime.hpp>
@@ -27,6 +29,7 @@
 #include <icebin/contracts/contracts.hpp>
 #include <spsparse/multiply_sparse.hpp>
 #include <spsparse/sort.hpp>
+#include <spsparse/netcdf.hpp>
 
 #ifdef USE_PISM
 #include <icebin/pism/IceCoupler_PISM.hpp>
@@ -37,6 +40,8 @@ using namespace ibmisc;
 using namespace netCDF;
 
 namespace icebin {
+
+static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 // ==========================================================
 /** @param nc The IceBin configuration file */
@@ -84,7 +89,7 @@ void GCMCoupler::ncread(
 
 
 
-void GCMCoupler::set_start_time(
+void GCMCoupler::cold_start(
     ibmisc::Datetime _time_base,
     double _time_start_s)
 {
@@ -94,7 +99,7 @@ void GCMCoupler::set_start_time(
     last_time_s = time_start_s;
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
-        ice_couplers[sheetix]->set_start_time(time_base, time_start_s);
+        ice_couplers[sheetix]->cold_start(time_base, time_start_s);
     }
 
 }
@@ -105,6 +110,9 @@ double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
 bool run_ice)
 {
+   std::array<double,2> timespan{last_time_s, time_s};
+
+
     // Figure out our calendar day to format filenames
     ibmisc::Datetime dt(time_unit.to_datetime(time_s));
 
@@ -115,8 +123,7 @@ bool run_ice)
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-out-" + sdate;
         NcIO ncio(fname, 'w');
-        ncio_gcm_output(ncio, gcm_ovalsE,
-            ibmisc::make_array(last_time_s, time_s),
+        ncio_gcm_output(ncio, gcm_ovalsE, timespan,
             time_unit.to_cf(), "");
         ncio();
     }
@@ -126,15 +133,15 @@ bool run_ice)
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
-        ice_coupler->couple(time_s, yymmdd, gcm_ovalsE, out, run_ice);
+        ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
     }
 
 
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-in-" + sdate;
         NcIO ncio(fname, 'r');
-        ncio_gcm_input(ncio, out, {last_time_s, time_s},
-            gcm_params.time_units, "");
+        ncio_gcm_input(ncio, out, timespan,
+            time_unit.to_cf(), "");
         ncio();
     }
 
@@ -142,10 +149,10 @@ bool run_ice)
     return out;
 }
 // ------------------------------------------------------------
-static ncwrite_dense(
-    NcFile *nc,
+static void ncwrite_dense(
+    NcGroup * const nc,
     VectorMultivec const *vecs,
-    VarSet *contract,
+    VarSet const *contract,
     ibmisc::Indexing const *indexing,
     std::string const &vname_base)
 {
@@ -153,22 +160,23 @@ static ncwrite_dense(
     blitz::Array<double,1> denseE(indexing->extent());    // All dims
 
     // NetCDF needs dimensions in stride-descending order
-    std::vector<size_t> startp
-    std::vector<size_t> extents;
-    for (int dimi : indexing->indices) {
+    std::vector<size_t> startp;
+    std::vector<size_t> countp;
+    for (int dimi : indexing->indices()) {
         startp.push_back(0);
-        extents.push_back(indexing->extents[dimi]);
+        countp.push_back(indexing[dimi].extent());
     }
 
     // Go through each variable...
-    for (unsigned int ivar=0; ivar < vals.values.size(); ++ivar) {
+    unsigned int nvar = vecs->size();
+    for (unsigned int ivar=0; ivar < nvar; ++ivar) {
         // Fill our dense var
         denseE = nan;
-        for (unsigned int i=0; i<vals.index.size(); ++i)
-            dense(vals.index[i]) = vals.values[ivar][i];
+        for (unsigned int i=0; i<vecs->index.size(); ++i)
+            denseE(vecs->index[i]) = vecs->vals[i*nvar + ivar];
 
         // Store in the netCDF variable
-        NcVar ncvar(nc.getVar(vname_base + (*contract)[ivar].name));
+        NcVar ncvar(nc->getVar(vname_base + (*contract)[ivar].name));
         ncvar.putVar(startp, countp, denseE.data());
     }
 
@@ -177,9 +185,9 @@ static ncwrite_dense(
 /** Densifies the sparse vectors, and then writes them out to netCDF */
 static void ncio_dense(
     NcIO &ncio,
-    VectorMultivec const &vec,    
-    VarSet &contract,
-    ibmisc::IndexingBase const &indexing,
+    VectorMultivec const &vecs,    
+    VarSet const &contract,
+    ibmisc::Indexing const &indexing,
     std::string const &vname_base = "")
 {
     if (ncio.rw != 'w') (*icebin_error)(-1,
@@ -187,26 +195,25 @@ static void ncio_dense(
 
     // Create the variables
     NcDimSpec dim_spec({"time"}, {-1});
-    append(dim_spec, indexingAE);
-    contract.ncdefine(ncio, dim_spec.to_dims(), vname_base);
+    append(dim_spec, indexing);
+    contract.ncdefine(ncio, dim_spec.to_dims(ncio), vname_base);
 
-    ncio += std::bind(&ncwrite_dense, ncio.nc,
-        &vec, &contract, &indexing,
-        vname_base);
+    ncio += std::bind(ncwrite_dense,
+        ncio.nc, &vecs, &contract, &indexing, vname_base);
 }
 // ------------------------------------------------------------
 /** Top-level ncio() to log output from coupler. (coupler->GCM) */
 void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     GCMInput &out,        // All MPI ranks included here
-    std::array<double,2> const &timespan,    // timespan[1] = current time_s
+    std::array<double,2> &timespan,    // timespan[1] = current time_s
     std::string const &time_units,
     std::string const &vname_base)
 {
-    ncio_timespan(ncio, timespan, time_units, vname_base);
+    ibmisc::ncio_timespan(ncio, timespan, time_units, vname_base);
 
-    for (GridAE iAE=0; iAE<GridAE::count; ++iAE) {
-        ncio_dense(ncio, out.gcm_ivals[iAE], gcm_inputs[iAE],
-            regridder.indexing(iAE), vname_base);
+    for (int iAE=0; iAE<GridAE::count; ++iAE) {
+        ncio_dense(ncio, out.gcm_ivalsAE[iAE], gcm_inputsAE[iAE],
+            gcm_regridder.indexing(iAE), vname_base);
     }
 
     ncio_spsparse(ncio, out.E1vE0, false, vname_base+"Ev1Ev0");
@@ -218,14 +225,14 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */
 void GCMCoupler::ncio_gcm_output(NcIO &ncio,
     VectorMultivec const &gcm_ovalsE,
-    std::array<double,2> const &timespan,    // timespan[1] = current time_s
+    std::array<double,2> &timespan,    // timespan[1] = current time_s
     std::string const &time_units,
     std::string const &vname_base)
 {
     ncio_timespan(ncio, timespan, time_units, vname_base);
 
     ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
-        regridder.indexingE, vname_base);
+        gcm_regridder.indexingE, vname_base);
 }
 // ------------------------------------------------------------
 // ======================================================================

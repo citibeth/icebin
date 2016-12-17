@@ -132,17 +132,18 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet)
 // ======================================================================
 // Called by
 //     LANDICE_DRV.f: init_LI(istart_fixup)
-//     lisnow%set_start_time()  (if cold start)
-//     lisheet%set_start_time()  [currently missing...?]
-//     GCMCoupler::set_start_time()
+//     lisnow%cold_start()  (if cold start)
+//     lisheet%cold_start()  [currently missing...?]
+//     gcmce_cold_start()
+//     GCMCoupler::cold_start()
 //         <this>
-//     [calls IceCoupler::set_start_time()]
-void IceCoupler_PISM::set_start_time(
+//     [calls IceCoupler::cold_start()]
+void IceCoupler_PISM::cold_start(
     ibmisc::time::tm const &time_base,
     double time_start_s)
 {
     // Call overridden method
-    IceCoupler::set_start_time(time_base, time_start_s);
+    IceCoupler::cold_start(time_base, time_start_s);
 
     // ------- Now instantiate PISM!
     // Convert PISM arguments to old C style
@@ -389,10 +390,10 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 // ====================================================================
 // Called by
 //     LANDICE_DRV.f: init_LI(istart_fixup)
-//     lisnow%set_start_time()  (if cold start)
-//     lisheet%set_start_time()  [currently missing...?]
-//     GCMCoupler::set_start_time()
-//     IceCoupler_PISM::set_start_time()
+//     lisnow%cold_start()  (if cold start)
+//     lisheet%cold_start()  [currently missing...?]
+//     GCMCoupler::cold_start()
+//     IceCoupler_PISM::cold_start()
 //     contracts/contracts.cpp: contracts::setup()
 //     contracts/modele_pism.cpp: setup_modele_pism()
 void IceCoupler_PISM::transfer_constant(std::string const &dest, std::string const &src, double multiply_by, bool set_new)

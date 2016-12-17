@@ -50,10 +50,10 @@ void IceRegridder::sEpvE(SparseTriplets<SparseMatrix> &w, std::function<bool(lon
 {
     ibmisc::Proj_LL2XY proj(gridI->sproj);
     for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
-        long nhp = gcm->nhp(cell->index);
+        long nhc = gcm->nhc(cell->index);
         long tuple[2] = {cell->index, 0};
         long &ihp(tuple[1]);
-        for (ihp=0; ihp<nhp; ++ihp) {
+        for (ihp=0; ihp<nhc; ++ihp) {
             long indexE = gcm->indexingHC.tuple_to_index(tuple);
             if (!filter_fn(indexE)) continue;
             w.add({indexE, indexE}, cell->native_area / cell->proj_area(&proj));
@@ -412,7 +412,7 @@ RegridMatrices::RegridMatrices(IceRegridder *regridder)
 {
     printf("===== RegridMatrices Grid geometries:\n");
     printf("    nA = %d\n", regridder->gcm->nA());
-    printf("    nhp = %d\n", regridder->gcm->nhp());
+    printf("    nhc = %d\n", regridder->gcm->nhc());
     printf("    nE = %d\n", regridder->gcm->nE());
     printf("    nI = %d\n", regridder->nI());
     printf("    nG = %d\n", regridder->nG());

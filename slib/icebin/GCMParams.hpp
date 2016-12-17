@@ -41,21 +41,25 @@ struct GCMParams {
     // ------- Passed into GCMCoupler::allocate()
     ibmisc::Domain domainA, domainA_global;
     MPI_Comm gcm_comm;
-    int gcm_root;
+    int gcm_rank;            // MPI rank of this node
+    int gcm_root;        // Root of the MPI group
+    bool am_i_root() { return gcm_rank == gcm_root; }
 
     std::string icebin_config_fname;
     std::string config_dir; // Where to look for Ice Model configuration files
     std::string run_dir;    // The GCM run directory
+    std::string gcm_dump_dir;
 
     bool icebin_logging = true ;    // Should IceBin log input & output?
 
     // Should IceBin update topography?
     bool dynamic_topo = false;
 
-    std::vector<HCSegmentData> hc_segments {
+    std::vector<HCSegmentData> hc_segments {    // 0-based
         HCSegmentData("legacy", 0, 1),
         HCSegmentData("sealand", 1, 2),
         HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
+    int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
 
     HCSegmentData &ec_segment()
     {

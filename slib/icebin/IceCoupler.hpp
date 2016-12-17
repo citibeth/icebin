@@ -21,7 +21,7 @@ namespace ibmisc {
 namespace icebin {
 
 class GCMCoupler;
-class GCMCouplerOutput;
+class GCMInput;    // formerly GCMCouplerOutput
 class IceWriter;
 
 class IceCoupler {
@@ -36,7 +36,7 @@ public:
 
     /** Ordered specification of the variables (w/ units)
     to be passed IceBin->IceCoupler and IceCoupler->IceBin */
-    enum IO {INPUT, OUTPUT, _count};
+    enum IO {INPUT, OUTPUT, count};
 
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
@@ -49,7 +49,7 @@ public:
 
     // [INPUT|OUTPUT] variables
     // List of fields this dynamic ice model takes for input / output.
-    std::array<VarSet, 2> contract;
+    std::array<VarSet, IO::count> contract;
 
     // Linear combination transforming variables from:
     //      INPUT: gcm_output --> ice_input
@@ -91,13 +91,13 @@ public:
 
     // ========= Called by
     //     LANDICE_DRV.f: init_LI(istart_fixup)
-    //     lisnow%set_start_time()  (if cold start)
-    //     lisheet%set_start_time()  [currently missing...?]
-    //     GCMCoupler::set_start_time()
+    //     lisnow%cold_start()  (if cold start)
+    //     lisheet%cold_start()  [currently missing...?]
+    //     GCMCoupler::cold_start()
     //         <this>
-    //     [calls IceCoupler::set_start_time()]
+    //     [calls IceCoupler::cold_start()]
     /** (2) Event handler to let IceCouplers know the start time is (finally) set */
-    virtual void set_start_time(
+    virtual void cold_start(
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
@@ -119,7 +119,7 @@ public:
         double time_s,
         // Values from GCM, passed GCM -> Ice
         VectorMultivec const &gcm_ovalsE,
-        GCMCouplerOutput &out,    // Accumulate matrices here...
+        GCMInput &out,    // Accumulate matrices here...
         bool do_run);
 
     /** (4.1) @param index Index of each grid value.
