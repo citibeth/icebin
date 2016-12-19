@@ -112,7 +112,7 @@ private:
     bool update_elevation = true;
 
     // NetCDF output files
-//    std::unique_ptr<pism::icebin::VecBundleWriter> pism_in_nc, pism_out_nc;
+    std::unique_ptr<pism::icebin::VecBundleWriter> pism_in_nc, pism_out_nc;
 
     // ------------------------
 public:
@@ -158,8 +158,9 @@ public:
 
 public:
     void run_timestep(double time_s,
-        blitz::Array<int,1> const &indices,
-        std::vector<blitz::Array<double,1>> const &ivals2);
+        blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
+        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+        bool run_ice);    // Should we run the ice model?
 
     void get_initial_state(double time_s);
 
@@ -168,7 +169,9 @@ private:
     /** Copies PISM->Icebin output variables from PISM variables to
     the Icebin-supplied variables (on the root node).
     @param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
-    void get_state(unsigned int mask = 0);
+    void get_state(
+        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+        unsigned int mask);
 };
 
 }}  // namespace icebin::pism

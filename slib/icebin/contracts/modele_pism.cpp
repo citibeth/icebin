@@ -21,7 +21,7 @@
 #include <pism/base/enthalpyConverter.hh>
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
-#include <icebin/pism/IceModel_PISM.hpp>
+#include <icebin/pism/IceCoupler_PISM.hpp>
 
 using namespace ibmisc;
 
@@ -32,18 +32,18 @@ namespace contracts {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 /** GCM-specific contract */
-void setup_modele_pism(GCMCoupler const &_coupler, IceModel &_model)
+void setup_modele_pism(GCMCoupler const &_coupler, IceCoupler &_model)
 {
     // Get arguments we need from coupler
     auto coupler(dynamic_cast<modele::GCMCoupler_ModelE const *>(&_coupler));
-    auto model(dynamic_cast<icebin::gpism::IceModel_PISM *>(&_model));
+    auto model(dynamic_cast<icebin::gpism::IceCoupler_PISM *>(&_model));
     
 
     printf("BEGIN setup_modele_pism()\n");
 
     // =========== Transfer  constants from Icebin's gcm_constants --> PISM
     // model->transfer_constant(PISM_destionation, icebin_src, multiply_by)
-    // (see IceModel_PISM.cpp)
+    // (see IceCoupler_PISM.cpp)
     model->transfer_constant("standard_gravity", "constant::grav");
     model->transfer_constant("beta_CC", "seaice::dtdp", -1.0);
     model->transfer_constant("water_melting_point_temperature", "constant::tf");
@@ -78,14 +78,14 @@ void setup_modele_pism(GCMCoupler const &_coupler, IceModel &_model)
 
 
     // ============ GCM -> Ice
-    VarSet &ice_input(model->contract[IceModel::INPUT]);
+    VarSet &ice_input(model->contract[IceCoupler::INPUT]);
 
     // ------ Decide on the coupling contract for this ice sheet
-    ice_input.add("massxfer", 0., "kg m-2 s-1", contracts::ELEVATION,
+    ice_input.add("massxfer", 0., "kg m-2 s-1", 0,
         "Mass of ice being transferred Stieglitz --> Icebin");
-    ice_input.add("enthxfer", 0., "W m-2", contracts::ELEVATION,
+    ice_input.add("enthxfer", 0., "W m-2", 0,
         "Enthalpy of ice being transferred Stieglitz --> Icebin");
-    ice_input.add("deltah", 0., "J m-2", contracts::ELEVATION,
+    ice_input.add("deltah", 0., "J m-2", 0,
         "Change of enthalpy of top layer in PISM");
 
     // Figure out the conversion between GCM and PISM enthalpy
@@ -112,10 +112,10 @@ void setup_modele_pism(GCMCoupler const &_coupler, IceModel &_model)
 
     // ------------- Convert the contract to a var transformer
     // ------------- of I <- E   (Ice <- GCM)
-    {VarTransformer &vt(model->var_transformer[IceModel::INPUT]);
+    {VarTransformer &vt(model->var_transformer[IceCoupler::INPUT]);
     vt.set_dims(
         ice_input.keys(),             // outputs
-        coupler->gcm_outputs.keys(),  // inputs
+        coupler->gcm_outputsE.keys(),  // inputs
         coupler->scalars.keys());      // scalars
 
     ok = ok && vt.set("massxfer", "massxfer", "by_dt", 1.0);
@@ -125,7 +125,7 @@ void setup_modele_pism(GCMCoupler const &_coupler, IceModel &_model)
     }
 
     // ============== Ice -> GCM
-    VarSet &ice_output(model->contract[IceModel::OUTPUT]);
+    VarSet &ice_output(model->contract[IceCoupler::OUTPUT]);
 
     // All these outputs are on the ICE grid.
     // Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
@@ -173,7 +173,7 @@ void setup_modele_pism(GCMCoupler const &_coupler, IceModel &_model)
     std::cout << ice_output << std::endl;
 
     // ------- Variable and unit conversions, Ice -> GCM
-    {VarTransformer &vt(model->var_transformer[IceModel::OUTPUT]);
+    {VarTransformer &vt(model->var_transformer[IceCoupler::OUTPUT]);
 
     // NOTE: coupler->gcm_inputs is set up through calls to add_gcm_input_xx() in LANDICE_COM.f
     vt.set_dims(

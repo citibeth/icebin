@@ -238,7 +238,7 @@ char const *long_name_f, int long_name_len)
     self->gcm_outputsE.add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_outputs.gcm_ovalsE.push_back(var);
+    self->modele_outputs.gcm_ovalsE.push_back(std::move(var));
 }
 // -----------------------------------------------------
 /** @para var_nhp Number of elevation points for this variable.
@@ -266,7 +266,7 @@ char const *long_name_f, int long_name_len)
     self->gcm_inputsAE[GridAE::A].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivalsA.push_back(var);
+    self->modele_inputs.gcm_ivalsA.push_back(std::move(var));
 }
 // -----------------------------------------------------
 extern "C"
@@ -291,7 +291,7 @@ char const *long_name_f, int long_name_len)
     self->gcm_inputsAE[GridAE::E].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivalsE.push_back(var);
+    self->modele_inputs.gcm_ivalsE.push_back(std::move(var));
 }
 // -----------------------------------------------------
 // ==========================================================
@@ -345,12 +345,15 @@ extern "C"
 void gcmce_cold_start(GCMCoupler_ModelE *self, int itimei)
 {
     // This will cold-start initial conditions of the dynamic ice model
+
+    // Call superclass cold_start()
     self->cold_start(
         ibmisc::Datetime(self->rdparams.yeari,1,1),
         itimei * self->rdparams.dtsrc);
 
     // b) Compute fhc, elevE
     // c) Compute ZATMO, FGICE, etc.
+    self->update_topo();
     if (self->gcm_params.dynamic_topo) {
         // TODO...
     }
@@ -430,7 +433,7 @@ bool run_ice)    // if false, only initialize
             val[ivar] = (*self->modele_outputs.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
         }
 
-        gcm_ovalsE_s.add({iE}, val);
+        gcm_ovalsE_s.add({iE}, &val[0]);
     }}}
 
 
@@ -438,110 +441,85 @@ bool run_ice)    // if false, only initialize
     // boost::mpi::communicator &gcm_world(world);
     // Init our output struct based on number of A and E variables.
     GCMInput out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
-    if (params.am_i_root()) {
+    if (self->gcm_params.am_i_root()) {
         std::vector<VectorMultivec> every_gcm_ovalsE_s;
-        boost::mpi::gather(world, gcm_ovalsE_s, every_gcm_ovalsE_s, world.root);
+        boost::mpi::gather(*self->world, gcm_ovalsE_s,
+            every_gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Concatenate coupler inputs
         VectorMultivec gcm_ovalsE_s(concatenate(every_gcm_ovalsE_s));
 
         // Couple on root!
         GCMInput out(
-            this->couple(time_s,
+            self->couple(time_s,
                 gcm_ovalsE_s, run_ice));
 
         // Split up the output (and 
-        std::vector<GCMInput<3>> every_outs(split_by_domain(out, domains));
+        std::vector<GCMInput> every_outs(
+            split_by_domain<DomainDecomposer_ModelE>(out,
+                *self->domains, *self->domains));
 
         // Scatter!
-        boost::mpi::scatter(world, every_outs, out, world.root);
+        boost::mpi::scatter(*self->world, every_outs, out, self->gcm_params.gcm_root);
 
 
     } else {    // ~world.am_i_root()
         // Send our input to root
-        boost::mpi::gather(world, gcm_ovalsE_s, world.root);
+        boost::mpi::gather(*self->world, gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Let root do the work...
 
         // Receive our output back from root
-        boost::mpi::scatter(world, out, world.root);
+        boost::mpi::scatter(*self->world, out, self->gcm_params.gcm_root);
     }
 
     // 1. Copies values back into modele.gcm_ivals
-    modele.update_gcm_ivals(out);
+    self->update_gcm_ivals(out);
     // 2. Sets icebin_nhc, 
     // 3. Updates FHC, ZATMO, etc.
-    modele.update_modele_vars(out);
+    self->update_topo();
 }
 // =======================================================
-// =======================================================
-// =======================================================
-
-#if 0
-/** Callback from new_ice_coupler() */
-std::unique_ptr<GCMPerIceSheetParams>
-GCMCoupler_ModelE::read_gcm_per_ice_sheet_params(
-    ibmisc::NcIO &ncio,
-    std::string const &sheet_vname)
-{
-
-
-    // Read GCM-specific coupling parameters
-    // Set the contract for each ice sheet, based on:
-    //   (a) GCM-specific coupling parameters (to be read),
-    //   (b) The type of ice model
-
-    auto gcm_var = giss::get_var_safe(nc, (sheet_vname + ".modele").c_str());
-
-    std::unique_ptr<GCMPerIceSheetParams_ModelE> params(
-        new GCMPerIceSheetParams_ModelE());
-
-    params->coupling_type = giss::parse_enum<ModelE_CouplingType>(
-        giss::get_att(gcm_var, "coupling_type")->as_string(0));
-
-    return static_cast_unique_ptr<GCMPerIceSheetParams>(params);
-}
-#endif
-// -----------------------------------------------------
-// ===============================================================
-
 /** Called from MPI rank */
-void ModelEInputs::update_gcm_ivals(GCMInput const &out)
+void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
 {
-    // Update ModelE variables (zatmo, fhc, etc);
-    // also icebin_base_hc and icebin_nhc
-    update_modele_vars(out);
-
     // Update gcm_ivalA variables...
-    VectorSparseParallelVectors &gcm_ivalsA_s(out.gcm_ivals[GridAE::A]);
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsA(modele.gcm_ivals[GridAE::A]);
+    // Read from here...
+    VectorMultivec const &gcm_ivalsA_s(out.gcm_ivalsAE[GridAE::A]);
+    // Write to here...
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsA(
+        gcm_ivalsA);
+    auto nvar(out.nvar());    // A and E
 
-    for (size_t i=0; i<out.gcm_ivalsA_s.size(); ++i) {
+    for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {
         long iA = gcm_ivalsA_s.index[i];
-        auto ij(indexingA.index_to_tuple(iA));    // zero-based, alphabetical order
+        auto ij(gcm_regridder.indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
         int const i_f = ij[0]+1;    // C2F
         int const j_f = ij[1]+1;
-        for (unsigned int ivar=0; ivar<out.nvar; ++ivar) {
+        for (unsigned int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
             (*gcm_ivalsA[ivar])(i_f, j_f) =
-                out.gcm_ivalsA_s.vals[i*out.nvar + ivar];
+                gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar];
         }
     }
 
     // Update gcm_ivalE variables...
-    VectorSparseParallelVectors &gcm_ivalsE_s(out.gcm_ivals[GridAE::E]);
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsE(modele.gcm_ivals[GridAE::E]);
+    // Read from here...
+    VectorMultivec const &gcm_ivalsE_s(out.gcm_ivalsAE[GridAE::E]);
+    // Write to here...
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsE(
+        gcm_ivalsE);
 
-    for (size_t i=0; i<out.gcm_ivalsE_s.size(); ++i) {
+    for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
         long iE = gcm_ivalsE_s.index[i];
-        ijk = indexingE.index_to_tuple(iE);
+        auto ijk(gcm_regridder.indexing(GridAE::E).index_to_tuple<int,2>(iE));
         int const i_f = ijk[0]+1;    // C2F
         int const j_f = ijk[1]+1;
         int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
-        int const ihc_gcm_f = icebin_base + ihc_ice + 1;    // 1-based, G
+        int const ihc_gcm_f = gcm_params.icebin_base_hc + ihc_ice + 1;    // 1-based, G
 
-        for (unsigned int ivar=0; ivar<out.nvar; ++ivar) {
+        for (unsigned int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
             (*gcm_ivalsE[ivar])(i_f, j_f, ihc_gcm_f) =
-                out.gcm_ivalsE_s.vals[i*out.nvar + ivar];
+                gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar];
         }
     }
 }

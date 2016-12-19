@@ -81,8 +81,6 @@ struct ModelEInputs
     blitz::Array<double,2> fgrnd;    // Alt: fearth0
     blitz::Array<double,2> fgice;    // Alt: flice
     blitz::Array<double,2> zatmo;      // i,j
-
-    void update_gcm_ivals(GCMInput const &out);
 };
 
 
@@ -96,10 +94,10 @@ public:
     DomainDecomposer_ModelE(std::vector<int> const &endj, ibmisc::Domain const &_domainA_global);
 
     /** Number of domains */
-    size_t size() { return ndomain; }
+    size_t size() const { return ndomain; }
 
     /** Returns the MPI rank of grid cell */
-    int get_domain(long ix) {    // zero-based
+    int get_domain(long ix) const {    // zero-based
         auto im_world(domainA_global[0].end);
         auto jm_world(domainA_global[1].end);
 
@@ -115,7 +113,8 @@ public:
     ModelEParams rdparams;    // Params straight from the rundeck
     std::unique_ptr<boost::mpi::communicator> world;
 
-    /** On root: separate global stuff back into individual domains. */
+    /** On root: separate global stuff back into individual domains.
+    Works for A and E grids. */
     std::unique_ptr<DomainDecomposer_ModelE> domains;
 
     ModelEOutputs modele_outputs;
@@ -132,6 +131,8 @@ public:
 
 
 public:
+    virtual ~GCMCoupler_ModelE() {}
+
     // Called from LISnow::allocate()
     GCMCoupler_ModelE();
 
@@ -139,6 +140,15 @@ public:
 
     // The gcmce_xxx() functions do not need to be declared here
     // because everything in this class is public.
+
+
+    // 1. Copies values back into modele_inputs.gcm_ivals
+    void update_gcm_ivals(GCMInput const &out);
+
+    /** Called from gcmce_Xxx() functions to update fhc, eleveE, focean, etc.
+    when the ice model changes.  For now, a NOP. */
+    virtual void update_topo() {}
+
 
 #if 0
     /** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */

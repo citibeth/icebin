@@ -39,7 +39,6 @@ namespace icebin {
 struct GCMInput {
     typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
     typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
-    typedef VectorMultivec SparseMultivec;
 
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
@@ -71,8 +70,8 @@ struct GCMInput {
 
     GCMInput(std::array<int, GridAE::count> const &nvar) :
         gcm_ivalsAE({
-            SparseMultivec(nvar[0]),
-            SparseMultivec(nvar[1]),
+            VectorMultivec(nvar[0]),
+            VectorMultivec(nvar[1]),
         })
     {}
 

@@ -27,6 +27,9 @@ public:
     // Number of _vals element per _ix element
     int nvar;
 
+    // Needed by boost::mpi::gather() [GCMCoupler_ModelE.cpp]
+    VectorMultivec() : nvar(-1) {}
+
     VectorMultivec(int _nvar) : nvar(_nvar) {}
 
     inline size_t size() const { return index.size(); }
