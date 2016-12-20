@@ -81,7 +81,7 @@ void GridSpec_XY::make_grid(Grid_XY &grid)
         double y1 = yb[iy+1];
 
         for (int ix = 0; ix < xb.size()-1; ++ix) {      // i
-            long index = indexing.tuple_to_index<2>({ix, iy});
+            long index = indexing.tuple_to_index<int,2>({ix, iy});
 
             double x0 = xb[ix];
             double x1 = xb[ix+1];

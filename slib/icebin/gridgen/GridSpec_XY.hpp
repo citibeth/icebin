@@ -32,7 +32,7 @@ struct GridSpec_XY : public GridSpec {
     std::string name;
     std::string sproj;
     std::function<bool(Cell const &)> euclidian_clip;
-    ibmisc::Indexing<int,long> indexing;
+    ibmisc::Indexing indexing;
 
     /** Cell boundaries in the x direction.
     Sorted low to high.

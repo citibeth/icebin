@@ -108,14 +108,16 @@ void IceCoupler::set_start_time(
 #if 1
     // Print out the contract and var transformations
     std::cout << "========= Contract for " << name() << std::endl;
-    std::cout << "---- GCM->Ice     Output Variables:" << std::endl;
+    std::cout << "---- Ice <- GCM     Output Variables:" << std::endl;
     std::cout << contract[IceCoupler::INPUT];
     std::cout << "TRANSFORMATIONS:" << std::endl;
-    std::cout << var_transformer[IceCoupler::INPUT];
-    std::cout << "---- Ice->GCM     Output Variables:" << std::endl;
+    std::cout << var_trans_in
+    std::cout << "---- GCM <- Ice     Output Variables:" << std::endl;
     std::cout << contract[IceCoupler::OUTPUT];
-    std::cout << "TRANSFORMATIONS:" << std::endl;
-    std::cout << var_transformer[IceCoupler::OUTPUT];
+    std::cout << "TRANSFORMATIONS GCM-A <- Ice:" << std::endl;
+    std::cout << var_trans_outAE[GridAE::A];
+    std::cout << "TRANSFORMATIONS GCM-E <- Ice:" << std::endl;
+    std::cout << var_trans_outAE[GridAE::E];
 #endif
 
 
@@ -174,7 +176,7 @@ bool run_ice)
     auto scalars({
         std::make_pair("by_dt", 1.0 / ((itime - api->itime_last) * api->dtsrc)),
         std::make_pair("unit", 1.0)});
-    CSRAndUnits icei_v_gcmo(var_transformer[INPUT].apply_scalars(scalars));
+    CSRAndUnits icei_v_gcmo(var_trans_in.apply_scalars(scalars));
 
     // ice_ivalsEd_{jk} = icei_v_gcmo_{kl} * gcm_ovalsEd_{jl}
     // ice_ivalsI_{ik} = IvEd_{ij} * ice_ivalsEd_{jk}
@@ -235,15 +237,16 @@ bool run_ice)
     copy(out.elevE1, EvI * to_col_vector(elevI), EvI.dims[0]);   // copy eigen column vector
 
     // ========= Compute gcm_ivalsE = EvI * vt * ice_ovals
-    CSRAndUnits gcmi_v_iceo(var_transformer[OUTPUT].apply_scalars(scalars));
 
-    std::array<WeightedSparse *, GCMCoupler::GCMI::COUNT> XvIs;
+    std::array<WeightedSparse *, GridAE::count> XvIs;
     XvIs[GCMCoupler::GCMI::E] = &EvI;
     XvIs[GCMCoupler::GCMI::A] = &AvI;
     std::vector<double> vals(contract.size());
 
     // Do it once for _E variables and once for _A variables.
-    for (int iEA=0; iEA < GCMCoupler::GCMI::COUNT; ++iEA) {
+    for (int iAE=0; iAE < GridAE::count; ++iAE) {
+        CSRAndUnits gcmi_v_iceo(var_trans_out[iAE].apply_scalars(scalars));
+
         VarSet &contract(gcm_coupler->gcm_inputs[iEA]);
         WeightedSparse &XvI_ws(*XvIs[iEA]);
         SparseMatrix XvI(to_spsparse(XvI_ws.M, XvI_ws.dims[0], XvI_ws.dims[1]));

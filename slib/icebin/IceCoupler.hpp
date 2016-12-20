@@ -55,7 +55,8 @@ public:
     //      INPUT: gcm_output --> ice_input
     //     OUTPUT: ice_output --> gcm_input
     // (eg: T_ice = T_gcm + 273.15)
-    std::array<ibmisc::VarTransformer, 2> var_transformer;
+    ibmisc::VarTransformer var_trans_inE;
+    std::array<ibmisc::VarTransformer, GridAE::count> var_trans_outAE;
 
     // Writers called to record the input and output seen by this IceCoupler
     std::array<std::unique_ptr<IceWriter>, 2> writer;

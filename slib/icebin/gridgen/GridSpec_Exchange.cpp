@@ -280,7 +280,7 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
         }
     }
 
-    exgrid.indexing = Indexing<int, long>({0}, {exgrid.cells.nfull()}, {0});    // No n-D indexing available.
+    exgrid.indexing = Indexing({"i0"}, {0}, {exgrid.cells.nfull()}, {0});    // No n-D indexing available.
 
 }
 
