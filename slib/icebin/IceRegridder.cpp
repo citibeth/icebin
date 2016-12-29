@@ -205,13 +205,13 @@ std::function<bool(long)> in_sparse_fn(SparseSet const &dim)
 static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder, bool scale, bool correctA, UrAE const &AE)
 {
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse);
-    auto &dimA(ret->dims[0]);
-    auto &dimI(ret->dims[1]);
+    SparseSet &dimA(ret->dims[0]);
+    SparseSet &dimI(ret->dims[1]);
     SparseSet dimG;
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     // GvI
-    SparseTriplets<SparseMatrix> GvI_t({&dimG, &dimI});    // _t=triplets
+    SparseTriplets<SparseMatrix> GvI_t(std::array<SparseSet *, 2>{&dimG, &dimI});    // _t=triplets
     GvI_t.set_shape({regridder->nG(), regridder->nI()});
     regridder->GvI(GvI_t);
 

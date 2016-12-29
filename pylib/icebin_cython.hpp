@@ -21,6 +21,8 @@
 #include <Python.h>
 #include <ibmisc/cython.hpp>
 #include <icebin/GCMRegridder.hpp>
+#include <spsparse/VectorCooArray.hpp>
+#include <spsparse/eigen.hpp>
 
 namespace icebin {
 namespace cython {
@@ -42,8 +44,11 @@ inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const 
 {
     std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name, scale, correctA));
 
-    PyObject *weight_py = ibmisc::cython::blitz_to_np(Mw->weight.to_dense(0));
-    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw->M);
+    PyObject *weight_py = ibmisc::cython::blitz_to_np(Mw->weight);
+    icebin::SparseMatrix Mw_sp;
+    spsparse::spcopy(Mw_sp, *Mw->M);
+    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw_sp);
+//    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(spsparse::to_spsparse(*Mw->M));
     return Py_BuildValue("OO", M_py, weight_py);
 }
 

@@ -108,10 +108,19 @@ void GCMCoupler::cold_start(
 GCMInput GCMCoupler::couple(
 double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
-bool run_ice)
+bool run_ice,
+bool am_i_root)
 {
-   std::array<double,2> timespan{last_time_s, time_s};
+    if (!am_i_root) {
+        GCMInput out({0,0});
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
+            ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice, am_i_root);
+        }
+        return out;
+    }
 
+    std::array<double,2> timespan{last_time_s, time_s};
 
     // Figure out our calendar day to format filenames
     ibmisc::Datetime dt(time_unit.to_datetime(time_s));
@@ -133,7 +142,7 @@ bool run_ice)
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
-        ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
+        ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice, am_i_root);
     }
 
 
@@ -144,7 +153,6 @@ bool run_ice)
             time_unit.to_cf(), "");
         ncio();
     }
-
 
     return out;
 }

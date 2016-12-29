@@ -165,8 +165,8 @@ int main(int argc, char **argv)
 
     // ------------ Make the grid from the spec
     Grid_LonLat grid;
-    spec.indexing = Indexing<int,long>(
-        {0,0}, {spec.nlon(), spec.nlat()}, {1,0});  // col major
+    spec.indexing = Indexing(
+        {"lon", "lat"}, {0,0}, {spec.nlon(), spec.nlat()}, {1,0});  // col major
     spec.make_grid(grid);
 
     // ------------- Write it out to NetCDF

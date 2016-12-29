@@ -44,7 +44,7 @@ void GCMRegridder_init(GCMRegridder *cself,
     cself->init(
         std::move(gridA),
         std::move(hcdefs),
-        Indexing<long,long>({"A", "HC"}, {0,0}, {gridA->ndata(), nhp}, {1,0}),
+        Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhp}, {1,0}),
         _correctA);
 
 }
@@ -110,13 +110,9 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
     auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {gridI->ndata()}));
     auto maskI(np_to_blitz<int,1>(maskI_py, "maskI", {gridI->ndata()}));
 
-    SparseVector elevI_sp({elevI.extent(0)});
-    for (int i=0; i<elevI.extent(0); ++i)
-        if (!maskI(i)) elevI_sp.add({i}, elevI(i));
-
     auto sheet(new_ice_regridder(gridI->parameterization));
     sheet->init(name, std::move(gridI), std::move(exgrid),
-        interp_style, std::move(elevI_sp));
+        interp_style, elevI);
     cself->add_sheet(std::move(sheet));
 }
 

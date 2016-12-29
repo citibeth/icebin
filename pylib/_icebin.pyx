@@ -95,7 +95,7 @@ cdef class GCMRegridder:
 
     def regrid_matrices(self, str sheet_name):
         cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
-            self.cself.sheet(sheet_name.encode()))
+            self.cself.ice_regridder(sheet_name.encode()))
         rm = RegridMatrices()
         rm.cself = crm
         return rm

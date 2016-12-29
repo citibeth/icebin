@@ -120,9 +120,9 @@ int main(int argc, char **argv)
     // ------------ Make the grid from the spec
     Grid_XY grid;
     if (icemodel == IceModel::pism) {
-        spec.indexing = Indexing<int,long>({0,0}, {spec.nx(), spec.ny()}, {0,1});   // row major: x has largest stride
+        spec.indexing = Indexing({"x", "y"}, {0,0}, {spec.nx(), spec.ny()}, {0,1});   // row major: x has largest stride
     } else {    // Native SeaRISE (and ModelE)
-        spec.indexing = Indexing<int,long>({0,0}, {spec.nx(), spec.ny()}, {1,0});   // column major: y has largest stride
+        spec.indexing = Indexing({"x", "y"}, {0,0}, {spec.nx(), spec.ny()}, {1,0});   // column major: y has largest stride
     }
     spec.make_grid(grid);
 

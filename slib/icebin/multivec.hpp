@@ -44,6 +44,12 @@ public:
     /** Adds a new element to all the sparse vectors */
     void add(long ix, double const *val);
 
+    void add(long ix, std::vector<double> &val)
+        { add(ix, &val[0]); }
+
+    double val(int varix, long ix) const
+        { return vals[ix*nvar + varix]; }
+
 };
 
 VectorMultivec concatenate(std::vector<VectorMultivec> const &vecs);

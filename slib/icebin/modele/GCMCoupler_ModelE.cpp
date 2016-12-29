@@ -468,6 +468,8 @@ bool run_ice)    // if false, only initialize
         boost::mpi::gather(*self->world, gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Let root do the work...
+        // TODO... we must call through MPI so ice model can do MPI scatter/gathers..
+        self->couple(time_s
 
         // Receive our output back from root
         boost::mpi::scatter(*self->world, out, self->gcm_params.gcm_root);

@@ -29,6 +29,7 @@ namespace icebin {
 
 class GCMRegridder;
 class IceCoupler;
+class IceWriter;    // Adjoint to IceCoupler
 
 /** Controls how we interpolate from elevation class space to the ice grid */
 BOOST_ENUM_VALUES( InterpStyle, int,
@@ -66,6 +67,8 @@ public:
     typedef Grid::Parameterization Type;
 
     friend class GCMRegridder;
+    friend class IceWriter;
+
     /** Parent pointer; holds the IceRegridder for ALL ice sheets */
     GCMRegridder const *gcm;
 
@@ -99,6 +102,9 @@ public:
         blitz::Array<double,1> &elevI);
 
     virtual ~IceRegridder();
+
+    void set_elevI(blitz::Array<double,1> const &_elevI)
+        { elevI = _elevI; }
 
     // ------------------------------------------------
     /** Number of dimensions of ice vector space */

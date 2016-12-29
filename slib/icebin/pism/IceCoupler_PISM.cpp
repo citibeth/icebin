@@ -49,23 +49,15 @@ namespace gpism {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-// =========================================================================
-// Called by:
-//     **** PART 1: Allocate
-//     ATM_DRV.f: alloc_drv_atm()
-//     LISnow%allocate()
-//     GCMCoupler_ModelE: gcmce_new()
-//     GCMCoupler::ncread()
-//     IceCoupler.cpp: new_ice_coupler()
-
 IceCoupler_PISM::IceCoupler_PISM()
     : IceCoupler(IceCoupler::Type::PISM),
     write_pism_inputs(true)
 {
 }
 
-// Arguments that are paths, and thus need pathname resolution
-// For stable0.5 branch
+// PISM command line arguments that are paths, and thus need pathname
+// resolution.
+// For PISM stable0.5 branch
 // static std::set<std::string> path_args = {"config_override", "i", "o", "surface_given_file", "extra_file", "ts_file"};
 // For dev branch
 static std::map<std::string, std::string> path_args = {
@@ -92,7 +84,7 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet)
     NcVar pism_var(ncio.nc->getVar(vname_sheet + ".pism"));
 
     // Get simple arguments
-    ibmisc::get_or_put_att(info_var, 'r', "update_elevtation", &update_elevation, 1);
+    ibmisc::get_or_put_att(info_var, 'r', "update_elevation", &update_elevation, 1);
 
     // Create arguments from PISM configuration
     pism_args.push_back("icebin_pism");
@@ -130,14 +122,6 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet)
 #endif
 }
 // ======================================================================
-// Called by
-//     LANDICE_DRV.f: init_LI(istart_fixup)
-//     lisnow%cold_start()  (if cold start)
-//     lisheet%cold_start()  [currently missing...?]
-//     gcmce_cold_start()
-//     GCMCoupler::cold_start()
-//         <this>
-//     [calls IceCoupler::cold_start()]
 void IceCoupler_PISM::cold_start(
     ibmisc::Datetime const &time_base,
     double time_start_s)
@@ -387,65 +371,23 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     printf("END IceCoupler_PISM::allocate()\n");
 }
 
-// ====================================================================
-// Called by
-//     LANDICE_DRV.f: init_LI(istart_fixup)
-//     lisnow%cold_start()  (if cold start)
-//     lisheet%cold_start()  [currently missing...?]
-//     GCMCoupler::cold_start()
-//     IceCoupler_PISM::cold_start()
-//     contracts/contracts.cpp: contracts::setup()
-//     contracts/modele_pism.cpp: setup_modele_pism()
-void IceCoupler_PISM::transfer_constant(std::string const &dest, std::string const &src, double multiply_by, bool set_new)
+blitz::Array<double,1> IceCoupler_PISM::get_elevI()
 {
-    // Make sure the PISM constant already exists
-    if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
-        "IceCoupler_PISM::transfer_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
+    // Reshape 1D blitz variable to 2D for use with PISM
+    blitz::Array<double,1> retI(ny()*nx());
+    auto ret_xy(reshape<double,1,2>(retI, blitz::shape(ny(), nx())));
 
-    // Discover the units PISM requires.
-    std::string doc = pism_config()->get_string(dest + "_doc");
-    std::string units = doc.substr(0, doc.find(';'));
-    double val = gcm_coupler->gcm_constants.get_as(src, units) * multiply_by;
-    pism_config()->set_double(dest, val);
-printf("IceCoupler_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), val, units.c_str(), src.c_str());
+    iceModelVec2S_to_blitz_xy(
+        pism_ice_model->ice_surface_elevation(),
+        ret_xy);
+    return retI;
 }
-
-void IceCoupler_PISM::set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new)
-{
-    // Make sure the PISM constant already exists
-    if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
-        "IceCoupler_PISM::set_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
-
-    ibmisc::ConstantSet const &gcm_constants(gcm_coupler->gcm_constants);
-
-    // Discover the units PISM requires.
-    std::string doc = pism_config()->get_string(dest + "_doc");
-    std::string dest_units = doc.substr(0, doc.find(';'));
-
-    UTUnit usrc(gcm_constants.ut_system->parse(src_units));
-    UTUnit udest(gcm_constants.ut_system->parse(dest_units));
-    CVConverter cv(usrc, udest);
-    double dest_val = cv.convert(src_val);
-
-    pism_config()->set_double(dest, dest_val);
-printf("IceCoupler_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), dest_val, dest_units.c_str(), usrc.c_str());
-}
-
-// ===============================================================================
-// Called from:
-//     MODELE.f: GISS_ModelE()
-//     MODELE.f: startNewDay()
-//     LANDICE_DRV.f: couple_li()
-//     LISnow%couple()
-//     LISheetIceBin%couple()
-//     gcmce_couple_native()
-//     GCMCoupler::couple()
-//     IceCoupler::couple()
 
 void IceCoupler_PISM::run_timestep(double time_s,
     blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
     blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
-    bool run_ice)    // Should we run the ice model?
+    bool run_ice,    // Should we run the ice model?
+    bool am_i_root)
 {
     PetscErrorCode ierr;
 
@@ -605,9 +547,9 @@ void IceCoupler_PISM::get_state(
     printf("END IceCoupler_PISM::get_state\n");
 }
 
-// ==================================================================================
-// Utility methods
 
+// ============================================================================
+// Utility Functions...
 
 void IceCoupler_PISM::deallocate()
 {
@@ -618,11 +560,10 @@ void IceCoupler_PISM::deallocate()
     // ierr = VecScatterDestroy(&scatter); CHKERRQ(ierr);
 //  ierr = VecDestroy(&Hp0); CHKERRQ(ierr);
 }
-// --------------------------------------------------
-/** icebin_var Variable, already allocated, to receive data
-@param icebin_var_xy The array to write into (on the root node).
-If this array is not yet allocated (ROOT NODE ONLY), it will be allocated.*/
-void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(pism::IceModelVec2S const &pism_var,
+
+
+void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(
+    pism::IceModelVec2S const &pism_var,
     blitz::Array<double,2> &ret)
 {
     PetscErrorCode ierr;
@@ -687,8 +628,42 @@ void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(pism::IceModelVec2S const &pism_
         // OLD CODE: ierr = VecRestoreArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0); CHKERRQ(ierr);
     }
 }
-// --------------------------------------------------
 
+
+void IceCoupler_PISM::transfer_constant(std::string const &dest, std::string const &src, double multiply_by, bool set_new)
+{
+    // Make sure the PISM constant already exists
+    if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
+        "IceCoupler_PISM::transfer_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
+
+    // Discover the units PISM requires.
+    std::string doc = pism_config()->get_string(dest + "_doc");
+    std::string units = doc.substr(0, doc.find(';'));
+    double val = gcm_coupler->gcm_constants.get_as(src, units) * multiply_by;
+    pism_config()->set_double(dest, val);
+printf("IceCoupler_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), val, units.c_str(), src.c_str());
+}
+
+void IceCoupler_PISM::set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new)
+{
+    // Make sure the PISM constant already exists
+    if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
+        "IceCoupler_PISM::set_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
+
+    ibmisc::ConstantSet const &gcm_constants(gcm_coupler->gcm_constants);
+
+    // Discover the units PISM requires.
+    std::string doc = pism_config()->get_string(dest + "_doc");
+    std::string dest_units = doc.substr(0, doc.find(';'));
+
+    UTUnit usrc(gcm_constants.ut_system->parse(src_units));
+    UTUnit udest(gcm_constants.ut_system->parse(dest_units));
+    CVConverter cv(usrc, udest);
+    double dest_val = cv.convert(src_val);
+
+    pism_config()->set_double(dest, dest_val);
+printf("IceCoupler_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), dest_val, dest_units.c_str(), usrc.c_str());
+}
 
 
 }}

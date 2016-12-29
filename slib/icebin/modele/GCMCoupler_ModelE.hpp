@@ -36,11 +36,6 @@ BOOST_ENUM_VALUES( ModelE_CouplingType, int,
     (NEUMANN_BC) (1)
 );
 
-
-class GCMPerIceSheetParams_ModelE : public icebin::GCMPerIceSheetParams {
-public:
-    ModelE_CouplingType coupling_type;
-};
 #endif
 
 
@@ -150,13 +145,6 @@ public:
     virtual void update_topo() {}
 
 
-#if 0
-    /** Read per-ice-sheet parameters that depend on the type of GCMCoupler. */
-    std::unique_ptr<GCMPerIceSheetParams>
-    read_gcm_per_ice_sheet_params(
-        ibmisc::NcIO &ncio,
-        std::string const &sheet_vname);
-#endif
 };    // class GCMCouler_ModelE
 
 

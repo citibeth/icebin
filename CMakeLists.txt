@@ -25,6 +25,7 @@ endif()
 if (NOT DEFINED BUILD_DOCS)
     set(BUILD_DOCS NO)
 endif()
+# Doesn't build docs anyway
 
 if (NOT DEFINED BUILD_GRIDGEN)
     set(BUILD_GRIDGEN YES)
@@ -35,7 +36,7 @@ if (BUILD_GRIDGEN)
     find_package(MPFR REQUIRED)
 
     list(APPEND EXTERNAL_LIBS ${CGAL_LIBRARY} ${GMP_LIBRARY} ${MPFR_LIBRARIES})
-    list(APPEND Boost_COMPONENTS thread system program_options)
+    list(APPEND Boost_COMPONENTS thread system program_options mpi serialization )
     include_directories(${CGAL_INCLUDE_DIR} ${GMP_INCLUDE_DIR} ${MPFR_INCLUDES})
     add_definitions(-DBUILD_GRIDGEN)
 endif()
@@ -70,6 +71,11 @@ if (BUILD_COUPLER)
     endif()
     add_definitions(-DBUILD_COUPLER)
 endif()
+
+if (NOT DEFINED BUILD_DOCS)
+    set(BUILD_DOCS YES)
+endif()
+
 
 find_package(Boost REQUIRED COMPONENTS ${Boost_COMPONENTS} filesystem date_time)
 #find_package(Boost REQUIRED thread system log filesystem date_time)

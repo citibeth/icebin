@@ -116,62 +116,111 @@ private:
 
     // ------------------------
 public:
-
-    virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet);
-
-    int nx() { return pism_grid->Mx(); }
-    int ny() { return pism_grid->My(); }
-
-    // ----------------------------------------------
-
-    // ----------------------------------------------
-    void iceModelVec2S_to_blitz_xy(pism::IceModelVec2S const &pism_var,
-        blitz::Array<double,2> &ret);
-    // ----------------------------------------------
-
-    void update_ice_sheet(ibmisc::NcIO &ncio, std::string const &vname);
-
+    /* Called by:
+       **** PART 1: Allocate
+       ATM_DRV.f: alloc_drv_atm()
+       LISnow%allocate()
+       GCMCoupler_ModelE: gcmce_new()
+       GCMCoupler::ncread()
+       IceCoupler.cpp: new_ice_coupler()
+    */
     IceCoupler_PISM();
 
     virtual ~IceCoupler_PISM()
         { deallocate(); }
 
-protected:
 
-    void deallocate();
+    int nx() { return pism_grid->Mx(); }
+    int ny() { return pism_grid->My(); }
 
-public:
+    // ===================================================================
+    // Lifecycle (virtual methods from IceCoupler)
+
+    virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet);
+
+    /* Called by
+         LANDICE_DRV.f: init_LI(istart_fixup)
+         lisnow%cold_start()  (if cold start)
+         lisheet%cold_start()  [currently missing...?]
+         gcmce_cold_start()
+         GCMCoupler::cold_start()
+             <this>
+         [calls IceCoupler::cold_start()] */
     virtual void cold_start(
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
-    void setup_contracts_modele();
+    virtual blitz::Array<double,1> get_elevI();
 
-    /** Transfers a constant from GCMCoupler::gcm_constants to PISM's configuration variable.
-    Runs from within transfer_constants_xxxx() */
-    void transfer_constant(std::string const &dest, std::string const &src, double multiply_by=1.0, bool set_new = false);
+    /* Called from:
+         MODELE.f: GISS_ModelE()
+         MODELE.f: startNewDay()
+         LANDICE_DRV.f: couple_li()
+         LISnow%couple()
+         LISheetIceBin%couple()
+         gcmce_couple_native()
+         GCMCoupler::couple()
+         IceCoupler::couple() */
+    virtual void run_timestep(double time_s,
+        blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
+        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+        bool run_ice,    // Should we run the ice model?
+        bool am_i_root);
+
+protected:
+
+    /** Copies PISM->Icebin output variables from PISM variables to
+    the Icebin-supplied variables (on the root node).
+
+    @param mask
+        Only do it for variables where (flags & mask) == mask.
+        Set to 0 for "all."
+    */
+    void get_state(
+        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+        unsigned int mask);
+
+    // ===================================================================
+    // Utility functions...
+
+    void deallocate();
+
+    /** Convert a PISM vector to a 2-D array
+    @param ret Variable, already allocated, to receive data
+    @param icebin_var_xy The array to write into (on the root node).
+    If this array is not yet allocated (ROOT NODE ONLY), it will be allocated.*/
+    void iceModelVec2S_to_blitz_xy(
+        pism::IceModelVec2S const &pism_var,
+        blitz::Array<double,2> &ret);
+
+
+    /** Transfers a constant from GCMCoupler::gcm_constants to PISM's
+        configuration variable.
+
+    Called by
+        LANDICE_DRV.f: init_LI(istart_fixup)
+        lisnow%cold_start()  (if cold start)
+        lisheet%cold_start()  [currently missing...?]
+        GCMCoupler::cold_start()
+        IceCoupler_PISM::cold_start()
+        contracts/contracts.cpp: contracts::setup()
+        contracts/modele_pism.cpp: setup_modele_pism()
+    */
+    void transfer_constant(
+        std::string const &dest,
+        std::string const &src,
+        double multiply_by=1.0,
+        bool set_new = false);
 
     /** @param set_new If true, PISM constant will be set, even if it
     was not already set in the configuration.  This defaults to false,
     as a program error check against misspelled parameter names. */
-    void set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new = false);
+    void set_constant(
+        std::string const &dest,
+        double src_val,
+        std::string const &src_units,
+        bool set_new = false);
 
-public:
-    void run_timestep(double time_s,
-        blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
-        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
-        bool run_ice);    // Should we run the ice model?
-
-    void get_initial_state(double time_s);
-
-private:
-
-    /** Copies PISM->Icebin output variables from PISM variables to
-    the Icebin-supplied variables (on the root node).
-    @param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
-    void get_state(
-        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
-        unsigned int mask);
 };
 
 }}  // namespace icebin::pism

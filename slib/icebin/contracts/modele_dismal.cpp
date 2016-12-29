@@ -35,7 +35,6 @@ void IceModel_DISMAL::setup_contracts_modele()
 {
     // Get arguments we need from coupler
     auto coupler(dynamic_cast<GCMCoupler_ModelE const *>(this->coupler));
-    auto params(dynamic_cast<GCMPerIceSheetParams_ModelE const *>(this->gcm_per_ice_sheet_params.get()));
 
     printf("BEGIN IceModel_DISMAL::setup_contract_modele\n");
     IceModel &model(*this);

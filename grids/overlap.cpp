@@ -37,13 +37,13 @@ int main(int argc, char **argv)
     std::string fname2(argv[2]);
 
     printf("------------- Read gridA (GCM Grid)\n");
-    NcIO ncio1(fname1);
+    NcIO ncio1(fname1, 'r');
     Grid gridA;
     gridA.ncio(ncio1, "grid");
     ncio1.close();
 
     printf("------------- Read gridI (Ice Grid)\n");
-    NcIO ncio2(fname2);
+    NcIO ncio2(fname2, 'r');
     Grid gridI;
     gridI.ncio(ncio2, "grid");
     ncio2.close();
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
     printf("--------------- Writing out\n");
     std::string fname = exgrid.name + ".nc";
 
-    ibmisc::NcIO ncio(exgrid.name + ".nc", netCDF::NcFile::replace);
+    ibmisc::NcIO ncio(exgrid.name + ".nc", 'w');
     gridA.ncio(ncio, "gridA");
     gridI.ncio(ncio, "gridI");
     exgrid.ncio(ncio, "exgrid");

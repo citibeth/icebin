@@ -27,7 +27,6 @@
 
 #include <icebin/IceCoupler.hpp>
 #include <icebin/GCMParams.hpp>
-#include <icebin/GCMPerIceSheetParams.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/VarSet.hpp>
 #include <icebin/multivec.hpp>
@@ -178,10 +177,16 @@ public:
         ibmisc::Datetime _time_base,
         double time_start_s);
 
+    /** @param am_i_root
+        Call with true if calling from MPI root; false otherwise.
+        The core coupling/regridding computation only runs on root.
+        But other MPI ranks need to go along for the ride, assuming that
+        the ice model uses MPI. */
     GCMInput couple(
         double time_s,        // Simulation time [s]
         VectorMultivec const &gcm_ovalsE,
-        bool run_ice);
+        bool run_ice,
+        bool am_i_root);
 
     /** Top-level ncio() to log output from coupler. (coupler->GCM) */
     void ncio_gcm_input(ibmisc::NcIO &ncio,
