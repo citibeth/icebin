@@ -40,11 +40,11 @@ void GCMRegridder_init(GCMRegridder *cself,
     ncio.close();
 
     // Put it together
-    long nhp = hcdefs.size();
+    long nhc = hcdefs.size();
     cself->init(
         std::move(gridA),
         std::move(hcdefs),
-        Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhp}, {1,0}),
+        Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhc}, {1,0}),
         _correctA);
 
 }

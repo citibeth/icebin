@@ -241,8 +241,8 @@ char const *long_name_f, int long_name_len)
     self->modele_outputs.gcm_ovalsE.push_back(std::move(var));
 }
 // -----------------------------------------------------
-/** @para var_nhp Number of elevation points for this variable.
- (equal to 1 for atmosphere variables, or nhp for elevation-grid variables)
+/** @para var_nhc Number of elevation points for this variable.
+ (equal to 1 for atmosphere variables, or nhc for elevation-grid variables)
 @param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
 extern "C"
 void gcmce_add_gcm_inputA(

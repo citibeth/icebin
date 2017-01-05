@@ -127,19 +127,19 @@ int main(int argc, char **argv)
     glint2_modele_set_start_time(api,
         1950, 0, 1800.);    // iyear, itimei
 
-    int nhp = api->gcm_coupler.maker->nhp(-1);
+    int nhc = api->gcm_coupler.maker->nhc(-1);
 
     auto used1h = blitz::Array<int,3>(
         blitz::Range(1,im),
         blitz::Range(1,jm),
-        blitz::Range(1,nhp),
+        blitz::Range(1,nhc),
         blitz::fortranArray);
     giss::F90Array<int,3> used1h_f(used1h);
 
     auto fhc1h = blitz::Array<double,3>(
         blitz::Range(1,im),
         blitz::Range(1,jm),
-        blitz::Range(1,nhp),
+        blitz::Range(1,nhc),
         blitz::fortranArray);
     giss::F90Array<double,3> fhc1h_f(fhc1h);
 
@@ -199,13 +199,13 @@ printf("A: fgice1(56, 76) = %g\n", fgice1(56,76));
     blitz::Array<double,3> elevhc(
         blitz::Range(1,im),
         blitz::Range(1,jm),
-        blitz::Range(1,nhp),
+        blitz::Range(1,nhc),
         blitz::fortranArray);
     giss::F90Array<double, 3> elevhc_f(elevhc);
     blitz::Array<double,3> fhp_approx1h(
         blitz::Range(1,im),
         blitz::Range(1,jm),
-        blitz::Range(1,nhp),
+        blitz::Range(1,nhc),
         blitz::fortranArray);
     giss::F90Array<double, 3> fhp_approx1h_f(fhp_approx1h);
 
@@ -233,13 +233,13 @@ printf("B: fgice1(56, 76) = %g\n", fgice1(56,76));
     std::vector<boost::function<void ()>> fns;
     NcDim *im_dim = ncout.add_dim("im", im);
     NcDim *jm_dim = ncout.add_dim("jm", jm);
-    NcDim *nhp_dim = ncout.add_dim("nhp", nhp);
+    NcDim *nhc_dim = ncout.add_dim("nhc", nhc);
 
     auto used1h_c(used1h.transpose(1,0));   // Re-order dimensions for netCDF standard
-    fns.push_back(giss::netcdf_define(ncout, "used1h", used1h_c, {nhp_dim, jm_dim, im_dim}));
+    fns.push_back(giss::netcdf_define(ncout, "used1h", used1h_c, {nhc_dim, jm_dim, im_dim}));
 
     auto fhc1h_c(fhc1h.transpose(2,1,0));   // Re-order dimensions for netCDF standard
-    fns.push_back(giss::netcdf_define(ncout, "fhc1h", fhc1h_c, {nhp_dim, jm_dim, im_dim}));
+    fns.push_back(giss::netcdf_define(ncout, "fhc1h", fhc1h_c, {nhc_dim, jm_dim, im_dim}));
 
     auto fgice1_c(fgice1.transpose(1,0));
     fns.push_back(giss::netcdf_define(ncout, "fgice1", fgice1_c, {jm_dim, im_dim}));

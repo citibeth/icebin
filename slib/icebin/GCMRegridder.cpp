@@ -53,7 +53,7 @@ ibmisc::Indexing const &indexingHC)    // iA,iHC
 void GCMRegridder::init(
     std::unique_ptr<Grid> &&_gridA,
 //  ibmisc::Domain<int> &&_domainA,     // Tells us which cells in gridA to keep...
-    std::vector<double> &&_hcdefs,  // [nhp]
+    std::vector<double> &&_hcdefs,  // [nhc]
     ibmisc::Indexing &&_indexingHC,
     bool _correctA)
 {
@@ -94,7 +94,7 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
     gridA->ncio(ncio, vname + ".gridA");
     indexingHC.ncio(ncio, vname + ".indexingHC");
     ncio_vector(ncio, hcdefs, true, vname + ".hcdefs", "double",
-        get_or_add_dims(ncio, {vname + ".nhp"}, {hcdefs.size()} ));
+        get_or_add_dims(ncio, {vname + ".nhc"}, {hcdefs.size()} ));
 //  domainA.ncio(ncio, ncInt, vname + ".domainA");
     get_or_put_att(info_v, ncio.rw, vname + ".correctA", &correctA, 1);
 

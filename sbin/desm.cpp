@@ -32,17 +32,17 @@ const double SHI  = 2060.;
 const double LHM = 3.34e5;
 
 class Desm {
-    int nhp;        // Number of elevation points for this grid.
+    int nhc;        // Number of elevation points for this grid.
 
     // Array to receive Glint2 outputs
     blitz::Array<double,3> gcm_inputs;      // Global array on root
-    int gcm_inputs_nhp;     // Total size in the elevation points direction
+    int gcm_inputs_nhc;     // Total size in the elevation points direction
     blitz::Array<double,3> ice_surface_enth;
 
     glint2_modele *api;
 
 public:
-    Desm() : nhp(0), gcm_inputs_nhp(0) {}
+    Desm() : nhc(0), gcm_inputs_nhc(0) {}
 
     int main(int argc, char **argv);
 
@@ -118,15 +118,15 @@ void Desm::allocate_gcm_input()
     add_gcm_input_ij("epsilon.enth", "W m-2", 0, "Changes not otherwise accounted for");
 
     if (api->gcm_coupler.am_i_root()) {
-        int nhp = glint2_modele_nhp_gcm(api);
-        int nhp_total = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
-printf("Allocating gcm_inputs with nhp = %d\n", nhp_total);
-        gcm_inputs.reference(blitz::Array<double,3>(nhp_total,
+        int nhc = glint2_modele_nhc_gcm(api);
+        int nhc_total = api->gcm_inputs_ihp[api->gcm_inputs_ihp.size()-1];
+printf("Allocating gcm_inputs with nhc = %d\n", nhc_total);
+        gcm_inputs.reference(blitz::Array<double,3>(nhc_total,
             api->domain->jm, api->domain->im));
 
         const int ix = ice_surface_enth_ix;
-printf("ice_surface_enth_ix = %d + %d\n", ix, nhp);
-        ice_surface_enth.reference(gcm_inputs(blitz::Range(ix, ix+nhp-1), blitz::Range::all(), blitz::Range::all()));
+printf("ice_surface_enth_ix = %d + %d\n", ix, nhc);
+        ice_surface_enth.reference(gcm_inputs(blitz::Range(ix, ix+nhc-1), blitz::Range::all(), blitz::Range::all()));
 
     }
 }
@@ -297,10 +297,10 @@ int Desm::main(int argc, char **argv)
     NcVar *var_nc = vars_nc[0];
     long ntime = var_nc->get_dim(0)->size();
     long counts[4] = {1,                // time
-        var_nc->get_dim(1)->size(),     // nhp
+        var_nc->get_dim(1)->size(),     // nhc
         var_nc->get_dim(2)->size(),     // jm
         var_nc->get_dim(3)->size()};        // im
-    int nhp = counts[1];
+    int nhc = counts[1];
 
     // Allocate arrays (buffers) for one timestep
     // These are gcm_outputs (massxfer, enthxfer, deltah, lif2)
