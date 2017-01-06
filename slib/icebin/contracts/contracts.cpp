@@ -37,7 +37,7 @@ struct Vtable : public std::map<
 };
 
 
-#if defined(USE_MODELE) && defined(USE_PISM)
+#if defined(BUILD_MODELE) && defined(USE_PISM)
     extern void setup_modele_pism(GCMCoupler const &, IceCoupler &);
 #endif
 
@@ -45,7 +45,7 @@ Vtable::Vtable()
 {
     VtableEntry entry;
 
-#if defined(USE_MODELE) && defined(USE_PISM)
+#if defined(BUILD_MODELE) && defined(USE_PISM)
     entry.setup = &setup_modele_pism;
     insert(std::make_pair(
         std::make_pair(GCMCoupler::Type::MODELE, IceCoupler::Type::PISM),

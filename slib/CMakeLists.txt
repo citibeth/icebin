@@ -48,7 +48,7 @@ if (BUILD_COUPLER)
         icebin/contracts/contracts.cpp
     )
 
-    if (USE_MODELE)
+    if (BUILD_MODELE)
         list(APPEND icebin_SOURCES
             icebin/modele/api_f.f90
             icebin/modele/GCMCoupler_ModelE.cpp
@@ -59,7 +59,7 @@ if (BUILD_COUPLER)
         list(APPEND icebin_SOURCES
             icebin/pism/IceCoupler_PISM.cpp
         )
-        if (USE_MODELE)
+        if (BUILD_MODELE)
             list(APPEND icebin_SOURCES
                 icebin/contracts/modele_pism.cpp
             )
@@ -101,6 +101,9 @@ install(TARGETS icebin DESTINATION lib)
 # install Icebin headers
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/slib/ DESTINATION include
           FILES_MATCHING PATTERN "*.hpp")
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.h
+    DESTINATION include/icebin)
 
 install(DIRECTORY ${PROJECT_BINARY_DIR}/slib/ DESTINATION include
           FILES_MATCHING PATTERN "*.mod")

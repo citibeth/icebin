@@ -113,7 +113,8 @@ static std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
 }
 
 
-extern "C" void *gcmce_new(
+extern "C"
+void *gcmce_new(
     ModelEParams const &_rdparams,
 
     // Info about the global grid
@@ -177,14 +178,14 @@ extern "C" void *gcmce_new(
     return self.release();
 }
 // ==========================================================
-// Called from LISheetIceBin::read_nhc_gcm()
+// Called from LISheetIceBin::_read_nhc_gcm()
 
 /* Tells ModelE how many elevation classes it needs **/
 extern "C"
 int gcmce_nhc_gcm(GCMCoupler_ModelE *self)
     { return self->nhc_gcm(); }
 
-int GCMCoupler_ModelE::read_nhc_gcm()
+int GCMCoupler_ModelE::_read_nhc_gcm()
 {
     NcIO ncio(this->gcm_params.icebin_config_fname, 'r');
     int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
@@ -203,6 +204,7 @@ int GCMCoupler_ModelE::read_nhc_gcm()
 /** Set a single constant value in Icebin.  This is a callback, to be called
 from ModelE's (Fortran code) constant_set::set_all_constants() */
 /** Called from within LISheetIceBin::allocate() */
+extern "C"
 void gcmce_set_constant(
     GCMCoupler_ModelE *self,
     char const *name_f, int name_len,
@@ -219,7 +221,7 @@ void gcmce_set_constant(
 
 // ---------------------------------------------------------------
 extern "C"
-void gcmce_add_gcm_outputE(
+void gcmce_add_gcm_outpute(
 GCMCoupler_ModelE *self,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
@@ -245,12 +247,12 @@ char const *long_name_f, int long_name_len)
  (equal to 1 for atmosphere variables, or nhc for elevation-grid variables)
 @param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
 extern "C"
-void gcmce_add_gcm_inputA(
+void gcmce_add_gcm_inputa(
 GCMCoupler_ModelE *self,
 F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
-int initial,    // bool
+bool initial,    // bool
 char const *long_name_f, int long_name_len)
 {
     std::string field_name(field_name_f, field_name_len);
@@ -270,7 +272,7 @@ char const *long_name_f, int long_name_len)
 }
 // -----------------------------------------------------
 extern "C"
-void gcmce_add_gcm_inputE(
+void gcmce_add_gcm_inpute(
 GCMCoupler_ModelE *self,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
@@ -321,7 +323,6 @@ void gcmce_reference_globals(
 // ===========================================================
 // Called from LISheetIceBin::io_rsf()   (warm starts)
 
-/** Only called from MPI Root */
 extern "C"
 void gcmce_io_rsf(GCMCoupler_ModelE *self,
     char *fname_c, int fname_n)
@@ -329,6 +330,8 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
     std::string fname(fname_c, fname_n);
     // TODO: Get ice model to save/restore state
     // We must figure out how to get an appropriate filename
+    if (self->gcm_params.am_i_root()) {
+    }
 }
 
 
@@ -452,7 +455,7 @@ bool run_ice)    // if false, only initialize
         // Couple on root!
         GCMInput out(
             self->couple(time_s,
-                gcm_ovalsE_s, run_ice));
+                gcm_ovalsE_s, run_ice, true));
 
         // Split up the output (and 
         std::vector<GCMInput> every_outs(
@@ -469,7 +472,7 @@ bool run_ice)    // if false, only initialize
 
         // Let root do the work...
         // TODO... we must call through MPI so ice model can do MPI scatter/gathers..
-        self->couple(time_s
+        self->couple(time_s, gcm_ovalsE_s, run_ice, false);
 
         // Receive our output back from root
         boost::mpi::scatter(*self->world, out, self->gcm_params.gcm_root);

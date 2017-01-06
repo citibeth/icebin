@@ -111,16 +111,16 @@ std::vector<GCMInput> split_by_domain(
 
     // Split the standard sparse vectors and matrices
     auto E1vE0(domain_accum(&outs.front().E1vE0, strideb, &domainsE));
-        copy(E1vE0, out.E1vE0);
+        spcopy(E1vE0, out.E1vE0);
 
     auto AvE1(domain_accum(&outs.front().AvE1, strideb, &domainsA));
-        copy(AvE1, out.AvE1);
+        spcopy(AvE1, out.AvE1);
 
     auto wAvE1(domain_accum(&outs.front().wAvE1, strideb, &domainsA));
-        copy(wAvE1, out.wAvE1);
+        spcopy(wAvE1, out.wAvE1);
 
     auto elevE1(domain_accum(&outs.front().elevE1, strideb, &domainsA));
-        copy(elevE1, out.elevE1);
+        spcopy(elevE1, out.elevE1);
 
     return outs;
 }

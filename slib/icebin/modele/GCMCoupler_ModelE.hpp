@@ -39,7 +39,9 @@ BOOST_ENUM_VALUES( ModelE_CouplingType, int,
 #endif
 
 
+// ---------------------------------------------
 // Parameters read from the ModelE rundeck
+// These have a peer in api_f.f90
 static int const MAX_CHAR_LEN = 128;    // From Dictionary_mod.F90
 struct ModelEParams
 {
@@ -47,6 +49,7 @@ struct ModelEParams
     double dtsrc;
     int yeari;
 };
+// ---------------------------------------------
 
 struct ModelEOutputs
 {
@@ -131,7 +134,7 @@ public:
     // Called from LISnow::allocate()
     GCMCoupler_ModelE();
 
-    int read_nhc_gcm();
+    int _read_nhc_gcm();
 
     // The gcmce_xxx() functions do not need to be declared here
     // because everything in this class is public.

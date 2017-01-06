@@ -194,6 +194,7 @@ protected:
         blitz::Array<double,2> &ret);
 
 
+public:
     /** Transfers a constant from GCMCoupler::gcm_constants to PISM's
         configuration variable.
 

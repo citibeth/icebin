@@ -124,11 +124,11 @@ public:
     /** Number of elevation classes the GCM sees */
     int _nhc_gcm = -1;
     int nhc_gcm() {
-        if (_nhc_gcm < 0) _nhc_gcm = read_nhc_gcm();
+        if (_nhc_gcm < 0) _nhc_gcm = _read_nhc_gcm();
         return _nhc_gcm;
     }
 protected:
-    virtual int read_nhc_gcm();
+    virtual int _read_nhc_gcm() = 0;
 
 public:
     /** See regridder.sheets_index */
