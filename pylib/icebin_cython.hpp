@@ -40,17 +40,7 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &sinterp_style,
     PyObject *elevI_py, PyObject *maskI_py);
 
-inline PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA)
-{
-    std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name, scale, correctA));
-
-    PyObject *weight_py = ibmisc::cython::blitz_to_np(Mw->weight);
-    icebin::SparseMatrix Mw_sp;
-    spsparse::spcopy(Mw_sp, *Mw->M);
-    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw_sp);
-//    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(spsparse::to_spsparse(*Mw->M));
-    return Py_BuildValue("OO", M_py, weight_py);
-}
+extern PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA);
 
 void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
     size_t M_nrow, size_t M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py);

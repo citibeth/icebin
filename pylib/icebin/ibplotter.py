@@ -61,15 +61,10 @@ class PlotterE(giss.plot.Plotter):
 
             # Used to determine nearest elevation point (for display)
             # (convert sparse to dense vector)
-            elevI_vals = nc.variables['m.'+ice_sheet+'.elevI.vals'][:]
-            elevI_indices = nc.variables['m.'+ice_sheet+'.elevI.indices'][:]
-            info = nc.variables['m.'+ice_sheet+'.gridI.info']
-            nI = getattr(info, 'cells.nfull')
-            elevI = np.zeros((nI,))+np.nan
-            elevI[elevI_indices] = elevI_vals
+            elevI = nc.variables['m.'+ice_sheet+'.elevI'][:]
 
             self.elevI = elevI.reshape(self.plotterI.ny2, self.plotterI.nx2)
-            self.hpdefs = nc.variables['m.hpdefs'][:]
+            self.hcdefs = nc.variables['m.hcdefs'][:]
 
             # self.mask2 = nc.variables['m.' + ice_sheet + '.mask2'][:]
 
@@ -106,9 +101,9 @@ class PlotterE(giss.plot.Plotter):
 
         # Find closest elevation point, based on our elevation on the ice grid.
         elev = self.elevI[coordsI]
-        ihp0 = bisect.bisect_left(self.hpdefs, elev)   # "rounds down"
-        delta0 = abs(elev - self.hpdefs[ihp0])
-        delta1 = abs(elev - self.hpdefs[ihp0+1])
+        ihp0 = bisect.bisect_left(self.hcdefs, elev)   # "rounds down"
+        delta0 = abs(elev - self.hcdefs[ihp0])
+        delta1 = abs(elev - self.hcdefs[ihp0+1])
         ihp = ihp0 if (delta0 <= delta1) else ihp0+1
 
         # Find enclosing grid cell on the GCM grid

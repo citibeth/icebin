@@ -58,10 +58,36 @@ static int nearest_1d(
 
 
 // --------------------------------------------------------
+extern void linterp_1d_b(
+    std::vector<double> const &xpoints,
+    double xx,
+    long *indices, double *weights)  // Size-2 arrays
+{
+    int n = xpoints.size();
+
+    // This is the point ABOVE our value.
+    // (i0 = i1 - 1, xpoints[i0] < xx <= xpoints[i1])
+    // See: http://www.cplusplus.com/reference/algorithm/lower_bound/
+    int i1 = lower_bound(xpoints.begin(), xpoints.end(), xx) - xpoints.begin();
+
+    if (i1 <= 0) i1 = 1;
+    if (i1 >= n) i1 = n-1;
+
+    int i0 = i1-1;
+    indices[0] = i0;
+    indices[1] = i1;
+    double ratio = (xx - xpoints[i0]) / (xpoints[i1] - xpoints[i0]);
+    weights[0] = (1.0 - ratio);
+    weights[1] = ratio;
+}
+
+
+
+
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
 @param ret Put the regrid matrix here.
 @param elevIh Must be the result of this->elevI_hash() */
-void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
+void IceRegridder_L0::GvEp(MakeDenseEigenT::AccumT &ret) const
 {
     IceExch dest = interp_grid;
 
@@ -70,6 +96,11 @@ void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
 
     // ---------------------------------------
     // Handle Z_INTERP or ELEV_CLASS_INTERP
+
+    gcm->indexingHC.tuple_to_index<long,2>({0L,0L}),
+    gcm->indexingHC.tuple_to_index<long,2>({1L,0L}),
+    gcm->indexingHC.tuple_to_index<long,2>({0L,1L}));
+
 
     // Interpolate in the vertical
     for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
@@ -83,17 +114,20 @@ void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
 
             // Interpolate in height points
             switch(interp_style.index()) {
-                case InterpStyle::Z_INTERP : {
-                    int ihps[2];
+                case InterpStyle::Z_INTERP :
+                {
+                    long ihps[2];
                     double whps[2];
-                    linterp_1d(gcm->hcdefs, elevation, ihps, whps);
+                    linterp_1d_b(gcm->hcdefs, elevation, ihps, whps);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[0]})},
                         cell->native_area * whps[0]);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[1]})},
                         cell->native_area * whps[1]);
+
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {
                     int ihps0 = nearest_1d(gcm->hcdefs, elevation);
+printf("ELEV_CLASS_INTERP %d (%d %d), %g\n", ihps0, iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps0}), cell->native_area);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps0})},
                         cell->native_area);
                 } break;
@@ -103,7 +137,7 @@ void IceRegridder_L0::GvEp(spsparse::SparseTriplets<SparseMatrix> &ret) const
 }
 // --------------------------------------------------------
 void IceRegridder_L0::GvI(
-    spsparse::SparseTriplets<SparseMatrix> &ret) const
+    MakeDenseEigenT::AccumT &ret) const
 {
     if (interp_grid == IceExch::ICE) {
         // Ice <- Ice = Indentity Matrix (scaled)
@@ -128,12 +162,15 @@ void IceRegridder_L0::GvI(
     }
 }
 // --------------------------------------------------------
-void IceRegridder_L0::GvAp(spsparse::SparseTriplets<SparseMatrix> &ret) const
+void IceRegridder_L0::GvAp(MakeDenseEigenT::AccumT &ret) const
 {
+int n=0;
     for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
         int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
         int iA = cell->i;
-        if (cell->native_area > 0) ret.add({iG, iA}, cell->native_area);
+        if (cell->native_area > 0) {
+            ret.add({iG, iA}, cell->native_area);
+        }
     }
 }
 // --------------------------------------------------------

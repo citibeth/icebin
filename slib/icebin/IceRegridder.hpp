@@ -38,21 +38,40 @@ BOOST_ENUM_VALUES( InterpStyle, int,
 )
 
 // ================================================
-/** The sparse vector and matrix data types we'll use in IceBin. */
-typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
-typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
 
-typedef spsparse::SparseSet<long,int> SparseSet;
-typedef blitz::Array<double,2> DenseMatrix;
-typedef blitz::Array<double,1> DenseVector;
+// Types that will be used throughout as template arguments
+typedef long sparse_index_type;
+typedef int dense_index_type;
+typedef double val_type;
 
-typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrix;
+
+typedef MakeDenseEigen<sparse_index_type, val_type, 0, dense_index_type> MakeDenseEigenT;
+
+//typedef spsparse::SparseSet<sparse_index_type,dense_index_type> SparseSetT;
+//template<int RANK>
+//    using TupleListT = spsparse::TupleList<dense_index_type,val_type,RANK> TupleListT;
+//template<int RANK>
+//    using TransformTupleListT =
+//        spsparse::SparseTransformAccum<
+//            accum::Permute<
+//                accum::Ref<
+//                    TupleListT<RANK>>>,
+//            SparseSetT>;
+template<int RANK>
+    using DenseArrayT = blitz::Array<val_type,RANK>;
+typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrixT;
+
+//typedef blitz::Array<val_type,1> DenseVectorT;
+//typedef TupleListT<2> TripletListT;
+//typedef MakeDenseEigenT::AccumT TransformTripletListT;
+
+
 
 /** Return value of a sparse matrix */
 struct WeightedSparse {
-    SparseSet dims[2];    // Dense-to-sparse mapping for the dimensions
-    std::unique_ptr<EigenSparseMatrix> M;
-    DenseVector weight;
+    std::array<SparseSetT,2> dims;            // Dense-to-sparse mapping for the dimensions
+    std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
+    DenseArrayT<1> weight;           // Dense indexing
 };
 
 
@@ -74,7 +93,7 @@ public:
 
     /** Elevation of grid cells in ice grid (I).
     This also implies a mask: cells with std::isnan() are masked out. */
-    blitz::Array<double,1> elevI;
+    DenseArrayT<1> elevI;
 protected:
 
     Type type;
@@ -99,11 +118,11 @@ public:
         std::unique_ptr<Grid> &&_gridI,
         std::unique_ptr<Grid> &&_exgrid,
         InterpStyle _interp_style,
-        blitz::Array<double,1> &elevI);
+        DenseArrayT<1> &elevI);
 
     virtual ~IceRegridder();
 
-    void set_elevI(blitz::Array<double,1> const &_elevI)
+    void set_elevI(DenseArrayT<1> const &_elevI)
         { elevI = _elevI; }
 
     // ------------------------------------------------
@@ -123,23 +142,20 @@ public:
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sApvA(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
+    void sApvA(MakeDenseEigenT::AccumT &w, std::function<bool(long)> const &filter_fn);
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sEpvE(spsparse::SparseTriplets<SparseMatrix> &w, std::function<bool(long)> const &filter_fn);
+    void sEpvE(MakeDenseEigenT::AccumT &w, std::function<bool(long)> const &filter_fn);
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
-    virtual void GvEp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
+    virtual void GvEp(MakeDenseEigenT::AccumT &ret) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Ice] */
-    virtual void GvI(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
+    virtual void GvI(MakeDenseEigenT::AccumT &ret) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
-    virtual void GvAp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const = 0;
+    virtual void GvAp(MakeDenseEigenT::AccumT &ret) const = 0;
 
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */

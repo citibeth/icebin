@@ -44,18 +44,11 @@ public:
     IceRegridder_L0() : interp_grid(IceExch::EXCH) {}
 
 public:
-
-    void GvEp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const;
-
-    void GvI(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const;
-
-    void GvAp(
-        spsparse::SparseTriplets<SparseMatrix> &ret) const;
-
+    // Implementations of virtual functions
+    void GvEp(MakeDenseEigenT::AccumT &ret) const;
+    void GvI(MakeDenseEigenT::AccumT &ret) const;
+    void GvAp(MakeDenseEigenT::AccumT &ret) const;
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
-
 };
 
 

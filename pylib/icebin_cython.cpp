@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/cython.hpp>
+#include <spsparse/SparseSet.hpp>
 #include "icebin_cython.hpp"
 
 using namespace ibmisc;
@@ -150,6 +151,33 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
         yy(row) = old_yy + data * xx(col);
     }
 
+}
+
+PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA)
+{
+    std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name, scale, correctA));
+
+    // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
+    // Allocate the output Python vector
+    PyObject *weight_py = ibmisc::cython::new_pyarray<double,1>(
+        std::array<int,1>{Mw->dims[0].sparse_extent()});
+    // Get a Blitz view on it
+    auto weight_pyb(np_to_blitz<double,1>(weight_py, "weight_py", {-1}));
+    // Copy, while translating the dimension
+    auto accum(spsparse::blitz_accum_existing(&weight_pyb));
+    spsparse::sparse_copy(accum, Mw->weight,
+        spsparse::SparseTransform::TO_SPARSE,
+        make_array(&Mw->dims[0]));
+
+    // Convert a dense matrix w/ dense indices to a sparse matrix with sparse indices
+    icebin::SparseMatrix Mw_sp;
+//    spsparse::spcopy(Mw_sp, *Mw->M);
+    sparse_copy(Mw_sp, *Mw->M,
+        spsparse::SparseTransform::TO_SPARSE,
+        make_array(&Mw->dims[0], &Mw->dims[1]));
+    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw_sp);
+//    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(spsparse::to_spsparse(*Mw->M));
+    return Py_BuildValue("OO", M_py, weight_py);
 }
 
 
