@@ -27,8 +27,6 @@
 #include <icebin/GCMCoupler.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/contracts/contracts.hpp>
-#include <spsparse/multiply_sparse.hpp>
-#include <spsparse/sort.hpp>
 #include <spsparse/netcdf.hpp>
 
 #ifdef USE_PISM

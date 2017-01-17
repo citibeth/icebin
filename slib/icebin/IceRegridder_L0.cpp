@@ -97,11 +97,6 @@ void IceRegridder_L0::GvEp(MakeDenseEigenT::AccumT &ret) const
     // ---------------------------------------
     // Handle Z_INTERP or ELEV_CLASS_INTERP
 
-    gcm->indexingHC.tuple_to_index<long,2>({0L,0L}),
-    gcm->indexingHC.tuple_to_index<long,2>({1L,0L}),
-    gcm->indexingHC.tuple_to_index<long,2>({0L,1L}));
-
-
     // Interpolate in the vertical
     for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
         long const iA = cell->i;        // GCM Atmosphere grid

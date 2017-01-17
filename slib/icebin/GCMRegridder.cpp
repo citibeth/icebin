@@ -143,7 +143,7 @@ void GCMRegridder::filter_cellsA(ibmisc::Domain const &domainA)
         &domainA, &gridA->indexing, _1));
 }
 
-void GCMRegridder::wA(SparseVector &w) const
+void GCMRegridder::wA(TupleListT<1> &w) const
 {
     for (auto cell=gridA->cells.begin(); cell != gridA->cells.end(); ++cell)
         w.add({cell->index}, cell->native_area);

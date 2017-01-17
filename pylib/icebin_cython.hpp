@@ -21,8 +21,6 @@
 #include <Python.h>
 #include <ibmisc/cython.hpp>
 #include <icebin/GCMRegridder.hpp>
-#include <spsparse/VectorCooArray.hpp>
-#include <spsparse/eigen.hpp>
 
 namespace icebin {
 namespace cython {

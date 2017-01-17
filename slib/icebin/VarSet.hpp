@@ -21,7 +21,6 @@
 #include <string>
 #include <ibmisc/IndexSet.hpp>
 #include <ibmisc/VarTransformer.hpp>
-#include <icebin/sparse.hpp>
 
 namespace icebin {
 

@@ -314,8 +314,8 @@ public:
     // -----------------------------------------
 
     /** Computes the weight (native area) of each cell of the Atmosphere grid (A).
-    These weights are added to an existing SparseVector. */
-    void wA(SparseVector &w) const;
+    These weights are added to an existing TupleListT<1>. */
+    void wA(TupleListT<1> &w) const;
 
     /** @return Number of elevation points for a given grid cell */
     unsigned int nhc(int i1) const { return hcdefs.size(); }

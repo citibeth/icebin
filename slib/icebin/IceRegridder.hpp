@@ -22,7 +22,8 @@
 #include <functional>
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
-#include <spsparse/VectorCooArray.hpp>
+#include <spsparse/eigen.hpp>
+
 #include <icebin/Grid.hpp>
 
 namespace icebin {
@@ -44,34 +45,23 @@ typedef long sparse_index_type;
 typedef int dense_index_type;
 typedef double val_type;
 
-
-typedef MakeDenseEigen<sparse_index_type, val_type, 0, dense_index_type> MakeDenseEigenT;
-
-//typedef spsparse::SparseSet<sparse_index_type,dense_index_type> SparseSetT;
-//template<int RANK>
-//    using TupleListT = spsparse::TupleList<dense_index_type,val_type,RANK> TupleListT;
-//template<int RANK>
-//    using TransformTupleListT =
-//        spsparse::SparseTransformAccum<
-//            accum::Permute<
-//                accum::Ref<
-//                    TupleListT<RANK>>>,
-//            SparseSetT>;
+// -----------------------------------------
+typedef spsparse::MakeDenseEigen<sparse_index_type, val_type, 0, dense_index_type> MakeDenseEigenT;
+template<int RANK>
+    using TupleListT = MakeDenseEigenT::TupleListT<RANK>;
 template<int RANK>
     using DenseArrayT = blitz::Array<val_type,RANK>;
-typedef Eigen::SparseMatrix<SparseMatrix::val_type> EigenSparseMatrixT;
-
-//typedef blitz::Array<val_type,1> DenseVectorT;
-//typedef TupleListT<2> TripletListT;
-//typedef MakeDenseEigenT::AccumT TransformTripletListT;
-
-
+typedef MakeDenseEigenT::SparseSetT SparseSetT;
+typedef MakeDenseEigenT::EigenSparseMatrixT EigenSparseMatrixT;
+// -----------------------------------------
 
 /** Return value of a sparse matrix */
 struct WeightedSparse {
-    std::array<SparseSetT,2> dims;            // Dense-to-sparse mapping for the dimensions
+    std::array<SparseSetT *,2> dims;            // Dense-to-sparse mapping for the dimensions
     std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
     DenseArrayT<1> weight;           // Dense indexing
+
+    WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims) {}
 };
 
 
@@ -142,11 +132,11 @@ public:
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sApvA(MakeDenseEigenT::AccumT &w, std::function<bool(long)> const &filter_fn);
+    void sApvA(MakeDenseEigenT::AccumT &w);
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sEpvE(MakeDenseEigenT::AccumT &w, std::function<bool(long)> const &filter_fn);
+    void sEpvE(MakeDenseEigenT::AccumT &w);
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
     virtual void GvEp(MakeDenseEigenT::AccumT &ret) const = 0;
@@ -166,7 +156,8 @@ public:
 std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type);
 std::unique_ptr<IceRegridder> new_ice_regridder(ibmisc::NcIO &ncio, std::string const &vname);
 // -----------------------------------------------------------
-typedef std::function<std::unique_ptr<WeightedSparse>(bool scale, bool correctA)> RegridFunction;
+typedef std::function<std::unique_ptr<WeightedSparse>(
+    std::array<SparseSetT *,2> dims, bool scale, bool correctA)> RegridFunction;
 
 /** Holds the set of "Ur" (original) matrices produced by an
     IceRegridder for a SINGLE ice sheet. */

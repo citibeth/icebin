@@ -155,28 +155,31 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 
 PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA)
 {
-    std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name, scale, correctA));
+    std::array<SparseSet,2> dims;
+    std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name,
+        {&dims[0], &dims[1]}, scale, correctA));
 
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
     // Allocate the output Python vector
     PyObject *weight_py = ibmisc::cython::new_pyarray<double,1>(
-        std::array<int,1>{Mw->dims[0].sparse_extent()});
+        std::array<int,1>{dims[0].sparse_extent()});
     // Get a Blitz view on it
     auto weight_pyb(np_to_blitz<double,1>(weight_py, "weight_py", {-1}));
-    // Copy, while translating the dimension
-    auto accum(spsparse::blitz_accum_existing(&weight_pyb));
-    spsparse::sparse_copy(accum, Mw->weight,
-        spsparse::SparseTransform::TO_SPARSE,
-        make_array(&Mw->dims[0]));
 
-    // Convert a dense matrix w/ dense indices to a sparse matrix with sparse indices
-    icebin::SparseMatrix Mw_sp;
-//    spsparse::spcopy(Mw_sp, *Mw->M);
-    sparse_copy(Mw_sp, *Mw->M,
-        spsparse::SparseTransform::TO_SPARSE,
-        make_array(&Mw->dims[0], &Mw->dims[1]));
+    // Copy, while translating the dimension
+    spcopy(
+        accum::sparsify(SparseTransform::TO_SPARSE, {&dims[0]},
+        accum::blitz_existing(weight_pyb)),
+        Mw->weight);
+
+    // Convert a sparse matrix w/ dense indices to a sparse matrix with sparse indices
+    TupleListT Mw_sp;
+    spcopy(
+        accum::sparsify(SparseTransform::TO_SPARSE,
+            make_array(&dims[0], &dims[1]),
+        accum::ref(Mw_sp)),
+        &Mw->M);
     PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw_sp);
-//    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(spsparse::to_spsparse(*Mw->M));
     return Py_BuildValue("OO", M_py, weight_py);
 }
 

@@ -36,8 +36,8 @@ namespace icebin {
 
 
 struct GCMInput {
-    typedef spsparse::VectorCooArray<long, double, 2> SparseMatrix;
-    typedef spsparse::VectorCooArray<long, double, 1> SparseVector;
+//    typedef spsparse::VectorCooArray<long, double, 2> TupleListT<2>;
+//    typedef spsparse::VectorCooArray<long, double, 1> TupleList<1>;
 
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
@@ -51,21 +51,24 @@ struct GCMInput {
     // Values required to update TOPO, etc. in ModelE
     // (see add_fhc.py for how these are to be used)
     // We can get these from AvE
-    // SparseVector wAvE;     // Area of A grid cells that overlap ice
-    //SparseVector areaA;    // Total (native) area of A grid cells
-    //SparseVector elevA;    // Used for atmosphere orography (ZATMO in ModelE)
+    // TupleList<1> wAvE;     // Area of A grid cells that overlap ice
+    //TupleList<1> areaA;    // Total (native) area of A grid cells
+    //TupleList<1> elevA;    // Used for atmosphere orography (ZATMO in ModelE)
+
+
+    // _s means these matrices and vectors all use sparse indexing
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    SparseMatrix E1vE0;
+    TupleListT<2> E1vE0_s;
 
     // Regrid matrix to convert to atmosphere.
     // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
-    SparseMatrix AvE1;
-    SparseVector wAvE1;
+    TupleListT<2> AvE1_s;
+    TupleListT<1> wAvE1_s;
 
     // Used for temperature downscaling according to a lapse rate
-    SparseVector elevE1;
+    TupleListT<1> elevE1_s;
 
     GCMInput(std::array<int, GridAE::count> const &nvar) :
         gcm_ivalsAE({

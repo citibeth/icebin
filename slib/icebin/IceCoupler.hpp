@@ -42,10 +42,11 @@ public:
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
     IceRegridder *ice_regridder;   // This is not const; see IceCoupler.IceRegridder::set_elevI()
-    std::unique_ptr<WeightedSparse> IvE;    // Regridding matrix made from regridder
 
-    EigenSparseMatrix IvE0;
-    SparseSet dimE0;
+    // Densified regridding matrix, and dimension, from previous call
+    // Used to interpret GCM output
+    std::unique_ptr<EigenSparseMatrixT> IvE0;
+    SparseSetT dimE0;
 
 
     // [INPUT|OUTPUT] variables
@@ -65,7 +66,7 @@ public:
 public:
     std::string const &name() const { return ice_regridder->name(); }
     Grid const *gridI() { return &*ice_regridder->gridI; }
-    long ndata() const { return ice_regridder->gridI->ndata(); }
+    long nI() const { return ice_regridder->gridI->ndata(); }
 
     // ======================================================
 
