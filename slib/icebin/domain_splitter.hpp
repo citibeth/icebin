@@ -2,6 +2,7 @@
 #define ICEBIN_DOMAIN_SPLITTER_HPP
 
 #include <icebin/GCMCoupler.hpp>
+#include <spsparse/accum.hpp>
 
 namespace icebin {
 
@@ -19,22 +20,25 @@ namespace icebin {
 // ----------------------------------------------------------------
 // split_by_domain() implementation...
 //
-/** Accumulator converts 1-D indices to n-D indices */
+
+namespace accum {
+
+
 template<class AccumulatorT, class DomainDecomposerT>
-class DomainAccum {
+class Domain {
     std::vector<AccumulatorT *> subs;    // One per domain
     DomainDecomposerT *domains;
 
 public:
     SPSPARSE_LOCAL_TYPES(AccumulatorT);    // Must be rank=1
 
-    DomainAccum(
+    Domain(
         std::vector<AccumulatorT *> &&_subs,
             DomainDecomposerT *_domains)
         : subs(std::move(_subs)), domains(_domains)
     {
         if (rank != 1) (*icebin_error)(-1,
-            "DomainAccum must be instantiated with AccumulatorT of rank=1");
+            "accum::Domain must be instantiated with AccumulatorT of rank=1");
     }
 
     void set_shape(std::array<long, AccumulatorT::rank> const &shape)
@@ -49,21 +53,25 @@ public:
     }
 };
 // ----------------------------------------------------------------
+
 /** @param sub0 Fist sub-accumulator in array of accumulators
 @param strideb Stride (in bytes) between first and next accumulator in non-dense. */
 template<class AccumulatorT, class DomainDecomposerT>
-DomainAccum<AccumulatorT,DomainDecomposerT> domain_accum(
-    AccumulatorT *sub0, size_t strideb,
-    DomainDecomposerT *domains)
+Domain<AccumulatorT,DomainDecomposerT> domain(
+    size_t strideb,
+    DomainDecomposerT *domains,
+    AccumulatorT *sub0)
 {
     std::vector<AccumulatorT *> subs;
     for (size_t i=0; i < domains->size(); ++i) {
         subs.push_back(reinterpret_cast<AccumulatorT *>(
             reinterpret_cast<char *>(sub0) + strideb));
     }
-    return DomainAccum<AccumulatorT,DomainDecomposerT>(
+    return Domain<AccumulatorT,DomainDecomposerT>(
         std::move(subs), domains);
 }
+
+}    // namespace accum
 // ----------------------------------------------------------------------
 template<class DomainDecomposerT>
 std::vector<GCMInput> split_by_domain(
@@ -77,6 +85,8 @@ std::vector<GCMInput> split_by_domain(
     DomainDecomposerT const &domainsA,
     DomainDecomposerT const &domainsE)
 {
+    using namespace spsparse;
+
     // Put domain decomposers in a nice array
     std::array<DomainDecomposerT const *, GridAE::count> domainsAE
         {&domainsA, &domainsE};
@@ -110,17 +120,18 @@ std::vector<GCMInput> split_by_domain(
     }
 
     // Split the standard sparse vectors and matrices
-    auto E1vE0(domain_accum(&outs.front().E1vE0, strideb, &domainsE));
-        spcopy(E1vE0, out.E1vE0);
+#   define SPCOPY(MATRIX, DOMAINSX) \
+    spcopy( \
+        accum::domain(strideb, &DOMAINSX, \
+        &outs.front().MATRIX), \
+        out.MATRIX)
 
-    auto AvE1(domain_accum(&outs.front().AvE1, strideb, &domainsA));
-        spcopy(AvE1, out.AvE1);
+    SPCOPY(E1vE0_s, domainsE);
+    SPCOPY(AvE1_s, domainsA);
+    SPCOPY(wAvE1_s, domainsA);
+    SPCOPY(elevE1_s, domainsA);
 
-    auto wAvE1(domain_accum(&outs.front().wAvE1, strideb, &domainsA));
-        spcopy(wAvE1, out.wAvE1);
-
-    auto elevE1(domain_accum(&outs.front().elevE1, strideb, &domainsA));
-        spcopy(elevE1, out.elevE1);
+#   undef SPCOPY
 
     return outs;
 }

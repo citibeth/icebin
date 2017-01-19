@@ -222,10 +222,10 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
             gcm_regridder.indexing(iAE), vname_base);
     }
 
-    ncio_spsparse(ncio, out.E1vE0, false, vname_base+"Ev1Ev0");
-    ncio_spsparse(ncio, out.AvE1, false, vname_base+"AvE1");
-    ncio_spsparse(ncio, out.wAvE1, false, vname_base+"wAvE1");
-    ncio_spsparse(ncio, out.elevE1, false, vname_base+"elevE1");
+    ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"Ev1Ev0");
+    ncio_spsparse(ncio, out.AvE1_s, false, vname_base+"AvE1");
+    ncio_spsparse(ncio, out.wAvE1_s, false, vname_base+"wAvE1");
+    ncio_spsparse(ncio, out.elevE1_s, false, vname_base+"elevE1");
 }
 
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */

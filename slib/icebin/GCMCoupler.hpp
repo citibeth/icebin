@@ -34,11 +34,10 @@
 namespace icebin {
 
 
+template<int RANK>
+    using TupleListLT = spsparse::TupleList<long,double,RANK>;
 
 struct GCMInput {
-//    typedef spsparse::VectorCooArray<long, double, 2> TupleListT<2>;
-//    typedef spsparse::VectorCooArray<long, double, 1> TupleList<1>;
-
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
 
@@ -60,15 +59,15 @@ struct GCMInput {
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    TupleListT<2> E1vE0_s;
+    TupleListLT<2> E1vE0_s;
 
     // Regrid matrix to convert to atmosphere.
     // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
-    TupleListT<2> AvE1_s;
-    TupleListT<1> wAvE1_s;
+    TupleListLT<2> AvE1_s;
+    TupleListLT<1> wAvE1_s;
 
     // Used for temperature downscaling according to a lapse rate
-    TupleListT<1> elevE1_s;
+    TupleListLT<1> elevE1_s;
 
     GCMInput(std::array<int, GridAE::count> const &nvar) :
         gcm_ivalsAE({
@@ -88,10 +87,10 @@ struct GCMInput {
     void serialize(ArchiveT &ar, const unsigned int file_version)
     {
         ar & gcm_ivalsAE;
-        ar & E1vE0;
-        ar & AvE1;
-        ar & wAvE1;
-        ar & elevE1;
+        ar & E1vE0_s;
+        ar & AvE1_s;
+        ar & wAvE1_s;
+        ar & elevE1_s;
     }
 };
 

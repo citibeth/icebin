@@ -28,6 +28,7 @@
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/contracts/contracts.hpp>
 #include <spsparse/eigen.hpp>
+#include <spsparse/blitz.hpp>
 
 #ifdef USE_PISM
 #include <icebin/pism/IceCoupler_PISM.hpp>
@@ -82,23 +83,6 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
 IceCoupler::~IceCoupler() {}
 // ==========================================================
 static double const nan = std::numeric_limits<double>::quiet_NaN();
-
-// ------------------------------------------------------------
-
-/** Returns just the matrix part of regridding.  Also sets scale and
-    correctA.  Local convenience function. */
-inline TupleListT<2> regrid_M(
-RegridMatrices &rm,
-std::string const &spec_name)
-{
-    std::unique_ptr<WeightedSparse> WS(rm.regrid(spec_name, true, true));
-    EigenTupleListT<2> &Meig(*WS->M);
-    TupleListT<2> Mout;
-    spcopy(Mout, Meig, true);
-    return std::move(Mout);
-}
-
-
 
 // ==============================================================
 void IceCoupler::cold_start(
@@ -224,14 +208,14 @@ bool am_i_root)
 
         // Transform units on the input while multiplying by M
         for (int kk = 0; kk < contract[INPUT].size(); ++kk) {
-            double ice_ivalsEd_jk = 0;
+            double ice_ivalsE_jk = 0;
             std::vector<std::pair<int, double>> const &row(icei_v_gcmo.mat[kk]);
             for (auto rowk_iter=row.begin(); rowk_iter != row.end(); ++rowk_iter) {
                 int ll(rowk_iter->first);
                 double icei_v_gcmo_kl(rowk_iter->second);
-                ice_ivalsEd_jk += icei_v_gcmo_kl * gcm_ovalsE(jj, ll);
+                ice_ivalsE_jk += icei_v_gcmo_kl * gcm_ovalsE0(jj, ll);
             }
-            ice_ivalsI(ii, kk) += IvE0_ij * ice_ivalsEd_jk;
+            ice_ivalsI(ii, kk) += IvE0_ij * ice_ivalsE_jk;
         }
     }
 
@@ -245,54 +229,51 @@ bool am_i_root)
     ice_regridder->set_elevI(elevI);
     RegridMatrices rm(ice_regridder);
 
-    SparseSet dimA1;
-    SparseSEt dimE1;
+    SparseSetT dimA1;
+    SparseSetT dimE1;
 
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
     {
         auto AvE1(rm.regrid("AvE", {&dimA1, &dimE1}, true, true));
 
         spcopy(
-            accum::sparsify(SparseTransform::TO_SPARSE, AvE->dims,
-            accum::ref(out.AvE1)),
+            accum::to_sparse(AvE1->dims,
+            accum::ref(out.AvE1_s)),
             *AvE1->M);
 
-        TupleListT<1> &out_wAvE1(out.wAvE1);    // Get around bug in gcc@4.9.3
+        TupleListLT<1> &out_wAvE1_s(out.wAvE1_s);    // Get around bug in gcc@4.9.3
         spcopy(
-            accum::sparsify(SparseTransform::TO_SPARSE, AvE->dims,
-            accum::ref(out_wAvE1));
+            accum::to_sparse(make_array(AvE1->dims[0]),
+            accum::ref(out_wAvE1_s)),
+            AvE1->weight);    // blitz::Array<double,1>
     }
 
 
-    {
-        // ------ Update E1vE0 translation between old and new elevation classes
-        //        (global for all ice sheets)
-        auto E1vI(rm.regrid("EvI", {&dimE1, NULL}, true, true));
+    // ------ Update E1vE0 translation between old and new elevation classes
+    //        (global for all ice sheets)
+    auto E1vI(rm.regrid("EvI", {&dimE1, NULL}, true, true));
 
-        TupleListT<2> &out_E1vE0(out.E1vE0);
-        Eigen::SparseMatrix<double> E1vE0(*E1vI->M * *IvE0);
-        spcopy(
-            accum::sparsify(SparseTransform::TO_SPARSE,
-                {&dimE1, &dimE0},
-            accum::ref(out_E1vE0)),
-            E1vE0);
+    TupleListLT<2> &out_E1vE0_s(out.E1vE0_s);
+    EigenSparseMatrixT E1vE0(*E1vI->M * *IvE0);
+    spcopy(
+        accum::to_sparse(make_array(&dimE1, &dimE0),
+        accum::ref(out_E1vE0_s)),
+        E1vE0);
 
-        // ------ Update orography (global for all ice sheets)
-        TupleListT<1> &out_elevE1(out.elevE1);
-        Eigen::VectorXd elevE1(*EvI->M * to_col_vector(elevI));
-        spcopy(
-            accum::permute(accum::in_rank<2>(), {0},   // copy eigen column vector
-            accum::sparsify(SparseTransform::TO_SPARSE,
-                {&dimE1},
-            accum::ref(out_elevE1))),
-            elevE1);
-    }
+    // ------ Update orography (global for all ice sheets)
+    TupleListLT<1> &out_elevE1_s(out.elevE1_s);
+    Eigen::VectorXd elevE1(*E1vI->M * to_col_vector(elevI));
+    spcopy(
+        accum::permute(accum::in_rank<2>(), {0},   // copy eigen column vector
+        accum::to_sparse(make_array(&dimE1),
+        accum::ref(out_elevE1_s))),
+        elevE1);
 
     // ========= Compute gcm_ivalsE = EvI * vt * ice_ovals
 
     auto A1vI(rm.regrid("AvI", {&dimA1, NULL}, true, true));
 
-    std::array<WeightedSparse &, GridAE::count> AE1vIs {*A1vI, *E1vI};
+    std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
     std::vector<double> vals(contract.size());
 
     // Do it once for _E variables and once for _A variables.
@@ -300,7 +281,7 @@ bool am_i_root)
         CSRAndUnits gcmi_v_iceo(var_trans_outAE[iAE].apply_scalars(scalars));
 
         VarSet const &contract(gcm_coupler->gcm_inputsAE[iAE]);
-        WeightedSparse &X1vI_ws(AE1vIs[iAE]);
+        WeightedSparse &X1vI_ws(*AE1vIs[iAE]);
         VectorMultivec &gcm_ivalsX_s(out.gcm_ivalsAE[iAE]);
 
         // gcm_ivalsX_{jn} = X1vI_{ji} * gcmi_v_iceo_{nm} * ice_ovalsI_{im}
@@ -311,7 +292,7 @@ bool am_i_root)
         // |n| = # variables in gcm_input
 
         // Do the multiplication
-        for (auto iX1vI(begin(X1vI)); iX1vI != end(X1vI); ++iX1vI) {
+        for (auto iX1vI(begin(*X1vI_ws.M)); iX1vI != end(*X1vI_ws.M); ++iX1vI) {
             auto jj(iX1vI->index(0));
             auto ii(iX1vI->index(1));
             auto X1vI_ji(iX1vI->value());

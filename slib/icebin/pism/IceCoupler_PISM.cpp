@@ -29,8 +29,6 @@
 #include <pism/base/stressbalance/PISMStressBalance.hh>
 #include <pism/earth/PISMBedDef.hh>
 
-#include <spsparse/sort.hpp>
-
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/ibmisc.hpp>
 

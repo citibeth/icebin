@@ -186,9 +186,10 @@ public:
     */
     std::unique_ptr<WeightedSparse> regrid(
         std::string const &spec_name,
+        std::array<SparseSetT *,2> dims,
         bool scale,
         bool correctA) const
-    { return (regrids.at(spec_name))(scale, correctA); }
+    { return (regrids.at(spec_name))(dims, scale, correctA); }
 };
 
 
