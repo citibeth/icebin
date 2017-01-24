@@ -24,6 +24,7 @@
 
 using namespace ibmisc;
 using namespace ibmisc::cython;
+using namespace spsparse;
 
 namespace icebin {
 namespace cython {
@@ -155,7 +156,7 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 
 PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA)
 {
-    std::array<SparseSet,2> dims;
+    std::array<SparseSetT,2> dims;
     std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name,
         {&dims[0], &dims[1]}, scale, correctA));
 
@@ -168,17 +169,16 @@ PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_n
 
     // Copy, while translating the dimension
     spcopy(
-        accum::sparsify(SparseTransform::TO_SPARSE, {&dims[0]},
+        accum::to_sparse(make_array(&dims[0]),
         accum::blitz_existing(weight_pyb)),
         Mw->weight);
 
     // Convert a sparse matrix w/ dense indices to a sparse matrix with sparse indices
-    TupleListT Mw_sp;
+    TupleListT<2> Mw_sp;
     spcopy(
-        accum::sparsify(SparseTransform::TO_SPARSE,
-            make_array(&dims[0], &dims[1]),
+        accum::to_sparse(make_array(&dims[0], &dims[1]),
         accum::ref(Mw_sp)),
-        &Mw->M);
+        *Mw->M);
     PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw_sp);
     return Py_BuildValue("OO", M_py, weight_py);
 }
