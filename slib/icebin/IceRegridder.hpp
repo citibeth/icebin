@@ -189,7 +189,10 @@ public:
         std::array<SparseSetT *,2> dims,
         bool scale,
         bool correctA) const
-    { return (regrids.at(spec_name))(dims, scale, correctA); }
+    {
+        auto ret(regrids.at(spec_name)(dims, scale, correctA));
+        return ret;
+    }
 };
 
 

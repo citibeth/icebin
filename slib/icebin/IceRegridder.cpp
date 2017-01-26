@@ -218,7 +218,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         std::bind(&IceRegridder::GvI, regridder, _1),
         SparsifyTransform::ADD_DENSE,
         {&dimG, &dimI}, '.');
-    MakeDenseEigenT ApvG_m(
+    MakeDenseEigenT ApvG_m(        // _m ==> type MakeDenseEigenT
         AE.GvAp,
         SparsifyTransform::ADD_DENSE,
         {&dimG, &dimA}, 'T');
@@ -349,6 +349,10 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     auto &dimA(*ret->dims[1]);
     SparseSetT dimG;
 
+    dimA.set_sparse_extent(A.nfull);
+    dimE.set_sparse_extent(E.nfull);
+    dimG.set_sparse_extent(regridder->nG());
+
     // ----- Get the Ur matrices (which determines our dense dimensions)
 
     MakeDenseEigenT GvAp_m(
@@ -363,6 +367,7 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     // ----- Convert to Eigen and multiply
     auto GvAp(GvAp_m.to_eigen());
     auto EpvG(EpvG_m.to_eigen());
+
     auto sGvAp(sum_to_diagonal(GvAp, 0, '-'));
 
     // Unweighted matrix
