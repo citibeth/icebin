@@ -103,6 +103,7 @@ void IceRegridder_L0::GvEp(MakeDenseEigenT::AccumT &ret) const
         long const iI = cell->j;        // Ice Grid
         long const iX = cell->index;    // X=Exchange Grid
         long const iG = (dest == IceExch::ICE ? iI : iX);   // G=Interpolation Grid
+
         if (!std::isnan(elevI(iI))) {
             // This cell not masked: look up elevation point as usual
             double elevation = std::max(elevI(iI), 0.0);
@@ -118,11 +119,9 @@ void IceRegridder_L0::GvEp(MakeDenseEigenT::AccumT &ret) const
                         cell->native_area * whps[0]);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[1]})},
                         cell->native_area * whps[1]);
-
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {
                     int ihps0 = nearest_1d(gcm->hcdefs, elevation);
-printf("ELEV_CLASS_INTERP %d (%d %d), %g\n", ihps0, iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps0}), cell->native_area);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps0})},
                         cell->native_area);
                 } break;

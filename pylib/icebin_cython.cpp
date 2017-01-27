@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cstdio>
 #include <algorithm>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/cython.hpp>
@@ -180,6 +181,7 @@ PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_n
         accum::ref(Mw_sp)),
         *Mw->M);
     PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw_sp);
+    fflush(stdout);
     return Py_BuildValue("OO", M_py, weight_py);
 }
 

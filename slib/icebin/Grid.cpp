@@ -216,10 +216,10 @@ std::string const &vname)
 
 
         NcVar native_area_var(nc->getVar(vname + ".cells.native_area"));
-        blitz::Array<long,1> native_area;
+        blitz::Array<double,1> native_area;
         if (!native_area_var.isNull()) {
             native_area.reference(nc_read_blitz
-                <long, 1>(nc, vname + ".cells.native_area"));
+                <double, 1>(nc, vname + ".cells.native_area"));
         }
 
         // std::vector<double> cells_area(giss::read_double_vector(nc, vname + ".cells.area"));

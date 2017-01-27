@@ -171,11 +171,13 @@ extern void linterp_1d(
     indices[0] = i0;
     indices[1] = i1;
     double ratio = (xx - xpoints[i0]) / (xpoints[i1] - xpoints[i0]);
+
 if (ratio < 0.0 || ratio > 1.0) {
     printf("BAD WEIGHTS: %g [%d]", xx, n);
     for (int i=0; i<n; ++i) printf(" %f", xpoints[i]);
     printf("\n");
 }
+
     weights[0] = (1.0 - ratio);
     weights[1] = ratio;
 }
@@ -241,7 +243,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         auto wApvI(sum_to_diagonal(*ApvI, 0, '+'));        // diagonal
         EigenSparseMatrixT wAvI(wAvAp * wApvI);    // diagonal...
 
-        // Sums rows of an Eigen matrix into a dense blitz::Array
+        // +correctA: Weight matrix in A space
         ret->weight.reference(sum(wAvI, 0, '+'));
 
         // Compute the main matrix
@@ -259,6 +261,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
     } else {
 
         // ----- Compute the final weight matrix
+        // ~correctA: Weight matrix in Ap space
         auto wApvI_b(sum(*ApvI, 0, '+'));
         ret->weight.reference(wApvI_b);
 
@@ -310,9 +313,7 @@ static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
         new EigenSparseMatrixT(IvG * sGvAp * GvAp));
 
     // Get weight vector from IvAp_e
-//    ret->weight.reference(sum(IvG, 0));  // testing only
     ret->weight.reference(sum(*IvAp, 0, '+'));
-
 
     // ----- Apply final scaling, and convert back to sparse dimension
     if (correctA) {
@@ -373,46 +374,41 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     // Unweighted matrix
     std::unique_ptr<EigenSparseMatrixT> EpvAp(
         new EigenSparseMatrixT(EpvG * sGvAp * GvAp));
-    auto wEpvAp_b(sum(*EpvAp,0,'+'));
 
     // ----- Apply final scaling, and convert back to sparse dimension
+    auto wEpvAp(sum_to_diagonal(*EpvAp,0,'+'));
     if (correctA) {
         auto sApvA(MakeDenseEigenT(
             A.sApvA,
             SparsifyTransform::TO_DENSE_IGNORE_MISSING,
             {&dimA, &dimA}, '.').to_eigen());
 
+        auto wEvEp(MakeDenseEigenT(
+            E.sApvA,
+            SparsifyTransform::TO_DENSE_IGNORE_MISSING,
+            {&dimE, &dimE}, '.').to_eigen());
+
+        // +correctA: Weight matrix in E space
+        EigenSparseMatrixT wEvAp(wEvEp * wEpvAp);
+        ret->weight.reference(sum(wEvAp,0,'+'));
+
         if (scale) {
-            auto sEpvE(MakeDenseEigenT(
-                E.sApvA,
-                SparsifyTransform::TO_DENSE_IGNORE_MISSING,
-                {&dimE, &dimE}, '.').to_eigen());
-
-
-            auto sEvEp(sum_to_diagonal(sEpvE,0,'-'));
-            auto sEpvAp(diag_matrix(wEpvAp_b,'-'));
-
+            auto sEvAp(sum_to_diagonal(wEvAp,0,'-'));
             ret->M.reset(new EigenSparseMatrixT(
-                sEvEp * sEpvAp * *EpvAp * sApvA));    // EvA
+                sEvAp * *EpvAp * sApvA));    // EvA
         } else {
             ret->M.reset(new EigenSparseMatrixT(*EpvAp * sApvA));
         }
-
-        // ----- Compute the final weight (diagonal) matrix
-        auto wEpvAp_b(sum(*EpvAp,0,'+'));
-        ret->weight.reference(wEpvAp_b);
-
     } else {    // ~correctA
+        // ~correctA: Weight matrix in Ep space
+        ret->weight.reference(sum(wEpvAp,0,'+'));
         if (scale) {
-            auto sEpvAp(diag_matrix(wEpvAp_b,'-'));
+            auto sEpvAp(sum_to_diagonal(wEpvAp,0,'-'));
 
             ret->M.reset(new EigenSparseMatrixT(sEpvAp * *EpvAp));
         } else {
             ret->M = std::move(EpvAp);
         }
-
-        // ----- Compute the final weight (diagonal) matrix
-        ret->weight.reference(wEpvAp_b);
     }
 
     return ret;
