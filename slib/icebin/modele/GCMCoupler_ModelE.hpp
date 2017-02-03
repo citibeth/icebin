@@ -45,9 +45,10 @@ BOOST_ENUM_VALUES( ModelE_CouplingType, int,
 static int const MAX_CHAR_LEN = 128;    // From Dictionary_mod.F90
 struct ModelEParams
 {
-    char icebin_segments[MAX_CHAR_LEN];
-    double dtsrc;
-    int yeari;
+//    char icebin_segments[MAX_CHAR_LEN];
+//    char ice_coupler_type[MAX_CHAR_LEN];    // DISMAL,PISM
+//    double dtsrc;
+    int dummy;    // Avoid zero-size struct
 };
 // ---------------------------------------------
 
@@ -108,7 +109,8 @@ public:
 class GCMCoupler_ModelE : public GCMCoupler
 {
 public:
-    ModelEParams rdparams;    // Params straight from the rundeck
+    double dtsrc;
+    ModelEParams rdparams;    // Params straight from the rundeck (came during init)
     std::unique_ptr<boost::mpi::communicator> world;
 
     /** On root: separate global stuff back into individual domains.

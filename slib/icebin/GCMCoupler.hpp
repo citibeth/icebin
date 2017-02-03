@@ -171,7 +171,8 @@ public:
     virtual ~GCMCoupler() {}
 
     virtual void ncread(
-        std::string const &fname,
+        std::string const &grid_fname,
+        std::string const &config_fname,
         std::string const &vname);
 
     /** Private; called from gcmce_cold_start() */

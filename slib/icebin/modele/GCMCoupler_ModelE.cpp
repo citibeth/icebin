@@ -40,8 +40,19 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/export.hpp>
 
-
+using namespace std;
 using namespace ibmisc;
+
+
+#if 0
+std::ostream &operator<<(std::ostream &os, icebin::modele::ModelEParams const &params)
+{
+    os << "ModelEParams:" << std::endl;
+    os << "    segments=" << std::string(params.icebin_segments,icebin::modele::MAX_CHAR_LEN) << std::endl;
+    os << "    dtsrc=" << params.dtsrc << std::endl;
+    return os;
+}
+#endif
 
 namespace icebin {
 namespace modele {
@@ -91,28 +102,6 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 // -----------------------------------------------------
 // Called from LISnow::allocate()
 
-static std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
-{
-    std::vector<HCSegmentData> ret;
-
-    // TDOO: Parse for real later
-    std::vector<std::string> segment_names;
-    boost::algorithm::split(segment_names, str, boost::is_any_of(","));
-    int base = 0;
-    for (auto &seg : segment_names) {
-        boost::algorithm::trim(seg);
-        int len;
-        if (seg == "legacy") len = 1;
-        else if (seg == "sealand") len = 2;
-        else len = -1;
-
-        ret.push_back(HCSegmentData(seg, base, len));
-        base += len;
-    }
-    return ret;
-}
-
-
 extern "C"
 void *gcmce_new(
     ModelEParams const &_rdparams,
@@ -126,6 +115,8 @@ void *gcmce_new(
     // MPI Stuff
     MPI_Fint comm_f, int root)
 {
+printf("BEGIN gcmce_new()\n");
+
     std::unique_ptr<GCMCoupler_ModelE> self(
         new GCMCoupler_ModelE());
 
@@ -142,19 +133,19 @@ void *gcmce_new(
         params.gcm_comm, boost::mpi::comm_attach));
     params.gcm_root = root;
 
-    params.icebin_config_fname = boost::filesystem::absolute("./ICEBIN_IN").string();
-    params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR").string();
+    params.icebin_grid_fname = boost::filesystem::absolute("./ICEBIN_GRID").string();
+//    params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR").string();
+    params.ice_config_dir = boost::filesystem::absolute("./ICE_CONFIG_DIR").string();
+
     params.run_dir = boost::filesystem::absolute(".").string();
     params.gcm_dump_dir = boost::filesystem::absolute("ibdump").string();
 
-    params.hc_segments = parse_hc_segments(f_to_cpp(
-        rdparams.icebin_segments, sizeof(rdparams.icebin_segments)));
-    params.icebin_base_hc = params.ec_segment().base;
-
-
+    params.icebin_config_fname = boost::filesystem::absolute("config/icebin.nc").string();
 
     // Read the coupler, along with ice model proxies
-    if (params.am_i_root()) self->ncread(params.icebin_config_fname, "m");
+    if (params.am_i_root()) self->ncread(
+        params.icebin_grid_fname,
+        params.icebin_config_fname, "m");
 
     // Check bounds on the IceSheets, set up any state, etc.
     // This is done AFTER setup of self because self->read_from_netcdf()
@@ -175,7 +166,8 @@ void *gcmce_new(
     }
 
     // TODO: Test that im and jm are consistent with the grid read.
-    return self.release();
+    GCMCoupler_ModelE *ret = self.release();
+    return ret;
 }
 // ==========================================================
 // Called from LISheetIceBin::_read_nhc_gcm()
@@ -183,11 +175,13 @@ void *gcmce_new(
 /* Tells ModelE how many elevation classes it needs **/
 extern "C"
 int gcmce_nhc_gcm(GCMCoupler_ModelE *self)
-    { return self->nhc_gcm(); }
+{
+    return self->nhc_gcm();
+}
 
 int GCMCoupler_ModelE::_read_nhc_gcm()
 {
-    NcIO ncio(this->gcm_params.icebin_config_fname, 'r');
+    NcIO ncio(this->gcm_params.icebin_grid_fname, 'r');
     int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
 
     // Find the "ec" segment and set its size now...
@@ -345,14 +339,15 @@ int itime,
 bool run_ice);    // if false, only initialize
 
 extern "C"
-void gcmce_cold_start(GCMCoupler_ModelE *self, int itimei)
+void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dtsrc)
 {
     // This will cold-start initial conditions of the dynamic ice model
+    self->dtsrc = dtsrc;
 
     // Call superclass cold_start()
     self->cold_start(
-        ibmisc::Datetime(self->rdparams.yeari,1,1),
-        itimei * self->rdparams.dtsrc);
+        ibmisc::Datetime(yeari,1,1) ,
+        itimei * dtsrc);
 
     // b) Compute fhc, elevE
     // c) Compute ZATMO, FGICE, etc.
@@ -404,7 +399,7 @@ void gcmce_couple_native(GCMCoupler_ModelE *self,
 int itime,
 bool run_ice)    // if false, only initialize
 {
-    double time_s = itime * self->rdparams.dtsrc;
+    double time_s = itime * self->dtsrc;
 
     // Fill it in...
     VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());

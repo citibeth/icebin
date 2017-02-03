@@ -279,7 +279,6 @@ public:
 
     void add_sheet(std::unique_ptr<IceRegridder> &&regridder)
     {
-        printf("Adding IceRegridder: '%s'\n", regridder->name().c_str());
         regridder->gcm = this;
         size_t ix = sheets_index.insert(regridder->name());
         ice_regridders.push_back(std::move(regridder));

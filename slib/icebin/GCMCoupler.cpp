@@ -19,6 +19,7 @@
 #include <mpi.h>        // Intel MPI wants to be first
 #include <functional>
 #include <boost/format.hpp>
+#include <boost/algorithm/string.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/ncfile.hpp>
 #include <ibmisc/memory.hpp>
@@ -42,20 +43,43 @@ namespace icebin {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 // ==========================================================
+static std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
+{
+    std::vector<HCSegmentData> ret;
+
+    // TDOO: Parse for real later
+    std::vector<std::string> segment_names;
+    boost::algorithm::split(segment_names, str, boost::is_any_of(","));
+    int base = 0;
+    for (auto &seg : segment_names) {
+        boost::algorithm::trim(seg);
+        int len;
+        if (seg == "legacy") len = 1;
+        else if (seg == "sealand") len = 2;
+        else len = -1;
+
+        ret.push_back(HCSegmentData(seg, base, len));
+        base += len;
+    }
+    return ret;
+}
+
+
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
-    std::string const &fname,        // comes from this->gcm_params
+    std::string const &grid_fname,        // comes from this->gcm_params
+    std::string const &config_fname,        // comes from this->gcm_params
     std::string const &vname)        // comes from this->gcm_params
 {
-    printf("BEGIN GCMCoupler::read_from_netcdf() %s\n", vname.c_str());
-
-    NcIO ncio(fname, NcFile::read);
+    printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 
     // Load the MatrixMaker (filtering by our domain, of course)
     // Also load the ice sheets
-    gcm_regridder.ncio(ncio, vname);
+    {
+        NcIO ncio(grid_fname, NcFile::read);
+        gcm_regridder.ncio(ncio, vname);
+    }
 
-#if 1
     std::cout << "========= GCM Constants" << std::endl;
     std::cout << gcm_constants;
     std::cout << "========= GCM Outputs" << std::endl;
@@ -65,8 +89,14 @@ void GCMCoupler::ncread(
     std::cout << "========= GCM InputsA" << std::endl;
     std::cout << gcm_inputsAE[GridAE::E];
 
+    NcIO ncio(config_fname, NcFile::read);
 
-#endif
+    // Read m.segments
+    std::string segments;
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
+    get_or_put_att(info_v, ncio.rw, "segments", segments);
+    gcm_params.hc_segments = parse_hc_segments(segments);
+    gcm_params.icebin_base_hc = gcm_params.ec_segment().base;
 
     ice_couplers.clear();
     for (size_t i=0; i < gcm_regridder.ice_regridders.size(); ++i) {
@@ -76,13 +106,10 @@ void GCMCoupler::ncread(
         // Create an IceCoupler corresponding to this IceSheet.
         std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio, vname_sheet, this, ice_regridder));
 
-        contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
-
         ice_couplers.push_back(std::move(ice_coupler));
     }
 
-    ncio.close();
-    printf("END GCMCoupler::read_from_netcdf()\n");
+    printf("END GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 }
 
 
@@ -97,7 +124,11 @@ void GCMCoupler::cold_start(
     last_time_s = time_start_s;
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
-        ice_couplers[sheetix]->cold_start(time_base, time_start_s);
+        auto &ice_coupler(ice_couplers[sheetix]);
+
+        // NOTE: Contract sizes are only needed at runtime, not allocate() time.
+        contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
+        ice_coupler->cold_start(time_base, time_start_s);
     }
 
 }

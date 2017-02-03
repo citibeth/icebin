@@ -45,8 +45,9 @@ struct GCMParams {
     int gcm_root;        // Root of the MPI group
     bool am_i_root() { return gcm_rank == gcm_root; }
 
+    std::string icebin_grid_fname;
     std::string icebin_config_fname;
-    std::string config_dir; // Where to look for Ice Model configuration files
+    std::string ice_config_dir; // Where to look for Ice Model configuration files
     std::string run_dir;    // The GCM run directory
     std::string gcm_dump_dir;
 

@@ -29,9 +29,10 @@ integer, parameter :: MAX_CHAR_LEN = 128   ! From ModelE's Dictionary_mod.F90
 type, bind(c) :: ModelEParams_t
 
     ! Segment specs: to be further parsed.
-    character(MAX_CHAR_LEN, kind=c_char) :: icebin_segments = 'legacy,sealand,ec'
-    real(c_double) :: dtsrc
-    integer(c_int) :: yeari
+!    character(MAX_CHAR_LEN, kind=c_char) :: icebin_segments = 'legacy,sealand,ec'
+!    real(c_double) :: dtsrc
+!    integer(c_int) :: yeari
+    integer(c_int) :: dummy
 end type ModelEParams_t
 
 
@@ -65,7 +66,7 @@ INTERFACE
     function gcmce_nhc_gcm(api) bind(c)
     use iso_c_binding
         type(c_ptr), value :: api
-        integer(c_int) :: gcmce_read_nhc_gcm
+        integer(c_int) :: gcmce_nhc_gcm
     end function gcmce_nhc_gcm
 
     ! Must conform to the set_constant_cb() interface
@@ -171,9 +172,10 @@ INTERFACE
         logical(c_bool), value :: run_ice
     end subroutine
 
-    subroutine gcmce_cold_start(api, itimei) bind(c)
+    subroutine gcmce_cold_start(api, yeari, itimei) bind(c)
         use iso_c_binding
         type(c_ptr), value :: api
+        integer(c_int), value :: yeari
         integer(c_int), value :: itimei
     end subroutine
 

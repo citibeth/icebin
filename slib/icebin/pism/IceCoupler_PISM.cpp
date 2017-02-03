@@ -101,7 +101,7 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet)
         } else {
             // Resolve path names according to the configuration directory
             auto &resolve(ii->second == "i" ?
-                gcm_coupler->gcm_params.config_dir : gcm_coupler->gcm_params.run_dir);
+                gcm_coupler->gcm_params.ice_config_dir : gcm_coupler->gcm_params.run_dir);
 
             val = boost::filesystem::absolute(
                 boost::filesystem::path(val),
@@ -630,6 +630,7 @@ void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(
 
 void IceCoupler_PISM::transfer_constant(std::string const &dest, std::string const &src, double multiply_by, bool set_new)
 {
+printf("BEGIN IceCoupler_PISM::transfer_constant %s %s\n", dest.c_str(), src.c_str()); fflush(stdout);
     // Make sure the PISM constant already exists
     if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
         "IceCoupler_PISM::transfer_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
