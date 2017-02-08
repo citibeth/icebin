@@ -60,6 +60,7 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
 #endif
 #ifdef USE_PISM
         case IceCoupler::Type::PISM :
+printf("new IceCoupler_PISM: %s\n", vname.c_str());
             self.reset(new gpism::IceCoupler_PISM);
         break;
 #endif
@@ -90,12 +91,20 @@ void IceCoupler::cold_start(
         double time_start_s)
 {
     // Set up writers
-    for (int io=0; io<2; ++io) {
-        this->writer[io].reset(new IceWriter(
-            this, &contract[io],
-            name() + (io == 0 ? "_in.nc" : "_out.nc")));
+    if (gcm_coupler->am_i_root()) {
+        for (int io=0; io<2; ++io) {    // INPUT / OUTPUT
+            auto fname(
+                boost::filesystem::path(gcm_coupler->gcm_params.gcm_dump_dir) /
+                (name() + (io == 0 ? "_in.nc" : "_out.nc")));
+            this->writer[io].reset(new IceWriter(
+                this, &contract[io], fname.string()));
+        }
     }
+}
 
+/** Print summary info of the contracts to STDOUT. */
+void IceCoupler::print_contracts()
+{
     // This function is the last phase of initialization.
     // Only now can we assume that the contracts are fully set up.
 #if 1
@@ -141,16 +150,15 @@ double time_s,
 // Values from GCM, passed GCM -> Ice
 VectorMultivec const &gcm_ovalsE_s,
 GCMInput &out,    // Accumulate matrices here...
-bool run_ice,
-bool am_i_root)
+bool run_ice)
 {
-    if (!am_i_root) {
+    if (!gcm_coupler->am_i_root()) {
         // Allocate dummy variables, even though they will only be set on root
         blitz::Array<double,2> ice_ivalsI(nI(), contract[INPUT].size());
         blitz::Array<double,2> ice_ovalsI(nI(), contract[OUTPUT].size());
         ice_ivalsI = 0;
         ice_ovalsI = 0;
-        run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice, am_i_root);
+        run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
         return;
     }
 
@@ -221,7 +229,7 @@ bool am_i_root)
 
     // ========= Step the ice model forward
     if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
-    run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice, am_i_root);
+    run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
     if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
 
     // ========== Update regridding matrices
@@ -347,7 +355,9 @@ IceWriter::IceWriter(
     }
 
     // Put our output files in this directory, one named per ice sheet.
+printf("_fname %s\n", _fname.c_str());
     boost::filesystem::path ofname(_fname);
+printf("parent_path %s\n", ofname.parent_path().string().c_str());
     boost::filesystem::create_directory(ofname.parent_path());    // Make sure it exists
 
 //    auto output_dir = boost::filesystem::absolute(

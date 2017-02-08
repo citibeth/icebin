@@ -65,7 +65,7 @@ public:
 
 public:
     std::string const &name() const { return ice_regridder->name(); }
-    Grid const *gridI() { return &*ice_regridder->gridI; }
+    Grid const *gridI() { return ice_regridder->gridI.get(); }
     long nI() const { return ice_regridder->gridI->ndata(); }
 
     // ======================================================
@@ -85,8 +85,9 @@ public:
     IceCoupler(IceCoupler::Type _type) : type(_type) {}
 
     /** (1) Initialize any grid information, etc. from the IceSheet struct.
-    @param vname_base Construct variable name from this, out of which to pull parameters from netCDF */
-    virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet) {}
+    @param vname_base Construct variable name from this, out of which to pull parameters from netCDF
+    @param Opened handle on the IceBin config file (not IceBin grid file). */
+    virtual void ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet) {}
 
 
     // ========= Called by
@@ -96,11 +97,15 @@ public:
     //     GCMCoupler::cold_start()
     //         <this>
     //     [calls IceCoupler::cold_start()]
-    /** (2) Event handler to let IceCouplers know the start time is (finally) set */
+    /** (2) Event handler to let IceCouplers know the start time is (finally) set.
+    This method must call where appropriate:
+        contracts::setup(*gcm_coupler, *this);
+    */
     virtual void cold_start(
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
+    void print_contracts();
 
     // ========= Called by
     //     IceCoupler::couple()
@@ -124,8 +129,7 @@ public:
         // Values from GCM, passed GCM -> Ice
         VectorMultivec const &gcm_ovalsE,
         GCMInput &out,    // Accumulate matrices here...
-        bool do_run,
-        bool am_i_root);
+        bool do_run);
 
     /** (4.1) @param index Index of each grid value.
     @param time_s Time since start of simulation, in seconds
@@ -133,8 +137,7 @@ public:
     virtual void run_timestep(double time_s,
         blitz::Array<double,2> const &ice_ivalsI,
         blitz::Array<double,2> const &ice_ovalsI,
-        bool run_ice,
-        bool am_i_root) = 0;
+        bool run_ice) = 0;
 
 };      // class IceCoupler
 // =========================================================

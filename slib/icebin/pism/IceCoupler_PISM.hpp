@@ -136,7 +136,7 @@ public:
     // ===================================================================
     // Lifecycle (virtual methods from IceCoupler)
 
-    virtual void ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet);
+    virtual void ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet);
 
     /* Called by
          LANDICE_DRV.f: init_LI(istart_fixup)
@@ -164,8 +164,7 @@ public:
     virtual void run_timestep(double time_s,
         blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
         blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
-        bool run_ice,    // Should we run the ice model?
-        bool am_i_root);
+        bool run_ice);    // Should we run the ice model?
 
 protected:
 

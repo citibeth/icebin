@@ -24,52 +24,6 @@
 
 namespace icebin {
 
-/** A segment of elevation classes (see add_fhc.py) */
-struct HCSegmentData {
-    std::string name;
-    int base;    // First elevation class of this segment
-    int size;    // Number of elevation classes in this segment
-
-    HCSegmentData(std::string const &_name, int _base, int _size)
-        : name(_name), base(_base), size(_size) {}
-};
-
-/** Parameters passed from the GCM through to the ice model.
-These parameters cannot be specific to either the ice model or the GCM.
-TODO: Make procedure to read rundeck params and set this stuff up. */
-struct GCMParams {
-    // ------- Passed into GCMCoupler::allocate()
-    ibmisc::Domain domainA, domainA_global;
-    MPI_Comm gcm_comm;
-    int gcm_rank;            // MPI rank of this node
-    int gcm_root;        // Root of the MPI group
-    bool am_i_root() { return gcm_rank == gcm_root; }
-
-    std::string icebin_grid_fname;
-    std::string icebin_config_fname;
-    std::string ice_config_dir; // Where to look for Ice Model configuration files
-    std::string run_dir;    // The GCM run directory
-    std::string gcm_dump_dir;
-
-    bool icebin_logging = true ;    // Should IceBin log input & output?
-
-    // Should IceBin update topography?
-    bool dynamic_topo = false;
-
-    std::vector<HCSegmentData> hc_segments {    // 0-based
-        HCSegmentData("legacy", 0, 1),
-        HCSegmentData("sealand", 1, 2),
-        HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
-    int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
-
-    HCSegmentData &ec_segment()
-    {
-        auto &ec(hc_segments[hc_segments.size()-1]);
-        if (ec.name != "ec") (*icebin_error)(-1,
-            "The last elevation class segment must be called 'ec'");
-        return ec;
-    }
-};
 
 
 }

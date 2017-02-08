@@ -20,6 +20,8 @@
 
 #include <cstdlib>
 
+#include <boost/mpi.hpp>
+
 #include <ibmisc/VarTransformer.hpp>
 #include <ibmisc/DynArray.hpp>
 #include <ibmisc/udunits2.hpp>
@@ -93,7 +95,53 @@ struct GCMInput {
         ar & elevE1_s;
     }
 };
+// =============================================================================
+/** A segment of elevation classes (see add_fhc.py) */
+struct HCSegmentData {
+    std::string name;
+    int base;    // First elevation class of this segment
+    int size;    // Number of elevation classes in this segment
 
+    HCSegmentData(std::string const &_name, int _base, int _size)
+        : name(_name), base(_base), size(_size) {}
+};
+
+/** Parameters passed from the GCM through to the ice model.
+These parameters cannot be specific to either the ice model or the GCM.
+TODO: Make procedure to read rundeck params and set this stuff up. */
+struct GCMParams {
+    // ------- Initialized in constructor
+    MPI_Comm gcm_comm;
+    int gcm_root;        // Root of the MPI group
+    int gcm_rank;            // MPI rank of this node
+    bool am_i_root() const { return gcm_rank == gcm_root; }
+    boost::mpi::communicator world;
+
+    // ------- Passed into GCMCoupler::allocate()
+    ibmisc::Domain domainA, domainA_global;
+
+    std::string icebin_grid_fname;
+    std::string icebin_config_fname;
+    std::string ice_config_dir; // Where to look for Ice Model configuration files
+    std::string run_dir;    // The GCM run directory
+    std::string gcm_dump_dir;
+
+    bool icebin_logging = true ;    // Should IceBin log input & output?
+
+    // Should IceBin update topography?
+    bool dynamic_topo = false;
+
+    std::vector<HCSegmentData> hc_segments {    // 0-based
+        HCSegmentData("legacy", 0, 1),
+        HCSegmentData("sealand", 1, 2),
+        HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
+    int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
+
+
+    GCMParams(MPI_Comm _gcm_comm, int _gcm_root);
+    HCSegmentData &ec_segment();
+};
+// =============================================================================
 class GCMCoupler {
 public:
     /** Type tags for subclasses of GCMCoupler */
@@ -133,6 +181,7 @@ protected:
     virtual int _read_nhc_gcm() = 0;
 
 public:
+
     /** See regridder.sheets_index */
     std::vector<std::unique_ptr<IceCoupler>> ice_couplers;
 
@@ -152,28 +201,21 @@ public:
 
     // Fields we read from the config file...
 
-    GCMCoupler(Type _type) :
-        type(_type),
-        ut_system("")
-    {
-        gcm_constants.init(&ut_system);
-
-        // Icebin requires orography on the ice grid, in order to
-        // regrid in elevation space when things change.  Therefore, this
-        // is added to the contract for all GCMs
-        // gcm_inputs.add_field("elev2", "m", "ICE", "ice upper surface elevation");
-        // No... this messes up what the GCM expects, and it's not used by the GCM.
-        // Therefore, it should not be listed as a GCM input, it's a Icebin input.
-        // Icebin will require it, somehow, as an IceCoupler output, and get it
-        // directly from there.
-    }
-
+    GCMCoupler(Type _type, GCMParams &&_params);
     virtual ~GCMCoupler() {}
+
+    bool am_i_root() const { return gcm_params.am_i_root(); }
 
     virtual void ncread(
         std::string const &grid_fname,
         std::string const &config_fname,
         std::string const &vname);
+
+    /** Locates an ice model input file, according to resolution rules
+        of the GCM. */
+    virtual std::string locate_input_file(
+        std::string const &sheet_name,        // eg: greenland
+        std::string const &file_name) = 0;        // eg: pism_Greenland_5km_v1.1.nc
 
     /** Private; called from gcmce_cold_start() */
     void cold_start(
@@ -188,8 +230,7 @@ public:
     GCMInput couple(
         double time_s,        // Simulation time [s]
         VectorMultivec const &gcm_ovalsE,
-        bool run_ice,
-        bool am_i_root);
+        bool run_ice);
 
     /** Top-level ncio() to log output from coupler. (coupler->GCM) */
     void ncio_gcm_input(ibmisc::NcIO &ncio,

@@ -67,19 +67,21 @@ static std::map<std::string, std::string> path_args = {
     {"extra_file", "o"},
     {"ts_file", "o"}};
 
-void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet)
+void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet)
 {
-    IceCoupler::ncread(ncio, vname_sheet);
+    IceCoupler::ncread(ncio_config, vname_sheet);
 
-    printf("BEGIN IceCoupler_PISM::ncread()\n");
+    printf("BEGIN IceCoupler_PISM::ncread(%s)\n", vname_sheet.c_str());
     GCMParams const &_gcm_params(gcm_coupler->gcm_params);
 
-    this->icebin_gridI = dynamic_cast<Grid_XY const *>(gridI());
+    this->icebin_gridI = ice_regridder ?
+        dynamic_cast<Grid_XY const *>(gridI())
+        : NULL;
 
     // General args passed to the ice sheet, regardless of which ice model is being used
-    NcVar info_var(ncio.nc->getVar(vname_sheet + ".info"));
+    NcVar info_var(ncio_config.nc->getVar(vname_sheet + ".info"));
     // PISM parameters, passed to PISM via argv
-    NcVar pism_var(ncio.nc->getVar(vname_sheet + ".pism"));
+    NcVar pism_var(ncio_config.nc->getVar(vname_sheet + ".pism"));
 
     // Get simple arguments
     ibmisc::get_or_put_att(info_var, 'r', "update_elevation", &update_elevation, 1);
@@ -118,12 +120,15 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio, std::string const &vname_sheet)
     pism_args.push_back("-extra_vars");
     pism_args.push_back("climatic_mass_balance_cumulative,nonneg_flux_cumulative,grounded_basal_flux_cumulative,floating_basal_flux_cumulative,flux_divergence");
 #endif
+    printf("END IceCoupler_PISM::ncread()\n");
 }
 // ======================================================================
 void IceCoupler_PISM::cold_start(
     ibmisc::Datetime const &time_base,
     double time_start_s)
 {
+    printf("BEGIN IceCouple_PISM::cold_start()\n");
+
     // Call overridden method
     IceCoupler::cold_start(time_base, time_start_s);
 
@@ -146,7 +151,9 @@ void IceCoupler_PISM::cold_start(
     char **argv = argv_array;
 
 printf("*** PISM Args:");
-for (int i=0; i<argc; ++i) printf(" %s", argv[i]);
+for (int i=0; i<argc; ++i) {
+    printf(" %s", argv[i]);
+}
 printf("\n");
 
 
@@ -361,12 +368,14 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     // ============== Miscellaneous
     // Check that grid dimensions match
-    if ((pism_grid->Mx() != icebin_gridI->nx()) || (pism_grid->My() != icebin_gridI->ny())) {
-        (*icebin_error)(-1,
-            "Grid mismatch: pism=(%d, %d) icebin=(%d, %d)", pism_grid->Mx(), pism_grid->My(), icebin_gridI->nx(), icebin_gridI->ny());
+    if (icebin_gridI) {
+        if ((pism_grid->Mx() != icebin_gridI->nx()) || (pism_grid->My() != icebin_gridI->ny())) {
+            (*icebin_error)(-1,
+                "Grid mismatch: pism=(%d, %d) icebin=(%d, %d)", pism_grid->Mx(), pism_grid->My(), icebin_gridI->nx(), icebin_gridI->ny());
+        }
     }
 
-    printf("END IceCoupler_PISM::allocate()\n");
+    printf("END IceCoupler_PISM::cold_start()\n");
 }
 
 blitz::Array<double,1> IceCoupler_PISM::get_elevI()
@@ -384,8 +393,7 @@ blitz::Array<double,1> IceCoupler_PISM::get_elevI()
 void IceCoupler_PISM::run_timestep(double time_s,
     blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
     blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
-    bool run_ice,    // Should we run the ice model?
-    bool am_i_root)
+    bool run_ice)    // Should we run the ice model?
 {
     PetscErrorCode ierr;
 

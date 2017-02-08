@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cstdlib>
 #include <mpi.h>        // Intel MPI wants to be first
 #include <ibmisc/memory.hpp>
 #include <ibmisc/ncfile.hpp>
@@ -25,7 +26,6 @@
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/domain_splitter.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
 
 // See here to serialize objects with non-default constructor
 //    http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
@@ -82,8 +82,8 @@ rank_of_j(endj[endj.size()-1], blitz::fortranArray)    // Allocate for 1-based i
 // ======================================================================
 // ======================================================================
 // Called from LISnow::allocate()
-GCMCoupler_ModelE::GCMCoupler_ModelE() :
-    GCMCoupler(GCMCoupler::Type::MODELE)
+GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
+    GCMCoupler(GCMCoupler::Type::MODELE, std::move(_params))
 {
 
     // ----------------- Scalars provided by the GCM
@@ -102,6 +102,16 @@ GCMCoupler_ModelE::GCMCoupler_ModelE() :
 // -----------------------------------------------------
 // Called from LISnow::allocate()
 
+std::string GCMCoupler_ModelE::locate_input_file(
+    std::string const &sheet_name,        // eg: greenland
+    std::string const &file_name)         // eg: pism_Greenland_5km_v1.1.nc
+{
+    // Filenames in icebin.cdl have already been absolutized by
+    // Modele-Control
+    return file_name;
+}
+
+
 extern "C"
 void *gcmce_new(
     ModelEParams const &_rdparams,
@@ -118,34 +128,29 @@ void *gcmce_new(
 printf("BEGIN gcmce_new()\n");
 
     std::unique_ptr<GCMCoupler_ModelE> self(
-        new GCMCoupler_ModelE());
+        new GCMCoupler_ModelE(GCMParams(MPI_Comm_f2c(comm_f), root)));
 
     ModelEParams &rdparams(self->rdparams);
     rdparams = _rdparams;
-    GCMParams &params(self->gcm_params);
+    GCMParams &gcm_params(self->gcm_params);
 
     // Domains and indexing are alphabetical indexes, zero-based
-    params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
-    params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
-    params.gcm_comm = MPI_Comm_f2c(comm_f);
-    MPI_Comm_rank(params.gcm_comm, &params.gcm_rank);
-    self->world.reset(new boost::mpi::communicator(
-        params.gcm_comm, boost::mpi::comm_attach));
-    params.gcm_root = root;
+    gcm_params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
+    gcm_params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
 
-    params.icebin_grid_fname = boost::filesystem::absolute("./ICEBIN_GRID").string();
-//    params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR").string();
-    params.ice_config_dir = boost::filesystem::absolute("./ICE_CONFIG_DIR").string();
+    gcm_params.icebin_grid_fname = boost::filesystem::absolute("./ICEBIN_GRID").string();
+//    gcm_params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR").string();
+    gcm_params.ice_config_dir = boost::filesystem::absolute("./ICE_CONFIG_DIR").string();
 
-    params.run_dir = boost::filesystem::absolute(".").string();
-    params.gcm_dump_dir = boost::filesystem::absolute("ibdump").string();
+    gcm_params.run_dir = boost::filesystem::absolute(".").string();
+    gcm_params.gcm_dump_dir = boost::filesystem::absolute("ibdump").string();
 
-    params.icebin_config_fname = boost::filesystem::absolute("config/icebin.nc").string();
+    gcm_params.icebin_config_fname = boost::filesystem::absolute("config/icebin.nc").string();
 
     // Read the coupler, along with ice model proxies
-    if (params.am_i_root()) self->ncread(
-        params.icebin_grid_fname,
-        params.icebin_config_fname, "m");
+    self->ncread(
+        gcm_params.icebin_grid_fname,
+        gcm_params.icebin_config_fname, "m");
 
     // Check bounds on the IceSheets, set up any state, etc.
     // This is done AFTER setup of self because self->read_from_netcdf()
@@ -157,12 +162,12 @@ printf("BEGIN gcmce_new()\n");
     /** Creates (on root) a picture of the full domain decomposition.
     Run from all MPI ranks... */
     std::vector<int> endj;
-    int endme = params.domainA[1].end;
-    boost::mpi::gather<int>(*self->world,
+    int endme = gcm_params.domainA[1].end;
+    boost::mpi::gather<int>(self->gcm_params.world,
         &endme, 1,    // In-values
-        endj, 0);                    // Out-values, root
-    if (params.am_i_root()) {
-        self->domains.reset(new DomainDecomposer_ModelE(endj, params.domainA_global));
+        endj, self->gcm_params.gcm_root);                    // Out-values, root
+    if (self->am_i_root()) {
+        self->domains.reset(new DomainDecomposer_ModelE(endj, gcm_params.domainA_global));
     }
 
     // TODO: Test that im and jm are consistent with the grid read.
@@ -324,7 +329,7 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
     std::string fname(fname_c, fname_n);
     // TODO: Get ice model to save/restore state
     // We must figure out how to get an appropriate filename
-    if (self->gcm_params.am_i_root()) {
+    if (self->am_i_root()) {
     }
 }
 
@@ -341,6 +346,8 @@ bool run_ice);    // if false, only initialize
 extern "C"
 void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dtsrc)
 {
+    printf("BEGIN gcmce_cold_start()\n");
+
     // This will cold-start initial conditions of the dynamic ice model
     self->dtsrc = dtsrc;
 
@@ -362,6 +369,8 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
     // Inits files used to dump gcm_in and gcm_out
     if (self->gcm_params.gcm_dump_dir.size() > 0)
         boost::filesystem::create_directory(self->gcm_params.gcm_dump_dir);
+
+    printf("END gcmce_cold_start()\n");
 }
 
 // =======================================================
@@ -439,9 +448,9 @@ bool run_ice)    // if false, only initialize
     // boost::mpi::communicator &gcm_world(world);
     // Init our output struct based on number of A and E variables.
     GCMInput out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
-    if (self->gcm_params.am_i_root()) {
+    if (self->am_i_root()) {
         std::vector<VectorMultivec> every_gcm_ovalsE_s;
-        boost::mpi::gather(*self->world, gcm_ovalsE_s,
+        boost::mpi::gather(self->gcm_params.world, gcm_ovalsE_s,
             every_gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Concatenate coupler inputs
@@ -450,7 +459,7 @@ bool run_ice)    // if false, only initialize
         // Couple on root!
         GCMInput out(
             self->couple(time_s,
-                gcm_ovalsE_s, run_ice, true));
+                gcm_ovalsE_s, run_ice));
 
         // Split up the output (and 
         std::vector<GCMInput> every_outs(
@@ -458,19 +467,19 @@ bool run_ice)    // if false, only initialize
                 *self->domains, *self->domains));
 
         // Scatter!
-        boost::mpi::scatter(*self->world, every_outs, out, self->gcm_params.gcm_root);
+        boost::mpi::scatter(self->gcm_params.world, every_outs, out, self->gcm_params.gcm_root);
 
 
     } else {    // ~world.am_i_root()
         // Send our input to root
-        boost::mpi::gather(*self->world, gcm_ovalsE_s, self->gcm_params.gcm_root);
+        boost::mpi::gather(self->gcm_params.world, gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Let root do the work...
         // TODO... we must call through MPI so ice model can do MPI scatter/gathers..
-        self->couple(time_s, gcm_ovalsE_s, run_ice, false);
+        self->couple(time_s, gcm_ovalsE_s, run_ice);
 
         // Receive our output back from root
-        boost::mpi::scatter(*self->world, out, self->gcm_params.gcm_root);
+        boost::mpi::scatter(self->gcm_params.world, out, self->gcm_params.gcm_root);
     }
 
     // 1. Copies values back into modele.gcm_ivals

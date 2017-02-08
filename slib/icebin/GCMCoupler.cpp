@@ -64,6 +64,41 @@ static std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
     return ret;
 }
 
+GCMParams::GCMParams(MPI_Comm _gcm_comm, int _gcm_root) :
+    gcm_comm(_gcm_comm),
+    gcm_root(_gcm_root),
+    world(gcm_comm, boost::mpi::comm_attach)
+{
+    MPI_Comm_rank(gcm_comm, &gcm_rank);
+}
+
+HCSegmentData &GCMParams::ec_segment()
+{
+    auto &ec(hc_segments[hc_segments.size()-1]);
+    if (ec.name != "ec") (*icebin_error)(-1,
+        "The last elevation class segment must be called 'ec'");
+    return ec;
+}
+
+// ==========================================================
+
+GCMCoupler::GCMCoupler(Type _type, GCMParams &&_gcm_params) :
+    type(_type),
+    gcm_params(std::move(_gcm_params)),
+    ut_system("")
+{
+    gcm_constants.init(&ut_system);
+
+    // Icebin requires orography on the ice grid, in order to
+    // regrid in elevation space when things change.  Therefore, this
+    // is added to the contract for all GCMs
+    // gcm_inputs.add_field("elev2", "m", "ICE", "ice upper surface elevation");
+    // No... this messes up what the GCM expects, and it's not used by the GCM.
+    // Therefore, it should not be listed as a GCM input, it's a Icebin input.
+    // Icebin will require it, somehow, as an IceCoupler output, and get it
+    // directly from there.
+}
+
 
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
@@ -71,6 +106,34 @@ void GCMCoupler::ncread(
     std::string const &config_fname,        // comes from this->gcm_params
     std::string const &vname)        // comes from this->gcm_params
 {
+    if (!am_i_root()) {
+        printf("[non-root] BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
+
+        // TODO: Load one ice sheet per IceBin grid file.
+        std::vector<std::string> sheet_names;
+        {
+            NcIO ncio_grid(grid_fname, NcFile::read);
+            auto info_v(get_or_add_var(ncio_grid, vname + ".info", "int64", {}));
+            get_or_put_att(info_v, ncio_grid.rw, vname + ".sheets", "string", sheet_names);
+        }
+
+        NcIO ncio_config(config_fname, NcFile::read);
+        auto info_v(get_or_add_var(ncio_config, vname + ".info", "int64", {}));
+        for (auto &sheet_name : sheet_names) {
+            std::string vname_sheet(vname + "." + sheet_name);
+    
+printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
+
+            // Create an IceCoupler corresponding to this IceSheet.
+            ice_couplers.push_back(
+                new_ice_coupler(ncio_config, vname_sheet, this, NULL));
+        }
+
+        printf("[non-root] END GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
+        return;
+    }
+
+
     printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 
     // Load the MatrixMaker (filtering by our domain, of course)
@@ -102,6 +165,7 @@ void GCMCoupler::ncread(
     for (size_t i=0; i < gcm_regridder.ice_regridders.size(); ++i) {
         IceRegridder *ice_regridder = &*gcm_regridder.ice_regridders[i];
         std::string vname_sheet = vname + "." + ice_regridder->name();
+printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
 
         // Create an IceCoupler corresponding to this IceSheet.
         std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio, vname_sheet, this, ice_regridder));
@@ -118,6 +182,7 @@ void GCMCoupler::cold_start(
     ibmisc::Datetime _time_base,
     double _time_start_s)
 {
+    printf("BEGIN GCMCoupler::cold_start() nsheets=%ld\n", ice_couplers.size());
     time_base = _time_base;
     time_start_s = _time_start_s;
     time_unit = TimeUnit(&cal365, time_base, TimeUnit::SECOND);
@@ -127,24 +192,28 @@ void GCMCoupler::cold_start(
         auto &ice_coupler(ice_couplers[sheetix]);
 
         // NOTE: Contract sizes are only needed at runtime, not allocate() time.
-        contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
+//        contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
+
+        // Dynamic ice model is instantiated here...
         ice_coupler->cold_start(time_base, time_start_s);
+
+        ice_coupler->print_contracts();
     }
 
+    printf("END GCMCoupler::cold_start()\n");
 }
 // ------------------------------------------------------------
 
 GCMInput GCMCoupler::couple(
 double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
-bool run_ice,
-bool am_i_root)
+bool run_ice)
 {
-    if (!am_i_root) {
+    if (!gcm_params.am_i_root()) {
         GCMInput out({0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);
-            ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice, am_i_root);
+            ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
         }
         return out;
     }
@@ -171,7 +240,7 @@ bool am_i_root)
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
-        ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice, am_i_root);
+        ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
     }
 
 

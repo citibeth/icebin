@@ -111,7 +111,6 @@ class GCMCoupler_ModelE : public GCMCoupler
 public:
     double dtsrc;
     ModelEParams rdparams;    // Params straight from the rundeck (came during init)
-    std::unique_ptr<boost::mpi::communicator> world;
 
     /** On root: separate global stuff back into individual domains.
     Works for A and E grids. */
@@ -134,7 +133,11 @@ public:
     virtual ~GCMCoupler_ModelE() {}
 
     // Called from LISnow::allocate()
-    GCMCoupler_ModelE();
+    GCMCoupler_ModelE(GCMParams &&_params);
+
+    virtual std::string locate_input_file(
+        std::string const &sheet_name,        // eg: greenland
+        std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 
     int _read_nhc_gcm();
 
