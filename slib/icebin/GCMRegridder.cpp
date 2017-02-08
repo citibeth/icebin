@@ -96,7 +96,7 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
     ncio_vector(ncio, hcdefs, true, vname + ".hcdefs", "double",
         get_or_add_dims(ncio, {vname + ".nhc"}, {hcdefs.size()} ));
 //  domainA.ncio(ncio, ncInt, vname + ".domainA");
-    get_or_put_att(info_v, ncio.rw, vname + ".correctA", &correctA, 1);
+    get_or_put_att(info_v, ncio.rw, "correctA", &correctA, 1);
 
     // Read/write list of sheet names
     std::vector<std::string> sheet_names;
@@ -105,7 +105,7 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
         for (auto ii=sheets_index.begin(); ii != sheets_index.end(); ++ii)
             sheet_names.push_back(*ii);
     }
-    get_or_put_att(info_v, ncio.rw, vname + ".sheets", "string", sheet_names);
+    get_or_put_att(info_v, ncio.rw, "sheets", "string", sheet_names);
 
     // Read/write the regridder for each ice sheet
     if (ncio.rw == 'r') {   // Instantiate

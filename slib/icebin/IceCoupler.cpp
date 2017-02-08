@@ -94,7 +94,7 @@ void IceCoupler::cold_start(
     if (gcm_coupler->am_i_root()) {
         for (int io=0; io<2; ++io) {    // INPUT / OUTPUT
             auto fname(
-                boost::filesystem::path(gcm_coupler->gcm_params.gcm_dump_dir) /
+                boost::filesystem::path(output_dir) /
                 (name() + (io == 0 ? "_in.nc" : "_out.nc")));
             this->writer[io].reset(new IceWriter(
                 this, &contract[io], fname.string()));

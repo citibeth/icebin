@@ -102,10 +102,16 @@ GCMCoupler::GCMCoupler(Type _type, GCMParams &&_gcm_params) :
 
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
-    std::string const &grid_fname,        // comes from this->gcm_params
     std::string const &config_fname,        // comes from this->gcm_params
     std::string const &vname)        // comes from this->gcm_params
 {
+    NcIO ncio_config(config_fname, NcFile::read);
+    auto config_info(get_or_add_var(ncio_config, vname + ".info", "int64", {}));
+    std::string grid_fname;
+    get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
+    get_or_put_att(config_info, ncio_config.rw, "output_dir", output_dir);
+
+    // ---------------------------- Non-root version
     if (!am_i_root()) {
         printf("[non-root] BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 
@@ -113,12 +119,10 @@ void GCMCoupler::ncread(
         std::vector<std::string> sheet_names;
         {
             NcIO ncio_grid(grid_fname, NcFile::read);
-            auto info_v(get_or_add_var(ncio_grid, vname + ".info", "int64", {}));
-            get_or_put_att(info_v, ncio_grid.rw, vname + ".sheets", "string", sheet_names);
+            auto grid_info(get_or_add_var(ncio_grid, vname + ".info", "int64", {}));
+            get_or_put_att(grid_info, ncio_grid.rw, "sheets", "string", sheet_names);
         }
 
-        NcIO ncio_config(config_fname, NcFile::read);
-        auto info_v(get_or_add_var(ncio_config, vname + ".info", "int64", {}));
         for (auto &sheet_name : sheet_names) {
             std::string vname_sheet(vname + "." + sheet_name);
     
@@ -132,15 +136,15 @@ printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
         printf("[non-root] END GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
         return;
     }
-
+    // -------------------------------------------------
 
     printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 
     // Load the MatrixMaker (filtering by our domain, of course)
     // Also load the ice sheets
     {
-        NcIO ncio(grid_fname, NcFile::read);
-        gcm_regridder.ncio(ncio, vname);
+        NcIO ncio_grid(grid_fname, NcFile::read);
+        gcm_regridder.ncio(ncio_grid, vname);
     }
 
     std::cout << "========= GCM Constants" << std::endl;
@@ -152,12 +156,9 @@ printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
     std::cout << "========= GCM InputsA" << std::endl;
     std::cout << gcm_inputsAE[GridAE::E];
 
-    NcIO ncio(config_fname, NcFile::read);
-
     // Read m.segments
     std::string segments;
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
-    get_or_put_att(info_v, ncio.rw, "segments", segments);
+    get_or_put_att(config_info, ncio_config.rw, "segments", segments);
     gcm_params.hc_segments = parse_hc_segments(segments);
     gcm_params.icebin_base_hc = gcm_params.ec_segment().base;
 
@@ -168,7 +169,7 @@ printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
 printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
 
         // Create an IceCoupler corresponding to this IceSheet.
-        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio, vname_sheet, this, ice_regridder));
+        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname_sheet, this, ice_regridder));
 
         ice_couplers.push_back(std::move(ice_coupler));
     }

@@ -53,6 +53,7 @@ IceCoupler_PISM::IceCoupler_PISM()
 {
 }
 
+#if 0
 // PISM command line arguments that are paths, and thus need pathname
 // resolution.
 // For PISM stable0.5 branch
@@ -66,6 +67,7 @@ static std::map<std::string, std::string> path_args = {
     {"o", "o"},
     {"extra_file", "o"},
     {"ts_file", "o"}};
+#endif
 
 void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet)
 {
@@ -84,7 +86,8 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname
     NcVar pism_var(ncio_config.nc->getVar(vname_sheet + ".pism"));
 
     // Get simple arguments
-    ibmisc::get_or_put_att(info_var, 'r', "update_elevation", &update_elevation, 1);
+    get_or_put_att(info_var, 'r', "update_elevation", &update_elevation, 1);
+    get_or_put_att(info_var, 'r', "output_dir", output_dir);
 
     // Create arguments from PISM configuration
     pism_args.push_back("icebin_pism");
@@ -96,20 +99,6 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname
         NcAtt const &att(jj->second);
         std::string val;
         att.getValues(val);
-
-        auto ii(path_args.find(name));
-        if (ii == path_args.end()) {
-            // Regular case, just use the value there
-        } else {
-            // Resolve path names according to the configuration directory
-            auto &resolve(ii->second == "i" ?
-                gcm_coupler->gcm_params.ice_config_dir : gcm_coupler->gcm_params.run_dir);
-
-            val = boost::filesystem::absolute(
-                boost::filesystem::path(val),
-                resolve).string();
-            printf("IceCoupler_PISM resolving %s: --> %s\n", name.c_str(), val.c_str());
-        }
 
         pism_args.push_back("-" + name);
         pism_args.push_back(val);
@@ -224,7 +213,9 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     pism::icebin::IBIceModel::Params params;
         params.time_start_s = gcm_coupler->time_start_s;
-        params.output_dir = boost::filesystem::absolute(gcm_coupler->gcm_params.run_dir).string();
+
+        params.output_dir = output_dir;
+
     pism_ice_model.reset(new pism::icebin::IBIceModel(pism_grid, ctx, params));
 
     // ------------------------------------------- \\

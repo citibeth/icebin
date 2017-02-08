@@ -120,11 +120,9 @@ struct GCMParams {
     // ------- Passed into GCMCoupler::allocate()
     ibmisc::Domain domainA, domainA_global;
 
-    std::string icebin_grid_fname;
+    // Name of the IceBin config file.
+    // Other input files should be listed here as abosolute paths.
     std::string icebin_config_fname;
-    std::string ice_config_dir; // Where to look for Ice Model configuration files
-    std::string run_dir;    // The GCM run directory
-    std::string gcm_dump_dir;
 
     bool icebin_logging = true ;    // Should IceBin log input & output?
 
@@ -162,6 +160,9 @@ public:
 
     /** Filename this coupler (including grid) was read from. */
     std::string icebin_in;
+
+    /** Parameters read from IceBin config file */
+    std::string output_dir;
 
     /** Main access to the core regridding of Icebin */
     GCMRegridder gcm_regridder;
@@ -207,7 +208,6 @@ public:
     bool am_i_root() const { return gcm_params.am_i_root(); }
 
     virtual void ncread(
-        std::string const &grid_fname,
         std::string const &config_fname,
         std::string const &vname);
 

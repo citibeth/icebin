@@ -43,6 +43,9 @@ public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
     IceRegridder *ice_regridder;   // This is not const; see IceCoupler.IceRegridder::set_elevI()
 
+    /** Place where we can write stuff related to this ice sheet */
+    std::string output_dir;
+
     // Densified regridding matrix, and dimension, from previous call
     // Used to interpret GCM output
     std::unique_ptr<EigenSparseMatrixT> IvE0;

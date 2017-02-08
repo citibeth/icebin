@@ -42,6 +42,7 @@
 
 using namespace std;
 using namespace ibmisc;
+using namespace netCDF;
 
 
 #if 0
@@ -138,19 +139,10 @@ printf("BEGIN gcmce_new()\n");
     gcm_params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
     gcm_params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
 
-    gcm_params.icebin_grid_fname = boost::filesystem::absolute("./ICEBIN_GRID").string();
-//    gcm_params.config_dir = boost::filesystem::canonical("./ICEBIN_MODEL_CONFIG_DIR").string();
-    gcm_params.ice_config_dir = boost::filesystem::absolute("./ICE_CONFIG_DIR").string();
-
-    gcm_params.run_dir = boost::filesystem::absolute(".").string();
-    gcm_params.gcm_dump_dir = boost::filesystem::absolute("ibdump").string();
-
     gcm_params.icebin_config_fname = boost::filesystem::absolute("config/icebin.nc").string();
 
     // Read the coupler, along with ice model proxies
-    self->ncread(
-        gcm_params.icebin_grid_fname,
-        gcm_params.icebin_config_fname, "m");
+    self->ncread(gcm_params.icebin_config_fname, "m");
 
     // Check bounds on the IceSheets, set up any state, etc.
     // This is done AFTER setup of self because self->read_from_netcdf()
@@ -186,7 +178,16 @@ int gcmce_nhc_gcm(GCMCoupler_ModelE *self)
 
 int GCMCoupler_ModelE::_read_nhc_gcm()
 {
-    NcIO ncio(this->gcm_params.icebin_grid_fname, 'r');
+    // Get the name of the grid file
+    std::string grid_fname;
+    {
+        NcIO ncio_config(gcm_params.icebin_config_fname, NcFile::read);
+        auto config_info(get_or_add_var(ncio_config, "m.info", "int64", {}));
+        get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
+    }
+
+    // Open the grid file to get the NHC
+    NcIO ncio(grid_fname, 'r');
     int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
 
     // Find the "ec" segment and set its size now...
@@ -365,10 +366,6 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
 
     // d) Sync with dynamic ice model
     gcmce_couple_native(self, itimei, false);
-
-    // Inits files used to dump gcm_in and gcm_out
-    if (self->gcm_params.gcm_dump_dir.size() > 0)
-        boost::filesystem::create_directory(self->gcm_params.gcm_dump_dir);
 
     printf("END gcmce_cold_start()\n");
 }
