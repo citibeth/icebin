@@ -39,9 +39,11 @@ public:
     to be passed IceBin->IceCoupler and IceCoupler->IceBin */
     enum IO {INPUT, OUTPUT, count};
 
+
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
     IceRegridder *ice_regridder;   // This is not const; see IceCoupler.IceRegridder::set_elevI()
+    std::string _name;              // Name of the ice sheet (in case ice_regridder is NULL)
 
     /** Place where we can write stuff related to this ice sheet */
     std::string output_dir;
@@ -67,7 +69,7 @@ public:
     std::array<std::unique_ptr<IceWriter>, 2> writer;
 
 public:
-    std::string const &name() const { return ice_regridder->name(); }
+    std::string const &name() const { return _name; }
     Grid const *gridI() { return ice_regridder->gridI.get(); }
     long nI() const { return ice_regridder->gridI->ndata(); }
 
@@ -146,7 +148,8 @@ public:
 // =========================================================
 
 extern
-std::unique_ptr<IceCoupler> new_ice_coupler(ibmisc::NcIO &ncio, std::string vname,
+std::unique_ptr<IceCoupler> new_ice_coupler(ibmisc::NcIO &ncio,
+    std::string const &vname, std::string const &sheet_name,
     GCMCoupler const *_gcm_coupler, IceRegridder *_regridder);
 
 

@@ -44,19 +44,18 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
     // =========== Transfer  constants from Icebin's gcm_constants --> PISM
     // ice_coupler->transfer_constant(PISM_destionation, icebin_src, multiply_by)
     // (see IceCoupler_PISM.cpp)
-    ice_coupler->transfer_constant("standard_gravity", "constant::grav");
-    ice_coupler->transfer_constant("beta_CC", "seaice::dtdp", -1.0);
-    ice_coupler->transfer_constant("water_melting_point_temperature", "constant::tf");
-    ice_coupler->transfer_constant("water_latent_heat_fusion", "constant::lhm");
-    ice_coupler->transfer_constant("water_specific_heat_capacity", "constant::shw");
+    ice_coupler->transfer_constant("constants.standard_gravity", "constant.grav");
+    ice_coupler->transfer_constant("constants.ice.beta_Clausius_Clapeyron", "seaice.dtdp", -1.0);
+    ice_coupler->transfer_constant("constants.fresh_water.melting_point_temperature", "constant.tf");
+    ice_coupler->transfer_constant("constants.fresh_water.latent_heat_of_fusion", "constant.lhm");
+    ice_coupler->transfer_constant("constants.fresh_water.specific_heat_capacity", "constant.shw");
 
-    ice_coupler->transfer_constant("ice_density", "constant::rhoi");
-    ice_coupler->transfer_constant("ice_thermal_conductivity", "seaice::alami0");
-    ice_coupler->transfer_constant("ice_specific_heat_capacity", "constant::shi");
-    ice_coupler->transfer_constant("fresh_water_density", "constant::rhow");
-    ice_coupler->transfer_constant("sea_water_density", "constant::rhows");
-    ice_coupler->transfer_constant("standard_gravity", "constant::grav");
-    ice_coupler->transfer_constant("ideal_gas_constant", "constant::gasc");
+    ice_coupler->transfer_constant("constants.ice.density", "constant.rhoi");
+    ice_coupler->transfer_constant("constants.ice.thermal_conductivity", "seaice.alami0");
+    ice_coupler->transfer_constant("constants.ice.specific_heat_capacity", "constant.shi");
+    ice_coupler->transfer_constant("constants.fresh_water.density", "constant.rhow");
+    ice_coupler->transfer_constant("constants.sea_water.density", "constant.rhows");
+    ice_coupler->transfer_constant("constants.ideal_gas_constant", "constant.gasc");
 
     // To set this, see (in ModelE): Function SHCGS in ocnfuntab.f is
     // used for the Russell ocean. I. The simple models use SHW=4185.
@@ -70,7 +69,7 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
 
     // In PISM and ModelE Clausius-Clapeyron equation, surfce_pressure is the DIFFERENCE
     // from 1atm.  Thus, surface_pressure=0 implies the ice sheet existing at 1atm
-    ice_coupler->set_constant("surface_pressure", 0, "Pa");       // Match ModelE thermodynam
+    ice_coupler->set_constant("surface.pressure", 0, "Pa");       // Match ModelE thermodynam
 
     // No need to set enthalpy_reference_temperature.  pism::EnthalpyConverter is used (below)
     // to convert enthalpy values between ModelE and PISM.
@@ -101,14 +100,15 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
     // getEnthalpyInterval() replaced with enthalpy_liquid()
     // https://github.com/pism/pism/commit/c820dfd8
     E_l = enth.enthalpy_liquid(pressure);
-    double const enth_modele_to_pism = E_l;     // (J/kg): Add to convert ModelE specific enthalpies (J/kg) to PISM specific enthalpies (J/kg)
-    // NOTE: enth_modele_to_pism == 437000 J/kg
-    if (ice_coupler->pism_rank() == 0) printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
+    double const enth_modele_to_pism = E_l;     // [J/kg]: Add to convert ModelE specific enthalpies [J/kg] to PISM specific enthalpies [J/kg]
+    // NOTE: enth_modele_to_pism == 437000 [J/kg]
+    printf("enth_modele_to_pism = %g\n", enth_modele_to_pism);
 
     bool ok = true;
 
-    double const RHOW = gcm_coupler->gcm_constants.get_as("constant::rhow", "kg m-3");
+    double const RHOW = gcm_coupler->gcm_constants.get_as("constant.rhow", "kg m-3");
     double const byRHOW = 1.0 / RHOW;
+
 
     // ------------- Convert the contract to a var transformer
     // ------------- of I <- E   (Ice <- GCM)

@@ -157,9 +157,43 @@ printf("\n");
 
 printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
-    // Initialize Petsc
+    // -------------- Initialize Petsc
+    // From personal correspondence with Barry Smith <bsmith@mcs.anl.gov>
+    //  > 3. The way PETSc provides stacktraces is clever.  However, it
+    //   doesn't really work well with the non-PETSc parts of the program
+    //   which don't (and won't) follow PETSc conventions.  It's also
+    //   clumsy to use, i.e. checking error returns on
+    //   every. single. call.  And finally, there are easier and less
+    //   invasive ways to get stacktraces (which I am discovering and
+    //   implementing).  Again... stacktraces are nice, but they have
+    //   nothing to do with the core functionality of PETSc in this case.
+    //
+    // You can have PETSc either abort on errors with either
+    // PetscOptionsSetValue("-on_error_abort","true") or
+    // PetscOptionsSetValue("-on_error_mpiabort","true") BEFORE
+    // PetscInitialize() or you can call PetscPushErrorHandler() after
+    // PetscInitialize() to set a custom or standard error handler, for
+    // example PetscReturnErrorHandler() simply returns the error flag up
+    // the stack without printing the stack
+    // trace. PetscAbortErrorHandler() and PetscMPIAbortErrorHandler()
+    // trigger an immediate abort or MPI_Abort().  If you don't want to
+    // check error codes always in C++ you could possible generate an
+    // exception on the errors and optionally catch them on the way up
+    // but I don't know how to a handle that in Fortran, plus at the
+    // interface calls between C++ and C or Fortran you would need to
+    // catch all the exceptions and translate them to error codes again.
+    //
+    // Also see here for proper calling sequence of PetscOptionsSetValue()
+    //    http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/Sys/PetscOptionsSetValue.html
     // petsc_initializer.reset(new pism::petsc::Initializer(pism_comm, argc, argv));
+//    printf("Setting -on_error_mpiabort\n");
+//    PetscOptionsSetValue(NULL, "-on_error_mpiabort", "true");
+    printf("Doing -no_signal_handler\n");
+    PetscOptionsSetValue(NULL, "-no_signal_handler", "true");
     petsc_initializer.reset(new pism::petsc::Initializer(argc, argv, "IceBin GCM Coupler"));
+//    printf("Calling PetscPopErrorHandler()\n");
+//    PetscPopErrorHandler();
+    // ------------------------------------
 
     // verbosityLevelFromOptions();    // https://github.com/pism/pism/commit/3c75fd63
     Context::Ptr ctx = context_from_options(pism_comm, "IceCoupler_PISM");
@@ -199,7 +233,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     // Get arguments from the GCM
     ibmisc::Datetime const &tb(gcm_coupler->time_base);
     std::string reference_date = (boost::format("%04d-%02d-%02d") % tb.year() % tb.month() % tb.day()).str();
-    config->set_string("reference_date", reference_date);
+    config->set_string("time.reference_date", reference_date);
     // ------------------------------ //
 
 #if 0    // Don't bother with profiling inside of GCM
@@ -273,7 +307,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     // Initialize scatter/gather stuff
     da2 = pism_grid->get_dm(1, // dm_dof
-        pism_grid->ctx()->config()->get_double("grid_max_stencil_width"));
+        pism_grid->ctx()->config()->get_double("grid.max_stencil_width"));
 
 //    ierr = DMCreateGlobalVector(*da2, &g2); PISM_CHK(ierr, "DMCreateGlobalVector");
 
@@ -629,17 +663,19 @@ void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(
 
 void IceCoupler_PISM::transfer_constant(std::string const &dest, std::string const &src, double multiply_by, bool set_new)
 {
-printf("BEGIN IceCoupler_PISM::transfer_constant %s %s\n", dest.c_str(), src.c_str()); fflush(stdout);
     // Make sure the PISM constant already exists
     if (!set_new && !pism_config()->is_set(dest)) (*icebin_error)(-1,
         "IceCoupler_PISM::transfer_constant: Trying to set '%s', which is not a PISM configuration parameter.  Is it misspelled?", dest.c_str());
 
     // Discover the units PISM requires.
-    std::string doc = pism_config()->get_string(dest + "_doc");
-    std::string units = doc.substr(0, doc.find(';'));
+    std::string units = pism_config()->get_string(dest + "_units");
     double val = gcm_coupler->gcm_constants.get_as(src, units) * multiply_by;
     pism_config()->set_double(dest, val);
-printf("IceCoupler_PISM::transfer_constant: %s = %g %s (from %s in GCM)\n", dest.c_str(), val, units.c_str(), src.c_str());
+printf("IceCoupler_PISM::transfer_constant: %s = %g [%s] (from %s in GCM)\n", dest.c_str(), val, units.c_str(), src.c_str());
+
+
+
+
 }
 
 void IceCoupler_PISM::set_constant(std::string const &dest, double src_val, std::string const &src_units, bool set_new)
@@ -651,8 +687,7 @@ void IceCoupler_PISM::set_constant(std::string const &dest, double src_val, std:
     ibmisc::ConstantSet const &gcm_constants(gcm_coupler->gcm_constants);
 
     // Discover the units PISM requires.
-    std::string doc = pism_config()->get_string(dest + "_doc");
-    std::string dest_units = doc.substr(0, doc.find(';'));
+    std::string dest_units = pism_config()->get_string(dest + "_units");
 
     UTUnit usrc(gcm_constants.ut_system->parse(src_units));
     UTUnit udest(gcm_constants.ut_system->parse(dest_units));

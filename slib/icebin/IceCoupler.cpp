@@ -42,11 +42,12 @@ using namespace netCDF;
 
 namespace icebin {
 
-std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
+std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
+    std::string const &vname, std::string const &sheet_name,
     GCMCoupler const *_gcm_coupler, IceRegridder *_ice_regridder)
 {
-    std::string vn(vname + ".info");
-    auto info_v = get_or_add_var(ncio, vn, "int64", {});
+    std::string vname_sheet(vname + "." + sheet_name);
+    auto info_v = get_or_add_var(ncio, vname_sheet + ".info", "int64", {});
 
     IceCoupler::Type type;
     get_or_put_att_enum(info_v, ncio.rw, "ice_coupler", type);
@@ -60,7 +61,6 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio, std::string vname,
 #endif
 #ifdef USE_PISM
         case IceCoupler::Type::PISM :
-printf("new IceCoupler_PISM: %s\n", vname.c_str());
             self.reset(new gpism::IceCoupler_PISM);
         break;
 #endif
@@ -71,11 +71,12 @@ printf("new IceCoupler_PISM: %s\n", vname.c_str());
 
 
     // Do basic initialization...
+    self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
     self->ice_regridder = _ice_regridder;
 //    self->ice_constants.init(&_coupler->ut_system);
 
-    self->ncread(ncio, vname);
+    self->ncread(ncio, vname_sheet);
 
     return self;
 }
@@ -355,9 +356,7 @@ IceWriter::IceWriter(
     }
 
     // Put our output files in this directory, one named per ice sheet.
-printf("_fname %s\n", _fname.c_str());
     boost::filesystem::path ofname(_fname);
-printf("parent_path %s\n", ofname.parent_path().string().c_str());
     boost::filesystem::create_directory(ofname.parent_path());    // Make sure it exists
 
 //    auto output_dir = boost::filesystem::absolute(

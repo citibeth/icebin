@@ -130,7 +130,7 @@ printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
 
             // Create an IceCoupler corresponding to this IceSheet.
             ice_couplers.push_back(
-                new_ice_coupler(ncio_config, vname_sheet, this, NULL));
+                new_ice_coupler(ncio_config, vname, sheet_name, this, NULL));
         }
 
         printf("[non-root] END GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
@@ -165,11 +165,9 @@ printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
     ice_couplers.clear();
     for (size_t i=0; i < gcm_regridder.ice_regridders.size(); ++i) {
         IceRegridder *ice_regridder = &*gcm_regridder.ice_regridders[i];
-        std::string vname_sheet = vname + "." + ice_regridder->name();
-printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
 
         // Create an IceCoupler corresponding to this IceSheet.
-        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname_sheet, this, ice_regridder));
+        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname, ice_regridder->name(), this, ice_regridder));
 
         ice_couplers.push_back(std::move(ice_coupler));
     }
