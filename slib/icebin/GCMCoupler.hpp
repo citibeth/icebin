@@ -118,7 +118,6 @@ struct GCMParams {
     boost::mpi::communicator world;
 
     // ------- Passed into GCMCoupler::allocate()
-    ibmisc::Domain domainA, domainA_global;
 
     // Name of the IceBin config file.
     // Other input files should be listed here as abosolute paths.

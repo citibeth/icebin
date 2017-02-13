@@ -382,7 +382,13 @@ void IceWriter::init_file()
     NcIO ncio(fname, NcFile::replace);
 
     auto one_dims(get_or_add_dims(ncio, {"one"}, {1}));
-    auto dims(get_or_add_dims(ncio, dim_names, counts));
+
+    // Make time dimension unlimited (-1)
+    std::vector<long> dcounts;
+    dcounts.reserve(counts.size());
+    dcounts[0] = -1;        // time needs to be unlimited
+    for (size_t i=1; i<dcounts.size(); ++i) dcounts[i] = counts[i];
+    auto dims(get_or_add_dims(ncio, dim_names, dcounts));
 
 
 //    NcDim one_dim = ncio.nc->addDim("one", 1);

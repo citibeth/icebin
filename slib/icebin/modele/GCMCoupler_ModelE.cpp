@@ -136,8 +136,8 @@ printf("BEGIN gcmce_new()\n");
     GCMParams &gcm_params(self->gcm_params);
 
     // Domains and indexing are alphabetical indexes, zero-based
-    gcm_params.domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
-    gcm_params.domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
+    self->domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
+    self->domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
 
     gcm_params.icebin_config_fname = boost::filesystem::absolute("config/icebin.nc").string();
 
@@ -154,12 +154,13 @@ printf("BEGIN gcmce_new()\n");
     /** Creates (on root) a picture of the full domain decomposition.
     Run from all MPI ranks... */
     std::vector<int> endj;
-    int endme = gcm_params.domainA[1].end;
+    int endme = self->domainA[1].end;
     boost::mpi::gather<int>(self->gcm_params.world,
         &endme, 1,    // In-values
         endj, self->gcm_params.gcm_root);                    // Out-values, root
     if (self->am_i_root()) {
-        self->domains.reset(new DomainDecomposer_ModelE(endj, gcm_params.domainA_global));
+        self->domains.reset(
+            new DomainDecomposer_ModelE(endj, self->domainA_global));
     }
 
     // TODO: Test that im and jm are consistent with the grid read.
@@ -418,6 +419,7 @@ bool run_ice)    // if false, only initialize
     std::vector<double> val(self->gcm_outputsE.size());    // Temporary
 
     auto &domainA(self->domainA);
+printf("domainA size=%ld\n", domainA.data.size());
     for (int ihc=base_hc; ihc < base_hc + nhc_ice; ++ihc) {
     for (int j=domainA[1].begin; j < domainA[1].end; ++j) {
     for (int i=domainA[0].begin; i < domainA[0].end; ++i) {

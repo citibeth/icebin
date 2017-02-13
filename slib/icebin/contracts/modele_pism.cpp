@@ -167,8 +167,6 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
     ice_output.add("epsilon.mass", nan, "kg m-2 s-1", 0, "");
     ice_output.add("epsilon.enth", nan, "W m-2", 0, "");
 
-    ice_output.add("unit", nan, "", 0, "Dimensionless identity");
-
     std::cout << "========= Ice Model Outputs (" << ice_coupler->name() << ") modele_pism.cpp:" << std::endl;
     std::cout << ice_output << std::endl;
 

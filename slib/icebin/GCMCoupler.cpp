@@ -208,6 +208,7 @@ double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
 bool run_ice)
 {
+printf("BEGIN GCMCoupler::coupler()\n");
     if (!gcm_params.am_i_root()) {
         GCMInput out({0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
@@ -227,7 +228,7 @@ bool run_ice)
     std::string log_dir = "icebin";
 
     if (gcm_params.icebin_logging) {
-        std::string fname = "gcm-out-" + sdate;
+        std::string fname = "gcm-out-" + sdate + ".nc";
         NcIO ncio(fname, 'w');
         ncio_gcm_output(ncio, gcm_ovalsE, timespan,
             time_unit.to_cf(), "");
@@ -245,12 +246,13 @@ bool run_ice)
 
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-in-" + sdate;
-        NcIO ncio(fname, 'r');
+        NcIO ncio(fname, 'w');
         ncio_gcm_input(ncio, out, timespan,
             time_unit.to_cf(), "");
         ncio();
     }
 
+printf("END GCMCoupler::coupler()\n");
     return out;
 }
 // ------------------------------------------------------------
@@ -261,6 +263,7 @@ static void ncwrite_dense(
     ibmisc::Indexing const *indexing,
     std::string const &vname_base)
 {
+printf("BEGIN ncwrite_dense()\n");
     // im,jm,ihc  0-based
     blitz::Array<double,1> denseE(indexing->extent());    // All dims
 
@@ -285,6 +288,7 @@ static void ncwrite_dense(
         ncvar.putVar(startp, countp, denseE.data());
     }
 
+printf("END ncwrite_dense()\n");
 }
 
 /** Densifies the sparse vectors, and then writes them out to netCDF */
@@ -295,6 +299,7 @@ static void ncio_dense(
     ibmisc::Indexing const &indexing,
     std::string const &vname_base = "")
 {
+printf("BEGIN ncio_dense()\n");
     if (ncio.rw != 'w') (*icebin_error)(-1,
         "ncio_dense(VectorMultivec) only writes, no read.");
 
@@ -303,8 +308,10 @@ static void ncio_dense(
     append(dim_spec, indexing);
     contract.ncdefine(ncio, dim_spec.to_dims(ncio), vname_base);
 
-    ncio += std::bind(ncwrite_dense,
-        ncio.nc, &vecs, &contract, &indexing, vname_base);
+//    ncio += std::bind(ncwrite_dense,
+//        ncio.nc, &vecs, &contract, &indexing, vname_base);
+
+printf("END ncio_dense()\n");
 }
 // ------------------------------------------------------------
 /** Top-level ncio() to log output from coupler. (coupler->GCM) */
@@ -334,10 +341,11 @@ void GCMCoupler::ncio_gcm_output(NcIO &ncio,
     std::string const &time_units,
     std::string const &vname_base)
 {
+printf("BEGIN GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
     ncio_timespan(ncio, timespan, time_units, vname_base);
-
     ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
         gcm_regridder.indexingE, vname_base);
+printf("END GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
 }
 // ------------------------------------------------------------
 // ======================================================================
