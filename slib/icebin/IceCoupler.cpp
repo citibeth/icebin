@@ -74,6 +74,8 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
     self->ice_regridder = _ice_regridder;
+    if (_ice_regridder) self->_nI = _ice_regridder->nI();
+
 //    self->ice_constants.init(&_coupler->ut_system);
 
     self->ncread(ncio, vname_sheet);
@@ -163,6 +165,8 @@ bool run_ice)
         return;
     }
 
+    printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
+
     // ========== Get Ice Inputs
     blitz::Array<double,2> ice_ivalsI(nI(), contract[INPUT].size());
     blitz::Array<double,2> ice_ovalsI(nI(), contract[OUTPUT].size());
@@ -210,6 +214,7 @@ bool run_ice)
     // ------------- Form ice_ivalsI
 
     // Regrid & combine to form ice_ivalsI
+    if (run_ice) {
     for (auto iIvE0(begin(*IvE0)); iIvE0 != end(*IvE0); ++iIvE0) {
         auto ii(iIvE0->index(0));
         auto jj(iIvE0->index(1));
@@ -226,7 +231,7 @@ bool run_ice)
             }
             ice_ivalsI(ii, kk) += IvE0_ij * ice_ivalsE_jk;
         }
-    }
+    }}
 
     // ========= Step the ice model forward
     if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
@@ -326,6 +331,8 @@ bool run_ice)
     auto IvE1(rm.regrid("IvE", {NULL, &dimE1}, true, true));
     dimE0 = std::move(dimE1);
     IvE0 = std::move(IvE1->M);
+
+    printf("END IceCoupler::couple(%s)\n", name().c_str());
 }
 // =======================================================
 /** Specialized init signature for IceWriter */
@@ -346,7 +353,6 @@ IceWriter::IceWriter(
     dim_names = {"time"};
     counts = {1};
     cur = {0};
-    strides = {1};
     for (size_t i=0; i<indexing.rank(); ++i) {
         // ix goes 0...n-1 for row-major, n-1..0 for col-major
         int ix = indexing.indices()[i];
@@ -386,8 +392,8 @@ void IceWriter::init_file()
     // Make time dimension unlimited (-1)
     std::vector<long> dcounts;
     dcounts.reserve(counts.size());
+    for (size_t count : counts) dcounts.push_back(count);
     dcounts[0] = -1;        // time needs to be unlimited
-    for (size_t i=1; i<dcounts.size(); ++i) dcounts[i] = counts[i];
     auto dims(get_or_add_dims(ncio, dim_names, dcounts));
 
 
@@ -456,15 +462,23 @@ printf("BEGIN IceWriter::write\n");
     NcVar time_var = ncio.nc->getVar("time");
     time_var.putVar(cur, counts, &time_s);
 
-
     // Write the other variables
-    strides[0] = &valsI(1,0) - &valsI(0,0);
+    size_t nI(valsI.extent(0));
+    blitz::Array<double,2> valI_tmp(nI);
+
+    // Sanity check array sizes
+    size_t all_count = 1;
+    for (auto count : counts) all_count *= count;
+    if (all_count != nI) (*icebin_error)(-1,
+        "Illegal count to write: %ld vs %ld", all_count, nI);
+
+
     for (int ivar=0; ivar < contract->size(); ++ivar) {
         VarMeta const &cf = (*contract)[ivar];
 
         NcVar ncvar = ncio.nc->getVar(cf.name.c_str());
-        double const *data(&valsI(0,ivar));
-        ncvar.putVar(cur, counts, strides, data);
+        for (int i=0; i<valsI.extent(0); ++i) valI_tmp(i) = valsI(i, ivar);
+        ncvar.putVar(cur, counts, valI_tmp.data());
     }
 
     ncio.close();

@@ -163,7 +163,7 @@ public:
          IceCoupler::couple() */
     virtual void run_timestep(double time_s,
         blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
-        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+        blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nI, nvar)
         bool run_ice);    // Should we run the ice model?
 
 protected:
@@ -176,7 +176,7 @@ protected:
         Set to 0 for "all."
     */
     void get_state(
-        blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+        blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nI, nvar)
         unsigned int mask);
 
     // ===================================================================
@@ -190,7 +190,7 @@ protected:
     If this array is not yet allocated (ROOT NODE ONLY), it will be allocated.*/
     void iceModelVec2S_to_blitz_xy(
         pism::IceModelVec2S const &pism_var,
-        blitz::Array<double,2> &ret);
+        blitz::Array<double,1> &ret);
 
 
 public:

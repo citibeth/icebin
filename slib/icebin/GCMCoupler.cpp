@@ -208,7 +208,7 @@ double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
 bool run_ice)
 {
-printf("BEGIN GCMCoupler::coupler()\n");
+printf("BEGIN GCMCoupler::coupler(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     if (!gcm_params.am_i_root()) {
         GCMInput out({0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
@@ -304,12 +304,12 @@ printf("BEGIN ncio_dense()\n");
         "ncio_dense(VectorMultivec) only writes, no read.");
 
     // Create the variables
-    NcDimSpec dim_spec({"time"}, {-1});
+    NcDimSpec dim_spec({"time"}, {1});
     append(dim_spec, indexing);
     contract.ncdefine(ncio, dim_spec.to_dims(ncio), vname_base);
 
-//    ncio += std::bind(ncwrite_dense,
-//        ncio.nc, &vecs, &contract, &indexing, vname_base);
+    ncio += std::bind(ncwrite_dense,
+        ncio.nc, &vecs, &contract, &indexing, vname_base);
 
 printf("END ncio_dense()\n");
 }

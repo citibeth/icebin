@@ -243,7 +243,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 #endif
 
     log->message(3, "* Setting the computational grid...\n");
-    IceGrid::Ptr pism_grid = IceGrid::FromOptions(ctx);
+    pism_grid = IceGrid::FromOptions(ctx);
 
     pism::icebin::IBIceModel::Params params;
         params.time_start_s = gcm_coupler->time_start_s;
@@ -251,6 +251,10 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
         params.output_dir = output_dir;
 
     pism_ice_model.reset(new pism::icebin::IBIceModel(pism_grid, ctx, params));
+    _nI = nx() * ny();
+
+    if (ice_regridder && (_nI != ice_regridder->nI())) (*icebin_error)(-1,
+        "nI does not match: %ld vs. %ld\n", _nI, ice_regridder->nI());
 
     // ------------------------------------------- \\
 
@@ -407,22 +411,23 @@ blitz::Array<double,1> IceCoupler_PISM::get_elevI()
 {
     // Reshape 1D blitz variable to 2D for use with PISM
     blitz::Array<double,1> retI(ny()*nx());
-    auto ret_xy(reshape<double,1,2>(retI, blitz::shape(ny(), nx())));
 
     iceModelVec2S_to_blitz_xy(
         pism_ice_model->ice_surface_elevation(),
-        ret_xy);
+        retI);
     return retI;
 }
 
 void IceCoupler_PISM::run_timestep(double time_s,
     blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
-    blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+    blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nI, nvar)
     bool run_ice)    // Should we run the ice model?
 {
     PetscErrorCode ierr;
 
-    // ----------- Type Checking
+    size_t nI;
+
+    // ----------- Bounds Checking
     // Check dimensions
     std::array<long,5> extents0{
         ice_ivalsI.extent(1),
@@ -443,13 +448,13 @@ void IceCoupler_PISM::run_timestep(double time_s,
         extents0[2], extents1[2],
         extents0[3], extents1[3],
         extents0[4], extents1[4]);
+    nI = ice_ivalsI.extent(0);
 
     // Check Petsc types
     if (sizeof(double) != sizeof(PetscScalar)) {
         (*icebin_error)(-1, "PetscScalar must be same as double\n");
     }
 
-    size_t nI = ice_ivalsI.extent(0);
 
     if (run_ice) {
         // ---------- Load input into PISM's PETSc arrays
@@ -530,22 +535,23 @@ void IceCoupler_PISM::run_timestep(double time_s,
 
     get_state(ice_ovalsI, run_ice ? contracts::INITIAL : 0);
     pism_ice_model->reset_rate();
+printf("END IceCoupler_PISM::run_timestep()\n");
 }
 
 /** Copies PISM->Icebin output variables from PISM variables to
 the Icebin-supplied variables (on the root node).
 @param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
 void IceCoupler_PISM::get_state(
-    blitz::Array<double,2> const &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+    blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nI, nvar)
     unsigned int mask)
 {
     printf("BEGIN IceCoupler_PISM::get_state: %ld\n", pism_ovars.size());
     VarSet const &ocontract(contract[IceCoupler::OUTPUT]);
 
     // Copy the outputs to the blitz arrays
+    int nI = ice_ovalsI.extent(0);
     for (unsigned int ivar=0; ivar<pism_ovars.size(); ++ivar) {
-        blitz::Array<double,1> const &ice_ovalsI_ivar(
-            ice_ovalsI(blitz::Range::all(),ivar));
+        blitz::Array<double,1> ice_ovalsI_ivar(nI);
 
         if (!pism_ovars[ivar]) (*icebin_error)(-1,
             "IceCoupler_PISM: Contract output %s (modele_pism.cpp) is not linked up to a pism_ovar (MassEnergyBudget.cpp)", ocontract.index[ivar].c_str());
@@ -556,18 +562,14 @@ void IceCoupler_PISM::get_state(
         printf("IceCoupler_PISM::get_state(mask=%d) copying field %s\n", mask, cf.name.c_str());
 
         if (am_i_root()) {      // ROOT in PISM communicator
-
-            // Reshape 1D blitz variable to 2D for use with PISM
-            blitz::Array<double,2> oval2_xy(
-                reshape<double,1,2>(ice_ovalsI_ivar, blitz::shape(ny(), nx())));
-        
-    
             // Get matching input (val) and output (pism_var) variables
-            iceModelVec2S_to_blitz_xy(*pism_ovars[ivar], oval2_xy);    // Allocates oval2_xy if needed
+            iceModelVec2S_to_blitz_xy(*pism_ovars[ivar], ice_ovalsI_ivar);    // Allocates oval2_xy if needed
 
+            // Copy to the output array
+            ice_ovalsI(blitz::Range::all(),ivar) = ice_ovalsI_ivar;
         } else {
             blitz::Array<double,2> oval2_xy;    // dummy
-            iceModelVec2S_to_blitz_xy(*pism_ovars[ivar], oval2_xy);
+            iceModelVec2S_to_blitz_xy(*pism_ovars[ivar], ice_ovalsI_ivar);
         }
 
         // Now send those data from the PISM root to the GCM root (MPI nodes)
@@ -595,20 +597,20 @@ void IceCoupler_PISM::deallocate()
 
 void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(
     pism::IceModelVec2S const &pism_var,
-    blitz::Array<double,2> &ret)
+    blitz::Array<double,1> &ret1)    // 1D version of 2D array
 {
     PetscErrorCode ierr;
 
     if (am_i_root()) {
-        auto xy_shape(blitz::shape(nx(), ny()));
-        if (ret.size() == 0) {
-            ret.reference(blitz::Array<double,2>(ny(), nx()));
+        auto xy_shape(blitz::shape(ny(), nx()));
+        if (ret1.size() == 0) {
+            ret1.reference(blitz::Array<double,1>(ny() * nx()));
         } else {
-            if (ret.extent(0) != xy_shape[0] || ret.extent(1) != xy_shape[1])
+            if (ret1.extent(0) != xy_shape[0] * xy_shape[1])
                 (*icebin_error)(-1,
                 "IceCoupler_PISM::iceModelVec2S_to_blitz_xy(): "
-                "ret(%d, %d) should be (%d, %d)",
-                ret.extent(0), ret.extent(1), xy_shape[0], xy_shape[1]);
+                "ret1(%d) should be (%d * %d)",
+                ret1.extent(0), xy_shape[0], xy_shape[1]);
         }
     }
 
@@ -645,19 +647,18 @@ void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(
     Hp0 = pism_var.allocate_proc0_copy();
     pism_var.put_on_proc0(*Hp0);
 
-    if (am_i_root()) {
-        // Copy it to blitz array (on the root node only)
-        // OLD CODE: ierr = VecGetArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
+    long nI = pism_grid->Mx() * pism_grid->My();
 
-        ret = nan;  // Vector operation, initializes ice_ovalsI
-        for (PetscInt i=0; i < pism_grid->Mx(); i++) {
-            for (PetscInt j=0; j < pism_grid->My(); j++) {
-// TODO: ???? What should this be?
-//                ret(i, j) = bHp0[i][j];
-            }
-        }
-        // OLD CODE: ierr = VecRestoreArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0); CHKERRQ(ierr);
-    }
+    // Copy it to blitz array (on the root node only)
+    // OLD CODE: ierr = VecGetArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
+
+    if (am_i_root()) ret1 = nan;  // Vector operation, initializes ice_ovalsI
+
+    PetscInt Hp0_size;
+    VecGetLocalSize(*Hp0, &Hp0_size);
+
+    double const *Hp0_data = petsc::VecArray(*Hp0).get();
+    if (am_i_root()) for (int i=0; i<nI; ++i) ret1(i) = Hp0_data[i];
 }
 
 
