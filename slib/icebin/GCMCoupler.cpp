@@ -208,7 +208,7 @@ double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
 bool run_ice)
 {
-printf("BEGIN GCMCoupler::coupler(time_s=%g, run_ice=%d)\n", time_s, run_ice);
+printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     if (!gcm_params.am_i_root()) {
         GCMInput out({0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
@@ -252,7 +252,7 @@ printf("BEGIN GCMCoupler::coupler(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         ncio();
     }
 
-printf("END GCMCoupler::coupler()\n");
+printf("END GCMCoupler::couple()\n");
     return out;
 }
 // ------------------------------------------------------------
@@ -265,23 +265,30 @@ static void ncwrite_dense(
 {
 printf("BEGIN ncwrite_dense()\n");
     // im,jm,ihc  0-based
-    blitz::Array<double,1> denseE(indexing->extent());    // All dims
+    long nE = indexing->extent();
+    blitz::Array<double,1> denseE(nE);    // All dims
 
     // NetCDF needs dimensions in stride-descending order
     std::vector<size_t> startp;
     std::vector<size_t> countp;
+    startp.push_back(0);    // Time dimension
+    countp.push_back(1);
     for (int dimi : indexing->indices()) {
         startp.push_back(0);
-        countp.push_back(indexing[dimi].extent());
+        countp.push_back((*indexing)[dimi].extent);
     }
 
     // Go through each variable...
-    unsigned int nvar = vecs->size();
+    unsigned int nvar = vecs->nvar;
     for (unsigned int ivar=0; ivar < nvar; ++ivar) {
         // Fill our dense var
         denseE = nan;
-        for (unsigned int i=0; i<vecs->index.size(); ++i)
-            denseE(vecs->index[i]) = vecs->vals[i*nvar + ivar];
+        for (unsigned int i=0; i<vecs->index.size(); ++i) {
+            auto index(vecs->index[i]);
+            if (index >= nE) (*icebin_error)(-1,
+                "Index out of range: %ls vs. %ld", (long)index, (long)nE);
+            denseE(index) = vecs->vals[i*nvar + ivar];
+        }
 
         // Store in the netCDF variable
         NcVar ncvar(nc->getVar(vname_base + (*contract)[ivar].name));
@@ -308,8 +315,8 @@ printf("BEGIN ncio_dense()\n");
     append(dim_spec, indexing);
     contract.ncdefine(ncio, dim_spec.to_dims(ncio), vname_base);
 
-    ncio += std::bind(ncwrite_dense,
-        ncio.nc, &vecs, &contract, &indexing, vname_base);
+    ncio.add("ncio_dense::" + vname_base, std::bind(ncwrite_dense,
+        ncio.nc, &vecs, &contract, &indexing, vname_base));
 
 printf("END ncio_dense()\n");
 }

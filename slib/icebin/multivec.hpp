@@ -32,6 +32,7 @@ public:
 
     VectorMultivec(int _nvar) : nvar(_nvar) {}
 
+    /** Number of elements in each parallel array. */
     inline size_t size() const { return index.size(); }
 
     template<typename ArchiveT>
