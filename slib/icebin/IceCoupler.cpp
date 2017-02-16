@@ -156,6 +156,8 @@ GCMInput &out,    // Accumulate matrices here...
 bool run_ice)
 {
     if (!gcm_coupler->am_i_root()) {
+        blitz::Array<double,1> elevI(get_elevI());    // blitz
+
         // Allocate dummy variables, even though they will only be set on root
         blitz::Array<double,2> ice_ivalsI(nI(), contract[INPUT].size());
         blitz::Array<double,2> ice_ovalsI(nI(), contract[OUTPUT].size());
@@ -167,12 +169,16 @@ bool run_ice)
 
     printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
+    // This requires MPI...
+    blitz::Array<double,1> elevI(get_elevI());    // blitz
+
     // ========== Get Ice Inputs
     blitz::Array<double,2> ice_ivalsI(nI(), contract[INPUT].size());
     blitz::Array<double,2> ice_ovalsI(nI(), contract[OUTPUT].size());
     ice_ivalsI = 0;
     ice_ovalsI = 0;
 
+printf("ice_coupler BB1\n");
     // E_s = Elevation grid (sparse indices)
     // E0 = Elevation grid @ beginning of timestep (dense indices)
     // E1 = Elevation grid @ end of timestep (dense indices)
@@ -193,6 +199,7 @@ bool run_ice)
         }
     }
 
+printf("ice_coupler BB2\n");
     // Get the CSR sparse matrix to convert GCM outputs to ice model inputs
     std::vector<std::pair<std::string, double>> scalars({
         std::make_pair("by_dt", 1.0 / (time_s - gcm_coupler->last_time_s)),
@@ -213,6 +220,7 @@ bool run_ice)
 
     // ------------- Form ice_ivalsI
 
+printf("ice_coupler BB3\n");
     // Regrid & combine to form ice_ivalsI
     if (run_ice) {
     for (auto iIvE0(begin(*IvE0)); iIvE0 != end(*IvE0); ++iIvE0) {
@@ -234,18 +242,27 @@ bool run_ice)
     }}
 
     // ========= Step the ice model forward
+printf("ice_coupler BB4\n");
     if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
+printf("ice_coupler BB5\n");
     run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
+printf("ice_coupler BB6\n");
     if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
+printf("ice_coupler BB7\n"); fflush(stdout);
 
     // ========== Update regridding matrices
-    blitz::Array<double,1> elevI(get_elevI());    // blitz
+printf("ice_coupler BB7.1\n"); fflush(stdout);
     ice_regridder->set_elevI(elevI);
+printf("ice_coupler BB7.2\n"); fflush(stdout);
     RegridMatrices rm(ice_regridder);
+printf("ice_coupler BB7.3\n"); fflush(stdout);
 
     SparseSetT dimA1;
     SparseSetT dimE1;
+    // A SparseSet that is identity for the entire range of I
+    auto dimI(id_sparse_set<SparseSetT>(nI()));
 
+printf("ice_coupler BB8\n"); fflush(stdout);
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
     {
         auto AvE1(rm.regrid("AvE", {&dimA1, &dimE1}, true, true));
@@ -261,18 +278,28 @@ bool run_ice)
             accum::ref(out_wAvE1_s)),
             AvE1->weight);    // blitz::Array<double,1>
     }
+printf("ice_coupler BB9.0\n");
 
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
-    auto E1vI(rm.regrid("EvI", {&dimE1, NULL}, true, true));
+    auto E1vI(rm.regrid("EvI", {&dimE1, &dimI}, true, true));
 
-    TupleListLT<2> &out_E1vE0_s(out.E1vE0_s);
-    EigenSparseMatrixT E1vE0(*E1vI->M * *IvE0);
-    spcopy(
-        accum::to_sparse(make_array(&dimE1, &dimE0),
-        accum::ref(out_E1vE0_s)),
-        E1vE0);
+    // Don't do this on the first round, since we don't yet have an IvE0
+    if (run_ice) {
+        TupleListLT<2> &out_E1vE0_s(out.E1vE0_s);
+        EigenSparseMatrixT E1vE0(*E1vI->M * *IvE0);
+        spcopy(
+            accum::to_sparse(make_array(&dimE1, &dimE0),
+            accum::ref(out_E1vE0_s)),
+            E1vE0);
+    }
+
+printf("ice_coupler BB9.1\n"); fflush(stdout);
+auto IvE1x(rm.regrid("IvE", {&dimI, &dimE1}, true, true));
+
+printf("ice_coupler BB10\n"); fflush(stdout);
+
 
     // ------ Update orography (global for all ice sheets)
     TupleListLT<1> &out_elevE1_s(out.elevE1_s);
@@ -283,18 +310,27 @@ bool run_ice)
         accum::ref(out_elevE1_s))),
         elevE1);
 
+printf("ice_coupler BB11.0\n"); 
     // ========= Compute gcm_ivalsE = EvI * vt * ice_ovals
 
-    auto A1vI(rm.regrid("AvI", {&dimA1, NULL}, true, true));
+    auto A1vI(rm.regrid("AvI", {&dimA1, &dimI}, true, true));
 
     std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
-    std::vector<double> vals(contract.size());
+
+printf("ice_coupler BB11.1\n");
+auto IvE1x1(rm.regrid("IvE", {&dimI, &dimE1}, true, true));
+printf("ice_coupler BB11.2\n"); 
+
+// Somewhere in this #if block is corrupting memory
+#if 1
 
     // Do it once for _E variables and once for _A variables.
     for (int iAE=0; iAE < GridAE::count; ++iAE) {
         CSRAndUnits gcmi_v_iceo(var_trans_outAE[iAE].apply_scalars(scalars));
 
         VarSet const &contract(gcm_coupler->gcm_inputsAE[iAE]);
+        std::vector<double> vals(contract.size());
+printf("ice_coupler BB11.3 [%d] vals.size() = %ld\n", iAE, vals.size());
         WeightedSparse &X1vI_ws(*AE1vIs[iAE]);
         VectorMultivec &gcm_ivalsX_s(out.gcm_ivalsAE[iAE]);
 
@@ -310,6 +346,7 @@ bool run_ice)
             auto jj(iX1vI->index(0));
             auto ii(iX1vI->index(1));
             auto X1vI_ji(iX1vI->value());
+//printf("X1vI[%d,%d] = %f\n",jj,ii,X1vI_ji);
 
             // Transform units on the input while multiplying by M
             for (size_t nn = 0; nn < contract.size(); ++nn) {
@@ -326,11 +363,14 @@ bool run_ice)
             gcm_ivalsX_s.add(jj, vals);
         }
     }
+#endif
 
+printf("ice_coupler BB12\n");
     // Compute IvE (for next timestep)
-    auto IvE1(rm.regrid("IvE", {NULL, &dimE1}, true, true));
+    auto IvE1(rm.regrid("IvE", {&dimI, &dimE1}, true, true));
     dimE0 = std::move(dimE1);
     IvE0 = std::move(IvE1->M);
+printf("ice_coupler BB13\n");
 
     printf("END IceCoupler::couple(%s)\n", name().c_str());
 }

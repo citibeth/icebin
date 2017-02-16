@@ -206,6 +206,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
     std::array<SparseSetT *,2> dims,
     bool scale, bool correctA, UrAE const &AE)
 {
+printf("BEGIN compute_AEvI\n");
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims));
     SparseSetT * const dimA(ret->dims[0]);
     SparseSetT * const dimI(ret->dims[1]);
@@ -217,19 +218,25 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
     dimG->set_sparse_extent(regridder->nG());
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
+printf("compute CC1\n");
     MakeDenseEigenT GvI_m(
         std::bind(&IceRegridder::GvI, regridder, _1),
         SparsifyTransform::ADD_DENSE,
         {dimG, dimI}, '.');
+printf("compute CC2\n");
     MakeDenseEigenT ApvG_m(        // _m ==> type MakeDenseEigenT
         AE.GvAp,
         SparsifyTransform::ADD_DENSE,
         {dimG, dimA}, 'T');
+printf("compute CC3\n");
 
     // ----- Convert to Eigen and multiply
     auto ApvG(ApvG_m.to_eigen());
+printf("compute CC4\n"); fflush(stdout);
     auto GvI(GvI_m.to_eigen());
+printf("compute CC5\n"); fflush(stdout);
     auto sGvI(sum_to_diagonal(GvI, 0, '-'));
+printf("compute CC6\n"); fflush(stdout);
 
     std::unique_ptr<EigenSparseMatrixT> ApvI(
         new EigenSparseMatrixT(ApvG * sGvI * GvI));
@@ -277,6 +284,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         }
     }
 
+printf("END compute_AEvI\n");
     return ret;
 }
 // ---------------------------------------------------------
