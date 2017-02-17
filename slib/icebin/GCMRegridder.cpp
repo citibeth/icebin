@@ -81,7 +81,7 @@ void GCMRegridder::clear()
     ice_regridders.clear();
 }
 // -------------------------------------------------------------
-void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
+void GCMRegridder::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 {
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
 
@@ -91,7 +91,7 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
     }
 
     // Read/Write gridA and other global stuff
-    gridA->ncio(ncio, vname + ".gridA");
+    gridA->ncio(ncio, vname + ".gridA", rw_full);
     indexingHC.ncio(ncio, vname + ".indexingHC");
     ncio_vector(ncio, hcdefs, true, vname + ".hcdefs", "double",
         get_or_add_dims(ncio, {vname + ".nhc"}, {hcdefs.size()} ));
@@ -115,7 +115,7 @@ void GCMRegridder::ncio(NcIO &ncio, std::string const &vname)
         }
     }
     for (auto ice_regridder=ice_regridders.begin(); ice_regridder != ice_regridders.end(); ++ice_regridder) {
-        (*ice_regridder)->ncio(ncio, vname + "." + (*ice_regridder)->name());
+        (*ice_regridder)->ncio(ncio, vname + "." + (*ice_regridder)->name(), rw_full);
     }
 
 

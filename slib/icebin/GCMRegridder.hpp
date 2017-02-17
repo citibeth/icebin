@@ -324,7 +324,12 @@ public:
     unsigned long nA() const { return gridA->ndata(); }
     unsigned long nE() const { return nA() * nhc(-1); }
 
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    /**
+    @param rw_full If true, read the entire data structure.  If false (i.e. we
+                   are using MPI and this is not the root), then avoid reading
+                   grid details, etc.
+    */
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 
 };  // class GCMRegridder
 // ===========================================================

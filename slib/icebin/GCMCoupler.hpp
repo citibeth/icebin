@@ -43,9 +43,8 @@ struct GCMInput {
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
 
-    // Mapping from the index of a variable in gcm_ivalsE/gcm_ivalsA
-    // and the index within the GCMCoupler::gcm_inputs
-    std::array<VectorMultivec, GridAE::count> gcm_ivalsAE;
+    // _s = sparse indexing
+    std::array<VectorMultivec, GridAE::count> gcm_ivalsAE_s;
 
     // This is all for elevation classes in ICE space (ice_nhc, not gcm_nhc)
 
@@ -72,7 +71,7 @@ struct GCMInput {
     TupleListLT<1> elevE1_s;
 
     GCMInput(std::array<int, GridAE::count> const &nvar) :
-        gcm_ivalsAE({
+        gcm_ivalsAE_s({
             VectorMultivec(nvar[0]),
             VectorMultivec(nvar[1]),
         })
@@ -81,14 +80,14 @@ struct GCMInput {
     std::array<int, GridAE::count> nvar() const
     {
         std::array<int, GridAE::count> ret;
-        for (int i=0; i<GridAE::count; ++i) ret[i] = gcm_ivalsAE[i].nvar;
+        for (int i=0; i<GridAE::count; ++i) ret[i] = gcm_ivalsAE_s[i].nvar;
         return ret;
     }
 
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
     {
-        ar & gcm_ivalsAE;
+        ar & gcm_ivalsAE_s;
         ar & E1vE0_s;
         ar & AvE1_s;
         ar & wAvE1_s;

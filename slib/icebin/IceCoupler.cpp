@@ -74,7 +74,6 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
     self->ice_regridder = _ice_regridder;
-    if (_ice_regridder) self->_nI = _ice_regridder->nI();
 
 //    self->ice_constants.init(&_coupler->ut_system);
 
@@ -156,6 +155,7 @@ GCMInput &out,    // Accumulate matrices here...
 bool run_ice)
 {
     if (!gcm_coupler->am_i_root()) {
+        printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
         blitz::Array<double,1> elevI(get_elevI());    // blitz
 
         // Allocate dummy variables, even though they will only be set on root
@@ -164,6 +164,7 @@ bool run_ice)
         ice_ivalsI = 0;
         ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
+        printf("[noroot] END IceCoupler::couple(%s)\n", name().c_str());
         return;
     }
 
@@ -184,16 +185,24 @@ bool run_ice)
     // All matrices and vectors assumed w/ densified indexing
     // Except _s ending means they use sparse indexing.
 
+    // ------------- Compute dimE0 transformation, if this is the first round
+    if (!run_ice) {
+        for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
+            long iE_s(gcm_ovalsE_s.index[i]);
+            dimE0.add_dense(iE_s);
+        }
+    }
+
     // ------------- Form gcm_ovalsE0
     // Densify gcm_ovalsE_s --> gcm_ovalsE
     // This should ONLY involve iE already mentioned in IvE0;
     // if not, there will be an exception.
     blitz::Array<double,2> gcm_ovalsE0(dimE0.dense_extent(), gcm_coupler->gcm_outputsE.size());
     gcm_ovalsE0 = 0;
-    for (size_t i=0; i<gcm_ovalsE_s.index.size(); ++i) {
-        auto iE_s(gcm_ovalsE_s.index[i]);
-        int iE0 (dimE0.to_dense(iE_s));
-        for (int ivar=0; ivar<gcm_ovalsE_s.size(); ++i) {
+    for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
+        long iE_s(gcm_ovalsE_s.index[i]);
+        int iE0(dimE0.to_dense(iE_s));
+        for (int ivar=0; ivar<gcm_ovalsE_s.nvar; ++ivar) {
             gcm_ovalsE0(iE0, ivar) += gcm_ovalsE_s.val(ivar, i);
         }
     }
@@ -254,6 +263,7 @@ bool run_ice)
 
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
     {
+        // Adds to dimA1 and dimE1
         auto AvE1(rm.regrid("AvE", {&dimA1, &dimE1}, true, true));
 
         spcopy(
@@ -306,7 +316,7 @@ bool run_ice)
         VarSet const &contract(gcm_coupler->gcm_inputsAE[iAE]);
         std::vector<double> vals(contract.size());
         WeightedSparse &X1vI_ws(*AE1vIs[iAE]);
-        VectorMultivec &gcm_ivalsX_s(out.gcm_ivalsAE[iAE]);
+        VectorMultivec &gcm_ivalsX_s(out.gcm_ivalsAE_s[iAE]);
 
         // gcm_ivalsX_{jn} = X1vI_{ji} * gcmi_v_iceo_{nm} * ice_ovalsI_{im}
         //       where:
@@ -316,8 +326,13 @@ bool run_ice)
         // |n| = # variables in gcm_input
 
         // Do the multiplication
+        SparseSetT &dimX(*X1vI_ws.dims[0]);    // dimA1 or dimE1
+        if (((iAE == GridAE::A) && (&dimX != &dimA1)) ||    // sanity check
+            ((iAE == GridAE::E) && (&dimX != &dimE1))) (*icebin_error)(-1,
+            "Unexpected dimX vs. dimA/E");
         for (auto iX1vI(begin(*X1vI_ws.M)); iX1vI != end(*X1vI_ws.M); ++iX1vI) {
             auto jj(iX1vI->index(0));
+            auto jj_s(dimX.to_sparse(jj));
             auto ii(iX1vI->index(1));
             auto X1vI_ji(iX1vI->value());
 
@@ -333,7 +348,7 @@ bool run_ice)
                 }
                 vals[nn] = X1vI_ji * gcm_ivalsX_in;
             }
-            gcm_ivalsX_s.add(jj, vals);
+            gcm_ivalsX_s.add(jj_s, vals);
         }
     }
 

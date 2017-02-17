@@ -283,7 +283,7 @@ std::unique_ptr<Grid> new_grid(NcIO &ncio, std::string const &vname)
     return new_grid(type);
 }
 
-void Grid::ncio(NcIO &ncio, std::string const &vname)
+void Grid::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 {
     // ------ Attributes
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
@@ -337,6 +337,9 @@ void Grid::ncio(NcIO &ncio, std::string const &vname)
     get_or_put_att(info_v, ncio.rw, "vertices.nfull", "int64", &vertices._nfull, 1);
     if (ncio.rw == 'w') info_v.putAtt("vertices.nfull.comment",
         "The total theoretical of vertices (of polygons) on this grid.");
+
+    // ------- Only read the rest of this on MPI root
+    if (!rw_full) return;
 
     // ------- Dimensions
     if (ncio.rw == 'w') {
@@ -460,7 +463,7 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
 {
 
     auto xb_d = get_or_add_dim(ncio,
@@ -485,7 +488,7 @@ void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     Grid::ncio(ncio, vname);
 }
 // ---------------------------------------------------------
-void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
 {
 
     auto lonb_d = get_or_add_dim(ncio,

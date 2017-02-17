@@ -101,7 +101,7 @@ public:
         auto jm_world(domainA_global[1].end);
 
         int j = (ix / im_world) % jm_world;    // +0 for 0-based indexing
-        return rank_of_j(ix);
+        return rank_of_j(j);
     }
 };
 

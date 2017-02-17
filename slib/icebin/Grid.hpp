@@ -290,7 +290,7 @@ protected:
     void nc_read(netCDF::NcGroup *nc, std::string const &vname);
     void nc_write(netCDF::NcGroup *nc, std::string const &vname) const;
 public:
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 
 
     /** Remove cells and vertices not relevant to us --- for example, not in our MPI domain.
@@ -317,7 +317,7 @@ public:
     int nx() const { return xb.size() - 1; }
     int ny() const { return yb.size() - 1; }
 
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 };
 
 extern void sort_renumber_vertices(Grid &grid);
@@ -364,7 +364,7 @@ public:
     /** Number of grid cell indices in latitude dimension */
     int nlat() const;
 
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 };  // class
 
 }   // namespace

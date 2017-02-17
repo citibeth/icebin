@@ -149,7 +149,7 @@ public:
 
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 
 };  // class IceRegridder
 

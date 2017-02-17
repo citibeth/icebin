@@ -251,10 +251,9 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
         params.output_dir = output_dir;
 
     pism_ice_model.reset(new pism::icebin::IBIceModel(pism_grid, ctx, params));
-    _nI = nx() * ny();
 
-    if (ice_regridder && (_nI != ice_regridder->nI())) (*icebin_error)(-1,
-        "nI does not match: %ld vs. %ld\n", _nI, ice_regridder->nI());
+    if (nx() * ny() != ice_regridder->nI()) (*icebin_error)(-1,
+        "nI does not match: %ld vs. %ld\n", nx()*ny(), ice_regridder->nI());
 
     // ------------------------------------------- \\
 

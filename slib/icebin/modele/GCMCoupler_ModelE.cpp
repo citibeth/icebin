@@ -430,16 +430,22 @@ printf("domainA size=%ld\n", domainA.data.size());
 
         if (self->modele_inputs.fhc(i_f,j_f,ihc_f) == 0) continue;    // C2F indexing
 
-        int ihc_ice = ihc - base_hc - 1;   // Use only IceBin HC's, F2C index conversion
+        int ihc_ice = ihc - base_hc;   // Use only IceBin HC's, zero-based indexing
 
-        long iE = self->gcm_regridder.indexingE.tuple_to_index(
+        if (ihc_ice < 0) (*icebin_error)(-1,
+            "ihc_ice cannot be <0: %d = %d - %d - 1\n", ihc_ice, ihc, base_hc);
+
+        long iE_s = self->gcm_regridder.indexingE.tuple_to_index(
             make_array(i, j, ihc_ice));
+
+        if (iE_s < 0) (*ibmisc_error)(-1,
+            "iE_s=%ld (from %d %d %d), it should not be negative\n", iE_s, i, j, ihc_ice);
 
         for (unsigned int ivar=0; ivar<self->gcm_outputsE.size(); ++ivar) {
             val[ivar] = (*self->modele_outputs.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
         }
 
-        gcm_ovalsE_s.add({iE}, &val[0]);
+        gcm_ovalsE_s.add({iE_s}, &val[0]);
     }}}
 
 
@@ -491,20 +497,29 @@ printf("domainA size=%ld\n", domainA.data.size());
 /** Called from MPI rank */
 void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
 {
-    // Update gcm_ivalA variables...
-    // Read from here...
-    VectorMultivec const &gcm_ivalsA_s(out.gcm_ivalsAE[GridAE::A]);
-    // Write to here...
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsA(
-        gcm_ivalsA);
     auto nvar(out.nvar());    // A and E
 
-    for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {
+    // Update gcm_ivalA variables...
+    // Read from here...
+    VectorMultivec const &gcm_ivalsA_s(out.gcm_ivalsAE_s[GridAE::A]);
+    std::vector<std::unique_ptr<blitz::Array<double,2>>> &gcm_ivalsA(modele_inputs.gcm_ivalsA);
+    if (gcm_ivalsA.size() != nvar[GridAE::A]) (*icebin_error)(-1,
+        "gcm_ivalsA is wrong size: %ld vs. %d", gcm_ivalsA.size(), nvar[GridAE::A]);
+
+    // Write to here...
+    printf("gcm_ivalsA_s.size() == %ld\n", gcm_ivalsA_s.size());
+
+    for (int iAE=0; iAE<GridAE::count; ++iAE) {
+        if (nvar[iAE] < 0) (*icebin_error)(-1,
+            "nvar[%d]=%d < 0, it should not be\n", iAE, nvar[iAE]);
+    }
+
+    for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {    // Iterate through elements of parallel arrays
         long iA = gcm_ivalsA_s.index[i];
         auto ij(gcm_regridder.indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
         int const i_f = ij[0]+1;    // C2F
         int const j_f = ij[1]+1;
-        for (unsigned int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
+        for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
             (*gcm_ivalsA[ivar])(i_f, j_f) =
                 gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar];
         }
@@ -512,11 +527,12 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
 
     // Update gcm_ivalE variables...
     // Read from here...
-    VectorMultivec const &gcm_ivalsE_s(out.gcm_ivalsAE[GridAE::E]);
-    // Write to here...
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsE(
-        gcm_ivalsE);
+    VectorMultivec const &gcm_ivalsE_s(out.gcm_ivalsAE_s[GridAE::E]);
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsE(modele_inputs.gcm_ivalsE);
+    if (gcm_ivalsE.size() != nvar[GridAE::E]) (*icebin_error)(-1,
+        "gcm_ivalsE is wrong size: %ld vs. %d", gcm_ivalsE.size(), nvar[GridAE::E]);
 
+    // Write to here...
     for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
         long iE = gcm_ivalsE_s.index[i];
         auto ijk(gcm_regridder.indexing(GridAE::E).index_to_tuple<int,2>(iE));
@@ -525,11 +541,12 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
         int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
         int const ihc_gcm_f = gcm_params.icebin_base_hc + ihc_ice + 1;    // 1-based, G
 
-        for (unsigned int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
+        for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
             (*gcm_ivalsE[ivar])(i_f, j_f, ihc_gcm_f) =
                 gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar];
         }
     }
+printf("END update_gcm_ivals\n");
 }
 
 

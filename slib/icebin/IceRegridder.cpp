@@ -65,8 +65,9 @@ void IceRegridder::clear()
     elevI = nan;
 }
 // -------------------------------------------------------------
-void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
+void IceRegridder::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 {
+printf("BEGIN IceRegridder::ncio(%s, %d)\n", vname.c_str(), rw_full);
     if (ncio.rw == 'r') {
         clear();
         gridI = new_grid(ncio, vname + ".gridI");
@@ -77,10 +78,12 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
     get_or_put_att(info_v, ncio.rw, "name", _name);
     get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 
-    gridI->ncio(ncio, vname + ".gridI");
-    exgrid->ncio(ncio, vname + ".exgrid");
-    ncio_blitz(ncio, elevI, true, vname + ".elevI", "double",
+    gridI->ncio(ncio, vname + ".gridI", rw_full);
+    exgrid->ncio(ncio, vname + ".exgrid", rw_full);
+    if (rw_full) ncio_blitz(ncio, elevI, true, vname + ".elevI", "double",
         get_dims(ncio ,{vname + ".gridI.cells.nfull"}));
+
+printf("END IceRegridder::ncio(%s, %d)\n", vname.c_str(), rw_full);
 }
 
 void IceRegridder::init(

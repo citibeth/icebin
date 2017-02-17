@@ -111,40 +111,15 @@ void GCMCoupler::ncread(
     get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
     get_or_put_att(config_info, ncio_config.rw, "output_dir", output_dir);
 
-    // ---------------------------- Non-root version
-    if (!am_i_root()) {
-        printf("[non-root] BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
-
-        // TODO: Load one ice sheet per IceBin grid file.
-        std::vector<std::string> sheet_names;
-        {
-            NcIO ncio_grid(grid_fname, NcFile::read);
-            auto grid_info(get_or_add_var(ncio_grid, vname + ".info", "int64", {}));
-            get_or_put_att(grid_info, ncio_grid.rw, "sheets", "string", sheet_names);
-        }
-
-        for (auto &sheet_name : sheet_names) {
-            std::string vname_sheet(vname + "." + sheet_name);
-    
-printf("new_ice_coupler vname_sheet = %s\n",vname_sheet.c_str());
-
-            // Create an IceCoupler corresponding to this IceSheet.
-            ice_couplers.push_back(
-                new_ice_coupler(ncio_config, vname, sheet_name, this, NULL));
-        }
-
-        printf("[non-root] END GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
-        return;
-    }
-    // -------------------------------------------------
-
     printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
+
+    bool rw_full = am_i_root();
 
     // Load the MatrixMaker (filtering by our domain, of course)
     // Also load the ice sheets
     {
         NcIO ncio_grid(grid_fname, NcFile::read);
-        gcm_regridder.ncio(ncio_grid, vname);
+        gcm_regridder.ncio(ncio_grid, vname, rw_full);
     }
 
     std::cout << "========= GCM Constants" << std::endl;
@@ -331,7 +306,7 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     ibmisc::ncio_timespan(ncio, timespan, time_units, vname_base);
 
     for (int iAE=0; iAE<GridAE::count; ++iAE) {
-        ncio_dense(ncio, out.gcm_ivalsAE[iAE], gcm_inputsAE[iAE],
+        ncio_dense(ncio, out.gcm_ivalsAE_s[iAE], gcm_inputsAE[iAE],
             gcm_regridder.indexing(iAE), vname_base);
     }
 

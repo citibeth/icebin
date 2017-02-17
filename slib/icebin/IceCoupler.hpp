@@ -67,12 +67,11 @@ public:
 
     // Writers called to record the input and output seen by this IceCoupler
     std::array<std::unique_ptr<IceWriter>, 2> writer;
-    long _nI;    // Set when we discover it from the ice model
 
 public:
     std::string const &name() const { return _name; }
     Grid const *gridI() { return ice_regridder->gridI.get(); }
-    long nI() const { return _nI; }
+    long nI() const { return ice_regridder->gridI->ndata(); }
 
     // ======================================================
 
@@ -88,7 +87,7 @@ public:
     //     GCMCoupler_ModelE: gcmce_new()
     //     GCMCoupler::ncread()
     //     IceCoupler.cpp: new_ice_coupler()
-    IceCoupler(IceCoupler::Type _type) : type(_type), _nI(-1) {}
+    IceCoupler(IceCoupler::Type _type) : type(_type) {}
 
     /** (1) Initialize any grid information, etc. from the IceSheet struct.
     @param vname_base Construct variable name from this, out of which to pull parameters from netCDF
