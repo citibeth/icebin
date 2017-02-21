@@ -172,11 +172,12 @@ INTERFACE
         logical(c_bool), value :: run_ice
     end subroutine
 
-    subroutine gcmce_cold_start(api, yeari, itimei) bind(c)
+    subroutine gcmce_cold_start(api, yeari, itimei, dtsrc) bind(c)
         use iso_c_binding
         type(c_ptr), value :: api
         integer(c_int), value :: yeari
         integer(c_int), value :: itimei
+        real(c_double), value :: dtsrc
     end subroutine
 
 
