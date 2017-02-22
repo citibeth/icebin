@@ -371,21 +371,24 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
         pism_ovars[ix] = &ii->vec;
     }
 
-    // -------------- Initialize pism_out.nc
+    // -------------- Initialize pism-out.nc
     {
         boost::filesystem::path output_dir(params.output_dir);
-        std::string ofname = (output_dir / "pism_out.nc").string();
+        std::string ofname = (output_dir / "pism-out.nc").string();
+
+        // Convert array from pism::IceModelVec2S* to pism::IceModelVec*
         std::vector<pism::IceModelVec const *> vecs;
-        for (auto &vec : pism_ovars) vecs.push_back(vec);
+        for (const pism::IceModelVec2S *vec : pism_ovars) vecs.push_back(vec);
+
         pism_out_nc.reset(new pism::icebin::VecBundleWriter(
             pism_ice_model->grid(), ofname, vecs));
         pism_out_nc->init();
     }
 
-    // ------------- Initialize pism_in.nc
+    // ------------- Initialize pism-in.nc
     {
         boost::filesystem::path output_dir(params.output_dir);
-        std::string ofname = (output_dir / "pism_in.nc").string();
+        std::string ofname = (output_dir / "pism-in.nc").string();
         std::vector<pism::IceModelVec const *> vecs;
         for (auto &vec : pism_ivars) vecs.push_back(vec);
         pism_in_nc.reset(new pism::icebin::VecBundleWriter(
@@ -530,9 +533,16 @@ void IceCoupler_PISM::run_timestep(double time_s,
 
     pism_ice_model->prepare_outputs(time_s);
 
-    pism_out_nc->write(time_s);
+    pism_out_nc->write(time_s);    // Writes from PISM-format variables on I grid
 
     get_state(ice_ovalsI, run_ice ? contracts::INITIAL : 0);
+
+if (am_i_root()) {
+long sampleI = gridI()->indexing.tuple_to_index(std::array<int,2>{25,25});
+double xxx = ice_ovalsI((int)sampleI, 0);
+printf("USF1 usurf(25,25 %ld) = %g\n", sampleI, xxx);
+}
+
     pism_ice_model->reset_rate();
 printf("END IceCoupler_PISM::run_timestep()\n");
 }

@@ -220,7 +220,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
 
 
     if (gcm_params.icebin_logging) {
-        std::string fname = "gcm-in-" + sdate;
+        std::string fname = "gcm-in-" + sdate + ".nc";
         NcIO ncio(fname, 'w');
         ncio_gcm_input(ncio, out, timespan,
             time_unit.to_cf(), "");

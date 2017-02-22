@@ -97,7 +97,7 @@ void IceCoupler::cold_start(
         for (int io=0; io<2; ++io) {    // INPUT / OUTPUT
             auto fname(
                 boost::filesystem::path(output_dir) /
-                (name() + (io == 0 ? "_in.nc" : "_out.nc")));
+                (std::string("icemodel") + (io == 0 ? "-in.nc" : "-out.nc")));
             this->writer[io].reset(new IceWriter(
                 this, &contract[io], fname.string()));
         }
@@ -128,9 +128,6 @@ void IceCoupler::print_contracts()
 }
 
 // ==============================================================
-
-static std::array<std::string, 2> _writer_ofname = {"ice_model_in.nc", "ice_model_out.nc"};
-
 
 static Eigen::VectorXd to_col_vector(blitz::Array<double,1> const &vec)
 {
@@ -379,10 +376,11 @@ IceWriter::IceWriter(
     counts = {1};
     cur = {0};
     for (size_t i=0; i<indexing.rank(); ++i) {
+
         // ix goes 0...n-1 for row-major, n-1..0 for col-major
         int ix = indexing.indices()[i];
-        dim_names.push_back(string_printf("dim%d", ix));
-        counts.push_back(indexing[i].extent);
+        dim_names.push_back(indexing[ix].name);
+        counts.push_back(indexing[ix].extent);
         cur.push_back(0);
     }
 
@@ -476,7 +474,9 @@ void IceWriter::write(double time_s,
     GCMParams const &gcm_params(gcm_coupler->gcm_params);
 
 
-printf("BEGIN IceWriter::write\n");
+printf("BEGIN IceWriter::write %g %s\n", time_s, fname.c_str());
+double xxx = valsI(1925,0);
+printf("USF2 usurf(1925) = %g\n", xxx);
     if (!file_initialized) init_file();
     NcIO ncio(fname, NcFile::write);
 
@@ -489,7 +489,7 @@ printf("BEGIN IceWriter::write\n");
 
     // Write the other variables
     size_t nI(valsI.extent(0));
-    blitz::Array<double,2> valI_tmp(nI);
+    blitz::Array<double,1> valI_tmp(nI);
 
     // Sanity check array sizes
     size_t all_count = 1;
@@ -498,11 +498,15 @@ printf("BEGIN IceWriter::write\n");
         "Illegal count to write: %ld vs %ld", all_count, nI);
 
 
+//for (size_t i=0; i<counts.size(); ++i) printf("    cur[%ld]=%ld, counts[%ld]=%ld\n", i, cur[i], i, counts[i]);
+
     for (int ivar=0; ivar < contract->size(); ++ivar) {
         VarMeta const &cf = (*contract)[ivar];
 
         NcVar ncvar = ncio.nc->getVar(cf.name.c_str());
         for (int i=0; i<valsI.extent(0); ++i) valI_tmp(i) = valsI(i, ivar);
+//printf("USF3 ivar=%d (%s)[1925] = %g (%g)\n", ivar, (*contract)[ivar].name.c_str(), valI_tmp(1925), valI_tmp.data()[1925]);
+
         ncvar.putVar(cur, counts, valI_tmp.data());
     }
 

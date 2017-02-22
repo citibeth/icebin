@@ -348,7 +348,7 @@ bool run_ice);    // if false, only initialize
 extern "C"
 void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dtsrc)
 {
-    printf("BEGIN gcmce_cold_start()\n");
+    printf("BEGIN gcmce_cold_start() yeari=%d, itimei=%d, dtsrc=%g\n", yeari, itimei, dtsrc);
 
     // This will cold-start initial conditions of the dynamic ice model
     self->dtsrc = dtsrc;
@@ -407,6 +407,7 @@ int itime,
 bool run_ice)    // if false, only initialize
 {
     double time_s = itime * self->dtsrc;
+printf("gcmce_couple_native(): itime=%d, dtsrc=%g, time_s=%g\n", itime, self->dtsrc, time_s);
 
     // Fill it in...
     VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());
