@@ -312,15 +312,15 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     da2 = pism_grid->get_dm(1, // dm_dof
         pism_grid->ctx()->config()->get_double("grid.max_stencil_width"));
 
-//    ierr = DMCreateGlobalVector(*da2, &g2); PISM_CHK(ierr, "DMCreateGlobalVector");
+    ierr = DMCreateGlobalVector(*da2, &g2); PISM_CHK(ierr, "DMCreateGlobalVector");
 
     // note we want a global Vec but reordered in the natural ordering
     // so when it is scattered to proc zero it is not all messed up;
     // see above
-//    ierr = DMDACreateNaturalVector(*da2, &g2natural);
-//        PISM_CHK(ierr, "DMDACreateNaturalVector");
+    ierr = DMDACreateNaturalVector(*da2, &g2natural);
+        PISM_CHK(ierr, "DMDACreateNaturalVector");
 
-    // next get context *and* allocate samplep0 (on proc zero only, naturally)
+//    // next get context *and* allocate samplep0 (on proc zero only, naturally)
 //    ierr = VecScatterCreateToZero(g2natural, &scatter, &Hp0);
 //        PISM_CHK(ierr, "VecScatterCreateToZero");
 
