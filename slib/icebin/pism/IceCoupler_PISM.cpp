@@ -409,40 +409,31 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     printf("END IceCoupler_PISM::cold_start()\n");
 }
 
-blitz::Array<double,1> IceCoupler_PISM::get_elevI()
-{
-    // Reshape 1D blitz variable to 2D for use with PISM
-    blitz::Array<double,1> retI(ny()*nx());
-
-    iceModelVec2S_to_blitz_xy(
-        pism_ice_model->ice_surface_elevation(),
-        retI);
-    return retI;
-}
-
 void IceCoupler_PISM::run_timestep(double time_s,
-    blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nI, nvar)
-    blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+    blitz::Array<double,2> const &ice_ivalsI,    // ice_ivalsI(nvar, nI)
+    blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nvar, nI)
     bool run_ice)    // Should we run the ice model?
 {
     PetscErrorCode ierr;
 
     size_t nI;
 
+    printf("BEGIN IceCoupler_PISM::run_timestep()\n");
+
     // ----------- Bounds Checking
     // Check dimensions
     std::array<long,5> extents0{
-        ice_ivalsI.extent(1),
+        ice_ivalsI.extent(0),
         pism_ivars.size(),
-        ice_ovalsI.extent(1),
+        ice_ovalsI.extent(0),
         pism_ovars.size(),
-        ice_ivalsI.extent(0)};
+        ice_ivalsI.extent(1)};
     std::array<long,5> extents1{
         contract[IceCoupler::INPUT].size(),
         contract[IceCoupler::INPUT].size(),
         contract[IceCoupler::OUTPUT].size(),
         contract[IceCoupler::OUTPUT].size(),
-        ice_ovalsI.extent(0)};
+        ice_ovalsI.extent(1)};
     if (extents0 != extents1) (*icebin_error)(-1,
         "Extents mismatch (%d=%d), (%d=%d), (%d=%d), (%d=%d), (%d=%d)",
         extents0[0], extents1[0],
@@ -450,13 +441,12 @@ void IceCoupler_PISM::run_timestep(double time_s,
         extents0[2], extents1[2],
         extents0[3], extents1[3],
         extents0[4], extents1[4]);
-    nI = ice_ivalsI.extent(0);
+    nI = ice_ivalsI.extent(1);
 
     // Check Petsc types
     if (sizeof(double) != sizeof(PetscScalar)) {
         (*icebin_error)(-1, "PetscScalar must be same as double\n");
     }
-
 
     if (run_ice) {
         // ---------- Load input into PISM's PETSc arrays
@@ -477,7 +467,7 @@ void IceCoupler_PISM::run_timestep(double time_s,
             // Copy value to a stride=1 array
             for (int iI=0; iI<nI; ++iI) {
                 g2_ix(iI) = iI;
-                g2_y(iI) = ice_ivalsI(iI, ivar);
+                g2_y(iI) = ice_ivalsI(ivar, iI);
             }
 
             // Put into a natural-ordering global distributed Petsc Vec
@@ -539,26 +529,27 @@ void IceCoupler_PISM::run_timestep(double time_s,
 
 if (am_i_root()) {
 long sampleI = gridI()->indexing.tuple_to_index(std::array<int,2>{25,25});
-double xxx = ice_ovalsI((int)sampleI, 0);
-printf("USF1 usurf(25,25 %ld) = %g\n", sampleI, xxx);
+double xxx = ice_ovalsI(0, (int)sampleI);
+
+    printf("USF1 usurf(25,25 %ld) = %g\n", sampleI, xxx);
 }
 
     pism_ice_model->reset_rate();
-printf("END IceCoupler_PISM::run_timestep()\n");
+    printf("END IceCoupler_PISM::run_timestep()\n");
 }
 
 /** Copies PISM->Icebin output variables from PISM variables to
 the Icebin-supplied variables (on the root node).
 @param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */
 void IceCoupler_PISM::get_state(
-    blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nI, nvar)
+    blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nvar, nI)
     unsigned int mask)
 {
     printf("BEGIN IceCoupler_PISM::get_state: %ld\n", pism_ovars.size());
     VarSet const &ocontract(contract[IceCoupler::OUTPUT]);
 
     // Copy the outputs to the blitz arrays
-    int nI = ice_ovalsI.extent(0);
+    int nI = ice_ovalsI.extent(1);
     for (unsigned int ivar=0; ivar<pism_ovars.size(); ++ivar) {
         blitz::Array<double,1> ice_ovalsI_ivar(nI);
 
@@ -575,7 +566,7 @@ void IceCoupler_PISM::get_state(
             iceModelVec2S_to_blitz_xy(*pism_ovars[ivar], ice_ovalsI_ivar);    // Allocates oval2_xy if needed
 
             // Copy to the output array
-            ice_ovalsI(blitz::Range::all(),ivar) = ice_ovalsI_ivar;
+            ice_ovalsI(ivar, blitz::Range::all()) = ice_ovalsI_ivar;
         } else {
             blitz::Array<double,2> oval2_xy;    // dummy
             iceModelVec2S_to_blitz_xy(*pism_ovars[ivar], ice_ovalsI_ivar);

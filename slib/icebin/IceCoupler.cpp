@@ -153,11 +153,11 @@ bool run_ice)
 {
     if (!gcm_coupler->am_i_root()) {
         printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
-        blitz::Array<double,1> elevI(get_elevI());    // blitz
+//        blitz::Array<double,1> elevI(get_elevI());    // blitz
 
         // Allocate dummy variables, even though they will only be set on root
-        blitz::Array<double,2> ice_ivalsI(nI(), contract[INPUT].size());
-        blitz::Array<double,2> ice_ovalsI(nI(), contract[OUTPUT].size());
+        blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
+        blitz::Array<double,2> ice_ovalsI(contract[OUTPUT].size(), nI());
         ice_ivalsI = 0;
         ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
@@ -168,11 +168,11 @@ bool run_ice)
     printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
     // This requires MPI...
-    blitz::Array<double,1> elevI(get_elevI());    // blitz
+//    blitz::Array<double,1> elevI(get_elevI());    // blitz
 
     // ========== Get Ice Inputs
-    blitz::Array<double,2> ice_ivalsI(nI(), contract[INPUT].size());
-    blitz::Array<double,2> ice_ovalsI(nI(), contract[OUTPUT].size());
+    blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
+    blitz::Array<double,2> ice_ovalsI(contract[OUTPUT].size(), nI());
     ice_ivalsI = 0;
     ice_ovalsI = 0;
 
@@ -240,7 +240,7 @@ bool run_ice)
                 double icei_v_gcmo_kl(rowk_iter->second);
                 ice_ivalsE_jk += icei_v_gcmo_kl * gcm_ovalsE0(jj, ll);
             }
-            ice_ivalsI(ii, kk) += IvE0_ij * ice_ivalsE_jk;
+            ice_ivalsI(kk, ii) += IvE0_ij * ice_ivalsE_jk;
         }
     }}
 
@@ -250,6 +250,11 @@ bool run_ice)
     if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
 
     // ========== Update regridding matrices
+    int ivar(contract[OUTPUT].index.at("ice_surface_elevation"));
+    blitz::Array<double,1> elevI(ice_ovalsI(ivar, blitz::Range::all()));
+    if (&ice_ovalsI(ivar,0) != &elevI(0)) (*icebin_error)(-1,
+        "ice_ovalsI <%p> != elevI <%p>\n", &ice_ovalsI(ivar,0), &elevI(0));
+
     ice_regridder->set_elevI(elevI);
     RegridMatrices rm(ice_regridder);
 
@@ -341,7 +346,7 @@ bool run_ice)
                 for (auto rown_iter=row.begin(); rown_iter != row.end(); ++rown_iter) {
                     int const &mm(rown_iter->first);
                     double const &gcmi_v_iceo_nm(rown_iter->second);
-                    gcm_ivalsX_in += gcmi_v_iceo_nm * ice_ovalsI((int)ii, (int)mm);
+                    gcm_ivalsX_in += gcmi_v_iceo_nm * ice_ovalsI((int)mm, (int)ii);
                 }
                 vals[nn] = X1vI_ji * gcm_ivalsX_in;
             }
@@ -468,14 +473,14 @@ T &no_const(const T &val)
 @param vals The values themselves -- could be SMB, Energy, something else...
 TODO: More params need to be added.  Time, return values, etc. */
 void IceWriter::write(double time_s,
-    blitz::Array<double,2> const &valsI)    // valsI[nI, nvars]
+    blitz::Array<double,2> const &valsI)    // valsI[nvars, nI]
 {
     GCMCoupler const *gcm_coupler(ice_coupler->gcm_coupler);
     GCMParams const &gcm_params(gcm_coupler->gcm_params);
 
 
 printf("BEGIN IceWriter::write %g %s\n", time_s, fname.c_str());
-double xxx = valsI(1925,0);
+double xxx = valsI(0, 1925);
 printf("USF2 usurf(1925) = %g\n", xxx);
     if (!file_initialized) init_file();
     NcIO ncio(fname, NcFile::write);
@@ -488,7 +493,7 @@ printf("USF2 usurf(1925) = %g\n", xxx);
     time_var.putVar(cur, counts, &time_s);
 
     // Write the other variables
-    size_t nI(valsI.extent(0));
+    size_t nI(valsI.extent(1));
     blitz::Array<double,1> valI_tmp(nI);
 
     // Sanity check array sizes
@@ -504,7 +509,7 @@ printf("USF2 usurf(1925) = %g\n", xxx);
         VarMeta const &cf = (*contract)[ivar];
 
         NcVar ncvar = ncio.nc->getVar(cf.name.c_str());
-        for (int i=0; i<valsI.extent(0); ++i) valI_tmp(i) = valsI(i, ivar);
+        for (int i=0; i<valsI.extent(1); ++i) valI_tmp(i) = valsI(ivar, i);
 //printf("USF3 ivar=%d (%s)[1925] = %g (%g)\n", ivar, (*contract)[ivar].name.c_str(), valI_tmp(1925), valI_tmp.data()[1925]);
 
         ncvar.putVar(cur, counts, valI_tmp.data());

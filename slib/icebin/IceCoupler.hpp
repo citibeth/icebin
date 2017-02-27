@@ -113,9 +113,6 @@ public:
     void print_contracts();
 
     // ========= Called by
-    //     IceCoupler::couple()
-    /** (3) Returns elevI based on the latest state from the ice model. */
-    virtual blitz::Array<double,1> get_elevI() = 0;
 
     /** (4) Run the ice model for one coupling timestep.
     @param time_s Seconds since GCMParams::time_base.  Helps with debugging.

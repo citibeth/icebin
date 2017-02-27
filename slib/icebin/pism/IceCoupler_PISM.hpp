@@ -150,8 +150,6 @@ public:
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
-    virtual blitz::Array<double,1> get_elevI();
-
     /* Called from:
          MODELE.f: GISS_ModelE()
          MODELE.f: startNewDay()
