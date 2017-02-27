@@ -162,9 +162,7 @@ bool run_ice)
     printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
     // ========== Get Ice Inputs
-    blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
     blitz::Array<double,2> ice_ovalsI(contract[OUTPUT].size(), nI());
-    ice_ivalsI = 0;
     ice_ovalsI = 0;
 
     // E_s = Elevation grid (sparse indices)
@@ -196,47 +194,49 @@ bool run_ice)
     }
 
 
-    // Get the CSR sparse matrix to convert GCM outputs to ice model inputs
+    // Set up scalars used to instantiate variable conversion matrices
     std::vector<std::pair<std::string, double>> scalars({
         std::make_pair("by_dt", 1.0 / (time_s - gcm_coupler->last_time_s)),
         std::make_pair("unit", 1.0)});
-#if 0
-    auto icei_v_gcmo(var_trans_inE.apply_scalars(scalars));    // Mxb
 
-    // ice_ivalsE0_{jk} = icei_v_gcmo_{kl} * gcm_ovalsE0_{jl}
-    // ice_ivalsI_{ik} = IvE0_{ij} * ice_ivalsE0_{jk}
-    //       or:
-    // ice_ivalsI_{ik} = IvE0_{ij} * icei_v_gcmo_{kl} * gcm_ovalsE0_{jl}
-    //       where:
+
+    // ------------- Form ice_ivalsI
+    // Assuming column-major matrices...
+    // ice_ivalsI{ik} = IvE0{ij} * (gcm_ovalsE0{jl} * ivg.M{lk} + ivg.b{jk})
+    //       Dense    =  Sparse          Dense          Sparse     Repeated
+    // *** where:
+    // ivg = icei_v_gcmo
     // |i| = # ice grid cells (|I|)
     // |j| = # dense elevation grid cells (|E0|)
     // |k| = # variables in ice_input
     // |l| = # variables in gcm_output
-    //
-    // (NOTE storage order; indices are row-major)
 
-    // ------------- Form ice_ivalsI
-
-    // Regrid & combine to form ice_ivalsI
+    blitz::Array<double,2> ice_ivalsI;
+    EigenDenseMatrixT ice_ivalsI_e;    // Must stick around as long as ice_ivalsI
     if (run_ice) {
-    for (auto iIvE0(begin(*IvE0)); iIvE0 != end(*IvE0); ++iIvE0) {
-        auto ii(iIvE0->index(0));
-        auto jj(iIvE0->index(1));
-        auto IvE0_ij(iIvE0->value());
+        // Get the sparse matrix to convert GCM output variables to ice model inputs
+        // This will be transposed: M(input, output).  b is a row-vector here.
+        auto icei_v_gcmo_T(var_trans_inE.apply_scalars(scalars, 'T'));    // Mxb
 
-        // Transform units on the input while multiplying by M
-        for (int kk = 0; kk < contract[INPUT].size(); ++kk) {
-            double ice_ivalsE_jk = 0;
-            std::vector<std::pair<int, double>> const &row(icei_v_gcmo.mat[kk]);
-            for (auto rowk_iter=row.begin(); rowk_iter != row.end(); ++rowk_iter) {
-                int ll(rowk_iter->first);
-                double icei_v_gcmo_kl(rowk_iter->second);
-                ice_ivalsE_jk += icei_v_gcmo_kl * gcm_ovalsE0(jj, ll);
-            }
-            ice_ivalsI(kk, ii) += IvE0_ij * ice_ivalsE_jk;
-        }
-    }}
-#endif
+        // Switch from row-major (Blitz++) to col-major (Eigen) indexing
+        Eigen::Map<EigenDenseMatrixT> gcm_ovalsE0_e(
+            gcm_ovalsE0.data(), gcm_ovalsE0.extent(1), gcm_ovalsE0.extent(0));
+
+        auto nE0(dimE0.dense_extent());
+        ice_ivalsI_e = (*IvE0) * (
+            gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
+
+        // Alias the Eigen array to blitz array
+        ice_ivalsI.reference(blitz::Array<double,2>(
+            ice_ivalsI_e.data(),
+            blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
+            blitz::neverDeleteData));
+    } else {
+        // Create dummy blitz array
+        ice_ivalsI.reference(
+            blitz::Array<double,2>(contract[INPUT].size(), nI()));
+    }
+
 
     // ========= Step the ice model forward
     if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
@@ -299,27 +299,22 @@ bool run_ice)
     std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
     for (int iAE=0; iAE < GridAE::count; ++iAE) {
 
-        // Assuming column-major vectors....
+        // Assuming column-major matrices...
         // gcm_ivalsX{jn} = X1vI{ji} * (ice_ovalsI{im} * gvi.M{mn} + gvi.b{in})
         //      Dense        Sparse         Dense          Sparse     Repeated
-        //
-        // OR (transposed):
-        //        WE ARE NOT USING THIS VERSION
-        // gcm_ivalsX{nj} = (gvi.M{nm} * ice_ovalsI{mi}  + gvi.b{ni}) * X1vI{ij}
-        //      Dense            Sparse     Dense          Repeated     Sparse
 
-        //        where:
+        // *** where:
         // gvi = gcmi_v_iceo (unit/variable conversion)
         // |i| = # ice grid cells (|I|)
         // |j| = # used elevation/atmosphere grid cells (|X|)
         // |m| = # variables in ice_output
         // |n| = # variables in gcm_input
 
-        // Get transposed variable transform matrix: M(input, output)
-        // b is a row-vector here
+        // Get the sparse matrix to convert ice model output variables to GCM inputs
+        // This will be transposed: M(input, output).  b is a row-vector here.
         auto gcmi_v_iceo_T(var_trans_outAE[iAE].apply_scalars(scalars, 'T'));
 
-        // "Transpose", switching from row-major to col-major indexing
+        // Switch from row-major (Blitz++) to col-major (Eigen) indexing
         Eigen::Map<EigenDenseMatrixT> ice_ovalsI_e(
             ice_ovalsI.data(), ice_ovalsI.extent(1), ice_ovalsI.extent(0));
 
