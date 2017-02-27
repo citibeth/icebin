@@ -120,8 +120,8 @@ void *gcmce_new(
     // Info about the global grid
     int im, int jm,
 
-    // Info about the local grid (1-based indexing)
-    int i0, int i1, int j0, int j1,
+    // Info about the local grid (1-based indexing, closed ranges)
+    int i0_f, int i1_f, int j0_f, int j1_f,
 
     // MPI Stuff
     MPI_Fint comm_f, int root)
@@ -135,9 +135,9 @@ printf("BEGIN gcmce_new()\n");
     rdparams = _rdparams;
     GCMParams &gcm_params(self->gcm_params);
 
-    // Domains and indexing are alphabetical indexes, zero-based
-    self->domainA = ibmisc::Domain({i0+1,j0+1}, {i1, j1});
-    self->domainA_global = ibmisc::Domain({1,1}, {im+1, jm+1});
+    // Domains and indexing are alphabetical indexes, zero-based, open ranges
+    self->domainA = ibmisc::Domain({i0_f-1,j0_f-1}, {i1_f, j1_f});
+    self->domainA_global = ibmisc::Domain({0,0}, {im, jm});
 
     gcm_params.icebin_config_fname = boost::filesystem::absolute("config/icebin.nc").string();
 
