@@ -135,12 +135,7 @@ static Eigen::VectorXd to_col_vector(blitz::Array<double,1> const &vec)
     for (int i=vec.lbound(0), j=0; i <= vec.ubound(0); ++i,++j) ret(j) = vec(i);
     return ret;
 }
-
-
-
-
-
-
+// -----------------------------------------------------------
 /** 
 @param do_run True if we are to actually run (otherwise just return ice_ovalsI from current state)
 @return ice_ovalsI */
@@ -153,7 +148,6 @@ bool run_ice)
 {
     if (!gcm_coupler->am_i_root()) {
         printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
-//        blitz::Array<double,1> elevI(get_elevI());    // blitz
 
         // Allocate dummy variables, even though they will only be set on root
         blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
@@ -166,9 +160,6 @@ bool run_ice)
     }
 
     printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
-
-    // This requires MPI...
-//    blitz::Array<double,1> elevI(get_elevI());    // blitz
 
     // ========== Get Ice Inputs
     blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
@@ -224,6 +215,7 @@ bool run_ice)
 
     // ------------- Form ice_ivalsI
 
+#if 0
     // Regrid & combine to form ice_ivalsI
     if (run_ice) {
     for (auto iIvE0(begin(*IvE0)); iIvE0 != end(*IvE0); ++iIvE0) {
@@ -243,6 +235,7 @@ bool run_ice)
             ice_ivalsI(kk, ii) += IvE0_ij * ice_ivalsE_jk;
         }
     }}
+#endif
 
     // ========= Step the ice model forward
     if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
@@ -252,6 +245,7 @@ bool run_ice)
     // ========== Update regridding matrices
     int ivar(contract[OUTPUT].index.at("ice_surface_elevation"));
     blitz::Array<double,1> elevI(ice_ovalsI(ivar, blitz::Range::all()));
+    // Check that elevI is an alias for variable #ivar in ice_ovalsI
     if (&ice_ovalsI(ivar,0) != &elevI(0)) (*icebin_error)(-1,
         "ice_ovalsI <%p> != elevI <%p>\n", &ice_ovalsI(ivar,0), &elevI(0));
 
@@ -305,52 +299,50 @@ bool run_ice)
         accum::ref(out_elevE1_s))),
         elevE1);
 
-    // ========= Compute gcm_ivalsE = EvI * vt * ice_ovals
+    // ========= Compute gcm_ivalsE
 
     auto A1vI(rm.regrid("AvI", {&dimA1, &dimI}, true, true));
 
-    std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
-
     // Do it once for _E variables and once for _A variables.
+    std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
     for (int iAE=0; iAE < GridAE::count; ++iAE) {
-        CSRAndUnits gcmi_v_iceo(var_trans_outAE[iAE].apply_scalars(scalars));
 
-        VarSet const &contract(gcm_coupler->gcm_inputsAE[iAE]);
-        std::vector<double> vals(contract.size());
-        WeightedSparse &X1vI_ws(*AE1vIs[iAE]);
-        VectorMultivec &gcm_ivalsX_s(out.gcm_ivalsAE_s[iAE]);
+        // Assuming column-major vectors....
+        // gcm_ivalsX{jn} = X1vI{ji} * (ice_ovalsI{im} * gvi.M{mn} + gvi.b{in})
+        //      Dense        Sparse         Dense          Sparse     Repeated
+        //
+        // OR (transposed):
+        //        WE ARE NOT USING THIS VERSION
+        // gcm_ivalsX{nj} = (gvi.M{nm} * ice_ovalsI{mi}  + gvi.b{ni}) * X1vI{ij}
+        //      Dense            Sparse     Dense          Repeated     Sparse
 
-        // gcm_ivalsX_{jn} = X1vI_{ji} * gcmi_v_iceo_{nm} * ice_ovalsI_{im}
-        //       where:
+        //        where:
+        // gvi = gcmi_v_iceo (unit/variable conversion)
         // |i| = # ice grid cells (|I|)
-        // |j| = # elevation/atmosphere grid cells (|X|)
+        // |j| = # used elevation/atmosphere grid cells (|X|)
         // |m| = # variables in ice_output
         // |n| = # variables in gcm_input
 
-        // Do the multiplication
-        SparseSetT &dimX(*X1vI_ws.dims[0]);    // dimA1 or dimE1
-        if (((iAE == GridAE::A) && (&dimX != &dimA1)) ||    // sanity check
-            ((iAE == GridAE::E) && (&dimX != &dimE1))) (*icebin_error)(-1,
-            "Unexpected dimX vs. dimA/E");
-        for (auto iX1vI(begin(*X1vI_ws.M)); iX1vI != end(*X1vI_ws.M); ++iX1vI) {
-            auto jj(iX1vI->index(0));
-            auto jj_s(dimX.to_sparse(jj));
-            auto ii(iX1vI->index(1));
-            auto X1vI_ji(iX1vI->value());
+        // Get transposed variable transform matrix: M(input, output)
+        // b is a row-vector here
+        Mxb gcmi_v_iceo_T(var_trans_outAE[iAE].apply_scalars(scalars, 'T'));
 
-            // Transform units on the input while multiplying by M
-            for (size_t nn = 0; nn < contract.size(); ++nn) {
-                double zval = 0;
-                double gcm_ivalsX_in = 0;
-                std::vector<std::pair<int, double>> const &row(gcmi_v_iceo.mat[nn]);
-                for (auto rown_iter=row.begin(); rown_iter != row.end(); ++rown_iter) {
-                    int const &mm(rown_iter->first);
-                    double const &gcmi_v_iceo_nm(rown_iter->second);
-                    gcm_ivalsX_in += gcmi_v_iceo_nm * ice_ovalsI((int)mm, (int)ii);
-                }
-                vals[nn] = X1vI_ji * gcm_ivalsX_in;
-            }
-            gcm_ivalsX_s.add(jj_s, vals);
+        // "Transpose", switching from row-major to col-major indexing
+        Map<EigenDenseMatrixT> ice_ovalsI_e(
+            ice_ovalsI.data(), _Ct.extent(1), _Ct.extent(0));
+
+        // Regrid while recombining variables
+        EigenDenseMatrixT gcm_ivalsX((*AE1vIs[iAE]->M) * (
+            ice_ovalsI_e * gcmi_v_iceo_T.M + gcmi_v_iceo_T.b.replicate(nI(),1) ));
+
+        // Sparsify while appending to the global VectorMultivec
+        // (Transposes order in memory)
+        std::vector<double> vals(gcm_ivalsX.cols());
+        for (int jj=0; jj < gcm_ivalsX.rows(); ++jj) {
+            auto jj_s(dimX.to_sparse(jj));
+            for (int nn=0; nn < gcm_ivalsX.cols(); ++nn)
+                vals[nn] = gcm_ivalsX(j,n);
+            out.gcm_ivalsAE_s[iAE].add(jj_s, vals);
         }
     }
 
