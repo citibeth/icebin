@@ -498,6 +498,7 @@ printf("domainA size=%ld\n", domainA.data.size());
 /** Called from MPI rank */
 void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
 {
+    printf("BEGIN GCMCoupler_ModelE::update_gcm_ivals\n");
     auto nvar(out.nvar());    // A and E
 
     // Update gcm_ivalA variables...
@@ -515,13 +516,14 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
             "nvar[%d]=%d < 0, it should not be\n", iAE, nvar[iAE]);
     }
 
+    for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) (*gcm_ivalsA[ivar]) = 0;
     for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {    // Iterate through elements of parallel arrays
         long iA = gcm_ivalsA_s.index[i];
         auto ij(gcm_regridder.indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
         int const i_f = ij[0]+1;    // C2F
         int const j_f = ij[1]+1;
         for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
-            (*gcm_ivalsA[ivar])(i_f, j_f) =
+            (*gcm_ivalsA[ivar])(i_f, j_f) +=
                 gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar];
         }
     }
@@ -534,6 +536,7 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
         "gcm_ivalsE is wrong size: %ld vs. %d", gcm_ivalsE.size(), nvar[GridAE::E]);
 
     // Write to here...
+    for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) (*gcm_ivalsE[ivar]) = 0;
     for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
         long iE = gcm_ivalsE_s.index[i];
         auto ijk(gcm_regridder.indexing(GridAE::E).index_to_tuple<int,2>(iE));
@@ -543,11 +546,11 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
         int const ihc_gcm_f = gcm_params.icebin_base_hc + ihc_ice + 1;    // 1-based, G
 
         for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
-            (*gcm_ivalsE[ivar])(i_f, j_f, ihc_gcm_f) =
+            (*gcm_ivalsE[ivar])(i_f, j_f, ihc_gcm_f) +=
                 gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar];
         }
     }
-printf("END update_gcm_ivals\n");
+    printf("END GCMCoupler_ModelE::update_gcm_ivals\n");
 }
 
 
