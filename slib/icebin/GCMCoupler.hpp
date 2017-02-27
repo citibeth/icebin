@@ -67,9 +67,6 @@ struct GCMInput {
     TupleListLT<2> AvE1_s;
     TupleListLT<1> wAvE1_s;
 
-    // Used for temperature downscaling according to a lapse rate
-    TupleListLT<1> elevE1_s;
-
     GCMInput(std::array<int, GridAE::count> const &nvar) :
         gcm_ivalsAE_s({
             VectorMultivec(nvar[0]),
@@ -91,7 +88,6 @@ struct GCMInput {
         ar & E1vE0_s;
         ar & AvE1_s;
         ar & wAvE1_s;
-        ar & elevE1_s;
     }
 };
 // =============================================================================

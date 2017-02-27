@@ -222,6 +222,9 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-in-" + sdate + ".nc";
         NcIO ncio(fname, 'w');
+        auto one_dims(get_or_add_dims(ncio, {"one"}, {1}));
+        NcVar info_var = get_or_add_var(ncio, "info", ibmisc::get_nc_type<double>(), one_dims);
+        info_var.putAtt("notes", "Elevation classes (HC) are just those known to IceBin.  No legacy or sea-land elevation classes included.");
         ncio_gcm_input(ncio, out, timespan,
             time_unit.to_cf(), "");
         ncio();
@@ -231,7 +234,7 @@ printf("END GCMCoupler::couple()\n");
     return out;
 }
 // ------------------------------------------------------------
-static void ncwrite_dense(
+static void ncwrite_dense_VectorMultivec(
     NcGroup * const nc,
     VectorMultivec const *vecs,
     VarSet const *contract,
@@ -290,11 +293,69 @@ printf("BEGIN ncio_dense()\n");
     append(dim_spec, indexing);
     contract.ncdefine(ncio, dim_spec.to_dims(ncio), vname_base);
 
-    ncio.add("ncio_dense::" + vname_base, std::bind(ncwrite_dense,
+    ncio.add("ncio_dense::" + vname_base, std::bind(ncwrite_dense_VectorMultivec,
         ncio.nc, &vecs, &contract, &indexing, vname_base));
 
 printf("END ncio_dense()\n");
 }
+// --------------------------------------------------------------
+#if 0	// Not needed
+static void ncwrite_dense_TupleList1(
+    NcGroup * const nc,
+    TupleListLT<1> const *E_s,
+    ibmisc::Indexing const *indexing,
+    std::string const &vname)
+{
+printf("BEGIN ncwrite_dense()\n");
+
+    // --------- Convert sparse to dense (1-D indexing)
+    long nE = indexing->extent();
+    blitz::Array<double,1> denseE(nE);    // All dims
+    for (auto ii = E_s->begin(); ii != E_s->end(); ++ii) {
+        // 1-D indexing here
+        auto iE(ii->index(0));
+        denseE(iE) = ii->value();
+    }
+
+    // NetCDF needs dimensions in stride-descending order
+    std::vector<size_t> startp;
+    std::vector<size_t> countp;
+    startp.push_back(0);    // Time dimension
+    countp.push_back(1);
+    for (int dimi : indexing->indices()) {
+        startp.push_back(0);
+        countp.push_back((*indexing)[dimi].extent);
+    }
+
+    // Store in the netCDF variable
+    NcVar ncvar(nc->getVar(vname));
+    ncvar.putVar(startp, countp, denseE.data());
+
+printf("END ncwrite_dense()\n");
+}
+
+/** Densifies the sparse vectors, and then writes them out to netCDF */
+static void ncio_dense(
+    NcIO &ncio,
+    TupleListLT<1> const &E_s,
+    ibmisc::Indexing const &indexing,
+    std::string const &vname)
+{
+printf("BEGIN ncio_dense()\n");
+    if (ncio.rw != 'w') (*icebin_error)(-1,
+        "ncio_dense(TupleListT<1>) only writes, no read.");
+
+    // Create the variables
+    NcDimSpec dim_spec({"time"}, {1});
+    append(dim_spec, indexing);
+    get_or_add_var(ncio, vname, "double", dim_spec.to_dims(ncio));
+
+    ncio.add("ncio_dense::" + vname, std::bind(ncwrite_dense_TupleList1,
+        ncio.nc, &E_s, &indexing, vname));
+
+printf("END ncio_dense()\n");
+}
+#endif
 // ------------------------------------------------------------
 /** Top-level ncio() to log output from coupler. (coupler->GCM) */
 void GCMCoupler::ncio_gcm_input(NcIO &ncio,
@@ -313,7 +374,6 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"Ev1Ev0");
     ncio_spsparse(ncio, out.AvE1_s, false, vname_base+"AvE1");
     ncio_spsparse(ncio, out.wAvE1_s, false, vname_base+"wAvE1");
-    ncio_spsparse(ncio, out.elevE1_s, false, vname_base+"elevE1");
 }
 
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */

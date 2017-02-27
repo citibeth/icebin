@@ -137,7 +137,6 @@ std::vector<GCMInput> split_by_domain(
     SPCOPY(E1vE0_s, domainsE);
     SPCOPY(AvE1_s, domainsA);
     SPCOPY(wAvE1_s, domainsA);
-    SPCOPY(elevE1_s, domainsE);
 
 #   undef SPCOPY
 

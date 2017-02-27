@@ -244,11 +244,11 @@ bool run_ice)
     if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
 
     // ========== Update regridding matrices
-    int ivar(contract[OUTPUT].index.at("ice_surface_elevation"));
-    blitz::Array<double,1> elevI(ice_ovalsI(ivar, blitz::Range::all()));
-    // Check that elevI is an alias for variable #ivar in ice_ovalsI
-    if (&ice_ovalsI(ivar,0) != &elevI(0)) (*icebin_error)(-1,
-        "ice_ovalsI <%p> != elevI <%p>\n", &ice_ovalsI(ivar,0), &elevI(0));
+    int elevI_ix = standard_names[OUTPUT].at("elevI");
+    blitz::Array<double,1> elevI(ice_ovalsI(elevI_ix, blitz::Range::all()));
+    // Check that elevI is an alias for variable #elevI_ix in ice_ovalsI
+    if (&ice_ovalsI(elevI_ix,0) != &elevI(0)) (*icebin_error)(-1,
+        "ice_ovalsI <%p> != elevI <%p>\n", &ice_ovalsI(elevI_ix,0), &elevI(0));
 
     ice_regridder->set_elevI(elevI);
     RegridMatrices rm(ice_regridder);
@@ -290,15 +290,6 @@ bool run_ice)
             E1vE0);
     }
 
-
-    // ------ Update orography (global for all ice sheets)
-    TupleListLT<1> &out_elevE1_s(out.elevE1_s);
-    Eigen::VectorXd elevE1(*E1vI->M * to_col_vector(elevI));
-    spcopy(
-        accum::permute(accum::in_rank<2>(), {0},   // copy eigen column vector
-        accum::to_sparse(make_array(&dimE1),
-        accum::ref(out_elevE1_s))),
-        elevE1);
 
     // ========= Compute gcm_ivalsE
 

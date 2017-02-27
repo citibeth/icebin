@@ -126,10 +126,12 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
 
     // ============== Ice -> GCM
     VarSet &ice_output(ice_coupler->contract[IceCoupler::OUTPUT]);
+    auto &standard_names(ice_coupler->standard_names[IceCoupler::OUTPUT]);
 
     // All these outputs are on the ICE grid.
     // Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
 
+    standard_names["elevI"] =
     ice_output.add("ice_surface_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
     ice_output.add("ice_thickness", nan, "m", contracts::INITIAL, "thickness of ice");
     ice_output.add("bed_topography", nan, "m", contracts::INITIAL, "topography of bedrock");
@@ -187,6 +189,7 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
         gcm_coupler->scalars.keys());    // scalars
 
     ok = ok && vtA.set("elevA", "ice_surface_elevation", "unit", 1.0);
+    ok = ok && vtE.set("elevE", "ice_surface_elevation", "unit", 1.0);
 
     // Top layer state from ice model
     ok = ok && vtE.set("M1E", "M1", "unit", 1.0); // Divide by RHOW to convert to m water equiv

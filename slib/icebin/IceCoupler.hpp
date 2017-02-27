@@ -58,6 +58,11 @@ public:
     // List of fields this dynamic ice model takes for input / output.
     std::array<VarSet, IO::count> contract;
 
+    // [INPUT|OUTPUT] variables
+    // Defines IceBin-standard names for certain fiels in the contracts.
+    // Allows IceBin to access these fields
+    std::array<std::map<std::string,int>, IO::count> standard_names;
+
     // Linear combination transforming variables from:
     //      INPUT: gcm_output --> ice_input
     //     OUTPUT: ice_output --> gcm_input
