@@ -195,11 +195,13 @@ bool run_ice)
         }
     }
 
+
     // Get the CSR sparse matrix to convert GCM outputs to ice model inputs
     std::vector<std::pair<std::string, double>> scalars({
         std::make_pair("by_dt", 1.0 / (time_s - gcm_coupler->last_time_s)),
         std::make_pair("unit", 1.0)});
-    CSRAndUnits icei_v_gcmo(var_trans_inE.apply_scalars(scalars));
+#if 0
+    auto icei_v_gcmo(var_trans_inE.apply_scalars(scalars));    // Mxb
 
     // ice_ivalsE0_{jk} = icei_v_gcmo_{kl} * gcm_ovalsE0_{jl}
     // ice_ivalsI_{ik} = IvE0_{ij} * ice_ivalsE0_{jk}
@@ -215,7 +217,6 @@ bool run_ice)
 
     // ------------- Form ice_ivalsI
 
-#if 0
     // Regrid & combine to form ice_ivalsI
     if (run_ice) {
     for (auto iIvE0(begin(*IvE0)); iIvE0 != end(*IvE0); ++iIvE0) {
@@ -325,11 +326,11 @@ bool run_ice)
 
         // Get transposed variable transform matrix: M(input, output)
         // b is a row-vector here
-        Mxb gcmi_v_iceo_T(var_trans_outAE[iAE].apply_scalars(scalars, 'T'));
+        auto gcmi_v_iceo_T(var_trans_outAE[iAE].apply_scalars(scalars, 'T'));
 
         // "Transpose", switching from row-major to col-major indexing
-        Map<EigenDenseMatrixT> ice_ovalsI_e(
-            ice_ovalsI.data(), _Ct.extent(1), _Ct.extent(0));
+        Eigen::Map<EigenDenseMatrixT> ice_ovalsI_e(
+            ice_ovalsI.data(), ice_ovalsI.extent(1), ice_ovalsI.extent(0));
 
         // Regrid while recombining variables
         EigenDenseMatrixT gcm_ivalsX((*AE1vIs[iAE]->M) * (
@@ -339,9 +340,9 @@ bool run_ice)
         // (Transposes order in memory)
         std::vector<double> vals(gcm_ivalsX.cols());
         for (int jj=0; jj < gcm_ivalsX.rows(); ++jj) {
-            auto jj_s(dimX.to_sparse(jj));
+            auto jj_s(AE1vIs[iAE]->dims[0]->to_sparse(jj));
             for (int nn=0; nn < gcm_ivalsX.cols(); ++nn)
-                vals[nn] = gcm_ivalsX(j,n);
+                vals[nn] = gcm_ivalsX(jj,nn);
             out.gcm_ivalsAE_s[iAE].add(jj_s, vals);
         }
     }

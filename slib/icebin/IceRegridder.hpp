@@ -53,9 +53,9 @@ template<int RANK>
     using DenseArrayT = blitz::Array<val_type,RANK>;
 typedef MakeDenseEigenT::SparseSetT SparseSetT;
 typedef MakeDenseEigenT::EigenSparseMatrixT EigenSparseMatrixT;
-typedef Eigen::Matrix<val_type, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColumnMajor> EigenDenseMatrixT;
-typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1, Eigen::ColumnMajor> EigenColVectorT;
-typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic, Eigen::ColumnMajor> EigenRowVectorT;
+typedef Eigen::Matrix<val_type, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> EigenDenseMatrixT;
+typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1, Eigen::ColMajor> EigenColVectorT;
+typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic, Eigen::ColMajor> EigenRowVectorT;
 // -----------------------------------------
 
 /** Return value of a sparse matrix */
