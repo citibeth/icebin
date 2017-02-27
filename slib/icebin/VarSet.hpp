@@ -63,6 +63,7 @@ public:
         datum.flags = flags;
         datum.description = description;
         data.push_back(std::move(datum));
+        return ix;
     }
 
     size_t size() const { return index.size(); }
