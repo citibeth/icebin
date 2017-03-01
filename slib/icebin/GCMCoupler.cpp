@@ -210,7 +210,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         ncio();
     }
 
-    // Initialize output
+    // Initialize output: A and E
     GCMInput out({gcm_inputsAE[0].size(), gcm_inputsAE[1].size()});
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {

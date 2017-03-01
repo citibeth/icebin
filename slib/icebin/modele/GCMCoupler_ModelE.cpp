@@ -411,43 +411,43 @@ printf("gcmce_couple_native(): itime=%d, dtsrc=%g, time_s=%g\n", itime, self->dt
 
     // Fill it in...
     VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());
+    std::vector<double> val(self->gcm_outputsE.size());    // Temporary
 
     auto &indexingA(self->gcm_regridder.gridA->indexing);
 
     // domain uses alphabetical order, 0-based indexing...
     const auto base_hc(self->gcm_params.icebin_base_hc);
     const auto nhc_ice(self->gcm_regridder.nhc(0));
-    std::vector<double> val(self->gcm_outputsE.size());    // Temporary
 
     auto &domainA(self->domainA);
-printf("domainA size=%ld\n", domainA.data.size());
+printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc, nhc_ice);
+
     for (int ihc=base_hc; ihc < base_hc + nhc_ice; ++ihc) {
-    for (int j=domainA[1].begin; j < domainA[1].end; ++j) {
-    for (int i=domainA[0].begin; i < domainA[0].end; ++i) {
-        // i,j are 0-based indexes.
-        int i_f = i+1;
-        int j_f = j+1;
-        int ihc_f = ihc+1;
-
-        if (self->modele_inputs.fhc(i_f,j_f,ihc_f) == 0) continue;    // C2F indexing
-
-        int ihc_ice = ihc - base_hc;   // Use only IceBin HC's, zero-based indexing
-
+        const int ihc_f = ihc+1;
+        const int ihc_ice = ihc - base_hc;   // Use only IceBin HC's, zero-based indexing
         if (ihc_ice < 0) (*icebin_error)(-1,
             "ihc_ice cannot be <0: %d = %d - %d - 1\n", ihc_ice, ihc, base_hc);
 
-        long iE_s = self->gcm_regridder.indexingE.tuple_to_index(
-            make_array(i, j, ihc_ice));
+        for (int j=domainA[1].begin; j < domainA[1].end; ++j) {
+        for (int i=domainA[0].begin; i < domainA[0].end; ++i) {
+            // i,j are 0-based indexes.
+            const int i_f = i+1;
+            const int j_f = j+1;
 
-        if (iE_s < 0) (*ibmisc_error)(-1,
-            "iE_s=%ld (from %d %d %d), it should not be negative\n", iE_s, i, j, ihc_ice);
+            if (self->modele_inputs.fhc(i_f,j_f,ihc_f) == 0) continue;    // C2F indexing
+            long iE_s = self->gcm_regridder.indexingE.tuple_to_index(
+                make_array(i, j, ihc_ice));
 
-        for (unsigned int ivar=0; ivar<self->gcm_outputsE.size(); ++ivar) {
-            val[ivar] = (*self->modele_outputs.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
-        }
+            if (iE_s < 0) (*ibmisc_error)(-1,
+                "iE_s=%ld (from %d %d %d), it should not be negative\n", iE_s, i, j, ihc_ice);
 
-        gcm_ovalsE_s.add({iE_s}, &val[0]);
-    }}}
+            for (unsigned int ivar=0; ivar<self->gcm_outputsE.size(); ++ivar) {
+                val[ivar] = (*self->modele_outputs.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
+            }
+
+            gcm_ovalsE_s.add({iE_s}, &val[0]);
+        }}
+    }
 
 
     // Gather it to root
@@ -455,6 +455,7 @@ printf("domainA size=%ld\n", domainA.data.size());
     // Init our output struct based on number of A and E variables.
     GCMInput out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
     if (self->am_i_root()) {
+        // =================== MPI ROOT =============================
         std::vector<VectorMultivec> every_gcm_ovalsE_s;
         boost::mpi::gather(self->gcm_params.world, gcm_ovalsE_s,
             every_gcm_ovalsE_s, self->gcm_params.gcm_root);
@@ -476,7 +477,8 @@ printf("domainA size=%ld\n", domainA.data.size());
         boost::mpi::scatter(self->gcm_params.world, every_outs, out, self->gcm_params.gcm_root);
 
 
-    } else {    // ~world.am_i_root()
+    } else {
+        // =================== NOT MPI ROOT =============================
         // Send our input to root
         boost::mpi::gather(self->gcm_params.world, gcm_ovalsE_s, self->gcm_params.gcm_root);
 

@@ -80,8 +80,10 @@ public:
         std::string vname_base) const
     {
         for (size_t i=0; i<size(); ++i) {
-            auto &var((*this)[i]);
-            get_or_add_var(ncio, vname_base+var.name, "double", dims);
+            VarMeta const &var((*this)[i]);
+            auto ncvar(get_or_add_var(ncio, vname_base+var.name, "double", dims));
+            ncvar.putAtt("units", var.units);
+            ncvar.putAtt("description", var.description);
         }
     }
 

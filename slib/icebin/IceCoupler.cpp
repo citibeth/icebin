@@ -183,13 +183,13 @@ bool run_ice)
     // Densify gcm_ovalsE_s --> gcm_ovalsE
     // This should ONLY involve iE already mentioned in IvE0;
     // if not, there will be an exception.
-    blitz::Array<double,2> gcm_ovalsE0(dimE0.dense_extent(), gcm_coupler->gcm_outputsE.size());
+    blitz::Array<double,2> gcm_ovalsE0(gcm_coupler->gcm_outputsE.size(), dimE0.dense_extent());
     gcm_ovalsE0 = 0;
     for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
         long iE_s(gcm_ovalsE_s.index[i]);
         int iE0(dimE0.to_dense(iE_s));
         for (int ivar=0; ivar<gcm_ovalsE_s.nvar; ++ivar) {
-            gcm_ovalsE0(iE0, ivar) += gcm_ovalsE_s.val(ivar, i);
+            gcm_ovalsE0(ivar, iE0) += gcm_ovalsE_s.val(ivar, i);
         }
     }
 
@@ -217,6 +217,7 @@ bool run_ice)
         // Get the sparse matrix to convert GCM output variables to ice model inputs
         // This will be transposed: M(input, output).  b is a row-vector here.
         auto icei_v_gcmo_T(var_trans_inE.apply_scalars(scalars, 'T'));    // Mxb
+//        print_var_trans(icei_v_gcmo_T, var_trans_inE, 'T');
 
         // Switch from row-major (Blitz++) to col-major (Eigen) indexing
         Eigen::Map<EigenDenseMatrixT> gcm_ovalsE0_e(
@@ -313,6 +314,7 @@ bool run_ice)
         // Get the sparse matrix to convert ice model output variables to GCM inputs
         // This will be transposed: M(input, output).  b is a row-vector here.
         auto gcmi_v_iceo_T(var_trans_outAE[iAE].apply_scalars(scalars, 'T'));
+//        print_var_trans(gcmi_v_iceo_T, var_trans_outAE[iAE], 'T');
 
         // Switch from row-major (Blitz++) to col-major (Eigen) indexing
         Eigen::Map<EigenDenseMatrixT> ice_ovalsI_e(
