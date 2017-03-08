@@ -94,11 +94,6 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
     // be placed directly into the VarTransformer.
 
     scalars.add("by_dt", nan, "s-1", 1., "Inverse of coupling timestep");
-
-    scalars.add("unit", nan, "", 0, "Dimensionless identity");
-//  gcm_input_scalars.add_field("unit", nan, "", 0, "Dimensionless identity");
-
-
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()
@@ -407,7 +402,6 @@ int itime,
 bool run_ice)    // if false, only initialize
 {
     double time_s = itime * self->dtsrc;
-printf("gcmce_couple_native(): itime=%d, dtsrc=%g, time_s=%g\n", itime, self->dtsrc, time_s);
 
     // Fill it in...
     VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());

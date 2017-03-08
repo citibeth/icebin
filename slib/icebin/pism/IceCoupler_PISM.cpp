@@ -309,6 +309,10 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
 
     // Initialize scatter/gather stuff
+    vtmp.create(pism_grid, "vtmp", WITHOUT_GHOSTS);
+    vtmp_p0 = vtmp.allocate_proc0_copy();
+
+    // Initialize scatter/gather stuff (probably obsolete)
     da2 = pism_grid->get_dm(1, // dm_dof
         pism_grid->ctx()->config()->get_double("grid.max_stencil_width"));
 
@@ -416,8 +420,6 @@ void IceCoupler_PISM::run_timestep(double time_s,
 {
     PetscErrorCode ierr;
 
-    size_t nI;
-
     printf("BEGIN IceCoupler_PISM::run_timestep()\n");
 
     // ----------- Bounds Checking
@@ -441,7 +443,7 @@ void IceCoupler_PISM::run_timestep(double time_s,
         extents0[2], extents1[2],
         extents0[3], extents1[3],
         extents0[4], extents1[4]);
-    nI = ice_ivalsI.extent(1);
+    size_t const nI = ice_ivalsI.extent(1);
 
     // Check Petsc types
     if (sizeof(double) != sizeof(PetscScalar)) {
@@ -452,38 +454,20 @@ void IceCoupler_PISM::run_timestep(double time_s,
         // ---------- Load input into PISM's PETSc arrays
         // Fill pism_ivars[i] <-- iceIvals[:,i]
         // pism_ivars are distributed (global) vectors.
-        blitz::Array<PetscScalar,1> g2_y(nI);
-        blitz::Array<int,1> g2_ix(nI);
         for (int ivar=0; ivar<contract[IceCoupler::INPUT].size(); ++ivar) {
             VarMeta const &cf(contract[IceCoupler::INPUT][ivar]);
 
-            // Get matching input (val) and output (pism_var) variables
-            IceModelVec2S *pism_var = pism_ivars[ivar];
-
-            // Inputs specified in the contract are not (necessarily) attached
-            // to any PISM var.  If they are not, just drop them on the ground.
-            if (!pism_var) continue;
-
-            // Copy value to a stride=1 array
-            for (int iI=0; iI<nI; ++iI) {
-                g2_ix(iI) = iI;
-                g2_y(iI) = ice_ivalsI(ivar, iI);
+            // -------- Use
+            // NOTE: vtmp_p0_va and *vtmp_p0 have different types
+            pism::petsc::VecArray vtmp_p0_va(*vtmp_p0);
+            if (am_i_root()) {
+                blitz::Array<double,1> vtmp_b(vtmp_p0_va.get(), blitz::shape(nI), blitz::neverDeleteData);
+                for (int iI=0; iI<nI; ++iI) {
+                    vtmp_b(iI) = ice_ivalsI(ivar, iI);
+                }
             }
-
-            // Put into a natural-ordering global distributed Petsc Vec
-            ierr = VecSet(g2natural, cf.default_value); PISM_CHK(ierr, "run_timestep");
-            ierr = VecSetValues(g2natural, nI, &g2_ix(0), &g2_y(0), INSERT_VALUES); PISM_CHK(ierr, "run_timestep");
-
-            ierr = VecAssemblyBegin(g2natural); PISM_CHK(ierr, "run_timestep");
-            ierr = VecAssemblyEnd(g2natural); PISM_CHK(ierr, "run_timestep");
-
-            // Copy to Petsc-ordered global vec
-            ierr = DMDANaturalToGlobalBegin(*da2, g2natural, INSERT_VALUES, g2); PISM_CHK(ierr, "run_timestep");
-            ierr = DMDANaturalToGlobalEnd(*da2, g2natural, INSERT_VALUES, g2); PISM_CHK(ierr, "run_timestep");
-
-            // Copy to the output variable
-            // (Could we just do DMDANaturalToGlobal() directly to this?)
-            pism_var->copy_from_vec(g2);
+            IceModelVec2S *pism_var = pism_ivars[ivar];
+            pism_var->get_from_proc0(*vtmp_p0);
         }
 
         // -------- Figure out the timestep
@@ -515,7 +499,8 @@ void IceCoupler_PISM::run_timestep(double time_s,
 
         if ((pism_ice_model->mass_t() != time_s) || (pism_ice_model->enthalpy_t() != time_s)) {
             (*icebin_error)(-1,
-                "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match ICEBIN time %f", pism_ice_model->mass_t(), pism_ice_model->enthalpy_t(), time_s);
+                "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match ICEBIN time %f",
+                pism_ice_model->mass_t(), pism_ice_model->enthalpy_t(), time_s);
         }
 
         pism_ice_model->set_rate(pism_ice_model->enthalpy_t() - old_pism_time);
@@ -526,13 +511,6 @@ void IceCoupler_PISM::run_timestep(double time_s,
     pism_out_nc->write(time_s);    // Writes from PISM-format variables on I grid
 
     get_state(ice_ovalsI, run_ice ? contracts::INITIAL : 0);
-
-if (am_i_root()) {
-long sampleI = gridI()->indexing.tuple_to_index(std::array<int,2>{25,25});
-double xxx = ice_ovalsI(0, (int)sampleI);
-
-    printf("USF1 usurf(25,25 %ld) = %g\n", sampleI, xxx);
-}
 
     pism_ice_model->reset_rate();
     printf("END IceCoupler_PISM::run_timestep()\n");

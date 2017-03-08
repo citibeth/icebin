@@ -19,6 +19,7 @@
 #include <mpi.h>        // Must be first
 #include <limits>
 #include <pism/base/enthalpyConverter.hh>
+#include <ibmisc/VarTransformer.hpp>
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/pism/IceCoupler_PISM.hpp>
@@ -28,6 +29,8 @@ using namespace ibmisc;
 // --------------------------------------------------------
 namespace icebin {
 namespace contracts {
+
+auto &UNIT(VarTransformer::UNIT);
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
@@ -121,7 +124,7 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
     ok = ok && vt.set("massxfer", "massxfer", "by_dt", 1.0);
     ok = ok && vt.set("enthxfer", "enthxfer", "by_dt", 1.0);
     ok = ok && vt.set("enthxfer", "massxfer", "by_dt", enth_modele_to_pism);
-    ok = ok && vt.set("deltah", "deltah", "unit", 1.0);
+    ok = ok && vt.set("deltah", "deltah", UNIT, 1.0);
     }
 
     // ============== Ice -> GCM
@@ -188,49 +191,49 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
         ice_output.keys(),            // inputs
         gcm_coupler->scalars.keys());    // scalars
 
-    ok = ok && vtA.set("elevA", "ice_surface_elevation", "unit", 1.0);
-    ok = ok && vtE.set("elevE", "ice_surface_elevation", "unit", 1.0);
+    ok = ok && vtA.set("elevA", "ice_surface_elevation", UNIT, 1.0);
+    ok = ok && vtE.set("elevE", "ice_surface_elevation", UNIT, 1.0);
 
     // Top layer state from ice model
-    ok = ok && vtE.set("M1E", "M1", "unit", 1.0); // Divide by RHOW to convert to m water equiv
-    ok = ok && vtE.set("H1E", "H1", "unit", 1.0);
-    ok = ok && vtE.set("H1E", "M1", "unit", -enth_modele_to_pism);
-    ok = ok && vtE.set("V1E", "V1", "unit", 1.0);
+    ok = ok && vtE.set("M1E", "M1", UNIT, 1.0); // Divide by RHOW to convert to m water equiv
+    ok = ok && vtE.set("H1E", "H1", UNIT, 1.0);
+    ok = ok && vtE.set("H1E", "M1", UNIT, -enth_modele_to_pism);
+    ok = ok && vtE.set("V1E", "V1", UNIT, 1.0);
 
     // Second-top layer state from ice model
-    ok = ok && vtE.set("M2E", "M2", "unit", 1.0); // Divide by RHOW to convert to m water equiv
-    ok = ok && vtE.set("H2E", "H2", "unit", 1.0);
-    ok = ok && vtE.set("H2E", "M2", "unit", -enth_modele_to_pism);
-    ok = ok && vtE.set("V2E", "V2", "unit", 1.0);
+    ok = ok && vtE.set("M2E", "M2", UNIT, 1.0); // Divide by RHOW to convert to m water equiv
+    ok = ok && vtE.set("H2E", "H2", UNIT, 1.0);
+    ok = ok && vtE.set("H2E", "M2", UNIT, -enth_modele_to_pism);
+    ok = ok && vtE.set("V2E", "V2", UNIT, 1.0);
 
 
-    ok = ok && vtA.set("basal_frictional_heating", "basal_frictional_heating", "unit", 1.0);
-    ok = ok && vtA.set("strain_heating", "strain_heating", "unit", 1.0);
+    ok = ok && vtA.set("basal_frictional_heating", "basal_frictional_heating", UNIT, 1.0);
+    ok = ok && vtA.set("strain_heating", "strain_heating", UNIT, 1.0);
 
-    ok = ok && vtA.set("geothermal_flux", "geothermal_flux", "unit", 1.0);
-    ok = ok && vtA.set("upward_geothermal_flux", "upward_geothermal_flux", "unit", 1.0);
+    ok = ok && vtA.set("geothermal_flux", "geothermal_flux", UNIT, 1.0);
+    ok = ok && vtA.set("upward_geothermal_flux", "upward_geothermal_flux", UNIT, 1.0);
 
-    ok = ok && vtA.set("basal_runoff.mass", "melt_grounded.mass", "unit", 1.0);
-    ok = ok && vtA.set("basal_runoff.enth", "melt_grounded.enth", "unit", 1.0);
-    ok = ok && vtA.set("basal_runoff.enth", "melt_grounded.mass", "unit", -enth_modele_to_pism);
+    ok = ok && vtA.set("basal_runoff.mass", "melt_grounded.mass", UNIT, 1.0);
+    ok = ok && vtA.set("basal_runoff.enth", "melt_grounded.enth", UNIT, 1.0);
+    ok = ok && vtA.set("basal_runoff.enth", "melt_grounded.mass", UNIT, -enth_modele_to_pism);
 
-    ok = ok && vtA.set("basal_runoff.mass", "melt_floating.mass", "unit", 1.0);
-    ok = ok && vtA.set("basal_runoff.enth", "melt_floating.enth", "unit", 1.0);
-    ok = ok && vtA.set("basal_runoff.enth", "melt_floating.mass", "unit", -enth_modele_to_pism);
+    ok = ok && vtA.set("basal_runoff.mass", "melt_floating.mass", UNIT, 1.0);
+    ok = ok && vtA.set("basal_runoff.enth", "melt_floating.enth", UNIT, 1.0);
+    ok = ok && vtA.set("basal_runoff.enth", "melt_floating.mass", UNIT, -enth_modele_to_pism);
 
-    ok = ok && vtA.set("calving.mass", "calving.mass", "unit", 1.0);
-    ok = ok && vtA.set("calving.enth", "calving.enth", "unit", 1.0);
-    ok = ok && vtA.set("calving.enth", "calving.mass", "unit", -enth_modele_to_pism);
-
-
-    ok = ok && vtA.set("internal_advection.mass", "internal_advection.mass", "unit", 1.0);
-    ok = ok && vtA.set("internal_advection.enth", "internal_advection.enth", "unit", 1.0);
-    ok = ok && vtA.set("internal_advection.enth", "internal_advection.mass", "unit", -enth_modele_to_pism);
+    ok = ok && vtA.set("calving.mass", "calving.mass", UNIT, 1.0);
+    ok = ok && vtA.set("calving.enth", "calving.enth", UNIT, 1.0);
+    ok = ok && vtA.set("calving.enth", "calving.mass", UNIT, -enth_modele_to_pism);
 
 
-    ok = ok && vtA.set("epsilon.mass", "epsilon.mass", "unit", 1.0);
-    ok = ok && vtA.set("epsilon.enth", "epsilon.enth", "unit", 1.0);
-    ok = ok && vtA.set("epsilon.enth", "epsilon.mass", "unit", -enth_modele_to_pism);
+    ok = ok && vtA.set("internal_advection.mass", "internal_advection.mass", UNIT, 1.0);
+    ok = ok && vtA.set("internal_advection.enth", "internal_advection.enth", UNIT, 1.0);
+    ok = ok && vtA.set("internal_advection.enth", "internal_advection.mass", UNIT, -enth_modele_to_pism);
+
+
+    ok = ok && vtA.set("epsilon.mass", "epsilon.mass", UNIT, 1.0);
+    ok = ok && vtA.set("epsilon.enth", "epsilon.enth", UNIT, 1.0);
+    ok = ok && vtA.set("epsilon.enth", "epsilon.mass", UNIT, -enth_modele_to_pism);
 
     }
 

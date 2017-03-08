@@ -38,6 +38,7 @@
 #include <pism/icebin/VecBundleWriter.hh>
 #include <pism/icebin/IBSurfaceModel.hh>
 #include <pism/base/util/petscwrappers/PetscInitializer.hh>
+#include <pism/base/util/petscwrappers/Vec.hh>
 // --------------------------------
 #include <mpi.h>
 #include <icebin/GCMCoupler.hpp>
@@ -87,6 +88,9 @@ public:
 
 private:
     // Stuff used for Scatter/Gather
+    pism::IceModelVec2S vtmp;
+    pism::petsc::Vec::Ptr vtmp_p0;
+    // (probably obsolete...)
     pism::petsc::DM::Ptr da2;
     Vec g2, g2natural;  //!< global Vecs used to transfer data to/from processor 0.
     VecScatter scatter; //!< VecScatter used to transfer data to/from processor 0.

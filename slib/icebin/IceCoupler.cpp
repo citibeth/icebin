@@ -195,9 +195,11 @@ bool run_ice)
 
 
     // Set up scalars used to instantiate variable conversion matrices
+    // NOTE: by_dt=inf on the first call (run_ice=false)
+    //       Should be OK because output variables that depend on by_dt
+    //       are not needed on the first call.
     std::vector<std::pair<std::string, double>> scalars({
-        std::make_pair("by_dt", 1.0 / (time_s - gcm_coupler->last_time_s)),
-        std::make_pair("unit", 1.0)});
+        std::make_pair("by_dt", 1.0 / (time_s - gcm_coupler->last_time_s))});
 
 
     // ------------- Form ice_ivalsI
@@ -223,11 +225,12 @@ bool run_ice)
         Eigen::Map<EigenDenseMatrixT> gcm_ovalsE0_e(
             gcm_ovalsE0.data(), gcm_ovalsE0.extent(1), gcm_ovalsE0.extent(0));
 
+        // Ice inputs calculated as the result of a matrix multiplication
         auto nE0(dimE0.dense_extent());
         ice_ivalsI_e = (*IvE0) * (
             gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
 
-        // Alias the Eigen array to blitz array
+        // Alias the Eigen matrix to blitz array
         ice_ivalsI.reference(blitz::Array<double,2>(
             ice_ivalsI_e.data(),
             blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
@@ -319,6 +322,41 @@ bool run_ice)
         // Switch from row-major (Blitz++) to col-major (Eigen) indexing
         Eigen::Map<EigenDenseMatrixT> ice_ovalsI_e(
             ice_ovalsI.data(), ice_ovalsI.extent(1), ice_ovalsI.extent(0));
+
+        // ----------- Sanity check: There should not be any NaNs...
+        bool hasnan = false
+        for (auto ii(begin(*AE1vIs[iAE]->M)); ii != end(*AE1vIs[iAE]->M); ++ii) {
+            if (std::isnan(ii->value())) {
+            	    printf("nan found: AvI[%d, %d] = %g\n", ii->row(), ii->col(), ii->value());
+                hasnan = true
+            }
+        }
+        for (int j=0; j<ice_ovalsI_e.cols(); ++j) {
+        for (int i=0; i<ice_ovalsI_e.rows(); ++i) {
+            auto val(ice_ovalsI_e(i,j));
+            if (std::isnan(val)) {
+                printf("nan found: ice_ovalsI_e[%d, %d] = %g\n", i, j, val);
+                hasnan = true
+            }
+        }}
+        for (auto ii(begin(gcmi_v_iceo_T.M)); ii != end(gcmi_v_iceo_T.M); ++ii) {
+            if (std::isnan(ii->value())) {
+                printf("nan found: gcmi_v_iceo_T.M[%d, %d] = %g\n", ii->row(), ii->col(), ii->value());
+                hasnan = true
+            }
+        }
+
+        for (int j=0; j<gcmi_v_iceo_T.b.cols(); ++j) {
+        for (int i=0; i<gcmi_v_iceo_T.b.rows(); ++i) {
+            auto val(gcmi_v_iceo_T.b(i,j));
+            if (std::isnan(val)) {
+                printf("nan found: gcmi_v_iceo_T.b[%d, %d] = %g\n", i, j, val);
+                hasnan = true
+            }
+        }}
+
+        if (hasnan) (*icebin_error)(-1, "At least one NaN detected!");
+        // -------------------------- END Sanity Check
 
         // Regrid while recombining variables
         EigenDenseMatrixT gcm_ivalsX((*AE1vIs[iAE]->M) * (
