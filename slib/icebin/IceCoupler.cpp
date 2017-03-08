@@ -324,11 +324,11 @@ bool run_ice)
             ice_ovalsI.data(), ice_ovalsI.extent(1), ice_ovalsI.extent(0));
 
         // ----------- Sanity check: There should not be any NaNs...
-        bool hasnan = false
+        bool hasnan = false;
         for (auto ii(begin(*AE1vIs[iAE]->M)); ii != end(*AE1vIs[iAE]->M); ++ii) {
             if (std::isnan(ii->value())) {
             	    printf("nan found: AvI[%d, %d] = %g\n", ii->row(), ii->col(), ii->value());
-                hasnan = true
+                hasnan = true;
             }
         }
         for (int j=0; j<ice_ovalsI_e.cols(); ++j) {
@@ -336,13 +336,13 @@ bool run_ice)
             auto val(ice_ovalsI_e(i,j));
             if (std::isnan(val)) {
                 printf("nan found: ice_ovalsI_e[%d, %d] = %g\n", i, j, val);
-                hasnan = true
+                hasnan = true;
             }
         }}
         for (auto ii(begin(gcmi_v_iceo_T.M)); ii != end(gcmi_v_iceo_T.M); ++ii) {
             if (std::isnan(ii->value())) {
                 printf("nan found: gcmi_v_iceo_T.M[%d, %d] = %g\n", ii->row(), ii->col(), ii->value());
-                hasnan = true
+                hasnan = true;
             }
         }
 
@@ -351,7 +351,7 @@ bool run_ice)
             auto val(gcmi_v_iceo_T.b(i,j));
             if (std::isnan(val)) {
                 printf("nan found: gcmi_v_iceo_T.b[%d, %d] = %g\n", i, j, val);
-                hasnan = true
+                hasnan = true;
             }
         }}
 
