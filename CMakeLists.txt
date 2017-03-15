@@ -113,6 +113,11 @@ list(APPEND EXTERNAL_LIBS ${PROJ4_LIBRARIES})
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+# --- SpatialIndex
+find_package(SpatialIndex REQUIRED)
+include_directories(${SPATIALINDEX_INCLUDE_DIRS})
+list(APPEND EXTERNAL_LIBS ${SPATIALINDEX_LIBRARIES})
+
 #find_package(GALAHAD REQUIRED)     # This should be optional
 
 #find_package(CGAL REQUIRED)

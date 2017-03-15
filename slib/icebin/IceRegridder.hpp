@@ -67,14 +67,73 @@ struct WeightedSparse {
     WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims) {}
 };
 
-
-
 // ------------------------------------------------------------
+class IceRegridder;
+
+/** Holds the set of "Ur" (original) matrices produced by an
+    IceRegridder for a SINGLE ice sheet. */
+class RegridMatrices {
+public:
+    class Params;
+    typedef std::function<std::unique_ptr<WeightedSparse>(
+        std::array<SparseSetT *,2> dims, Params const &params)> Function;
+
+    /** Parameters controlling the generation of regridding matrices */
+    struct Params {
+        /** Produce a scaled vs. unscaled matrix (Scaled means divide
+        by the weights vector).  Used for all matrices. */
+        bool const scale;
+
+        /** Correct for changes in area due to projections?  Used for
+        all matrices. */
+        bool const correctA;
+
+        /** If non-zero, smooth the resulting matrix, with sigma as the
+        scale length of the smoothing.  Used for IvA and IvE. */
+        double const sigma;
+
+        Params(bool _scale, bool _correctA, double _sigma) :
+            scale(_scale), correctA(_correctA), sigma(_sigma) {}
+    };
+
+    std::map<std::string, Function> regrids;
+
+    /** Use this to construct a RegridMatrices instance:
+           GCMRegridder gcm_regridder(...);
+           auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
+           // rm.regrid("AvI", scale=true, correctA=true)
+           auto AvI(rm.regrid("AvI", true, true));
+           AvI.M        // The matrix
+           AvI.weight   // The weight vector
+    */
+    RegridMatrices(IceRegridder *sheet);
+
+    /** Retrieves a final regrid matrix.
+    @param spec_name: The matrix to produce.
+        Should be "AvI", "IvA", "EvI", "IvE", "AvE" or "EvA".
+    @param scale: Produce scaled matrix?
+        true  --> [kg m-2]
+        false --> [kg]
+    @param correctA: Correct for projection error in A or E grids?
+    @return The regrid matrix and weights
+    */
+    std::unique_ptr<WeightedSparse> regrid(
+        std::string const &spec_name,
+        std::array<SparseSetT *,2> dims,
+        Params const &params) const
+    {
+        auto ret(regrids.at(spec_name)(dims, params));
+        return ret;
+    }
+};
+// -----------------------------------------------------------------
+class UrAE;
+
 /** Represents a single ice sheet.
 Produces low-level unscaled matrices *for that single ice sheet*. */
 class IceRegridder {
     friend class IceCoupler;
-
+    friend class RegridMatrices;
 public:
     typedef Grid::Parameterization Type;
 
@@ -150,53 +209,26 @@ public:
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
     virtual void GvAp(MakeDenseEigenT::AccumT &ret) const = 0;
 
+    /** Produces a smoothing matrix on [Ice] grid
+    @param sigma Length scale [m] of smoothing. */
+    virtual void smoothI(MakeDenseEigenT::AccumT &ret, double sigma) const
+        { (*icebin_error)(-1, "IceRegridder::smoothI() not implemented"); }
+
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
+
+protected:
+    /** Used by RegridMatrices (top-level API) */
+    std::unique_ptr<WeightedSparse> compute_IvAE(
+        std::array<SparseSetT *,2> dims,
+        RegridMatrices::Params const &params, UrAE const &AE);
 
 };  // class IceRegridder
 
 std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type);
 std::unique_ptr<IceRegridder> new_ice_regridder(ibmisc::NcIO &ncio, std::string const &vname);
 // -----------------------------------------------------------
-typedef std::function<std::unique_ptr<WeightedSparse>(
-    std::array<SparseSetT *,2> dims, bool scale, bool correctA)> RegridFunction;
-
-/** Holds the set of "Ur" (original) matrices produced by an
-    IceRegridder for a SINGLE ice sheet. */
-class RegridMatrices {
-public:
-    std::map<std::string, RegridFunction> regrids;
-
-    /** Use this to construct a RegridMatrices instance:
-           GCMRegridder gcm_regridder(...);
-           auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
-           // rm.regrid("AvI", scale=true, correctA=true)
-           auto AvI(rm.regrid("AvI", true, true));
-           AvI.M        // The matrix
-           AvI.weight   // The weight vector
-    */
-    RegridMatrices(IceRegridder *sheet);
-
-    /** Retrieves a final regrid matrix.
-    @param spec_name: The matrix to produce.
-        Should be "AvI", "IvA", "EvI", "IvE", "AvE" or "EvA".
-    @param scale: Produce scaled matrix?
-        true  --> [kg m-2]
-        false --> [kg]
-    @param correctA: Correct for projection error in A or E grids?
-    @return The regrid matrix and weights
-    */
-    std::unique_ptr<WeightedSparse> regrid(
-        std::string const &spec_name,
-        std::array<SparseSetT *,2> dims,
-        bool scale,
-        bool correctA) const
-    {
-        auto ret(regrids.at(spec_name)(dims, scale, correctA));
-        return ret;
-    }
-};
 
 
 /** Gives weights for linear interpolation with a bunch of points.  If

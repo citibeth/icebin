@@ -155,11 +155,12 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 
 }
 
-PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA)
+PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma)
 {
     std::array<SparseSetT,2> dims;
     std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name,
-        {&dims[0], &dims[1]}, scale, correctA));
+        {&dims[0], &dims[1]},
+        RegridMatrices::Params(scale, correctA, sigma)));
 
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
     // Allocate the output Python vector

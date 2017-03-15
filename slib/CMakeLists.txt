@@ -34,6 +34,7 @@ set(icebin_SOURCES
     icebin/error.cpp
     icebin/Grid.cpp
     icebin/IceRegridder.cpp
+    icebin/smoother.cpp
     icebin/GCMRegridder.cpp
     icebin/IceRegridder_L0.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
