@@ -260,17 +260,13 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
     for (auto ii1 = ogridA.ocells.begin(); ii1 != ogridA.ocells.end(); ++ii1) {
         ocell1 = &ii1->second;      // Set parameter for the callback
 
-        double min[2];
-        double max[2];
-
 //printf("gridA[%d]: x in (%f - %f), y in (%f - %f)\n", ocell1->cell->index, min[0], max[0], min[1], max[1]);
-
-        min[0] = CGAL::to_double(ocell1->bounding_box.xmin());
-        min[1] = CGAL::to_double(ocell1->bounding_box.ymin());
-        max[0] = CGAL::to_double(ocell1->bounding_box.xmax());
-        max[1] = CGAL::to_double(ocell1->bounding_box.ymax());
-
-        int nfound = ogridI.rtree->Search(min, max, callback);
+        int nfound = ogridI.rtree->Search(
+            {CGAL::to_double(ocell1->bounding_box.xmin()),
+             CGAL::to_double(ocell1->bounding_box.ymin())},
+            {CGAL::to_double(ocell1->bounding_box.xmax()),
+             CGAL::to_double(ocell1->bounding_box.ymax())},
+            callback);
 
         // Logging
         ++nprocessed;

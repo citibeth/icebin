@@ -1,10 +1,8 @@
 #ifndef ICEBIN_SMOOTHER_HPP
 #define ICEBIN_SMOOTHER_HPP
 
+#include <ibmisc/RTree.hpp>
 #include <icebin/IceRegridder.hpp>
-
-// The libspatialindex library pollutes the top-level namespace.
-class Index;
 
 namespace icebin {
 
@@ -33,19 +31,38 @@ public:
         : iX_d(_iX_d), centroid(_centroid), mass(_mass)
         {}
     };
+
+    typedef ibmisc::RTree<Tuple const *, double, 2> RTree;
+
+    double const radius;
+    double const radius_squared;
+    double const two_sigma_squared_inv;
+
 protected:
-    std::unique_ptr<Index> rtree;
+    // ------ Variables used in loop; see Smoother::matrix()
+    Tuple *t0;
+    std::vector<std::pair<int,double>> M_raw;
+    double mass_sum;
+    // --------------------------
+
+    RTree rtree;
 
     // Outer loop: set once
     std::vector<Tuple> tuples;
 
+public:
     /** Set up the RTree needed for the smoothing matrix */
-    Smoother(std::vector<Tuple> &&_tuples);
+    Smoother(std::vector<Tuple> &&_tuples, double sigma);
 
     ~Smoother();    // Not inline because of forward-declared type of rtree
 
+protected:
+    /** Inner loop for Smoother::matrix() */
+    bool matrix_callback(Tuple const *t);
+
+public:
     /** Generate the smoothing matrix. */
-    void matrix(MakeDenseEigenT::AccumT &ret, double sigma);
+    void matrix(TupleListT<2> &ret);
 };
 
 /** Produces a smoothing matrix that "smears" one grid cell into

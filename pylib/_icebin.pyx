@@ -26,6 +26,7 @@ cimport numpy as np
 np.import_array()
 import scipy.sparse
 from cython.operator cimport dereference as deref, preincrement as inc
+from libcpp cimport bool
 
 cdef class IceRegridder:
     pass

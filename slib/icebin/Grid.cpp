@@ -69,7 +69,7 @@ double Cell::proj_area(
 
 /** Finds the geographic centroid of a polygon.
 See: https://en.wikipedia.org/wiki/Centroid#Bounded_region */
-Point Cell::centroid()
+Point Cell::centroid() const
 {
     double A2 = 0;        // Will be 2A
     double Cx = 0;

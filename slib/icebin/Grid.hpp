@@ -116,7 +116,7 @@ public:
 
     double proj_area(ibmisc::Proj_LL2XY const *proj);   // OPTIONAL
 
-    Point centroid();
+    Point centroid() const;
 };      // class Cell
 // ----------------------------------------------------
 class Grid;
@@ -293,7 +293,7 @@ public:
 
     /** For now, just return the geographic center of the cell's polygon.
         But this might be revisited for finite element */
-    Point centroid(Cell *cell)
+    Point centroid(Cell const *cell) const
         { return cell->centroid(); }
 
 protected:

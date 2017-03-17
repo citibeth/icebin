@@ -231,20 +231,23 @@ TEST_F(GridTest, centroid)
 
     {
         Cell cell0(std::move(vertices_p));
-        Point cell0.centroid();
-        EXPECT_EQ(cell0.x, 1.);
-        EXPECT_EQ(cell0.y, 1.);
+        Point pt(cell0.centroid());
+        EXPECT_EQ(pt.x, 1.);
+        EXPECT_EQ(pt.y, 1.);
     }
 
     vertices.clear();
     vertices.push_back(Vertex(0,0));
     vertices.push_back(Vertex(3.,0));
     vertices.push_back(Vertex(0,3.));
+    vertices_p.clear();
+    for (auto &v : vertices) vertices_p.push_back(&v);
+
     {
         Cell cell0(std::move(vertices_p));
-        Point cell0.centroid();
-        EXPECT_EQ(cell0.x, 1.);
-        EXPECT_EQ(cell0.y, 1.);
+        Point pt(cell0.centroid());
+        EXPECT_EQ(pt.x, 1.);
+        EXPECT_EQ(pt.y, 1.);
     }
 
 }

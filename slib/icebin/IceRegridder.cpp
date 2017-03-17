@@ -323,11 +323,19 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
 
     // Create smoothing matrix if smoothing was requested
     bool smooth = (params.sigma != 0);
-    EigenSparseMatrixT smoothM;
+printf("IceRegridder: sigma=%g, smooth=%d\n", params.sigma, smooth);
+    EigenSparseMatrixT smoothM(nI(), nI());
     if (smooth) {
         TupleListT<2> smooth_accum;
         smoothing_matrix(smooth_accum, *this->gridI, *dimI, ret->weight, params.sigma);
-        smoothM.setFromTriplets(smooth_accum.begin(), smooth_accum.end());
+printf("Smoothing matrix has size %ld\n", smooth_accum.size());
+        smoothM.setFromTriplets(smooth_accum.base().begin(), smooth_accum.base().end());
+//for (auto ii(begin(smoothM)); ii != end(smoothM); ++ii) printf("smoothM[%d, %d] = %g\n", ii->row(), ii->col(), ii->value());
+
+        auto sumS(sum(smoothM, 1, '+'));
+//for (int i=0; i<sumS.extent(0); ++i) printf("sumS[%d] = %g\n", i, sumS(i));
+
+
     }
 
     // ----- Apply final scaling, and convert back to sparse dimension
@@ -341,8 +349,12 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
         if (params.scale) {
             auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
             if (smooth) {
-                ret->M.reset(new EigenSparseMatrixT(
-                    sIvAp * smoothM * *IvAp * sApvA));
+printf("Hacking smooth\n");
+                auto IvA(sIvAp * *IvAp * sApvA);
+                ret->M.reset(new EigenSparseMatrixT(smoothM * IvA));
+
+//                ret->M.reset(new EigenSparseMatrixT(
+//                    sIvAp * smoothM * *IvAp * sApvA));
             } else {
                 ret->M.reset(new EigenSparseMatrixT(
                     sIvAp * *IvAp * sApvA));
