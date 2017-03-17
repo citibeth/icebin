@@ -22,13 +22,13 @@ public:
         of the Gaussian function at this centroid. */
         Point const centroid;
 
-        /** Mass to assign to the grid cell; typically the area /
+        /** Area to assign to the grid cell; typically the area /
         integral of this cell, as it overlaps some other grid. */
-        double mass;
+        double area;
 
         Tuple(int _iX_d,
-            Point const _centroid, double _mass)
-        : iX_d(_iX_d), centroid(_centroid), mass(_mass)
+            Point const _centroid, double _area)
+        : iX_d(_iX_d), centroid(_centroid), area(_area)
         {}
     };
 
@@ -42,7 +42,7 @@ protected:
     // ------ Variables used in loop; see Smoother::matrix()
     Tuple *t0;
     std::vector<std::pair<int,double>> M_raw;
-    double mass_sum;
+    double denom_sum;
     // --------------------------
 
     RTree rtree;
@@ -73,10 +73,10 @@ public:
         Grid being used (sparse indexing)
     @param dimX
         Translation between dense and sparse indexing
-    @param mass_d
-        Mass (area for L0 grid) of each grid cell.  This
+    @param area_d
+        (Generalized) area of each grid cell.  This
         will typically be a weight vector for a regridding matrix; for
-        example, for IvA or IvE.  There is mass only for grid cells
+        example, for IvA or IvE.  There is area only for grid cells
         that overlap the A/E grid.
     @param sigma
         Scale size of the Gaussian smoothing function.  If smoothing
@@ -85,7 +85,7 @@ public:
 */
 extern void smoothing_matrix(TupleListT<2> &ret,
     Grid const &gridX, SparseSetT const &dimX,
-    DenseArrayT<1> const &mass_d, double sigma);
+    DenseArrayT<1> const &area_d, double sigma);
 
 }
 

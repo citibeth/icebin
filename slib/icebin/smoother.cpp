@@ -31,10 +31,11 @@ bool Smoother::matrix_callback(Smoother::Tuple const *t)
     double const dy = t->centroid.y - t0->centroid.y;
     double const distance_squared = dx*dx + dy*dy;
     if (distance_squared < radius_squared) {
-        double w0 = std::exp(
+        double const gaussian_ij = std::exp(
             -two_sigma_squared_inv * distance_squared);
-        M_raw.push_back(std::make_pair(t->iX_d, w0));
-        mass_sum += w0 * t->mass;
+        double w = gaussian_ij * t->area;
+        M_raw.push_back(std::make_pair(t->iX_d, w));
+        denom_sum += w;
     }
     return true;
 }
@@ -47,9 +48,7 @@ void Smoother::matrix(TupleListT<2> &ret)
     for (auto _t0(tuples.begin()); _t0 != tuples.end(); ++_t0) {
         t0 = &*_t0;
         M_raw.clear();
-        mass_sum = 0;
-//printf("t0 = (%g %g) radius=%g\n", t0->centroid.x, t0->centroid.y, radius);
-
+        denom_sum = 0;
 
         // Pair t0 with nearby points
         rtree.Search(
@@ -58,29 +57,26 @@ void Smoother::matrix(TupleListT<2> &ret)
             callback);
 
         // Add to the final matrix
-        double factor = t0->mass / mass_sum;
-//printf("t0=%d (factor=%g):", (int)t0->iX_d, factor);
+        double factor = 1. / denom_sum;
         for (auto ii=M_raw.begin(); ii != M_raw.end(); ++ii) {
-//printf(" %g", factor*ii->second);
-            ret.add({ii->first, t0->iX_d}, factor * ii->second);
+            ret.add({t0->iX_d, ii->first}, factor * ii->second);
         }
-//printf("\n");
     }
 }
 // -----------------------------------------------------------
 void smoothing_matrix(TupleListT<2> &ret,
     Grid const &gridX, SparseSetT const &dimX,
-    DenseArrayT<1> const &mass_d, double sigma)
+    DenseArrayT<1> const &area_d, double sigma)
 {
     std::vector<Smoother::Tuple> tuples;
-    for (int iX_d=0; iX_d<mass_d.size(); ++iX_d) {
-        double mass(mass_d(iX_d));
-        if (mass == 0.) continue;
+    for (int iX_d=0; iX_d<area_d.size(); ++iX_d) {
+        double area(area_d(iX_d));
+        if (area == 0.) continue;
 
         tuples.push_back(
             Smoother::Tuple(iX_d,
                 gridX.centroid(gridX.cells.at(dimX.to_sparse(iX_d))),
-                mass));
+                area));
     }
     Smoother smoother(std::move(tuples), sigma);
     smoother.matrix(ret);
