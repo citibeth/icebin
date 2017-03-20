@@ -36,7 +36,7 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &gridI_fname, std::string const &gridI_vname,
     std::string const &exgrid_fname, std::string const &exgrid_vname,
     std::string const &sinterp_style,
-    PyObject *elevI_py, PyObject *maskI_py);
+    PyObject *elevI_py);
 
 extern PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma);
 

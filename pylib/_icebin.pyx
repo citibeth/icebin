@@ -87,12 +87,13 @@ cdef class GCMRegridder:
 
         elevI = elevI.reshape(-1)
         maskI = maskI.reshape(-1)
+        elevI[maskI != 0] = np.nan  # For IceBin, isnan(elevI) means it's masked out.
         cicebin.GCMRegridder_add_sheet(&self.cself,
             name.encode(),
             gridI_fname.encode(), gridI_vname.encode(),
             exgrid_fname.encode(), exgrid_vname.encode(),
             interp_style.encode(),
-            <PyObject *>elevI, <PyObject *>maskI)   # Borrowed references
+            <PyObject *>elevI)   # Borrowed references
 
     def regrid_matrices(self, str sheet_name):
         cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
