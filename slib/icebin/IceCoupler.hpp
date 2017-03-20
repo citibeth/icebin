@@ -50,7 +50,9 @@ public:
 
     // Densified regridding matrix, and dimension, from previous call
     // Used to interpret GCM output
-    std::unique_ptr<EigenSparseMatrixT> IvE0;
+    blitz::Array<double,1> wE0vI;
+    std::unique_ptr<EigenSparseMatrixT> IvE0_rough;
+    std::unique_ptr<EigenSparseMatrixT> IvE0_smooth;
     SparseSetT dimE0;
 
 

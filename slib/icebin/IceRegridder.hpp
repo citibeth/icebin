@@ -54,6 +54,7 @@ template<int RANK>
 typedef MakeDenseEigenT::SparseSetT SparseSetT;
 typedef MakeDenseEigenT::EigenSparseMatrixT EigenSparseMatrixT;
 typedef Eigen::Matrix<val_type, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> EigenDenseMatrixT;
+typedef Eigen::Array<val_type, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> EigenArrayT;
 typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1, Eigen::ColMajor> EigenColVectorT;
 typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic, Eigen::ColMajor> EigenRowVectorT;
 // -----------------------------------------

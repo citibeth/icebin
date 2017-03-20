@@ -227,8 +227,16 @@ bool run_ice)
 
         // Ice inputs calculated as the result of a matrix multiplication
         auto nE0(dimE0.dense_extent());
-        ice_ivalsI_e = (*IvE0) * (
+        EigenDenseMatrixT ice_ivalsE_e(    // ice_ivalsE_e{jk}
             gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
+        EigenArrayT ice_ivalsE_sum(ice_ivalsE_e.colwise().sum());    // {1k}
+
+        ice_ivalsI_e = (*IvE0_smooth) * ice_ivalsE_e;    // {ik}
+        EigenArrayT ice_ivalsI_sum(ice_ivalsI_e.colwise().sum());    // {1k}
+
+        // Fudge factor to regain conservation in the IvE regridding
+        EigenMatrixT conserve_ratio(ice_ivalsE_sum / ice_ivalsI_sum);    // {1k}
+        ice_ivalsI_e *= conserve_ratio.asDiagonal();
 
         // Alias the Eigen matrix to blitz array
         ice_ivalsI.reference(blitz::Array<double,2>(
@@ -256,7 +264,10 @@ bool run_ice)
 
     ice_regridder->set_elevI(elevI);
     RegridMatrices rm(ice_regridder);
-    RegridMatrices::Params regrid_params(true, true, 0);
+    bool const scale = true;
+    bool const correctA = true;
+    double const sigma = 50.*1000;    // Smoothing parameter; make it a real param
+    typedef RegridMatrices::Params RGParams;
 
     SparseSetT dimA1;
     SparseSetT dimE1;
@@ -266,7 +277,8 @@ bool run_ice)
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
     {
         // Adds to dimA1 and dimE1
-        auto AvE1(rm.regrid("AvE", {&dimA1, &dimE1}, regrid_params));
+        auto AvE1(rm.regrid("AvE", {&dimA1, &dimE1},
+            RegridMatrices::Params(scale, correctA, 0.)));
 
         spcopy(
             accum::to_sparse(AvE1->dims,
@@ -283,12 +295,13 @@ bool run_ice)
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
-    auto E1vI(rm.regrid("EvI", {&dimE1, &dimI}, regrid_params));
+    auto E1vI(rm.regrid("EvI", {&dimE1, &dimI},
+        RegridMatrices::Params(scale, correctA, 0.)));
 
     // Don't do this on the first round, since we don't yet have an IvE0
     if (run_ice) {
         TupleListLT<2> &out_E1vE0_s(out.E1vE0_s);
-        EigenSparseMatrixT E1vE0(*E1vI->M * *IvE0);
+        EigenSparseMatrixT E1vE0(*E1vI->M * *IvE0_rough);
         spcopy(
             accum::to_sparse(make_array(&dimE1, &dimE0),
             accum::ref(out_E1vE0_s)),
@@ -298,7 +311,8 @@ bool run_ice)
 
     // ========= Compute gcm_ivalsE
 
-    auto A1vI(rm.regrid("AvI", {&dimA1, &dimI}, regrid_params));
+    auto A1vI(rm.regrid("AvI", {&dimA1, &dimI},
+        RegridMatrices::Params(scale, correctA, 0.)));
 
     // Do it once for _E variables and once for _A variables.
     std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
@@ -375,10 +389,23 @@ bool run_ice)
     }
 
     // Compute IvE (for next timestep)
-    auto IvE1(rm.regrid("IvE", {&dimI, &dimE1}, regrid_params));
-    dimE0 = std::move(dimE1);
-    IvE0 = std::move(IvE1->M);
 
+    // Raw unsmoothed, unscaled matrix can be used to determine total sum
+    auto E1vI(rm.regrid("EvI", {&dimE1, &dimI}, 
+        RegridMatrices::Params(false, correctA, 0.)));
+    wE0vI.reset(E1vI->weight);
+
+    // Smoothed matrix doesn't conserve, and cannot be used for area of I or E cells
+    auto IvE1_smooth(rm.regrid("IvE", {&dimI, &dimE1},
+        RegridMatrices::Params(scale, correctA, sigma)));
+    IvE0_smooth = std::move(IvE1->M);
+
+    // Unsmoothed matrix used for computing E1vE0
+    auto IvE1_rough(rm.regrid("IvE", {&dimI, &dimE1},
+        RegridMatrices::Params(scale, correctA, 0.)));
+    IvE0_rough = std::move(IvE1_rough->M);
+
+    dimE0 = std::move(dimE1);
     printf("END IceCoupler::couple(%s)\n", name().c_str());
 }
 // =======================================================
