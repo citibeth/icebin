@@ -53,45 +53,6 @@ void GCMRegridder_init(GCMRegridder *cself,
 }
 
 
-#if 0
-template<class T>
-static blitz::Array<T,1> np_to_blitz_1d(
-PyObject *ovec,
-std::string const &vname,
-std::array<int,1> dims)
-{
-    // Check that it's type PyArrayObject
-    if (!PyArray_Check(ovec)) {
-        (*icebin_error)(-1,
-            "check_dimensions: Object %s is not a Numpy array", vname.c_str());
-    }
-    PyArrayObject *vec = (PyArrayObject *)ovec;
-
-
-    // Set up shape and strides
-    int const T_size = sizeof(T);
-    size_t len = 1;
-    auto min_stride = PyArray_STRIDE(vec, 0);
-    for (int i=0;i<PyArray_NDIM(vec); ++i) {
-        len *=  PyArray_DIM(vec, i);
-
-        // Python/Numpy strides are in bytes, Blitz++ in sizeof(T) units.
-        min_stride = std::min(min_stride, PyArray_STRIDE(vec, i) / T_size);
-    }
-
-
-    assert(T_size == PyArray_ITEMSIZE(vec));
-
-    blitz::TinyVector<int,1> shape(0);
-    shape[0] = len;
-    blitz::TinyVector<int,1> strides(0);
-    strides[0] = min_stride;
-
-    return blitz::Array<T,1>((T*) PyArray_DATA(vec),shape,strides,
-        blitz::neverDeleteData);
-}
-#endif
-
 void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string name,
     std::string const &gridI_fname, std::string const &gridI_vname,
@@ -164,7 +125,7 @@ PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_n
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
     // Allocate the output Python vector
     PyObject *weight_py = ibmisc::cython::new_pyarray<double,1>(
-        std::array<int,1>{dims[0].sparse_extent()});
+        std::array<npy_intp,1>{dims[0].sparse_extent()});
     // Get a Blitz view on it
     auto weight_pyb(np_to_blitz<double,1>(weight_py, "weight_py", {-1}));
 
