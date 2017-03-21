@@ -80,9 +80,9 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         string &gridI_fname, string &gridI_vname,
         string &exgrid_fname, string &exgrid_vname,
         string &sinterp_style,
-        PyObject *elevI_py, PyObject *maskI_py) except +        # PyObject=Borrowed reference, object = owned reference
+        PyObject *elevI_py) except +        # PyObject=Borrowed reference, object = owned reference
 
-    cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name, bool scale, bool correctA) except +
+    cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z) except +
 
     cdef void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
         int M_nrow, int M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py) except +

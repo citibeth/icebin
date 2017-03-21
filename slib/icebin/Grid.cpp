@@ -67,6 +67,27 @@ double Cell::proj_area(
     return ret;
 }
 
+/** Finds the geographic centroid of a polygon.
+See: https://en.wikipedia.org/wiki/Centroid#Bounded_region */
+Point Cell::centroid() const
+{
+    double A2 = 0;        // Will be 2A
+    double Cx = 0;
+    double Cy = 0;
+    Vertex *v0 = _vertices[_vertices.size()-1];
+
+    for (Vertex *v1 : _vertices) {
+        double dA = v0->x*v1->y - v1->x*v0->y;
+        A2 += dA;
+        Cx += (v0->x + v1->x) * dA;
+        Cy += (v0->y + v1->y) * dA;
+        v0 = v1;
+    }
+
+    double w = 1./(3.*A2);    // 1/6A
+    return Point(w*Cx, w*Cy);
+}
+
 // ========================================================
 
 // ------------------------------------------------------------

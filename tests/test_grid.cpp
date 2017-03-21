@@ -218,6 +218,39 @@ TEST_F(GridTest, create_grid)
 
 }
 
+TEST_F(GridTest, centroid)
+{
+    std::vector<Vertex> vertices;
+    std::vector<Vertex *> vertices_p;
+
+    vertices.push_back(Vertex(0,0));
+    vertices.push_back(Vertex(2,0));
+    vertices.push_back(Vertex(2,2));
+    vertices.push_back(Vertex(0,2));
+    for (auto &v : vertices) vertices_p.push_back(&v);
+
+    {
+        Cell cell0(std::move(vertices_p));
+        Point pt(cell0.centroid());
+        EXPECT_EQ(pt.x, 1.);
+        EXPECT_EQ(pt.y, 1.);
+    }
+
+    vertices.clear();
+    vertices.push_back(Vertex(0,0));
+    vertices.push_back(Vertex(3.,0));
+    vertices.push_back(Vertex(0,3.));
+    vertices_p.clear();
+    for (auto &v : vertices) vertices_p.push_back(&v);
+
+    {
+        Cell cell0(std::move(vertices_p));
+        Point pt(cell0.centroid());
+        EXPECT_EQ(pt.x, 1.);
+        EXPECT_EQ(pt.y, 1.);
+    }
+
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

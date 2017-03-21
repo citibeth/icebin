@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/IceRegridder_L0.hpp>
+#include <icebin/smoother.hpp>
 #include <spsparse/netcdf.hpp>
 
 using namespace std;
@@ -207,7 +208,7 @@ std::function<bool(long)> in_sparse_fn(SparseSetT const &dim)
 // ------------------------------------------------------------
 static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
     std::array<SparseSetT *,2> dims,
-    bool scale, bool correctA, UrAE const &AE)
+    RegridMatrices::Params const &params, UrAE const &AE)
 {
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims));
     SparseSetT * const dimA(ret->dims[0]);
@@ -238,7 +239,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         new EigenSparseMatrixT(ApvG * sGvI * GvI));
 
     // ----- Apply final scaling, and convert back to sparse dimension
-    if (correctA) {
+    if (params.correctA) {
         // ----- Compute the final weight matrix
         auto wAvAp(MakeDenseEigenT(                   // diagonal
             AE.sApvA,
@@ -251,7 +252,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         ret->weight.reference(sum(wAvI, 0, '+'));
 
         // Compute the main matrix
-        if (scale) {
+        if (params.scale) {
             // Get two diagonal Eigen scale matrices
             auto sAvAp(sum_to_diagonal(wAvAp, 0, '-'));
             auto sApvI(sum_to_diagonal(wApvI, 0, '-'));
@@ -269,7 +270,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         auto wApvI_b(sum(*ApvI, 0, '+'));
         ret->weight.reference(wApvI_b);
 
-        if (scale) {
+        if (params.scale) {
             // Get two diagonal Eigen scale matrices
             auto sApvI(diag_matrix(wApvI_b, '-'));
 
@@ -283,10 +284,10 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
     return ret;
 }
 // ---------------------------------------------------------
-
-static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
+// ---------------------------------------------------------
+std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
     std::array<SparseSetT *,2> dims,
-    bool scale, bool correctA, UrAE const &AE)
+    RegridMatrices::Params const &params, UrAE const &AE)
 {
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims));
     SparseSetT * const dimA(ret->dims[1]);
@@ -295,8 +296,8 @@ static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
     SparseSetT * const dimG(&_dimG);
 
     if (dimA) dimA->set_sparse_extent(AE.nfull);
-    if (dimI) dimI->set_sparse_extent(regridder->nI());
-    dimG->set_sparse_extent(regridder->nG());
+    if (dimI) dimI->set_sparse_extent(this->nI());
+    dimG->set_sparse_extent(this->nG());
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     MakeDenseEigenT GvAp_m(
@@ -304,7 +305,7 @@ static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
         SparsifyTransform::ADD_DENSE,
         {dimG, dimA}, '.');
     MakeDenseEigenT IvG_m(
-        std::bind(&IceRegridder::GvI, regridder, _1),
+        std::bind(&IceRegridder::GvI, this, _1),
         SparsifyTransform::ADD_DENSE,
         {dimG, dimI}, 'T');
 
@@ -320,26 +321,60 @@ static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
     // Get weight vector from IvAp_e
     ret->weight.reference(sum(*IvAp, 0, '+'));
 
+    // Create smoothing matrix if smoothing was requested
+    bool smooth = (params.sigma[0] != 0);
+    EigenSparseMatrixT smoothM(nI(), nI());
+    if (smooth) {
+        TupleListT<2> smooth_accum;
+        smoothing_matrix(smooth_accum, *this->gridI, *dimI,
+            elevI, ret->weight, params.sigma);
+        smoothM.setFromTriplets(smooth_accum.base().begin(), smooth_accum.base().end());
+        auto sumS(sum(smoothM, 1, '+'));
+    }
+
     // ----- Apply final scaling, and convert back to sparse dimension
-    if (correctA) {
+    if (params.correctA) {
         // Scaling matrix
         auto sApvA(MakeDenseEigenT(
             AE.sApvA,
             SparsifyTransform::TO_DENSE_IGNORE_MISSING,
             {dimA, dimA}, '.').to_eigen());
 
-        if (scale) {
+        if (params.scale) {
             auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
-            ret->M.reset(new EigenSparseMatrixT(sIvAp * *IvAp * sApvA));
+            if (smooth) {
+                auto IvA(sIvAp * *IvAp * sApvA);
+                ret->M.reset(new EigenSparseMatrixT(smoothM * IvA));
+            } else {
+                ret->M.reset(new EigenSparseMatrixT(
+                    sIvAp * *IvAp * sApvA));
+            }
         } else {
-            ret->M.reset(new EigenSparseMatrixT(*IvAp * sApvA));
+            if (smooth) {
+                ret->M.reset(new EigenSparseMatrixT(
+                    smoothM * *IvAp * sApvA));
+            } else {
+                ret->M.reset(new EigenSparseMatrixT(
+                    *IvAp * sApvA));
+            }
         }
     } else {
-        if (scale) {
+        if (params.scale) {
             auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
-            ret->M.reset(new EigenSparseMatrixT(sIvAp * *IvAp));
+            if (smooth) {
+                ret->M.reset(new EigenSparseMatrixT(
+                    smoothM * sIvAp * *IvAp));
+            } else {
+                ret->M.reset(new EigenSparseMatrixT(
+                    sIvAp * *IvAp));
+            }
         } else {
-            ret->M = std::move(IvAp);
+            if (smooth) {
+                ret->M.reset(new EigenSparseMatrixT(
+                    smoothM * *IvAp));
+            } else {
+                ret->M = std::move(IvAp);
+            }
         }
     }
 
@@ -348,7 +383,7 @@ static std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
 
 static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     std::array<SparseSetT *,2> dims,
-    bool scale, bool correctA, UrAE const &E, UrAE const &A)
+    RegridMatrices::Params const &params, UrAE const &E, UrAE const &A)
 {
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims));
     SparseSetT * const dimE(ret->dims[0]);
@@ -383,7 +418,7 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
 
     // ----- Apply final scaling, and convert back to sparse dimension
     auto wEpvAp(sum_to_diagonal(*EpvAp,0,'+'));
-    if (correctA) {
+    if (params.correctA) {
         auto sApvA(MakeDenseEigenT(
             A.sApvA,
             SparsifyTransform::TO_DENSE_IGNORE_MISSING,
@@ -398,7 +433,7 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
         EigenSparseMatrixT wEvAp(wEvEp * wEpvAp);
         ret->weight.reference(sum(wEvAp,0,'+'));
 
-        if (scale) {
+        if (params.scale) {
             auto sEvAp(sum_to_diagonal(wEvAp,0,'-'));
             ret->M.reset(new EigenSparseMatrixT(
                 sEvAp * *EpvAp * sApvA));    // EvA
@@ -408,7 +443,7 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     } else {    // ~correctA
         // ~correctA: Weight matrix in Ep space
         ret->weight.reference(sum(wEpvAp,0,'+'));
-        if (scale) {
+        if (params.scale) {
             auto sEpvAp(sum_to_diagonal(wEpvAp,0,'-'));
 
             ret->M.reset(new EigenSparseMatrixT(sEpvAp * *EpvAp));
@@ -439,21 +474,21 @@ RegridMatrices::RegridMatrices(IceRegridder *regridder)
 
     // ------- AvI, IvA
     regrids.insert(make_pair("AvI", std::bind(&compute_AEvI,
-        regridder, _1, _2, _3, urA) ));
-    regrids.insert(make_pair("IvA", std::bind(&compute_IvAE,
-        regridder, _1, _2, _3, urA) ));
+        regridder, _1, _2, urA) ));
+    regrids.insert(make_pair("IvA", std::bind(&IceRegridder::compute_IvAE,
+        regridder, _1, _2, urA) ));
 
     // ------- EvI, IvE
     regrids.insert(make_pair("EvI", std::bind(&compute_AEvI,
-        regridder, _1, _2, _3, urE) ));
-    regrids.insert(make_pair("IvE", std::bind(&compute_IvAE,
-        regridder, _1, _2, _3, urE) ));
+        regridder, _1, _2, urE) ));
+    regrids.insert(make_pair("IvE", std::bind(&IceRegridder::compute_IvAE,
+        regridder, _1, _2, urE) ));
 
-    // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, this, _1, _2, _3, urE, urA) ));
+    // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, this, _1, _2, urE, urA) ));
     regrids.insert(make_pair("EvA", std::bind(&compute_EvA,
-        regridder, _1, _2, _3, urE, urA) ));
+        regridder, _1, _2, urE, urA) ));
     regrids.insert(make_pair("AvE", std::bind(&compute_EvA,
-        regridder, _1, _2, _3, urA, urE) ));
+        regridder, _1, _2, urA, urE) ));
 
     // ----- Show what we have!
     printf("Available Regrids:");

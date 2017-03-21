@@ -35,20 +35,24 @@ namespace icebin {
 class Cell;
 
 // --------------------------------------------------
-
-struct Vertex {
-    long index;
+struct Point {
     double const x;
     double const y;
 
-    Vertex() : x(0), y(0), index(-1) {}
+    Point() : x(0), y(0) {}
+    Point(double _x, double _y) : x(_x), y(_y) {}
+};
+
+struct Vertex : public Point {
+    long index;
+
+    Vertex() : index(-1) {}
 
     Vertex(double _x, double _y, int _index=-1) :
-        x(_x), y(_y), index(_index) {}
+        Point(_x,_y), index(_index) {}
 
     bool operator<(Vertex const &rhs) const
         { return index < rhs.index; }
-
 };
 
 // ----------------------------------------------------
@@ -112,6 +116,7 @@ public:
 
     double proj_area(ibmisc::Proj_LL2XY const *proj);   // OPTIONAL
 
+    Point centroid() const;
 };      // class Cell
 // ----------------------------------------------------
 class Grid;
@@ -286,6 +291,11 @@ public:
 
     void clear();
 
+    /** For now, just return the geographic center of the cell's polygon.
+        But this might be revisited for finite element */
+    Point centroid(Cell const &cell) const
+        { return cell.centroid(); }
+
 protected:
     void nc_read(netCDF::NcGroup *nc, std::string const &vname);
     void nc_write(netCDF::NcGroup *nc, std::string const &vname) const;
@@ -296,7 +306,6 @@ public:
     /** Remove cells and vertices not relevant to us --- for example, not in our MPI domain.
     This will be done AFTER we read it in.  It's an optimization. */
     void filter_cells(std::function<bool (long)> const &keep_fn);
-
 };
 
 class Grid_XY : public Grid

@@ -26,6 +26,7 @@ cimport numpy as np
 np.import_array()
 import scipy.sparse
 from cython.operator cimport dereference as deref, preincrement as inc
+from libcpp cimport bool
 
 cdef class IceRegridder:
     pass
@@ -36,7 +37,7 @@ cdef class RegridMatrices:
     def __dealloc__(self):
         del self.cself
 
-    def regrid(self, str spec_name, scale=True, correctA=True):
+    def regrid(self, str spec_name, bool scale=True, bool correctA=True, sigma=(0,0,0)):
         """Compute a regrid matrix.
         spec_name:
             Type of regrid matrix to obtain.  Choice are:
@@ -53,7 +54,7 @@ cdef class RegridMatrices:
                     M(scaled=True) = diag(1/weight) * M(scaled=False)
                     M(scaled=False) = diag(weight) * M(scaled=True)
         """
-        (data,shape), weight = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale, correctA)
+        (data,shape), weight = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale, correctA, sigma[0], sigma[1], sigma[2])
         # scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
         return scipy.sparse.coo_matrix(data, shape), weight
 
@@ -86,12 +87,13 @@ cdef class GCMRegridder:
 
         elevI = elevI.reshape(-1)
         maskI = maskI.reshape(-1)
+        elevI[maskI != 0] = np.nan  # For IceBin, isnan(elevI) means it's masked out.
         cicebin.GCMRegridder_add_sheet(&self.cself,
             name.encode(),
             gridI_fname.encode(), gridI_vname.encode(),
             exgrid_fname.encode(), exgrid_vname.encode(),
             interp_style.encode(),
-            <PyObject *>elevI, <PyObject *>maskI)   # Borrowed references
+            <PyObject *>elevI)   # Borrowed references
 
     def regrid_matrices(self, str sheet_name):
         cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(

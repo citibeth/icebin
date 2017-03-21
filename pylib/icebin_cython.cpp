@@ -97,7 +97,7 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &gridI_fname, std::string const &gridI_vname,
     std::string const &exgrid_fname, std::string const &exgrid_vname,
     std::string const &sinterp_style,
-    PyObject *elevI_py, PyObject *maskI_py)
+    PyObject *elevI_py)
 {
     NcIO ncio_I(gridI_fname, netCDF::NcFile::read);
     std::unique_ptr<Grid> gridI(new_grid(ncio_I, "grid"));
@@ -111,7 +111,6 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
 
     auto interp_style(parse_enum<InterpStyle>(sinterp_style));
     auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {gridI->ndata()}));
-    auto maskI(np_to_blitz<int,1>(maskI_py, "maskI", {gridI->ndata()}));
 
     auto sheet(new_ice_regridder(gridI->parameterization));
     sheet->init(name, std::move(gridI), std::move(exgrid),
@@ -155,11 +154,12 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 
 }
 
-PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA)
+PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z)
 {
     std::array<SparseSetT,2> dims;
     std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name,
-        {&dims[0], &dims[1]}, scale, correctA));
+        {&dims[0], &dims[1]},
+        RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z})));
 
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
     // Allocate the output Python vector
