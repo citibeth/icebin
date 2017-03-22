@@ -157,32 +157,46 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z)
 {
     std::array<SparseSetT,2> dims;
-    std::unique_ptr<WeightedSparse> Mw(cself->regrid(spec_name,
+    std::unique_ptr<WeightedSparse> RM(cself->regrid(spec_name,
         {&dims[0], &dims[1]},
         RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z})));
 
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
+
+    // ---------- wM
     // Allocate the output Python vector
-    PyObject *weight_py = ibmisc::cython::new_pyarray<double,1>(
+    PyObject *wM_py = ibmisc::cython::new_pyarray<double,1>(
         std::array<int,1>{dims[0].sparse_extent()});
     // Get a Blitz view on it
-    auto weight_pyb(np_to_blitz<double,1>(weight_py, "weight_py", {-1}));
-
+    auto wM_pyb(np_to_blitz<double,1>(wM_py, "wM_py", {-1}));
     // Copy, while translating the dimension
     spcopy(
         accum::to_sparse(make_array(&dims[0]),
-        accum::blitz_existing(weight_pyb)),
-        Mw->weight);
+        accum::blitz_existing(wM_pyb)),
+        RM->wM);
 
+    // -------------- M
     // Convert a sparse matrix w/ dense indices to a sparse matrix with sparse indices
-    TupleListT<2> Mw_sp;
+    TupleListT<2> RM_sp;
     spcopy(
         accum::to_sparse(make_array(&dims[0], &dims[1]),
-        accum::ref(Mw_sp)),
-        *Mw->M);
-    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(Mw_sp);
-    fflush(stdout);
-    return Py_BuildValue("OO", M_py, weight_py);
+        accum::ref(RM_sp)),
+        *RM->M);
+    PyObject *M_py = ibmisc::cython::spsparse_to_tuple(RM_sp);
+
+    // ---------- Mw
+    // Allocate the output Python vector
+    PyObject *Mw_py = ibmisc::cython::new_pyarray<double,1>(
+        std::array<int,1>{dims[1].sparse_extent()});
+    // Get a Blitz view on it
+    auto Mw_pyb(np_to_blitz<double,1>(Mw_py, "Mw_py", {-1}));
+    // Copy, while translating the dimension
+    spcopy(
+        accum::to_sparse(make_array(&dims[1]),
+        accum::blitz_existing(Mw_pyb)),
+        RM->Mw);
+
+    return Py_BuildValue("OOO", wM_py, M_py, Mw_py);
 }
 
 

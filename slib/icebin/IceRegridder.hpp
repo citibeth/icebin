@@ -61,8 +61,15 @@ typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic, Eigen::ColMajor> EigenRowVect
 /** Return value of a sparse matrix */
 struct WeightedSparse {
     std::array<SparseSetT *,2> dims;            // Dense-to-sparse mapping for the dimensions
+
+
+    // If M=BvA, then wM = wBvA = area of B cells
+    DenseArrayT<1> wM;           // Dense indexing
+
     std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
-    DenseArrayT<1> weight;           // Dense indexing
+
+    // Area of A cells
+    DenseArrayT<1> Mw;
 
     WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims) {}
 };
@@ -92,8 +99,12 @@ public:
         scale length of the smoothing.  Used for IvA and IvE. */
         std::array<double,3> const sigma;
 
-        Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
-            scale(_scale), correctA(_correctA), sigma(_sigma) {}
+        /** (For apply() method).. apply conservation correction after
+        multiplying by the regridding matrix. */
+        bool conserve;
+
+        Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma, bool _conserve=false) :
+            scale(_scale), correctA(_correctA), sigma(_sigma), conserve(_conserve) {}
     };
 
     std::map<std::string, Function> regrids;
@@ -104,7 +115,7 @@ public:
            // rm.regrid("AvI", scale=true, correctA=true)
            auto AvI(rm.regrid("AvI", true, true));
            AvI.M        // The matrix
-           AvI.weight   // The weight vector
+           AvI.wM       // The weight vector
     */
     RegridMatrices(IceRegridder *sheet);
 

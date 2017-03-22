@@ -237,6 +237,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
 
     std::unique_ptr<EigenSparseMatrixT> ApvI(
         new EigenSparseMatrixT(ApvG * sGvI * GvI));
+    ret->Mw.reference(sum(*ApvI, 1, '+'));    // Area of I cells
 
     // ----- Apply final scaling, and convert back to sparse dimension
     if (params.correctA) {
@@ -249,7 +250,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         EigenSparseMatrixT wAvI(wAvAp * wApvI);    // diagonal...
 
         // +correctA: Weight matrix in A space
-        ret->weight.reference(sum(wAvI, 0, '+'));
+        ret->wM.reference(sum(wAvI, 0, '+'));    // Area of A cells
 
         // Compute the main matrix
         if (params.scale) {
@@ -268,7 +269,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         // ----- Compute the final weight matrix
         // ~correctA: Weight matrix in Ap space
         auto wApvI_b(sum(*ApvI, 0, '+'));
-        ret->weight.reference(wApvI_b);
+        ret->wM.reference(wApvI_b);
 
         if (params.scale) {
             // Get two diagonal Eigen scale matrices
@@ -319,7 +320,7 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
         new EigenSparseMatrixT(IvG * sGvAp * GvAp));
 
     // Get weight vector from IvAp_e
-    ret->weight.reference(sum(*IvAp, 0, '+'));
+    ret->wM.reference(sum(*IvAp, 0, '+'));
 
     // Create smoothing matrix if smoothing was requested
     bool smooth = (params.sigma[0] != 0);
@@ -327,7 +328,7 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
     if (smooth) {
         TupleListT<2> smooth_accum;
         smoothing_matrix(smooth_accum, *this->gridI, *dimI,
-            elevI, ret->weight, params.sigma);
+            elevI, ret->wM, params.sigma);
         smoothM.setFromTriplets(smooth_accum.base().begin(), smooth_accum.base().end());
         auto sumS(sum(smoothM, 1, '+'));
     }
@@ -339,6 +340,12 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
             AE.sApvA,
             SparsifyTransform::TO_DENSE_IGNORE_MISSING,
             {dimA, dimA}, '.').to_eigen());
+
+        // Compute area of A grid cells
+        auto IvApw(sum_to_diagonal(*IvAp, 1, '+'));    // Area of A cells
+        auto &wAvAp(sApvA);    // Symmetry: wAvAp == sApvA
+        EigenSparseMatrixT Aw(wAvAp * IvApw);
+        ret->Mw.reference(sum(Aw,0,'+'));
 
         if (params.scale) {
             auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
@@ -359,6 +366,7 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
             }
         }
     } else {
+        ret->Mw.reference(sum(*IvAp, 1, '+'));    // Area of A cells
         if (params.scale) {
             auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
             if (smooth) {
@@ -431,7 +439,13 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
 
         // +correctA: Weight matrix in E space
         EigenSparseMatrixT wEvAp(wEvEp * wEpvAp);
-        ret->weight.reference(sum(wEvAp,0,'+'));
+        ret->wM.reference(sum(wEvAp,0,'+'));
+
+        // Compute area of A cells
+        auto EpvApw(sum_to_diagonal(*EpvAp,1,'+'));
+        auto &wAvAp(sApvA);    // Symmetry: wAvAp == sApvA
+        EigenSparseMatrixT Aw(wAvAp * EpvApw);
+        ret->Mw.reference(sum(Aw,0,'+'));
 
         if (params.scale) {
             auto sEvAp(sum_to_diagonal(wEvAp,0,'-'));
@@ -442,7 +456,8 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
         }
     } else {    // ~correctA
         // ~correctA: Weight matrix in Ep space
-        ret->weight.reference(sum(wEpvAp,0,'+'));
+        ret->wM.reference(sum(wEpvAp,0,'+'));
+        ret->Mw.reference(sum(*EpvAp,1,'+'));
         if (params.scale) {
             auto sEpvAp(sum_to_diagonal(wEpvAp,0,'-'));
 

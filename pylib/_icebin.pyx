@@ -54,9 +54,10 @@ cdef class RegridMatrices:
                     M(scaled=True) = diag(1/weight) * M(scaled=False)
                     M(scaled=False) = diag(weight) * M(scaled=True)
         """
-        (data,shape), weight = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale, correctA, sigma[0], sigma[1], sigma[2])
+        wM, (data,shape), Mw = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale, correctA, sigma[0], sigma[1], sigma[2])
+        print('BB2')
         # scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
-        return scipy.sparse.coo_matrix(data, shape), weight
+        return wM, scipy.sparse.coo_matrix(data, shape), Mw
 
 cdef class GCMRegridder:
     cdef cicebin.GCMRegridder cself

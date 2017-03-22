@@ -277,7 +277,7 @@ bool run_ice)
         spcopy(
             accum::to_sparse(make_array(AvE1->dims[0]),
             accum::ref(out_wAvE1_s)),
-            AvE1->weight);    // blitz::Array<double,1>
+            AvE1->wM);    // blitz::Array<double,1>
     }
 
 
