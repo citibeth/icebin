@@ -53,9 +53,10 @@ template<int RANK>
     using DenseArrayT = blitz::Array<val_type,RANK>;
 typedef MakeDenseEigenT::SparseSetT SparseSetT;
 typedef MakeDenseEigenT::EigenSparseMatrixT EigenSparseMatrixT;
-typedef Eigen::Matrix<val_type, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> EigenDenseMatrixT;
-typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1, Eigen::ColMajor> EigenColVectorT;
-typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic, Eigen::ColMajor> EigenRowVectorT;
+typedef Eigen::Matrix<val_type, Eigen::Dynamic, Eigen::Dynamic> EigenDenseMatrixT;
+typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1> EigenColVectorT;
+typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic> EigenRowVectorT;
+typedef Eigen::DiagonalMatrix<val_type, Eigen::Dynamic> EigenDiagonalMatrixT;
 // -----------------------------------------
 
 /** Return value of a sparse matrix */
@@ -67,11 +68,12 @@ struct WeightedSparse {
     DenseArrayT<1> wM;           // Dense indexing
 
     std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
+    bool smooth;    // Is M smoothed?
 
     // Area of A cells
     DenseArrayT<1> Mw;
 
-    WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims) {}
+    WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims), smooth(false) {}
 };
 
 // ------------------------------------------------------------
@@ -83,7 +85,14 @@ class RegridMatrices {
 public:
     class Params;
     typedef std::function<std::unique_ptr<WeightedSparse>(
-        std::array<SparseSetT *,2> dims, Params const &params)> Function;
+        std::array<SparseSetT *,2> dims, Params const &params)> MatrixFunction;
+
+    typedef std::function<void(
+        TupleListT<2> &ret,
+        SparseSetT const &dimX,
+        DenseArrayT<1> const &area_d,    // RM.regrid()->wM
+        std::array<double,3> const &sigma
+        )> SmoothingFunction;
 
     /** Parameters controlling the generation of regridding matrices */
     struct Params {
@@ -99,16 +108,35 @@ public:
         scale length of the smoothing.  Used for IvA and IvE. */
         std::array<double,3> const sigma;
 
-        /** (For apply() method).. apply conservation correction after
-        multiplying by the regridding matrix. */
-        bool conserve;
+        /** Should we enforce conservation (in the face of smoothing)?
+        Unsmoothed regrid matrices are already conservative... */
+        bool const conserve;
+
+        bool smooth() const { return sigma[0] != 0; }
 
         Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma, bool _conserve=false) :
             scale(_scale), correctA(_correctA), sigma(_sigma), conserve(_conserve) {}
     };
 
-    std::map<std::string, Function> regrids;
+protected:
+    struct Binding {
+        MatrixFunction const matrix;
+        SmoothingFunction const *smooth;
 
+        Binding(MatrixFunction const &_matrix, SmoothingFunction const *_smooth) :
+            matrix(_matrix), smooth(_smooth) {}
+    };
+
+    // Smoothing functions for the different grids
+    RegridMatrices::SmoothingFunction smoothI;
+
+    std::map<std::string, Binding> regrids;
+    void add_regrid(std::string const &spec,
+        SmoothingFunction const *smooth,
+        MatrixFunction const &regrid);
+
+
+public:
     /** Use this to construct a RegridMatrices instance:
            GCMRegridder gcm_regridder(...);
            auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
@@ -119,7 +147,8 @@ public:
     */
     RegridMatrices(IceRegridder *sheet);
 
-    /** Retrieves a final regrid matrix.
+    /** Retrieves a regrid matrix, and weights (area) of the input and
+        output grid cells.
     @param spec_name: The matrix to produce.
         Should be "AvI", "IvA", "EvI", "IvE", "AvE" or "EvA".
     @param scale: Produce scaled matrix?
@@ -128,14 +157,26 @@ public:
     @param correctA: Correct for projection error in A or E grids?
     @return The regrid matrix and weights
     */
-    std::unique_ptr<WeightedSparse> regrid(
+    std::unique_ptr<WeightedSparse> matrix(
         std::string const &spec_name,
         std::array<SparseSetT *,2> dims,
-        Params const &params) const
-    {
-        auto ret(regrids.at(spec_name)(dims, params));
-        return ret;
-    }
+        Params const &_params) const;
+
+    /** Applies a regrid matrix.
+    Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
+    In the face of smoothing, it also compensates for non-conservation in
+    smoothB.
+
+    @param BvA_smoothed Smoothed version of the regrid matrix (BvA) that
+        was obtained from RegridMatrices::regrid().  It should follow:
+               BvA_smoothed.M = smoothB * BvA.M
+        where smoothB is a smoothing matrix (@see smoother.hpp)
+    @param A The values to regrid, as a series of Eigen column vectors.
+    */
+    EigenDenseMatrixT apply(
+        WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+        EigenDenseMatrixT const &A,           // A{jn}   One col vec per variable
+        Params const &_params) const;
 };
 // -----------------------------------------------------------------
 class UrAE;
@@ -167,7 +208,7 @@ protected:
 
     // ---------------------------------
 
-    // Functions used by corresponding functions in GCMRegridder
+    // MatrixFunctions used by corresponding functions in GCMRegridder
     /** Remove unnecessary GCM grid cells. */
     void filter_cellsA(std::function<bool(long)> const &keepA);
 
@@ -223,13 +264,6 @@ public:
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
-
-protected:
-    /** Used by RegridMatrices (top-level API) */
-    std::unique_ptr<WeightedSparse> compute_IvAE(
-        std::array<SparseSetT *,2> dims,
-        RegridMatrices::Params const &params, UrAE const &AE);
-
 };  // class IceRegridder
 
 std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type);
@@ -261,7 +295,6 @@ extern void linterp_1d(
     std::vector<double> const &xpoints,
     double xx,
     int *indices, double *weights); // Size-2 arrays
-
 
 }    // namespace
 #endif    // guard

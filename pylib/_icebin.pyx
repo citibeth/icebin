@@ -31,13 +31,26 @@ from libcpp cimport bool
 cdef class IceRegridder:
     pass
 
+
+cdef class WeightedSparse:
+    cdef cicebin.CythonWeightedSparse *cself
+
+    def __dealloc__(self):
+        del self.cself
+
+    def __call__(self):
+        cdef cicebin.CythonWeightedSparse *xcself
+        wM, (data,shape), Mw = cicebin.CythonWeightedSparse_to_tuple(self.cself)
+        return wM, scipy.sparse.coo_matrix(data, shape), Mw
+
+
 cdef class RegridMatrices:
     cdef cicebin.RegridMatrices *cself
 
     def __dealloc__(self):
         del self.cself
 
-    def regrid(self, str spec_name, bool scale=True, bool correctA=True, sigma=(0,0,0)):
+    def matrix(self, str spec_name, bool scale=True, bool correctA=True, sigma=(0,0,0)):
         """Compute a regrid matrix.
         spec_name:
             Type of regrid matrix to obtain.  Choice are:
@@ -54,10 +67,12 @@ cdef class RegridMatrices:
                     M(scaled=True) = diag(1/weight) * M(scaled=False)
                     M(scaled=False) = diag(weight) * M(scaled=True)
         """
-        wM, (data,shape), Mw = cicebin.RegridMatrices_regrid(self.cself, spec_name.encode(), scale, correctA, sigma[0], sigma[1], sigma[2])
-        print('BB2')
-        # scipy.sparse.coo_matrix((data1, (rows1, cols1)), shape=(nrow1, ncol1))
-        return wM, scipy.sparse.coo_matrix(data, shape), Mw
+        cdef cicebin.CythonWeightedSparse *crm
+        crm = cicebin.RegridMatrices_matrix(
+            self.cself, spec_name.encode(), scale, correctA, sigma[0], sigma[1], sigma[2])
+        ret = WeightedSparse()
+        ret.cself = crm
+        return ret
 
 cdef class GCMRegridder:
     cdef cicebin.GCMRegridder cself

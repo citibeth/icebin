@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <iostream>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/IceRegridder_L0.hpp>
 #include <icebin/smoother.hpp>
@@ -286,7 +287,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
+std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &AE)
 {
@@ -297,8 +298,8 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
     SparseSetT * const dimG(&_dimG);
 
     if (dimA) dimA->set_sparse_extent(AE.nfull);
-    if (dimI) dimI->set_sparse_extent(this->nI());
-    dimG->set_sparse_extent(this->nG());
+    if (dimI) dimI->set_sparse_extent(regridder->nI());
+    dimG->set_sparse_extent(regridder->nG());
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     MakeDenseEigenT GvAp_m(
@@ -306,7 +307,7 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
         SparsifyTransform::ADD_DENSE,
         {dimG, dimA}, '.');
     MakeDenseEigenT IvG_m(
-        std::bind(&IceRegridder::GvI, this, _1),
+        std::bind(&IceRegridder::GvI, regridder, _1),
         SparsifyTransform::ADD_DENSE,
         {dimG, dimI}, 'T');
 
@@ -321,17 +322,6 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
 
     // Get weight vector from IvAp_e
     ret->wM.reference(sum(*IvAp, 0, '+'));
-
-    // Create smoothing matrix if smoothing was requested
-    bool smooth = (params.sigma[0] != 0);
-    EigenSparseMatrixT smoothM(nI(), nI());
-    if (smooth) {
-        TupleListT<2> smooth_accum;
-        smoothing_matrix(smooth_accum, *this->gridI, *dimI,
-            elevI, ret->wM, params.sigma);
-        smoothM.setFromTriplets(smooth_accum.base().begin(), smooth_accum.base().end());
-        auto sumS(sum(smoothM, 1, '+'));
-    }
 
     // ----- Apply final scaling, and convert back to sparse dimension
     if (params.correctA) {
@@ -349,40 +339,20 @@ std::unique_ptr<WeightedSparse> IceRegridder::compute_IvAE(
 
         if (params.scale) {
             auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
-            if (smooth) {
-                auto IvA(sIvAp * *IvAp * sApvA);
-                ret->M.reset(new EigenSparseMatrixT(smoothM * IvA));
-            } else {
-                ret->M.reset(new EigenSparseMatrixT(
-                    sIvAp * *IvAp * sApvA));
-            }
+            ret->M.reset(new EigenSparseMatrixT(
+                sIvAp * *IvAp * sApvA));
         } else {
-            if (smooth) {
-                ret->M.reset(new EigenSparseMatrixT(
-                    smoothM * *IvAp * sApvA));
-            } else {
-                ret->M.reset(new EigenSparseMatrixT(
-                    *IvAp * sApvA));
-            }
+            ret->M.reset(new EigenSparseMatrixT(
+                *IvAp * sApvA));
         }
     } else {
         ret->Mw.reference(sum(*IvAp, 1, '+'));    // Area of A cells
         if (params.scale) {
             auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
-            if (smooth) {
-                ret->M.reset(new EigenSparseMatrixT(
-                    smoothM * sIvAp * *IvAp));
-            } else {
-                ret->M.reset(new EigenSparseMatrixT(
-                    sIvAp * *IvAp));
-            }
+            ret->M.reset(new EigenSparseMatrixT(
+                sIvAp * *IvAp));
         } else {
-            if (smooth) {
-                ret->M.reset(new EigenSparseMatrixT(
-                    smoothM * *IvAp));
-            } else {
-                ret->M = std::move(IvAp);
-            }
+            ret->M = std::move(IvAp);
         }
     }
 
@@ -470,6 +440,13 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     return ret;
 }
 // ----------------------------------------------------------------
+void RegridMatrices::add_regrid(std::string const &spec,
+    RegridMatrices::SmoothingFunction const *smooth,
+    RegridMatrices::MatrixFunction const &regrid)
+{
+    regrids.insert(make_pair(spec, Binding(regrid, smooth)));
+}
+// ----------------------------------------------------------------
 RegridMatrices::RegridMatrices(IceRegridder *regridder)
 {
     printf("===== RegridMatrices Grid geometries:\n");
@@ -487,23 +464,27 @@ RegridMatrices::RegridMatrices(IceRegridder *regridder)
         std::bind(&IceRegridder::GvEp, regridder, _1),
         std::bind(&IceRegridder::sEpvE, regridder, _1));
 
+    // Get a smoothing function for each output grid
+     smoothI = std::bind(&smoothing_matrix,
+        _1, &*regridder->gridI, _2, &regridder->elevI, _3, _4);
+
     // ------- AvI, IvA
-    regrids.insert(make_pair("AvI", std::bind(&compute_AEvI,
-        regridder, _1, _2, urA) ));
-    regrids.insert(make_pair("IvA", std::bind(&IceRegridder::compute_IvAE,
-        regridder, _1, _2, urA) ));
+    add_regrid("AvI", nullptr,
+        std::bind(&compute_AEvI, regridder, _1, _2, urA));
+    add_regrid("IvA", &smoothI,
+        std::bind(&compute_IvAE, regridder, _1, _2, urA));
 
     // ------- EvI, IvE
-    regrids.insert(make_pair("EvI", std::bind(&compute_AEvI,
-        regridder, _1, _2, urE) ));
-    regrids.insert(make_pair("IvE", std::bind(&IceRegridder::compute_IvAE,
-        regridder, _1, _2, urE) ));
+    add_regrid("EvI", nullptr,
+        std::bind(&compute_AEvI, regridder, _1, _2, urE));
+    add_regrid("IvE", &smoothI,
+        std::bind(&compute_IvAE, regridder, _1, _2, urE));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, this, _1, _2, urE, urA) ));
-    regrids.insert(make_pair("EvA", std::bind(&compute_EvA,
-        regridder, _1, _2, urE, urA) ));
-    regrids.insert(make_pair("AvE", std::bind(&compute_EvA,
-        regridder, _1, _2, urA, urE) ));
+    add_regrid("EvA", nullptr,
+        std::bind(&compute_EvA, regridder, _1, _2, urE, urA));
+    add_regrid("AvE", nullptr,
+        std::bind(&compute_EvA, regridder, _1, _2, urA, urE));
 
     // ----- Show what we have!
     printf("Available Regrids:");
@@ -512,6 +493,65 @@ RegridMatrices::RegridMatrices(IceRegridder *regridder)
     }
     printf("\n");
 }
+// ----------------------------------------------------------------
+std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
+    std::string const &spec_name,
+    std::array<SparseSetT *,2> dims,
+    Params const &params) const
+{
+    auto &bindings(regrids.at(spec_name));
+    auto BvA(bindings.matrix(dims, params));
+    // If the user asked for smoothing and we can smooth this kind of matrix...
+    if (params.smooth() && bindings.smooth) {
+        TupleListT<2> smoothB_t;
+        (*bindings.smooth)(smoothB_t, *dims[0], BvA->wM, params.sigma);
 
+        // Smooth the underlying unsmoothed regridding transformation
+        BvA->M.reset(new EigenSparseMatrixT(
+            to_eigen(smoothB_t) * *BvA->M));
+        BvA->smooth = true;
+    }
+    return BvA;
+}
+// ----------------------------------------------------------------
+EigenDenseMatrixT RegridMatrices::apply(
+    WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    EigenDenseMatrixT const &A,           // A{jn}   One col vec per variable
+    Params const &params) const
+{
+    // |i| = size of output vector space (B)
+    // |j| = size of input vector space (A)
+    // |n| = number of variables being processed together
+
+    // Initial regridding.
+    EigenDenseMatrixT B0(*BvA.M * A);        // B0{in}
+
+    if (!BvA.smooth) return B0;
+
+    // We are using smoothing.  Assume that BvA has been smoothed, as
+    // in regrid()
+
+    // Integrate each variable of input (A) over full domain
+    auto &wA_b(BvA.Mw);
+    Eigen::Map<EigenRowVectorT> const wA(const_cast<double *>(wA_b.data()), 1, wA_b.extent(0));
+    // Return as diagonal matrix
+//    EigenDiagonalMatrixT TA((wA * A).asDiagonal());    // TA{nn}
+    auto TA((wA * A).array());        // TA{n} row array
+
+
+    // Integrate each variable of output (B) over full domain
+    auto &wB_b(BvA.wM);
+    Eigen::Map<EigenRowVectorT> const wB(const_cast<double *>(wB_b.data()), 1, wB_b.extent(0));
+    // ...invert and return TB-1{n} as diagonal matrix
+//    EigenDiagonalMatrixT TB_inv(  (1. / (wB * B0).array()).matrix().asDiagonal()  ); // TB_inv{nn}
+    auto TB_inv( 1. / (wB * B0).array() );    // TB_inv{n} row array
+
+    // Factor{nn}: Conservation correction for each variable.
+
+    auto Factor(TA * TB_inv);    // Factor{n} row array
+std::cout << "Conservation Factors = " << Factor << std::endl;
+
+    return B0 * Factor.matrix().asDiagonal();
+}
 
 } // namespace

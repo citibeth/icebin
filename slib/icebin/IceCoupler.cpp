@@ -266,7 +266,7 @@ bool run_ice)
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
     {
         // Adds to dimA1 and dimE1
-        auto AvE1(rm.regrid("AvE", {&dimA1, &dimE1}, regrid_params));
+        auto AvE1(rm.matrix("AvE", {&dimA1, &dimE1}, regrid_params));
 
         spcopy(
             accum::to_sparse(AvE1->dims,
@@ -283,7 +283,7 @@ bool run_ice)
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
-    auto E1vI(rm.regrid("EvI", {&dimE1, &dimI}, regrid_params));
+    auto E1vI(rm.matrix("EvI", {&dimE1, &dimI}, regrid_params));
 
     // Don't do this on the first round, since we don't yet have an IvE0
     if (run_ice) {
@@ -298,7 +298,7 @@ bool run_ice)
 
     // ========= Compute gcm_ivalsE
 
-    auto A1vI(rm.regrid("AvI", {&dimA1, &dimI}, regrid_params));
+    auto A1vI(rm.matrix("AvI", {&dimA1, &dimI}, regrid_params));
 
     // Do it once for _E variables and once for _A variables.
     std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
@@ -375,7 +375,7 @@ bool run_ice)
     }
 
     // Compute IvE (for next timestep)
-    auto IvE1(rm.regrid("IvE", {&dimI, &dimE1}, regrid_params));
+    auto IvE1(rm.matrix("IvE", {&dimI, &dimE1}, regrid_params));
     dimE0 = std::move(dimE1);
     IvE0 = std::move(IvE1->M);
 

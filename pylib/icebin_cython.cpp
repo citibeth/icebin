@@ -154,47 +154,53 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 
 }
 
-PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z)
+extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z, bool conserve)
 {
-    std::array<SparseSetT,2> dims;
-    std::unique_ptr<WeightedSparse> RM(cself->regrid(spec_name,
-        {&dims[0], &dims[1]},
-        RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z})));
+    std::unique_ptr<CythonWeightedSparse> CRM(new CythonWeightedSparse());
 
+    CRM->RM = cself->matrix(spec_name,
+        {&CRM->dims[0], &CRM->dims[1]},
+        RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z}, conserve));
+
+    return CRM.release();
+}
+
+PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself)
+{
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
 
     // ---------- wM
     // Allocate the output Python vector
     PyObject *wM_py = ibmisc::cython::new_pyarray<double,1>(
-        std::array<int,1>{dims[0].sparse_extent()});
+        std::array<int,1>{cself->dims[0].sparse_extent()});
     // Get a Blitz view on it
     auto wM_pyb(np_to_blitz<double,1>(wM_py, "wM_py", {-1}));
     // Copy, while translating the dimension
     spcopy(
-        accum::to_sparse(make_array(&dims[0]),
+        accum::to_sparse(make_array(&cself->dims[0]),
         accum::blitz_existing(wM_pyb)),
-        RM->wM);
+        cself->RM->wM);
 
     // -------------- M
     // Convert a sparse matrix w/ dense indices to a sparse matrix with sparse indices
     TupleListT<2> RM_sp;
     spcopy(
-        accum::to_sparse(make_array(&dims[0], &dims[1]),
+        accum::to_sparse(make_array(&cself->dims[0], &cself->dims[1]),
         accum::ref(RM_sp)),
-        *RM->M);
+        *cself->RM->M);
     PyObject *M_py = ibmisc::cython::spsparse_to_tuple(RM_sp);
 
     // ---------- Mw
     // Allocate the output Python vector
     PyObject *Mw_py = ibmisc::cython::new_pyarray<double,1>(
-        std::array<int,1>{dims[1].sparse_extent()});
+        std::array<int,1>{cself->dims[1].sparse_extent()});
     // Get a Blitz view on it
     auto Mw_pyb(np_to_blitz<double,1>(Mw_py, "Mw_py", {-1}));
     // Copy, while translating the dimension
     spcopy(
-        accum::to_sparse(make_array(&dims[1]),
+        accum::to_sparse(make_array(&cself->dims[1]),
         accum::blitz_existing(Mw_pyb)),
-        RM->Mw);
+        cself->RM->Mw);
 
     return Py_BuildValue("OOO", wM_py, M_py, Mw_py);
 }

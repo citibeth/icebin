@@ -38,7 +38,17 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &sinterp_style,
     PyObject *elevI_py);
 
-extern PyObject *RegridMatrices_regrid(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z);
+/** Wraps WeightedSparse to keep around the dense/sparse dimension
+    translators */
+struct CythonWeightedSparse {
+    std::array<SparseSetT,2> dims;
+    std::unique_ptr<WeightedSparse> RM;
+};
+
+
+extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z);
+
+PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself);
 
 void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
     size_t M_nrow, size_t M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py);

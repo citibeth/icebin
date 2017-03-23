@@ -101,9 +101,10 @@ public:
         different elevation classes.
 */
 extern void smoothing_matrix(TupleListT<2> &ret,
-    Grid const &gridX, SparseSetT const &dimX,
-    DenseArrayT<1> const &elev_s,
-    DenseArrayT<1> const &area_s,
+    Grid const *gridX,
+    SparseSetT const &dimX,
+    DenseArrayT<1> const *elev_s,
+    DenseArrayT<1> const &area_d,
     std::array<double,3> const &sigma);
 
 }

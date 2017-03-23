@@ -50,6 +50,7 @@ cdef extern from "icebin/Grid.hpp" namespace "icebin":
 
         Grid() except +
 
+
 cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
     pass
 
@@ -67,6 +68,9 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
 
 
 cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
+    cdef cppclass CythonWeightedSparse:
+        pass
+
     cdef void GCMRegridder_init(
         GCMRegridder *self,
         string &gridA_fname,
@@ -82,7 +86,9 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         string &sinterp_style,
         PyObject *elevI_py) except +        # PyObject=Borrowed reference, object = owned reference
 
-    cdef object RegridMatrices_regrid(RegridMatrices *self, string spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z) except +
+    cdef CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *self, string spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z) except +
+
+    cdef object CythonWeightedSparse_to_tuple(CythonWeightedSparse *self) except +
 
     cdef void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
         int M_nrow, int M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py) except +
