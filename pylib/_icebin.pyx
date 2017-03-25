@@ -33,16 +33,48 @@ cdef class IceRegridder:
 
 
 cdef class WeightedSparse:
+    """The result of RegridMatrices.matrix()"""
     cdef cicebin.CythonWeightedSparse *cself
 
     def __dealloc__(self):
         del self.cself
 
     def __call__(self):
+        """Obtain the matrix and weight vectors as Python structures.
+        returns: (wM, M, Mw)
+            wM: np.array
+                Weight vector ("area" of output grid cells)
+            M: scipy.sparse.coo_matrix
+                Unscaled regridding matrix (i.e. produces [kg] not [kg m-2])
+            Mw: np.array
+                Weight vector ("area" of input grid cells)
+       """
+
         cdef cicebin.CythonWeightedSparse *xcself
         wM, (data,shape), Mw = cicebin.CythonWeightedSparse_to_tuple(self.cself)
         return wM, scipy.sparse.coo_matrix(data, shape), Mw
 
+    def apply(self, A_s):
+        """Applies the regrid matrix to A_s.  Smoothes and conserves, if those
+        options were specified in RegridMatrices.matrix().
+        A_s: Either:
+            - A single vector (1-D array) to be transformed.
+            - A 2-D array of row vectors to be transformed."""
+
+        rank = len(A_s.shape)
+        if rank == 1:
+            A_s = A_s.reshape((1,A_s.shape[0]))
+        elif rank == 2:
+            pass
+        else:
+            raise ValueError('A_s must be of rank 1 or 2')
+
+        B_s = cicebin.CythonWeightedSparse_apply(self.cself, <PyObject *>A_s)
+
+        if rank == 1:
+            B_s = B_s.reshape((B_s.shape[1],))
+
+        return B_s
 
 cdef class RegridMatrices:
     cdef cicebin.RegridMatrices *cself
@@ -50,7 +82,8 @@ cdef class RegridMatrices:
     def __dealloc__(self):
         del self.cself
 
-    def matrix(self, str spec_name, bool scale=True, bool correctA=True, sigma=(0,0,0)):
+    def matrix(self, str spec_name, bool scale=True, bool correctA=True,
+        sigma=(0,0,0), conserve=True):
         """Compute a regrid matrix.
         spec_name:
             Type of regrid matrix to obtain.  Choice are:
@@ -59,17 +92,15 @@ cdef class RegridMatrices:
             true  --> [kg m-2]
             false --> [kg]
         correctA: Correct for projection on A and E side of matrices?
-        returns: (M, weights)
-            M: scipy.sparse.coo_matrix
-                Unscaled regridding matrix (i.e. produces [kg] not [kg m-2])
-            weight: np.array
-                Weight vector, defined by:
-                    M(scaled=True) = diag(1/weight) * M(scaled=False)
-                    M(scaled=False) = diag(weight) * M(scaled=True)
+        conserve: Apply conservation correction
+            (if needed; eg, if sigma is set, and smoothing is supported
+            for the output grid).
+        returns: WeightedSparse
         """
         cdef cicebin.CythonWeightedSparse *crm
         crm = cicebin.RegridMatrices_matrix(
-            self.cself, spec_name.encode(), scale, correctA, sigma[0], sigma[1], sigma[2])
+            self.cself, spec_name.encode(), scale, correctA,
+            sigma[0], sigma[1], sigma[2], conserve)
         ret = WeightedSparse()
         ret.cself = crm
         return ret

@@ -30,6 +30,8 @@ using namespace spsparse;
 namespace icebin {
 namespace cython {
 
+static double const nan = std::numeric_limits<double>::quiet_NaN();
+
 void GCMRegridder_init(GCMRegridder *cself,
     std::string const &gridA_fname,
     std::string const &gridA_vname,
@@ -52,45 +54,6 @@ void GCMRegridder_init(GCMRegridder *cself,
 
 }
 
-
-#if 0
-template<class T>
-static blitz::Array<T,1> np_to_blitz_1d(
-PyObject *ovec,
-std::string const &vname,
-std::array<int,1> dims)
-{
-    // Check that it's type PyArrayObject
-    if (!PyArray_Check(ovec)) {
-        (*icebin_error)(-1,
-            "check_dimensions: Object %s is not a Numpy array", vname.c_str());
-    }
-    PyArrayObject *vec = (PyArrayObject *)ovec;
-
-
-    // Set up shape and strides
-    int const T_size = sizeof(T);
-    size_t len = 1;
-    auto min_stride = PyArray_STRIDE(vec, 0);
-    for (int i=0;i<PyArray_NDIM(vec); ++i) {
-        len *=  PyArray_DIM(vec, i);
-
-        // Python/Numpy strides are in bytes, Blitz++ in sizeof(T) units.
-        min_stride = std::min(min_stride, PyArray_STRIDE(vec, i) / T_size);
-    }
-
-
-    assert(T_size == PyArray_ITEMSIZE(vec));
-
-    blitz::TinyVector<int,1> shape(0);
-    shape[0] = len;
-    blitz::TinyVector<int,1> strides(0);
-    strides[0] = min_stride;
-
-    return blitz::Array<T,1>((T*) PyArray_DATA(vec),shape,strides,
-        blitz::neverDeleteData);
-}
-#endif
 
 void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string name,
@@ -162,7 +125,55 @@ extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::s
         {&CRM->dims[0], &CRM->dims[1]},
         RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z}, conserve));
 
-    return CRM.release();
+    CythonWeightedSparse *ret = CRM.release();
+    return ret;
+}
+
+extern PyObject *CythonWeightedSparse_apply(
+    CythonWeightedSparse *BvA,
+    PyObject *A_s_py)            // A_b{nj_s} One row per variable
+{
+    // |j_s| = size of sparse input vector space (A_s)
+    // |j_d] = size of dense input vector space (A_d)
+    // |n| = number of variables being processed together
+
+    // Allocate dense A matrix
+    auto &bdim(BvA->dims[0]);
+    auto &adim(BvA->dims[1]);
+    auto A_s(np_to_blitz<double,2>(A_s_py, "A", {-1,-1}));    // Sparse indexed dense vector
+    int n_n = A_s.extent(0);
+
+    // Densify the A matrix
+    blitz::Array<double,2> A_d(n_n, adim.dense_extent());
+    for (int j_d=0; j_d < adim.dense_extent(); ++j_d) {
+        int j_s = adim.to_sparse(j_d);
+        for (int n=0; n < n_n; ++n) {
+            A_d(n,j_d) = A_s(n,j_s);
+        }
+    }
+
+    // Apply...
+    auto B_d_eigen(BvA->RM->apply(A_d));    // Column major indexing
+
+    // Allocate output vector and get a Blitz view
+    PyObject *B_s_py = ibmisc::cython::new_pyarray<double,2>(
+        std::array<int,2>{n_n, bdim.sparse_extent()});
+    auto B_s(np_to_blitz<double,2>(B_s_py, "B_s_py", {-1,-1}));
+
+    // Sparsify the output B
+    for (int n=0; n < n_n; ++n)
+    for (int j_s=0; j_s < bdim.sparse_extent(); ++j_s) {
+        B_s(n,j_s) = nan;
+    }
+
+    for (int j_d=0; j_d < bdim.dense_extent(); ++j_d) {
+        int j_s = bdim.to_sparse(j_d);
+        for (int n=0; n < n_n; ++n) {
+            B_s(n,j_s) = B_d_eigen(j_d,n);
+        }
+    }
+
+    return B_s_py;
 }
 
 PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself)

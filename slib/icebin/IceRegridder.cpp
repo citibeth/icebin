@@ -503,53 +503,60 @@ std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
     auto BvA(bindings.matrix(dims, params));
     // If the user asked for smoothing and we can smooth this kind of matrix...
     if (params.smooth() && bindings.smooth) {
-        TupleListT<2> smoothB_t;
+        TupleListT<2> smoothB_t({dims[0]->dense_extent(), dims[0]->dense_extent()});
         (*bindings.smooth)(smoothB_t, *dims[0], BvA->wM, params.sigma);
+        auto smoothB(to_eigen(smoothB_t));
 
         // Smooth the underlying unsmoothed regridding transformation
-        BvA->M.reset(new EigenSparseMatrixT(
-            to_eigen(smoothB_t) * *BvA->M));
+        BvA->M.reset(new EigenSparseMatrixT(smoothB * *BvA->M));
         BvA->smooth = true;
+        BvA->conserve = params.conserve;
     }
     return BvA;
 }
 // ----------------------------------------------------------------
-EigenDenseMatrixT RegridMatrices::apply(
-    WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-    EigenDenseMatrixT const &A,           // A{jn}   One col vec per variable
-    Params const &params) const
+EigenDenseMatrixT WeightedSparse::apply(
+    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    blitz::Array<double,2> const &A_b) const      // A_b{nj} One row per variable
 {
+    auto &BvA(*this);
+
+    // A{jn}   One col per variable
+    Eigen::Map<EigenDenseMatrixT> const A(
+        const_cast<double *>(A_b.data()), A_b.extent(1), A_b.extent(0));
+
     // |i| = size of output vector space (B)
     // |j| = size of input vector space (A)
     // |n| = number of variables being processed together
 
-    // Initial regridding.
+    // Apply initial regridding.
     EigenDenseMatrixT B0(*BvA.M * A);        // B0{in}
 
-    if (!BvA.smooth) return B0;
-
-    // We are using smoothing.  Assume that BvA has been smoothed, as
-    // in regrid()
+    // Only apply conservation correction if all of:
+    //   a) Matrix is smoothed, so it needs a conservation correction
+    //   b) User requested conservation be maintained
+    if (!(BvA.smooth && BvA.conserve)) return B0;
 
     // Integrate each variable of input (A) over full domain
     auto &wA_b(BvA.Mw);
     Eigen::Map<EigenRowVectorT> const wA(const_cast<double *>(wA_b.data()), 1, wA_b.extent(0));
-    // Return as diagonal matrix
-//    EigenDiagonalMatrixT TA((wA * A).asDiagonal());    // TA{nn}
-    auto TA((wA * A).array());        // TA{n} row array
-
+    typedef Eigen::Array<double,Eigen::Dynamic,Eigen::Dynamic> EigenArrayT;
+    EigenArrayT TA((wA * A).array());        // TA{n} row array
 
     // Integrate each variable of output (B) over full domain
     auto &wB_b(BvA.wM);
     Eigen::Map<EigenRowVectorT> const wB(const_cast<double *>(wB_b.data()), 1, wB_b.extent(0));
-    // ...invert and return TB-1{n} as diagonal matrix
-//    EigenDiagonalMatrixT TB_inv(  (1. / (wB * B0).array()).matrix().asDiagonal()  ); // TB_inv{nn}
-    auto TB_inv( 1. / (wB * B0).array() );    // TB_inv{n} row array
+    EigenArrayT TB((wB * B0).array());
+    EigenArrayT TB_inv(1. / TB);    // TB_inv{n} row array
 
     // Factor{nn}: Conservation correction for each variable.
 
     auto Factor(TA * TB_inv);    // Factor{n} row array
-std::cout << "Conservation Factors = " << Factor << std::endl;
+
+    std::cout << "-------- WeightedSparse::apply() conservation" << std::endl;
+    std::cout << "    |input|    = " << TA << std::endl;
+    std::cout << "    |output|   = " << TA << std::endl;
+    std::cout << "    correction = " << Factor << std::endl;
 
     return B0 * Factor.matrix().asDiagonal();
 }

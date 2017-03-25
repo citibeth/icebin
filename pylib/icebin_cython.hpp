@@ -46,7 +46,13 @@ struct CythonWeightedSparse {
 };
 
 
-extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z);
+extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself,
+    std::string const &spec_name, bool scale, bool correctA,
+    double sigma_x, double sigma_y, double sigma_z, bool conserve);
+
+extern PyObject *CythonWeightedSparse_apply(
+    CythonWeightedSparse *BvA,
+    PyObject *A_s_py);            // A_b{nj_s} One row per variable
 
 PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself);
 

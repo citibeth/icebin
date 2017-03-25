@@ -70,10 +70,26 @@ struct WeightedSparse {
     std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
     bool smooth;    // Is M smoothed?
 
+    /** Should we enforce conservation (in the face of smoothing)?
+    Unsmoothed regrid matrices are already conservative... */
+    bool conserve;
+
     // Area of A cells
     DenseArrayT<1> Mw;
 
     WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims), smooth(false) {}
+
+    /** Applies a regrid matrix.
+    Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
+    (where BvA is this)
+    In the face of smoothing, it also compensates for non-conservation in
+    smoothB.
+
+    @param A The values to regrid, as a series of Eigen column vectors.
+    */
+    EigenDenseMatrixT apply(
+        // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+        blitz::Array<double,2> const &A) const;   // A{nj} One row per variable
 };
 
 // ------------------------------------------------------------
@@ -160,22 +176,6 @@ public:
     std::unique_ptr<WeightedSparse> matrix(
         std::string const &spec_name,
         std::array<SparseSetT *,2> dims,
-        Params const &_params) const;
-
-    /** Applies a regrid matrix.
-    Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
-    In the face of smoothing, it also compensates for non-conservation in
-    smoothB.
-
-    @param BvA_smoothed Smoothed version of the regrid matrix (BvA) that
-        was obtained from RegridMatrices::regrid().  It should follow:
-               BvA_smoothed.M = smoothB * BvA.M
-        where smoothB is a smoothing matrix (@see smoother.hpp)
-    @param A The values to regrid, as a series of Eigen column vectors.
-    */
-    EigenDenseMatrixT apply(
-        WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-        EigenDenseMatrixT const &A,           // A{jn}   One col vec per variable
         Params const &_params) const;
 };
 // -----------------------------------------------------------------
