@@ -52,7 +52,8 @@ extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself,
 
 extern PyObject *CythonWeightedSparse_apply(
     CythonWeightedSparse *BvA,
-    PyObject *A_s_py);            // A_b{nj_s} One row per variable
+    PyObject *A_s_py,
+    double fill);            // A_b{nj_s} One row per variable
 
 PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself);
 

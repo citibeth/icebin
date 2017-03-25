@@ -131,7 +131,8 @@ extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::s
 
 extern PyObject *CythonWeightedSparse_apply(
     CythonWeightedSparse *BvA,
-    PyObject *A_s_py)            // A_b{nj_s} One row per variable
+    PyObject *A_s_py,            // A_b{nj_s} One row per variable
+    double fill)
 {
     // |j_s| = size of sparse input vector space (A_s)
     // |j_d] = size of dense input vector space (A_d)
@@ -163,7 +164,7 @@ extern PyObject *CythonWeightedSparse_apply(
     // Sparsify the output B
     for (int n=0; n < n_n; ++n)
     for (int j_s=0; j_s < bdim.sparse_extent(); ++j_s) {
-        B_s(n,j_s) = nan;
+        B_s(n,j_s) = fill;
     }
 
     for (int j_d=0; j_d < bdim.dense_extent(); ++j_d) {

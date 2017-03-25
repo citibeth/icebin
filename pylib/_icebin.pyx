@@ -54,12 +54,14 @@ cdef class WeightedSparse:
         wM, (data,shape), Mw = cicebin.CythonWeightedSparse_to_tuple(self.cself)
         return wM, scipy.sparse.coo_matrix(data, shape), Mw
 
-    def apply(self, A_s):
+    def apply(self, A_s, double fill=np.nan):
         """Applies the regrid matrix to A_s.  Smoothes and conserves, if those
         options were specified in RegridMatrices.matrix().
         A_s: Either:
             - A single vector (1-D array) to be transformed.
-            - A 2-D array of row vectors to be transformed."""
+            - A 2-D array of row vectors to be transformed.
+        fill:
+            Un-set indices in output array will get this value."""
 
         rank = len(A_s.shape)
         if rank == 1:
@@ -69,7 +71,7 @@ cdef class WeightedSparse:
         else:
             raise ValueError('A_s must be of rank 1 or 2')
 
-        B_s = cicebin.CythonWeightedSparse_apply(self.cself, <PyObject *>A_s)
+        B_s = cicebin.CythonWeightedSparse_apply(self.cself, <PyObject *>A_s, fill)
 
         if rank == 1:
             B_s = B_s.reshape((B_s.shape[1],))
