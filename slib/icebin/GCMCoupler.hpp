@@ -230,14 +230,14 @@ public:
     void ncio_gcm_input(ibmisc::NcIO &ncio,
         GCMInput &out,        // All MPI ranks included here
         std::array<double,2> &timespan,    // timespan[1] = current time_s
-        std::string const &time_units,
+        ibmisc::TimeUnit const &time_unit,
         std::string const &vname_base);
 
     /** Top-level ncio() to log input to coupler. (GCM->coupler) */
     void ncio_gcm_output(ibmisc::NcIO &ncio,
         VectorMultivec const &gcm_ovalsE,
         std::array<double,2> &timespan,    // timespan[1] = current time_s
-        std::string const &time_units,
+        ibmisc::TimeUnit const &time_unit,
         std::string const &vname_base);
 
 };

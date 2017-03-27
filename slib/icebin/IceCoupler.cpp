@@ -20,6 +20,7 @@
 #include <type_traits>
 
 #include <spsparse/blitz.hpp>
+#include <ibmisc/datetime.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/memory.hpp>
 #include <ibmisc/array.hpp>
@@ -430,6 +431,7 @@ void IceWriter::init_file()
 {
     GCMCoupler const *gcm_coupler(ice_coupler->gcm_coupler);
     GCMParams const &gcm_params(gcm_coupler->gcm_params);
+    auto &time_unit(gcm_coupler->time_unit);
 
     printf("BEGIN IceWriter::init_file(%s)\n", fname.c_str());
 
@@ -445,26 +447,28 @@ void IceWriter::init_file()
     auto dims(get_or_add_dims(ncio, dim_names, dcounts));
 
 
-//    NcDim one_dim = ncio.nc->addDim("one", 1);
-//    NcVar info_var = ncio.nc->addVar("grid", ibmisc::get_nc_type<double>(), one_dims[0]);
     NcVar info_var = get_or_add_var(ncio, "grid", ibmisc::get_nc_type<double>(), one_dims);
 
-
     info_var.putAtt("icebin_in", gcm_coupler->icebin_in);
-//    info_var.putAtt("variable", coupler->vname);
     info_var.putAtt("ice_sheet", ice_coupler->name());
 
     NcVar time0_var = get_or_add_var(ncio, "time0", ibmisc::get_nc_type<double>(), one_dims);
-    time0_var.putAtt("units", gcm_coupler->time_unit.to_cf());
-    time0_var.putAtt("calendar", gcm_coupler->time_unit.cal->to_cf());
+    time0_var.putAtt("units", time_unit.to_cf());
+    time0_var.putAtt("calendar", time_unit.cal->to_cf());
     time0_var.putAtt("axis", "T");
     time0_var.putAtt("long_name", "Simulation start time");
 
+    NcVar time0_txt = get_or_add_var(ncio, "time0.txt", "char",
+        get_or_add_dims(ncio, {"iso8601.length"}, {iso8601_length}));
+
     NcVar time_var = get_or_add_var(ncio, "time", ibmisc::get_nc_type<double>(), {dims[0]});
-    time_var.putAtt("units", gcm_coupler->time_unit.to_cf());
-    time_var.putAtt("calendar", gcm_coupler->time_unit.cal->to_cf());
+    time_var.putAtt("units", time_unit.to_cf());
+    time_var.putAtt("calendar", time_unit.cal->to_cf());
     time_var.putAtt("axis", "T");
     time_var.putAtt("long_name", "Coupling times");
+
+    NcVar time_txt = get_or_add_var(ncio, "time.txt", "char",
+        get_or_add_dims(ncio, {dim_names[0], "iso8601.length"}, {-1, iso8601_length}));
 
 
     for (size_t i=0; i < contract->size(); ++i) {
@@ -475,7 +479,11 @@ void IceWriter::init_file()
     }
 
     // Put initial time in it...
-    time0_var.putVar({0}, {1}, &gcm_coupler->time_start_s);
+    double const &time_start_s(gcm_coupler->time_start_s);
+    time0_var.putVar({0}, {1}, &time_start_s);
+    time0_txt.putVar({0}, {iso8601_length},
+        to_iso8601(time_unit.to_datetime(time_start_s)).c_str());
+
     ncio.close();
 
     file_initialized = true;
@@ -497,11 +505,8 @@ void IceWriter::write(double time_s,
 {
     GCMCoupler const *gcm_coupler(ice_coupler->gcm_coupler);
     GCMParams const &gcm_params(gcm_coupler->gcm_params);
+    auto &time_unit(gcm_coupler->time_unit);
 
-
-printf("BEGIN IceWriter::write %g %s\n", time_s, fname.c_str());
-double xxx = valsI(0, 1925);
-printf("USF2 usurf(1925) = %g\n", xxx);
     if (!file_initialized) init_file();
     NcIO ncio(fname, NcFile::write);
 
@@ -511,6 +516,10 @@ printf("USF2 usurf(1925) = %g\n", xxx);
     // Write the current time
     NcVar time_var = ncio.nc->getVar("time");
     time_var.putVar(cur, counts, &time_s);
+
+    NcVar time_txt = ncio.nc->getVar("time.txt");
+    time_txt.putVar({cur[0],0}, {counts[0],iso8601_length},
+        to_iso8601(time_unit.to_datetime(time_s)).c_str());
 
     // Write the other variables
     size_t nI(valsI.extent(1));
@@ -522,22 +531,15 @@ printf("USF2 usurf(1925) = %g\n", xxx);
     if (all_count != nI) (*icebin_error)(-1,
         "Illegal count to write: %ld vs %ld", all_count, nI);
 
-
-//for (size_t i=0; i<counts.size(); ++i) printf("    cur[%ld]=%ld, counts[%ld]=%ld\n", i, cur[i], i, counts[i]);
-
     for (int ivar=0; ivar < contract->size(); ++ivar) {
         VarMeta const &cf = (*contract)[ivar];
 
         NcVar ncvar = ncio.nc->getVar(cf.name.c_str());
         for (int i=0; i<valsI.extent(1); ++i) valI_tmp(i) = valsI(ivar, i);
-//printf("USF3 ivar=%d (%s)[1925] = %g (%g)\n", ivar, (*contract)[ivar].name.c_str(), valI_tmp(1925), valI_tmp.data()[1925]);
-
         ncvar.putVar(cur, counts, valI_tmp.data());
     }
 
     ncio.close();
-printf("END IceWriter::write\n");
-    
 }
 
 }    // namespace icebin

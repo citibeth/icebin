@@ -206,7 +206,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         std::string fname = "gcm-out-" + sdate + ".nc";
         NcIO ncio(fname, 'w');
         ncio_gcm_output(ncio, gcm_ovalsE, timespan,
-            time_unit.to_cf(), "");
+            time_unit, "");
         ncio();
     }
 
@@ -225,8 +225,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         auto one_dims(get_or_add_dims(ncio, {"one"}, {1}));
         NcVar info_var = get_or_add_var(ncio, "info", ibmisc::get_nc_type<double>(), one_dims);
         info_var.putAtt("notes", "Elevation classes (HC) are just those known to IceBin.  No legacy or sea-land elevation classes included.");
-        ncio_gcm_input(ncio, out, timespan,
-            time_unit.to_cf(), "");
+        ncio_gcm_input(ncio, out, timespan, time_unit, "");
         ncio();
     }
 
@@ -361,10 +360,10 @@ printf("END ncio_dense()\n");
 void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     GCMInput &out,        // All MPI ranks included here
     std::array<double,2> &timespan,    // timespan[1] = current time_s
-    std::string const &time_units,
+    ibmisc::TimeUnit const &time_unit,
     std::string const &vname_base)
 {
-    ibmisc::ncio_timespan(ncio, timespan, time_units, vname_base);
+    ibmisc::ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
 
     for (int iAE=0; iAE<GridAE::count; ++iAE) {
         ncio_dense(ncio, out.gcm_ivalsAE_s[iAE], gcm_inputsAE[iAE],
@@ -380,11 +379,11 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
 void GCMCoupler::ncio_gcm_output(NcIO &ncio,
     VectorMultivec const &gcm_ovalsE,
     std::array<double,2> &timespan,    // timespan[1] = current time_s
-    std::string const &time_units,
+    ibmisc::TimeUnit const &time_unit,
     std::string const &vname_base)
 {
 printf("BEGIN GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
-    ncio_timespan(ncio, timespan, time_units, vname_base);
+    ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
     ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
         gcm_regridder.indexingE, vname_base);
 printf("END GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
