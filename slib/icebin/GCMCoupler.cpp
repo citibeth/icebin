@@ -261,10 +261,10 @@ printf("BEGIN ncwrite_dense()\n");
         // Fill our dense var
         denseE = nan;
         for (unsigned int i=0; i<vecs->index.size(); ++i) {
-            auto index(vecs->index[i]);
-            if (index >= nE) (*icebin_error)(-1,
-                "Index out of range: %ls vs. %ld", (long)index, (long)nE);
-            denseE(index) = vecs->vals[i*nvar + ivar];
+            auto iE(vecs->index[i]);
+            if (iE >= nE) (*icebin_error)(-1,
+                "Index out of range: %ls vs. %ld", (long)iE, (long)nE);
+            denseE(iE) = vecs->vals[i*nvar + ivar];
         }
 
         // Store in the netCDF variable
