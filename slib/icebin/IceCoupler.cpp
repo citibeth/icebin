@@ -38,8 +38,6 @@
 using namespace spsparse;
 using namespace ibmisc;
 using namespace netCDF;
-//using namespace std;
-
 
 namespace icebin {
 
@@ -83,6 +81,16 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     return self;
 }
 
+// Default NOP for reconstruct_ice_ivalsI
+static void _reconstruct_ice_ivalsI(
+    blitz::Array<double,2> &ice_ivalsI) {}
+
+IceCoupler::IceCoupler(IceCoupler::Type _type) :
+    type(_type),
+    reconstruct_ice_ivalsI(std::bind(
+        &_reconstruct_ice_ivalsI, std::placeholders::_1))
+    {}
+
 
 IceCoupler::~IceCoupler() {}
 // ==========================================================
@@ -103,6 +111,12 @@ void IceCoupler::cold_start(
                 this, &contract[io], fname.string()));
         }
     }
+
+    // Subclass-specific cold start
+    _cold_start(time_base, time_start_s);
+
+    // Allocate
+    ice_ovalsI.reference(blitz::Array<double,2>(contract[OUTPUT].size(), nI()));
 }
 
 /** Print summary info of the contracts to STDOUT. */
@@ -137,6 +151,52 @@ static Eigen::VectorXd to_col_vector(blitz::Array<double,1> const &vec)
     return ret;
 }
 // -----------------------------------------------------------
+blitz::Array<double,2> IceCoupler::construct_ice_ivalsI(
+blitz::Array<double,2> const &gcm_ovalsE0,
+std::vector<std::pair<std::string, double>> const &scalars,
+ibmisc::TmpAlloc &tmp)
+{
+    auto nE0(gcm_ovalsE0.extent(0));
+
+    // ------------- Form ice_ivalsI
+    // Assuming column-major matrices...
+    // ice_ivalsI{ik} = IvE0{ij} * (gcm_ovalsE0{jl} * ivg.M{lk} + ivg.b{jk})
+    //       Dense    =  Sparse          Dense          Sparse     Repeated
+    // *** where:
+    // ivg = icei_v_gcmo
+    // |i| = # ice grid cells (|I|)
+    // |j| = # dense elevation grid cells (|E0|)
+    // |k| = # variables in ice_input
+    // |l| = # variables in gcm_output
+
+    auto &ice_ivalsI_e(tmp.make<EigenDenseMatrixT>());    // Memory for ice_ivalsI
+
+    // Get the sparse matrix to convert GCM output variables to ice model inputs
+    // This will be transposed: M(input, output).  b is a row-vector here.
+    auto icei_v_gcmo_T(var_trans_inE.apply_scalars(scalars, 'T'));    // Mxb
+//  print_var_trans(icei_v_gcmo_T, var_trans_inE, 'T');
+
+    // Switch from row-major (Blitz++) to col-major (Eigen) indexing
+    Eigen::Map<EigenDenseMatrixT> gcm_ovalsE0_e(
+        gcm_ovalsE0.data(), gcm_ovalsE0.extent(1), gcm_ovalsE0.extent(0));
+
+    // Ice inputs calculated as the result of a matrix multiplication
+    ice_ivalsI_e = (*IvE0) * (
+        gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
+
+    // Alias the Eigen matrix to blitz array
+    blitz::Array<double,2> ice_ivalsI(
+        ice_ivalsI_e.data(),
+        blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
+        blitz::neverDeleteData));
+
+
+    // Continue construction in a contract-specific manner
+    reconstruct_ice_ivalsI(ice_ivalsI);
+
+    return ice_ivalsI;
+}
+// -----------------------------------------------------------
 /** 
 @param do_run True if we are to actually run (otherwise just return ice_ovalsI from current state)
 @return ice_ovalsI */
@@ -147,14 +207,14 @@ VectorMultivec const &gcm_ovalsE_s,
 GCMInput &out,    // Accumulate matrices here...
 bool run_ice)
 {
+    ice_ovalsI = 0;
+
     if (!gcm_coupler->am_i_root()) {
         printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
         // Allocate dummy variables, even though they will only be set on root
         blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
-        blitz::Array<double,2> ice_ovalsI(contract[OUTPUT].size(), nI());
         ice_ivalsI = 0;
-        ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
         printf("[noroot] END IceCoupler::couple(%s)\n", name().c_str());
         return;
@@ -163,9 +223,6 @@ bool run_ice)
     printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
     // ========== Get Ice Inputs
-    blitz::Array<double,2> ice_ovalsI(contract[OUTPUT].size(), nI());
-    ice_ovalsI = 0;
-
     // E_s = Elevation grid (sparse indices)
     // E0 = Elevation grid @ beginning of timestep (dense indices)
     // E1 = Elevation grid @ end of timestep (dense indices)
@@ -202,51 +259,17 @@ bool run_ice)
     std::vector<std::pair<std::string, double>> scalars({
         std::make_pair("by_dt", 1.0 / (time_s - gcm_coupler->last_time_s))});
 
-
-    // ------------- Form ice_ivalsI
-    // Assuming column-major matrices...
-    // ice_ivalsI{ik} = IvE0{ij} * (gcm_ovalsE0{jl} * ivg.M{lk} + ivg.b{jk})
-    //       Dense    =  Sparse          Dense          Sparse     Repeated
-    // *** where:
-    // ivg = icei_v_gcmo
-    // |i| = # ice grid cells (|I|)
-    // |j| = # dense elevation grid cells (|E0|)
-    // |k| = # variables in ice_input
-    // |l| = # variables in gcm_output
-
-    blitz::Array<double,2> ice_ivalsI;
-    EigenDenseMatrixT ice_ivalsI_e;    // Must stick around as long as ice_ivalsI
-    if (run_ice) {
-        // Get the sparse matrix to convert GCM output variables to ice model inputs
-        // This will be transposed: M(input, output).  b is a row-vector here.
-        auto icei_v_gcmo_T(var_trans_inE.apply_scalars(scalars, 'T'));    // Mxb
-//        print_var_trans(icei_v_gcmo_T, var_trans_inE, 'T');
-
-        // Switch from row-major (Blitz++) to col-major (Eigen) indexing
-        Eigen::Map<EigenDenseMatrixT> gcm_ovalsE0_e(
-            gcm_ovalsE0.data(), gcm_ovalsE0.extent(1), gcm_ovalsE0.extent(0));
-
-        // Ice inputs calculated as the result of a matrix multiplication
-        auto nE0(dimE0.dense_extent());
-        ice_ivalsI_e = (*IvE0) * (
-            gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
-
-        // Alias the Eigen matrix to blitz array
-        ice_ivalsI.reference(blitz::Array<double,2>(
-            ice_ivalsI_e.data(),
-            blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
-            blitz::neverDeleteData));
-    } else {
-        // Create dummy blitz array
-        ice_ivalsI.reference(
+    {
+        TmpAlloc tmp;    // Allocate variables for the duration of this function
+        blitz::Array<double,2> ice_ivalsI(run_ice ?
+            construct_ice_ivalsI(gcm_ovalsE0, time_s, scalars, tmp) :
             blitz::Array<double,2>(contract[INPUT].size(), nI()));
+
+        // ========= Step the ice model forward
+        if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
+        run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
+        if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
     }
-
-
-    // ========= Step the ice model forward
-    if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
-    run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
-    if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
 
     // ========== Update regridding matrices
     int elevI_ix = standard_names[OUTPUT].at("elevI");

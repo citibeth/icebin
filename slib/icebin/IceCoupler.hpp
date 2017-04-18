@@ -53,6 +53,11 @@ public:
     std::unique_ptr<EigenSparseMatrixT> IvE0;
     SparseSetT dimE0;
 
+    // Output of ice model from the last time we coupled.
+    // Some of these values are needed for computation of ice_ivalsI
+    // on the next coupling timestep.
+    // TODO: Only keep variables we need here, instead of all of ice_ovalsI
+    blitz::Array<double,2> ice_ovalsI;
 
     // [INPUT|OUTPUT] variables
     // List of fields this dynamic ice model takes for input / output.
@@ -111,13 +116,33 @@ public:
     This method must call where appropriate:
         contracts::setup(*gcm_coupler, *this);
     */
-    virtual void cold_start(
+    void cold_start(
         ibmisc::Datetime const &time_base,
         double time_start_s);
+
+    /** Called by cold_start() */
+    virtual void _cold_start(
+        ibmisc::Datetime const &time_base,
+        double time_start_s) = 0;
 
     void print_contracts();
 
     // ========= Called by
+
+protected:
+
+    /** Called in just one place.  Transforms GCM output to Ice Model
+    input using general means.  This function is customized by
+    setting reconstruct_ice_ivalsI below. */
+    void construct_ice_ivalsI(
+        blitz::Array<double,2> const &gcm_ovalsE0,
+        std::vector<std::pair<std::string, double>> const &scalars,
+        ibmisc::TmpAlloc &tmp);
+
+public:
+    /** A "virtual function" used to customize construct_ice_ivalsI().
+    This defaults to NOP, and is set by the coupling contract. */
+    std::function<void(blitz::Array<double,2> &)> reconstruct_ice_ivalsI;
 
     /** (4) Run the ice model for one coupling timestep.
     @param time_s Seconds since GCMParams::time_base.  Helps with debugging.

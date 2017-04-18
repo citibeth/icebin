@@ -34,15 +34,82 @@ auto &UNIT(VarTransformer::UNIT);
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
+
+static void _reconstruct_ice_ivalsI(
+    GCMCoupler_ModelE const *gcm_coupler,
+    gpism::IceCoupler_PISM const *ice_coupler,
+    blitz::Array<double,2> &ice_ivalsI)
+{
+    // ------------------ Pick relevant variables out of ice input & output
+
+    // --------- Inputs of this Computation
+    // surface_senth: State of top of PISM ice sheet [J kg-1]
+    blitz::Array<double,1> &surface_senth(ice_coupler->ice_ovalsI(
+        ice_coupler->contract[OUTPUT].index.at("surface_senth"),
+        blitz::Range::all()));
+    // deltah: Change in enthalpy to effect in PISM by B.C.
+    blitz::Array<double,1> &deltah(ice_ivalsI(
+        ice_coupler->contract[INPUT].index.at("deltah"),
+        blitz::Range::all()));
+
+    // --------- Outputs of this Computation
+    blitz::Array<double,1> &bc_senth(ice_ivalsI(
+        ice_coupler->contract[INPUT].index.at("bc_senth"),
+        blitz::Range::all()));
+    blitz::Array<double,1> &bc_temp(ice_ivalsI(
+        ice_coupler->contract[INPUT].index.at("bc_temp"),
+        blitz::Range::all()));
+    blitz::Array<double,1> &bc_watercontent(ice_ivalsI(
+        ice_coupler->contract[INPUT].index.at("bc_watercontent"),
+        blitz::Range::all()));
+
+    // kappa: see modelE/model/landice/lisnowsubs.F90
+    // Layer 0 = ice borrowed from GCM
+    // Layer 1 = top layer of PISM
+    double const RHOI = gcm_coupler->gcm_constants.get_as("constant.rhoi", "kg m-3");
+    double const SHI = gcm_coupler->gcm_constants.get_as("constant.shi", / "J kg-1 K-1");
+
+    // PISM will "see" a layer of PISM-style ice, with a certain enthalpy.
+    // Make sure that this layer produces ~deltah of heat flux
+
+    // Pretend both layers have density RHOI; because that is what PISM will see
+    double const ksn = STIEGLITZ_8B * (RHOI*RHOI);
+    // Pretend that both layers are 40m; the standard depth of a PISM layer
+    double const dz = 40;    // [m]  TODO: Find where this is in PISM
+    // Constant for Fourier's law:  flux = kappa (H0 - H1) where H=specific enth
+    double const kappa = ksn / (SHI * dz)
+
+    // Get a PISM Enthalpy Converter
+    pism::EnthalpyConverter enth(*ice_coupler->pism_config());
+
+    for (int i=0; i<nI(); ++i) {
+        double const H1 = surface_senth(i);    // [J kg-1]
+        double const Q = = deltah(i);          // [W m-2]
+
+        // Specific enthalpy for the boundary condition
+        double const H0 = (Q/kappa) + H1;        // [K kg-1]
+        bc_senth(i) = H0;
+
+        // Pressure at top of PISM ice sheet; by convention, 0
+        double const P = 0;
+
+        // Convert specific enthalpy to T and water content
+        bc_temp(i) = enth.temperature(H0, P);
+        bc_watercontent(i) = enth.water_fraction(H0, P);
+    }
+}
+
 /** GCM-specific contract */
 void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
 {
     // Get arguments we need from coupler
     auto gcm_coupler(dynamic_cast<modele::GCMCoupler_ModelE const *>(&_gcm_coupler));
     auto ice_coupler(dynamic_cast<icebin::gpism::IceCoupler_PISM *>(&_ice_coupler));
-    
 
     printf("BEGIN setup_modele_pism()\n");
+
+    ice_coupler.custom_construct_ice_ivalsI = std::bind(&custom_construct_ice_ivalsI,
+        &gcm_coupler, &ice_coupler, std::placeholders::_1);
 
     // =========== Transfer  constants from Icebin's gcm_constants --> PISM
     // ice_coupler->transfer_constant(PISM_destionation, icebin_src, multiply_by)
@@ -87,8 +154,22 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
         "Mass of ice being transferred Stieglitz --> Icebin");
     ice_input.add("enthxfer", 0., "W m-2", 0,
         "Enthalpy of ice being transferred Stieglitz --> Icebin");
+
+    // Temporary variables of the ice input: not bound to PISM variables.
+    // deltah: Regridded from GCM output's deltah
     ice_input.add("deltah", 0., "J m-2", 0,
-        "Change of enthalpy of top layer in PISM");
+        "Change of enthalpy to apply to top layer in PISM");
+    // bc_senth: Boundary condition, computed based on deltah
+    ice_input.add("bc_senth", 0., "J kg-1", 0,
+        "Enthalpy of the Dirichlet B.C. being applied to the top of the ice sheet");
+
+    // These variables are the actual boundary condition provided to PISM.
+    // They are computed based on bc_senth.
+    ice_input.add("bc_temp", 0., "K", 0,
+        "Temperature of the Dirichlet B.C.");
+    ice_input.add("bc_watercontent", 0., "1", 0,
+        "Water content of the Dirichlet B.C.");
+
 
     // Figure out the conversion between GCM and PISM enthalpy
     // ModelE's reference state is 1atm, 0C, 100% liquid water.
@@ -142,12 +223,7 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
 
     ice_output.add("mask", nan, "", contracts::INITIAL, "PISM land surface type");
 
-    ice_output.add("M1", nan, "kg m-2", contracts::INITIAL, "");
-    ice_output.add("M2", nan, "kg m-2", contracts::INITIAL, "");
-    ice_output.add("H1", nan, "J m-2", contracts::INITIAL, "");
-    ice_output.add("H2", nan, "J m-2", contracts::INITIAL, "");
-    ice_output.add("V1", nan, "m^3 m-2", contracts::INITIAL, "");
-    ice_output.add("V2", nan, "m^3 m-2",contracts::INITIAL, "");
+    ice_output.add("surface_senth", nan, "J kg-1", contracts::INITIAL, "");
 
     ice_output.add("basal_frictional_heating", nan, "W m-2", 0, "");
     ice_output.add("strain_heating", nan, "W m-2", 0, "");
@@ -195,17 +271,8 @@ void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
     ok = ok && vtE.set("elevE", "ice_surface_elevation", UNIT, 1.0);
 
     // Top layer state from ice model
-    ok = ok && vtE.set("M1E", "M1", UNIT, 1.0); // Divide by RHOW to convert to m water equiv
-    ok = ok && vtE.set("H1E", "H1", UNIT, 1.0);
-    ok = ok && vtE.set("H1E", "M1", UNIT, -enth_modele_to_pism);
-    ok = ok && vtE.set("V1E", "V1", UNIT, 1.0);
-
-    // Second-top layer state from ice model
-    ok = ok && vtE.set("M2E", "M2", UNIT, 1.0); // Divide by RHOW to convert to m water equiv
-    ok = ok && vtE.set("H2E", "H2", UNIT, 1.0);
-    ok = ok && vtE.set("H2E", "M2", UNIT, -enth_modele_to_pism);
-    ok = ok && vtE.set("V2E", "V2", UNIT, 1.0);
-
+    ok = ok && vtE.set("surface_senth", "surface_senth", UNIT, 1.0);
+    ok = ok && vtE.set("surface_senth", UNIT, UNIT, -enth_modele_to_pism);
 
     ok = ok && vtA.set("basal_frictional_heating", "basal_frictional_heating", UNIT, 1.0);
     ok = ok && vtA.set("strain_heating", "strain_heating", UNIT, 1.0);
