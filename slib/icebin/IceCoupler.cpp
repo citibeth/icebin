@@ -177,8 +177,9 @@ ibmisc::TmpAlloc &tmp)
 //  print_var_trans(icei_v_gcmo_T, var_trans_inE, 'T');
 
     // Switch from row-major (Blitz++) to col-major (Eigen) indexing
-    Eigen::Map<EigenDenseMatrixT> gcm_ovalsE0_e(
-        gcm_ovalsE0.data(), gcm_ovalsE0.extent(1), gcm_ovalsE0.extent(0));
+    Eigen::Map<EigenDenseMatrixT> const gcm_ovalsE0_e(
+        const_cast<double *>(gcm_ovalsE0.data()),
+        gcm_ovalsE0.extent(1), gcm_ovalsE0.extent(0));
 
     // Ice inputs calculated as the result of a matrix multiplication
     ice_ivalsI_e = (*IvE0) * (
@@ -188,7 +189,7 @@ ibmisc::TmpAlloc &tmp)
     blitz::Array<double,2> ice_ivalsI(
         ice_ivalsI_e.data(),
         blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
-        blitz::neverDeleteData));
+        blitz::neverDeleteData);
 
 
     // Continue construction in a contract-specific manner
@@ -262,7 +263,7 @@ bool run_ice)
     {
         TmpAlloc tmp;    // Allocate variables for the duration of this function
         blitz::Array<double,2> ice_ivalsI(run_ice ?
-            construct_ice_ivalsI(gcm_ovalsE0, time_s, scalars, tmp) :
+            construct_ice_ivalsI(gcm_ovalsE0, scalars, tmp) :
             blitz::Array<double,2>(contract[INPUT].size(), nI()));
 
         // ========= Step the ice model forward

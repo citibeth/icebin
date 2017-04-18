@@ -97,7 +97,7 @@ public:
     //     GCMCoupler_ModelE: gcmce_new()
     //     GCMCoupler::ncread()
     //     IceCoupler.cpp: new_ice_coupler()
-    IceCoupler(IceCoupler::Type _type) : type(_type) {}
+    IceCoupler(IceCoupler::Type _type);
 
     /** (1) Initialize any grid information, etc. from the IceSheet struct.
     @param vname_base Construct variable name from this, out of which to pull parameters from netCDF
@@ -134,7 +134,7 @@ protected:
     /** Called in just one place.  Transforms GCM output to Ice Model
     input using general means.  This function is customized by
     setting reconstruct_ice_ivalsI below. */
-    void construct_ice_ivalsI(
+    blitz::Array<double,2> construct_ice_ivalsI(
         blitz::Array<double,2> const &gcm_ovalsE0,
         std::vector<std::pair<std::string, double>> const &scalars,
         ibmisc::TmpAlloc &tmp);

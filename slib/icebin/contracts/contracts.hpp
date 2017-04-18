@@ -36,7 +36,7 @@ extern std::string to_str(unsigned int flags);
 // =====================================================
 // Virtual Functions that dispatch on GCMCoupler and IceCoupler
 
-void setup(GCMCoupler const &gcm_coupler, IceCoupler &ice_coupler);
+void setup(GCMCoupler const *gcm_coupler, IceCoupler *ice_coupler);
 // ======================================================
 
 

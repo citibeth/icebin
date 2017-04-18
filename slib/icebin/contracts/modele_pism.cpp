@@ -25,15 +25,17 @@
 #include <icebin/pism/IceCoupler_PISM.hpp>
 
 using namespace ibmisc;
+using namespace icebin::modele;
 
 // --------------------------------------------------------
 namespace icebin {
 namespace contracts {
 
-auto &UNIT(VarTransformer::UNIT);
-
+// Aliases
+static auto const &UNIT(VarTransformer::UNIT);
+static auto const &INPUT(IceCoupler::INPUT);
+static auto const &OUTPUT(IceCoupler::OUTPUT);
 static double const nan = std::numeric_limits<double>::quiet_NaN();
-
 
 static void _reconstruct_ice_ivalsI(
     GCMCoupler_ModelE const *gcm_coupler,
@@ -44,22 +46,22 @@ static void _reconstruct_ice_ivalsI(
 
     // --------- Inputs of this Computation
     // surface_senth: State of top of PISM ice sheet [J kg-1]
-    blitz::Array<double,1> &surface_senth(ice_coupler->ice_ovalsI(
+    blitz::Array<double,1> surface_senth(ice_coupler->ice_ovalsI(
         ice_coupler->contract[OUTPUT].index.at("surface_senth"),
         blitz::Range::all()));
     // deltah: Change in enthalpy to effect in PISM by B.C.
-    blitz::Array<double,1> &deltah(ice_ivalsI(
+    blitz::Array<double,1> deltah(ice_ivalsI(
         ice_coupler->contract[INPUT].index.at("deltah"),
         blitz::Range::all()));
 
     // --------- Outputs of this Computation
-    blitz::Array<double,1> &bc_senth(ice_ivalsI(
+    blitz::Array<double,1> bc_senth(ice_ivalsI(
         ice_coupler->contract[INPUT].index.at("bc_senth"),
         blitz::Range::all()));
-    blitz::Array<double,1> &bc_temp(ice_ivalsI(
+    blitz::Array<double,1> bc_temp(ice_ivalsI(
         ice_coupler->contract[INPUT].index.at("bc_temp"),
         blitz::Range::all()));
-    blitz::Array<double,1> &bc_watercontent(ice_ivalsI(
+    blitz::Array<double,1> bc_watercontent(ice_ivalsI(
         ice_coupler->contract[INPUT].index.at("bc_watercontent"),
         blitz::Range::all()));
 
@@ -67,7 +69,8 @@ static void _reconstruct_ice_ivalsI(
     // Layer 0 = ice borrowed from GCM
     // Layer 1 = top layer of PISM
     double const RHOI = gcm_coupler->gcm_constants.get_as("constant.rhoi", "kg m-3");
-    double const SHI = gcm_coupler->gcm_constants.get_as("constant.shi", / "J kg-1 K-1");
+    double const SHI = gcm_coupler->gcm_constants.get_as("constant.shi", "J kg-1 K-1");
+    double const STIEGLITZ_8B = gcm_coupler->gcm_constants.get_as("constant.stieglitz_8b", "W m-1 K-1");
 
     // PISM will "see" a layer of PISM-style ice, with a certain enthalpy.
     // Make sure that this layer produces ~deltah of heat flux
@@ -77,14 +80,14 @@ static void _reconstruct_ice_ivalsI(
     // Pretend that both layers are 40m; the standard depth of a PISM layer
     double const dz = 40;    // [m]  TODO: Find where this is in PISM
     // Constant for Fourier's law:  flux = kappa (H0 - H1) where H=specific enth
-    double const kappa = ksn / (SHI * dz)
+    double const kappa = ksn / (SHI * dz);
 
     // Get a PISM Enthalpy Converter
     pism::EnthalpyConverter enth(*ice_coupler->pism_config());
 
-    for (int i=0; i<nI(); ++i) {
+    for (int i=0; i<ice_coupler->nI(); ++i) {
         double const H1 = surface_senth(i);    // [J kg-1]
-        double const Q = = deltah(i);          // [W m-2]
+        double const Q = deltah(i);          // [W m-2]
 
         // Specific enthalpy for the boundary condition
         double const H0 = (Q/kappa) + H1;        // [K kg-1]
@@ -100,16 +103,17 @@ static void _reconstruct_ice_ivalsI(
 }
 
 /** GCM-specific contract */
-void setup_modele_pism(GCMCoupler const &_gcm_coupler, IceCoupler &_ice_coupler)
+void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
 {
     // Get arguments we need from coupler
-    auto gcm_coupler(dynamic_cast<modele::GCMCoupler_ModelE const *>(&_gcm_coupler));
-    auto ice_coupler(dynamic_cast<icebin::gpism::IceCoupler_PISM *>(&_ice_coupler));
+    auto gcm_coupler(dynamic_cast<modele::GCMCoupler_ModelE const *>(_gcm_coupler));
+    auto ice_coupler(dynamic_cast<icebin::gpism::IceCoupler_PISM *>(_ice_coupler));
 
     printf("BEGIN setup_modele_pism()\n");
 
-    ice_coupler.custom_construct_ice_ivalsI = std::bind(&custom_construct_ice_ivalsI,
-        &gcm_coupler, &ice_coupler, std::placeholders::_1);
+    ice_coupler->reconstruct_ice_ivalsI = std::bind(
+        &_reconstruct_ice_ivalsI,
+        gcm_coupler, ice_coupler, std::placeholders::_1);
 
     // =========== Transfer  constants from Icebin's gcm_constants --> PISM
     // ice_coupler->transfer_constant(PISM_destionation, icebin_src, multiply_by)

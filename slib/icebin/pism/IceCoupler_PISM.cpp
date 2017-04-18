@@ -258,7 +258,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     // This is the right place to do it, since PISM is now fully up and functional,
     // and all PISM config files have been read.
     // This call through the GCMCoupler will call back to setup_contracts_xxx().
-    contracts::setup(*gcm_coupler, *this);
+    contracts::setup(gcm_coupler, this);
 
 //printf("start = %f\n", pism_grid->time->start());
 //printf("end = %f\n", pism_grid->time->end());
