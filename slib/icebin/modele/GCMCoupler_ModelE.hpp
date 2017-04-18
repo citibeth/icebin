@@ -72,6 +72,7 @@ struct ModelEInputs
     // --------- State variables we can update inside ModelE
     // i,j,ihc arrays on Elevation grid
     blitz::Array<double,3> fhc;
+    blitz::Array<int,3> underice;
     blitz::Array<double,3> elevE;
 
     // i,j arrays on Atmosphere grid

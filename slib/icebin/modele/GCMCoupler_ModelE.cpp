@@ -44,6 +44,10 @@ using namespace std;
 using namespace ibmisc;
 using namespace netCDF;
 
+// See LIGrid.F90
+const int UI_ICEBIN = 1;
+const int UI_NOTHING= 2;
+
 
 #if 0
 std::ostream &operator<<(std::ostream &os, icebin::modele::ModelEParams const &params)
@@ -167,9 +171,11 @@ printf("BEGIN gcmce_new()\n");
 
 /* Tells ModelE how many elevation classes it needs **/
 extern "C"
-int gcmce_nhc_gcm(GCMCoupler_ModelE *self)
+void gcmce_hc_params(GCMCoupler_ModelE *self, int &nhc_gcm, int &icebin_base_hc, int &nhc_ice)
 {
-    return self->nhc_gcm();
+    nhc_gcm = self->nhc_gcm();
+    icebin_base_hc = self->gcm_params.ec_segment().base;
+    nhc_ice = self->gcm_regridder.nhc(0);
 }
 
 int GCMCoupler_ModelE::_read_nhc_gcm()
@@ -299,6 +305,7 @@ extern "C"
 void gcmce_reference_globals(
     GCMCoupler_ModelE *self,
     F90Array<double, 3> &fhc,
+    F90Array<int, 3> &underice,
     F90Array<double, 3> &elevE,
     F90Array<double, 2> &focean,
     F90Array<double, 2> &flake,
@@ -306,8 +313,9 @@ void gcmce_reference_globals(
     F90Array<double, 2> &fgice,
     F90Array<double, 2> &zatmo)
 {
-    auto &modele_inputs(self->modele_inputs);
+    ModelEInputs &modele_inputs(self->modele_inputs);
     modele_inputs.fhc.reference(fhc.to_blitz());
+    modele_inputs.underice.reference(underice.to_blitz());
     modele_inputs.elevE.reference(elevE.to_blitz());
     modele_inputs.focean.reference(focean.to_blitz());
     modele_inputs.flake.reference(flake.to_blitz());
@@ -428,7 +436,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
             const int i_f = i+1;
             const int j_f = j+1;
 
-            if (self->modele_inputs.fhc(i_f,j_f,ihc_f) == 0) continue;    // C2F indexing
+            if (self->modele_inputs.underice(i_f,j_f,ihc_f) != UI_ICEBIN) continue;    // C2F indexing
             long iE_s = self->gcm_regridder.indexingE.tuple_to_index(
                 make_array(i, j, ihc_ice));
 
@@ -456,6 +464,17 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
 
         // Concatenate coupler inputs
         VectorMultivec gcm_ovalsE_s(concatenate(every_gcm_ovalsE_s));
+#if 0
+printf("BEGIN gcm_ovalsE_s nvar=%d\n", gcm_ovalsE_s.nvar);
+for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
+    auto &iE_s(gcm_ovalsE_s.index[i]);
+    double *vals(&gcm_ovalsE_s.vals[i*gcm_ovalsE_s.nvar]);
+    printf("gcm_ovalsE_s[iE_s=%ld] =", iE_s);
+    for (int j=0; j<gcm_ovalsE_s.nvar; ++j) printf(" %g", vals[j]);
+    printf("\n");
+}
+printf("END gcm_ovalsE_s\n");
+#endif
 
         // Couple on root!
         GCMInput out(
@@ -466,6 +485,16 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
         std::vector<GCMInput> every_outs(
             split_by_domain<DomainDecomposer_ModelE>(out,
                 *self->domains, *self->domains));
+#if 0
+printf("BEGIN gcmce_couple_native() every_outs\n");
+for (size_t i=0; i<every_outs.size(); ++i) {
+    auto &gcmo(every_outs[i]);
+    printf("    every_outs[%ld]: |gcm_ivalsA_s|=%ld, |gcm_ivalsE_s|=%ld\n", i,
+        gcmo.gcm_ivalsAE_s[GridAE::A].size(),
+        gcmo.gcm_ivalsAE_s[GridAE::E].size());
+}
+printf("END gcmce_couple_native() every_outs\n");
+#endif
 
         // Scatter!
         boost::mpi::scatter(self->gcm_params.world, every_outs, out, self->gcm_params.gcm_root);
@@ -505,8 +534,6 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
         "gcm_ivalsA is wrong size: %ld vs. %d", gcm_ivalsA.size(), nvar[GridAE::A]);
 
     // Write to here...
-    printf("gcm_ivalsA_s.size() == %ld\n", gcm_ivalsA_s.size());
-
     for (int iAE=0; iAE<GridAE::count; ++iAE) {
         if (nvar[iAE] < 0) (*icebin_error)(-1,
             "nvar[%d]=%d < 0, it should not be\n", iAE, nvar[iAE]);
@@ -535,7 +562,7 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) (*gcm_ivalsE[ivar]) = 0;
     for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
         long iE = gcm_ivalsE_s.index[i];
-        auto ijk(gcm_regridder.indexing(GridAE::E).index_to_tuple<int,2>(iE));
+        auto ijk(gcm_regridder.indexing(GridAE::E).index_to_tuple<int,3>(iE));
         int const i_f = ijk[0]+1;    // C2F
         int const j_f = ijk[1]+1;
         int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
