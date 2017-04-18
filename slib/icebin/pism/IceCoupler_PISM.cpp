@@ -112,14 +112,11 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname
     printf("END IceCoupler_PISM::ncread()\n");
 }
 // ======================================================================
-void IceCoupler_PISM::cold_start(
+void IceCoupler_PISM::_cold_start(
     ibmisc::Datetime const &time_base,
     double time_start_s)
 {
-    printf("BEGIN IceCouple_PISM::cold_start()\n");
-
-    // Call overridden method
-    IceCoupler::cold_start(time_base, time_start_s);
+    printf("BEGIN IceCouple_PISM::_cold_start()\n");
 
     // ------- Now instantiate PISM!
     // Convert PISM arguments to old C style
@@ -258,7 +255,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     // ------------------------------------------- \\
 
     // Transfer constants from GCM to PISM, and also set up coupling contracts.
-    // This is the right place to do it, since the PISM systme is fully up and functional,
+    // This is the right place to do it, since PISM is now fully up and functional,
     // and all PISM config files have been read.
     // This call through the GCMCoupler will call back to setup_contracts_xxx().
     contracts::setup(*gcm_coupler, *this);
@@ -294,8 +291,12 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     ix = contract[INPUT].index.at("enthxfer");
         pism_ivars[ix] = &pism_surface_model->icebin_enthxfer;
 
-    ix = contract[INPUT].index.at("deltah");
-        pism_ivars[ix] = &pism_surface_model->icebin_deltah;
+    ix = contract[INPUT].index.at("bc_temp");
+        pism_ivars[ix] = &pism_surface_model->icebin_bc_temp;
+    ix = contract[INPUT].index.at("bc_watercontent");
+        pism_ivars[ix] = &pism_surface_model->icebin_bc_waterfraction;
+
+
 
     // Check that all PISM inputs are bound to a variable
     bool err = false;
@@ -348,23 +349,10 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     ix = contract[OUTPUT].index.at("mask");
         pism_ovars[ix] = &pism_ice_model->cell_type();
 
-    // Mass of top two layers
-    ix = contract[OUTPUT].index.at("M1");
-        pism_ovars[ix] = &pism_ice_model->M1;
-    ix = contract[OUTPUT].index.at("M2");
-        pism_ovars[ix] = &pism_ice_model->M2;
 
-    // Enthalpy of top two layers
-    ix = contract[OUTPUT].index.at("H1");
-        pism_ovars[ix] = &pism_ice_model->H1;
-    ix = contract[OUTPUT].index.at("H2");
-        pism_ovars[ix] = &pism_ice_model->H2;
-
-    // Volume of top two layers
-    ix = contract[OUTPUT].index.at("V1");
-        pism_ovars[ix] = &pism_ice_model->V1;
-    ix = contract[OUTPUT].index.at("V2");
-        pism_ovars[ix] = &pism_ice_model->V2;
+    // Specific enthalpy (PISM-style) of the top layer
+    ix = contract[OUTPUT].index.at("surface_senth");
+        pism_ovars[ix] = &pism_ice_model->surface_senth;
 
     // For MassEnergyBudget variables that have a contract name specified,
     // link them up into pism_ovars now.
@@ -410,7 +398,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
         }
     }
 
-    printf("END IceCoupler_PISM::cold_start()\n");
+    printf("END IceCoupler_PISM::_cold_start()\n");
 }
 
 void IceCoupler_PISM::run_timestep(double time_s,
@@ -471,20 +459,6 @@ void IceCoupler_PISM::run_timestep(double time_s,
         }
 
         // -------- Figure out the timestep
-        auto old_pism_time(pism_grid->ctx()->time()->current()); // beginning of this PISM timestep [s]
-        auto timestep_s = time_s - old_pism_time;       // [s]
-
-        // -------- Determine Dirichlet B.C. for ice sheet
-        // This is done by taking the changes in the "borrowed" enthalpies
-        // from the GCM, and applying them to the corresponding top layer in
-        // the ice model.  The result is placed in surface->surface_temp.
-        pism::icebin::IBSurfaceModel * const surface = pism_ice_model->ib_surface_model();
-        pism_ice_model->construct_surface_temp(
-            surface->icebin_deltah,
-            contract[INPUT].at("deltah").default_value,
-            timestep_s,
-            surface->surface_temp);
-
         pism_in_nc->write(time_s);
 
 
@@ -503,6 +477,7 @@ void IceCoupler_PISM::run_timestep(double time_s,
                 pism_ice_model->mass_t(), pism_ice_model->enthalpy_t(), time_s);
         }
 
+        auto old_pism_time(pism_grid->ctx()->time()->current()); // beginning of this PISM timestep [s]
         pism_ice_model->set_rate(pism_ice_model->enthalpy_t() - old_pism_time);
     }    // if run_ice
 

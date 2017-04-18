@@ -150,7 +150,7 @@ public:
          GCMCoupler::cold_start()
              <this>
          [calls IceCoupler::cold_start()] */
-    virtual void cold_start(
+    virtual void _cold_start(
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
