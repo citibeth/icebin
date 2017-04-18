@@ -89,7 +89,8 @@ struct WeightedSparse {
     */
     EigenDenseMatrixT apply(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-        blitz::Array<double,2> const &A) const;   // A{nj} One row per variable
+        blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
+        double fill = std::numeric_limits<double>::quiet_NaN()) const;    // Fill value for cells not in BvA matrix
 };
 
 // ------------------------------------------------------------

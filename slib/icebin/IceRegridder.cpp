@@ -515,15 +515,32 @@ std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
     return BvA;
 }
 // ----------------------------------------------------------------
+static void mask_result(EigenDenseMatrixT &ret, blitz::Array<double,1> const &wB_b, double fill)
+{
+    int nB = ret.rows();    // == wB_b.extent(0)
+    int nvar = ret.cols();
+
+    // Mask out cells that slipped into the output because they were
+    // in the SparseSet; but don't actually get any contribution.
+    for (int i=0; i<nB; ++i) {
+        if (wB_b(i) != 0.) continue;
+        for (int n=0; n<nvar; ++n) ret(i,n) = fill;
+    }
+
+}
+
 EigenDenseMatrixT WeightedSparse::apply(
     // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-    blitz::Array<double,2> const &A_b) const      // A_b{nj} One row per variable
+    blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
+    double fill) const    // Fill value for cells not in BvA matrix
 {
     auto &BvA(*this);
 
     // A{jn}   One col per variable
+    int nvar = A_b.extent(0);
+    int nA = A_b.extent(1);
     Eigen::Map<EigenDenseMatrixT> const A(
-        const_cast<double *>(A_b.data()), A_b.extent(1), A_b.extent(0));
+        const_cast<double *>(A_b.data()), nA, nvar);
 
     // |i| = size of output vector space (B)
     // |j| = size of input vector space (A)
@@ -535,7 +552,11 @@ EigenDenseMatrixT WeightedSparse::apply(
     // Only apply conservation correction if all of:
     //   a) Matrix is smoothed, so it needs a conservation correction
     //   b) User requested conservation be maintained
-    if (!(BvA.smooth && BvA.conserve)) return B0;
+    if (!(BvA.smooth && BvA.conserve)) {
+        // Remove cells not in the sparse matrix
+        mask_result(B0, BvA.wM, fill);
+        return B0;
+    }
 
     // Integrate each variable of input (A) over full domain
     auto &wA_b(BvA.Mw);
@@ -545,6 +566,7 @@ EigenDenseMatrixT WeightedSparse::apply(
 
     // Integrate each variable of output (B) over full domain
     auto &wB_b(BvA.wM);
+    int nB = wB_b.extent(0);
     Eigen::Map<EigenRowVectorT> const wB(const_cast<double *>(wB_b.data()), 1, wB_b.extent(0));
     EigenArrayT TB((wB * B0).array());
     EigenArrayT TB_inv(1. / TB);    // TB_inv{n} row array
@@ -558,7 +580,11 @@ EigenDenseMatrixT WeightedSparse::apply(
     std::cout << "    |output|   = " << TA << std::endl;
     std::cout << "    correction = " << Factor << std::endl;
 
-    return B0 * Factor.matrix().asDiagonal();
+    EigenDenseMatrixT ret(B0 * Factor.matrix().asDiagonal());    // ret{in}
+    // Remove cells not in the sparse matrix
+    mask_result(B0, BvA.wM, fill);
+
+    return ret;
 }
 
 } // namespace
