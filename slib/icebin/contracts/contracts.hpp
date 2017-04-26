@@ -30,6 +30,7 @@ namespace contracts {
 
 /** This field is returned at initialization time, before the first coupling. */
 const unsigned INITIAL = 1;
+const unsigned PRIVATE = 2;
 
 extern std::string to_str(unsigned int flags);
 

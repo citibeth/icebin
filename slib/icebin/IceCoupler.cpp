@@ -83,12 +83,13 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
 
 // Default NOP for reconstruct_ice_ivalsI
 static void _reconstruct_ice_ivalsI(
-    blitz::Array<double,2> &ice_ivalsI) {}
+    blitz::Array<double,2> &ice_ivalsI,
+    double dt) {}
 
 IceCoupler::IceCoupler(IceCoupler::Type _type) :
     type(_type),
     reconstruct_ice_ivalsI(std::bind(
-        &_reconstruct_ice_ivalsI, std::placeholders::_1))
+        &_reconstruct_ice_ivalsI, std::placeholders::_1, std::placeholders::_2))
     {}
 
 
@@ -154,6 +155,7 @@ static Eigen::VectorXd to_col_vector(blitz::Array<double,1> const &vec)
 blitz::Array<double,2> IceCoupler::construct_ice_ivalsI(
 blitz::Array<double,2> const &gcm_ovalsE0,
 std::vector<std::pair<std::string, double>> const &scalars,
+double dt,
 ibmisc::TmpAlloc &tmp)
 {
     auto nE0(gcm_ovalsE0.extent(0));
@@ -193,7 +195,7 @@ ibmisc::TmpAlloc &tmp)
 
 
     // Continue construction in a contract-specific manner
-    reconstruct_ice_ivalsI(ice_ivalsI);
+    reconstruct_ice_ivalsI(ice_ivalsI, dt);
 
     return ice_ivalsI;
 }
@@ -208,14 +210,13 @@ VectorMultivec const &gcm_ovalsE_s,
 GCMInput &out,    // Accumulate matrices here...
 bool run_ice)
 {
-    ice_ovalsI = 0;
-
     if (!gcm_coupler->am_i_root()) {
         printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
         // Allocate dummy variables, even though they will only be set on root
         blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
         ice_ivalsI = 0;
+        ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
         printf("[noroot] END IceCoupler::couple(%s)\n", name().c_str());
         return;
@@ -257,17 +258,19 @@ bool run_ice)
     // NOTE: by_dt=inf on the first call (run_ice=false)
     //       Should be OK because output variables that depend on by_dt
     //       are not needed on the first call.
+    double const dt = (time_s - gcm_coupler->last_time_s);
     std::vector<std::pair<std::string, double>> scalars({
-        std::make_pair("by_dt", 1.0 / (time_s - gcm_coupler->last_time_s))});
+        std::make_pair("by_dt", 1.0 / dt)});
 
     {
         TmpAlloc tmp;    // Allocate variables for the duration of this function
         blitz::Array<double,2> ice_ivalsI(run_ice ?
-            construct_ice_ivalsI(gcm_ovalsE0, scalars, tmp) :
+            construct_ice_ivalsI(gcm_ovalsE0, scalars, dt, tmp) :
             blitz::Array<double,2>(contract[INPUT].size(), nI()));
 
         // ========= Step the ice model forward
         if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
+        ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
         if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
     }

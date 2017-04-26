@@ -30,7 +30,7 @@ struct VarMeta {
     std::string name;
     /** The units of the variable, in UDUNITS format. */
     std::string units;          //!< UDUnits-compatible string
-    /** The flags the variable resides on. */
+    /** The flags the variable resides on; see contracts.hpp for values */
     unsigned flags;         //!< Allows arbitrary subsets
     /** A textual description of the variable, also called the "long name" */
     std::string description;

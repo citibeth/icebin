@@ -137,12 +137,13 @@ protected:
     blitz::Array<double,2> construct_ice_ivalsI(
         blitz::Array<double,2> const &gcm_ovalsE0,
         std::vector<std::pair<std::string, double>> const &scalars,
+        double dt,
         ibmisc::TmpAlloc &tmp);
 
 public:
     /** A "virtual function" used to customize construct_ice_ivalsI().
     This defaults to NOP, and is set by the coupling contract. */
-    std::function<void(blitz::Array<double,2> &)> reconstruct_ice_ivalsI;
+    std::function<void(blitz::Array<double,2> &, double)> reconstruct_ice_ivalsI;
 
     /** (4) Run the ice model for one coupling timestep.
     @param time_s Seconds since GCMParams::time_base.  Helps with debugging.

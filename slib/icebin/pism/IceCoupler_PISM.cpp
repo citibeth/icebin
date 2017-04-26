@@ -300,11 +300,14 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     // Check that all PISM inputs are bound to a variable
     bool err = false;
-    for (unsigned int i=0; i<pism_ivars.size(); ++i) {
+    for (unsigned i=0; i<pism_ivars.size(); ++i) {
         IceModelVec2S *pism_var = pism_ivars[i];
-        if (!pism_var) fprintf(stderr,
-            "PISM input %s is not bound to a variable\n",
-            contract[INPUT].data[ix].name.c_str());
+        if (!pism_var && !(contract[INPUT][i].flags & contracts::PRIVATE)) {
+            fprintf(stderr,
+                "PISM input %s (i=%d) is not bound to a variable\n",
+                contract[INPUT].data[i].name.c_str(), i);
+            err = true;
+        }
     }
     if (err) (*icebin_error)(-1, "Exiting due to errors");
 
@@ -370,7 +373,10 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
         // Convert array from pism::IceModelVec2S* to pism::IceModelVec*
         std::vector<pism::IceModelVec const *> vecs;
-        for (const pism::IceModelVec2S *vec : pism_ovars) vecs.push_back(vec);
+        for (unsigned i=0; i<pism_ovars.size(); ++i) {
+            if (!(contract[OUTPUT][i].flags & contracts::PRIVATE))
+                vecs.push_back(pism_ovars[i]);
+        }
 
         pism_out_nc.reset(new pism::icebin::VecBundleWriter(
             pism_ice_model->grid(), ofname, vecs));
@@ -382,7 +388,10 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
         boost::filesystem::path output_dir(params.output_dir);
         std::string ofname = (output_dir / "pism-in.nc").string();
         std::vector<pism::IceModelVec const *> vecs;
-        for (auto &vec : pism_ivars) vecs.push_back(vec);
+        for (unsigned i=0; i<pism_ivars.size(); ++i) {
+            if (!(contract[INPUT][i].flags & contracts::PRIVATE))
+                vecs.push_back(pism_ivars[i]);
+        }
         pism_in_nc.reset(new pism::icebin::VecBundleWriter(
             pism_ice_model->grid(), ofname, vecs));
         pism_in_nc->init();
@@ -454,8 +463,10 @@ void IceCoupler_PISM::run_timestep(double time_s,
                     vtmp_b(iI) = ice_ivalsI(ivar, iI);
                 }
             }
-            IceModelVec2S *pism_var = pism_ivars[ivar];
-            pism_var->get_from_proc0(*vtmp_p0);
+            if (!(cf.flags & contracts::PRIVATE)) {
+                IceModelVec2S *pism_var = pism_ivars[ivar];
+                pism_var->get_from_proc0(*vtmp_p0);
+            }
         }
 
         // -------- Figure out the timestep
@@ -505,11 +516,12 @@ void IceCoupler_PISM::get_state(
     int nI = ice_ovalsI.extent(1);
     for (unsigned int ivar=0; ivar<pism_ovars.size(); ++ivar) {
         blitz::Array<double,1> ice_ovalsI_ivar(nI);
+        VarMeta const &cf(ocontract.data[ivar]);
+        bool const priv = (cf.flags & contracts::PRIVATE);
 
-        if (!pism_ovars[ivar]) (*icebin_error)(-1,
+        if (!(pism_ovars[ivar] || priv)) (*icebin_error)(-1,
             "IceCoupler_PISM: Contract output %s (modele_pism.cpp) is not linked up to a pism_ovar (MassEnergyBudget.cpp)", ocontract.index[ivar].c_str());
 
-        VarMeta const &cf(ocontract.data[ivar]);
         if ((cf.flags & mask) != mask) continue;
 
         printf("IceCoupler_PISM::get_state(mask=%d) copying field %s\n", mask, cf.name.c_str());
