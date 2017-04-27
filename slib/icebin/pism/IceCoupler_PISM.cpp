@@ -475,28 +475,29 @@ void IceCoupler_PISM::run_timestep(double time_s,
 
         // =========== Run PISM for one coupling timestep
         // Time of last time we coupled
+        auto time0(pism_grid->ctx()->time()->current());
         printf("BEGIN pism_ice_model->run_to(%f -> %f) %p\n",
-            pism_grid->ctx()->time()->current(), time_s, pism_ice_model.get());
+            time0, time_s, pism_ice_model.get());
         // See pism::icebin::IBIceModel::run_to()
         pism_ice_model->run_to(time_s);
         printf("END pism_ice_model->run_to()\n");
+        auto time1(pism_grid->ctx()->time()->current());
 
 
-        if ((pism_ice_model->mass_t() != time_s) || (pism_ice_model->enthalpy_t() != time_s)) {
+        if ((pism_ice_model->mass_t() != time_s) || (pism_ice_model->enthalpy_t() != time_s) || (time1 != time_s)) {
             (*icebin_error)(-1,
                 "ERROR: PISM time (mass=%f, enthalpy=%f) doesn't match ICEBIN time %f",
                 pism_ice_model->mass_t(), pism_ice_model->enthalpy_t(), time_s);
         }
 
-        auto old_pism_time(pism_grid->ctx()->time()->current()); // beginning of this PISM timestep [s]
-        pism_ice_model->set_rate(pism_ice_model->enthalpy_t() - old_pism_time);
+        pism_ice_model->set_rate(time1 - time0);
     }    // if run_ice
 
     pism_ice_model->prepare_outputs(time_s);
 
     pism_out_nc->write(time_s);    // Writes from PISM-format variables on I grid
 
-    get_state(ice_ovalsI, run_ice ? contracts::INITIAL : 0);
+    get_state(ice_ovalsI, run_ice ? 0 : contracts::INITIAL);
 
     pism_ice_model->reset_rate();
     printf("END IceCoupler_PISM::run_timestep()\n");
@@ -509,7 +510,7 @@ void IceCoupler_PISM::get_state(
     blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nvar, nI)
     unsigned int mask)
 {
-    printf("BEGIN IceCoupler_PISM::get_state: %ld\n", pism_ovars.size());
+    printf("BEGIN IceCoupler_PISM::get_state: %ld (mask = %d)\n", pism_ovars.size(), mask);
     VarSet const &ocontract(contract[IceCoupler::OUTPUT]);
 
     // Copy the outputs to the blitz arrays
@@ -612,18 +613,26 @@ void IceCoupler_PISM::iceModelVec2S_to_blitz_xy(
     Hp0 = pism_var.allocate_proc0_copy();
     pism_var.put_on_proc0(*Hp0);
 
-    long nI = pism_grid->Mx() * pism_grid->My();
 
     // Copy it to blitz array (on the root node only)
     // OLD CODE: ierr = VecGetArray2d(Hp0, pism_grid->Mx, pism_grid->My, 0, 0, &bHp0);
 
-    if (am_i_root()) ret1 = nan;  // Vector operation, initializes ice_ovalsI
+//    if (am_i_root()) ret1 = nan;  // Vector operation, initializes ice_ovalsI
 
-    PetscInt Hp0_size;
-    VecGetLocalSize(*Hp0, &Hp0_size);
+//    PetscInt Hp0_size;
+//    VecGetLocalSize(*Hp0, &Hp0_size);
 
-    double const *Hp0_data = petsc::VecArray(*Hp0).get();
-    if (am_i_root()) for (int i=0; i<nI; ++i) ret1(i) = Hp0_data[i];
+
+
+//    petsc::VecArray va(*Hp0);
+//    double const *Hp0_data = va.get();
+    if (am_i_root()) {
+        double const *Hp0_data = petsc::VecArray(*Hp0).get();
+
+        long nI = pism_grid->Mx() * pism_grid->My();
+        ret1 = nan;
+        for (int i=0; i<nI; ++i) ret1(i) = Hp0_data[i];
+    }
 }
 
 
