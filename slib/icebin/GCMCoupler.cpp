@@ -85,7 +85,8 @@ HCSegmentData &GCMParams::ec_segment()
 GCMCoupler::GCMCoupler(Type _type, GCMParams &&_gcm_params) :
     type(_type),
     gcm_params(std::move(_gcm_params)),
-    ut_system("")
+    ut_system(""),
+    use_smb(true)
 {
     gcm_constants.init(&ut_system);
 
@@ -110,6 +111,7 @@ void GCMCoupler::ncread(
     std::string grid_fname;
     get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
     get_or_put_att(config_info, ncio_config.rw, "output_dir", output_dir);
+    get_or_put_att(config_info, ncio_config.rw, "use_smb", &use_smb, 1);
 
     printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 

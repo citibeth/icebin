@@ -112,13 +112,33 @@ static void _reconstruct_ice_ivalsI(
         // Pressure at top of PISM ice sheet; by convention, 0
         double const P = 0;
 
-        // Convert specific enthalpy to T and water content
-        bc_temp(i) = enth.temperature(H0, P);
-        bc_watercontent(i) = enth.water_fraction(H0, P);
         pism_surface_senth(i) = surface_senth(i);
-
         pism_surface_temp(i) = enth.temperature(pism_surface_senth(i), P) - TF;
 
+        if (use_smb) {
+            // Convert specific enthalpy to T and water content
+            bc_temp(i) = enth.temperature(H0, P);
+            bc_watercontent(i) = enth.water_fraction(H0, P);
+        } else {
+            // If no SMB, then use a bland boundary condition.
+            bc_temp(i) = enth.temperature(pism_surface_senth(i), P);
+            bc_watercontent(i) = enth.water_fraction(pism_surface_senth(i), P);
+        }
+    }
+
+
+    // Eliminate SMB if we're told to not use it.
+    if (!use_smb) {
+        blitz::Array<double,1> massxfer(ice_ivalsI(
+            ice_coupler->contract[INPUT].index.at("massxfer"),
+            blitz::Range::all()));
+
+        blitz::Array<double,1> enthxfer(ice_ivalsI(
+            ice_coupler->contract[INPUT].index.at("enthxfer"),
+            blitz::Range::all()));
+
+        massxfer = 0;
+        enthxfer = 0;
     }
 }
 

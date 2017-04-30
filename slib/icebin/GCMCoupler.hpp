@@ -158,6 +158,10 @@ public:
     /** Parameters read from IceBin config file */
     std::string output_dir;
 
+    /** Set to false and IceBin will pass a zero SMB and appropriately
+    zero B.C. to the ice sheet.  This is for testing. */
+    bool use_smb;
+
     /** Main access to the core regridding of Icebin */
     GCMRegridder gcm_regridder;
 
