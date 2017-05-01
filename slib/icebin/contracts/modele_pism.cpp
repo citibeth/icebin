@@ -115,7 +115,7 @@ static void _reconstruct_ice_ivalsI(
         pism_surface_senth(i) = surface_senth(i);
         pism_surface_temp(i) = enth.temperature(pism_surface_senth(i), P) - TF;
 
-        if (use_smb) {
+        if (gcm_coupler->use_smb) {
             // Convert specific enthalpy to T and water content
             bc_temp(i) = enth.temperature(H0, P);
             bc_watercontent(i) = enth.water_fraction(H0, P);
@@ -128,7 +128,7 @@ static void _reconstruct_ice_ivalsI(
 
 
     // Eliminate SMB if we're told to not use it.
-    if (!use_smb) {
+    if (!gcm_coupler->use_smb) {
         blitz::Array<double,1> massxfer(ice_ivalsI(
             ice_coupler->contract[INPUT].index.at("massxfer"),
             blitz::Range::all()));
