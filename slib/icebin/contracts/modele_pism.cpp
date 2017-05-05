@@ -46,32 +46,22 @@ static void _reconstruct_ice_ivalsI(
     // ------------------ Pick relevant variables out of ice input & output
 
     // --------- Inputs of this Computation
-    // surface_senth: State of top of PISM ice sheet [J kg-1]
-    blitz::Array<double,1> surface_senth(ice_coupler->ice_ovalsI(
-        ice_coupler->contract[OUTPUT].index.at("surface_senth"),
+    // ice_top_senth: State of top of PISM ice sheet [J kg-1]
+    blitz::Array<double,1> ice_top_senth(ice_coupler->ice_ovalsI(
+        ice_coupler->contract[OUTPUT].index.at("ice_top_senth"),
         blitz::Range::all()));
-    // deltah: Change in enthalpy to effect in PISM by B.C.
+    // bc_deltah: Change in enthalpy to effect in PISM by B.C.
     blitz::Array<double,1> deltah(ice_ivalsI(
         ice_coupler->contract[INPUT].index.at("deltah"),
         blitz::Range::all()));
 
-    blitz::Array<double,1> pism_surface_senth(ice_ivalsI(
-        ice_coupler->contract[INPUT].index.at("pism_surface_senth"),
-        blitz::Range::all()));
-
 
     // --------- Outputs of this Computation
-    blitz::Array<double,1> bc_senth(ice_ivalsI(
-        ice_coupler->contract[INPUT].index.at("bc_senth"),
+    blitz::Array<double,1> ice_top_bc_temp(ice_ivalsI(
+        ice_coupler->contract[INPUT].index.at("ice_top_bc_temp"),
         blitz::Range::all()));
-    blitz::Array<double,1> bc_temp(ice_ivalsI(
-        ice_coupler->contract[INPUT].index.at("bc_temp"),
-        blitz::Range::all()));
-    blitz::Array<double,1> bc_watercontent(ice_ivalsI(
-        ice_coupler->contract[INPUT].index.at("bc_watercontent"),
-        blitz::Range::all()));
-    blitz::Array<double,1> pism_surface_temp(ice_ivalsI(
-        ice_coupler->contract[INPUT].index.at("pism_surface_temp"),
+    blitz::Array<double,1> ice_top_bc_wc(ice_ivalsI(
+        ice_coupler->contract[INPUT].index.at("ice_top_bc_wc"),
         blitz::Range::all()));
 
 
@@ -101,29 +91,25 @@ static void _reconstruct_ice_ivalsI(
     pism::EnthalpyConverter enth(*ice_coupler->pism_config());
 
     for (int i=0; i<ice_coupler->nI(); ++i) {
-        double const H1 = surface_senth(i);    // [J kg-1]
-        double const Q = deltah(i) / dt;          // [W m-2]
+        double const H1 = ice_top_senth(i);    // [J kg-1]
 
-        // Specific enthalpy for the boundary condition
-        // Q/kappa: [W m-2 kg-1 s m^2] = [J kg-1]
-        double const H0 = (Q/kappa) + H1;        // [J kg-1]
-        bc_senth(i) = H0;
+        double ice_top_bc_senth;
+        if (gcm_coupler->use_smb) {
+            double const Q = deltah(i) / dt;          // [W m-2]
+
+            // Specific enthalpy for the boundary condition
+            // Q/kappa: [W m-2 kg-1 s m^2] = [J kg-1]
+            double const H0 = (Q/kappa) + H1;        // [J kg-1]
+            ice_top_bc_senth = H0;
+        } else {
+            ice_top_bc_senth = H1;
+        }
 
         // Pressure at top of PISM ice sheet; by convention, 0
         double const P = 0;
-
-        pism_surface_senth(i) = surface_senth(i);
-        pism_surface_temp(i) = enth.temperature(pism_surface_senth(i), P) - TF;
-
-        if (gcm_coupler->use_smb) {
-            // Convert specific enthalpy to T and water content
-            bc_temp(i) = enth.temperature(H0, P);
-            bc_watercontent(i) = enth.water_fraction(H0, P);
-        } else {
-            // If no SMB, then use a bland boundary condition.
-            bc_temp(i) = enth.temperature(pism_surface_senth(i), P);
-            bc_watercontent(i) = enth.water_fraction(pism_surface_senth(i), P);
-        }
+        // Convert specific enthalpy to T and water content
+        ice_top_bc_temp(i) = enth.temperature(ice_top_bc_senth, P);
+        ice_top_bc_wc(i) = enth.water_fraction(ice_top_bc_senth, P);
     }
 
 
@@ -198,28 +184,15 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
         "Mass of ice being transferred Stieglitz --> Icebin");
     ice_input.add("enthxfer", 0., "W m-2", 0,
         "Enthalpy of ice being transferred Stieglitz --> Icebin");
-    ice_input.add("gcm_bottom_temp", 0., "degC", contracts::PRIVATE,
-        "Temperature at bottom of GCM snow/firn model");
-
-
-    // Temporary variables of the ice input: not bound to PISM variables.
-    // deltah: Regridded from GCM output's deltah
-    ice_input.add("deltah", 0., "J m-2", contracts::PRIVATE,
+    ice_input.add("deltah", 0., "W m-2", contracts::PRIVATE,
         "Change of enthalpy to apply to top layer in PISM");
-    // bc_senth: Boundary condition, computed based on deltah
-    ice_input.add("bc_senth", 0., "J kg-1", contracts::PRIVATE,
-        "Enthalpy of the Dirichlet B.C. being applied to the top of the ice sheet");
-    ice_input.add("pism_surface_senth", 0., "J kg-1", contracts::PRIVATE,
-        "surface_senth output by PISM on the last timestep");
 
     // These variables are the actual boundary condition provided to PISM.
-    // They are computed based on bc_senth.
-    ice_input.add("bc_temp", 0., "K", 0,
+    // They are computed based on the above, plus OUTPUT::ice_top_bc_senth.
+    ice_input.add("ice_top_bc_temp", 0., "K", 0,
         "Temperature of the Dirichlet B.C.");
-    ice_input.add("bc_watercontent", 0., "1", 0,
+    ice_input.add("ice_top_bc_wc", 0., "1", 0,
         "Water content of the Dirichlet B.C.");
-    ice_input.add("pism_surface_temp", 0., "degC", contracts::PRIVATE,
-        "Temperature of pism_surface_senth");
 
 
     // Figure out the conversion between GCM and PISM enthalpy
@@ -253,10 +226,9 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
         gcm_coupler->gcm_outputsE.keys(),  // inputs
         gcm_coupler->scalars.keys());      // scalars
 
-    ok = ok && vt.set("massxfer", "massxfer", "by_dt", 1.0);
-    ok = ok && vt.set("enthxfer", "enthxfer", "by_dt", 1.0);
-    ok = ok && vt.set("enthxfer", "massxfer", "by_dt", enth_modele_to_pism);
-    ok = ok && vt.set("gcm_bottom_temp", "gcm_bottom_temp", UNIT, 1.0);
+    ok = ok && vt.set("massxfer", "massxfer", UNIT, 1.0);
+    ok = ok && vt.set("enthxfer", "enthxfer", UNIT, 1.0);
+    ok = ok && vt.set("enthxfer", "massxfer", UNIT, enth_modele_to_pism);
     ok = ok && vt.set("deltah", "deltah", UNIT, 1.0);
     }
 
@@ -268,14 +240,14 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
 
     standard_names["elevI"] =
-    ice_output.add("ice_surface_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
+    ice_output.add("ice_top_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
     ice_output.add("ice_thickness", nan, "m", contracts::INITIAL, "thickness of ice");
     ice_output.add("bed_topography", nan, "m", contracts::INITIAL, "topography of bedrock");
 
 
     ice_output.add("mask", nan, "", contracts::INITIAL, "PISM land surface type");
 
-    ice_output.add("surface_senth", nan, "J kg-1", contracts::INITIAL, "");
+    ice_output.add("ice_top_senth", nan, "J kg-1", contracts::INITIAL, "");
 
     ice_output.add("basal_frictional_heating", nan, "W m-2", 0, "");
     ice_output.add("strain_heating", nan, "W m-2", 0, "");
@@ -284,8 +256,6 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
 
     ice_output.add("calving.mass", nan, "kg m-2 s-1", 0, "");
     ice_output.add("calving.enth", nan, "W m-2", 0, "");
-    ice_output.add("icebin_smb.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("icebin_smb.enth", nan, "W m-2", 0, "");
     ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", 0, "");
     ice_output.add("pism_smb.enth", nan, "W m-2", 0, "");
 
@@ -319,12 +289,12 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
         ice_output.keys(),            // inputs
         gcm_coupler->scalars.keys());    // scalars
 
-    ok = ok && vtA.set("elevA", "ice_surface_elevation", UNIT, 1.0);
-    ok = ok && vtE.set("elevE", "ice_surface_elevation", UNIT, 1.0);
+    ok = ok && vtA.set("elevA", "ice_top_elevation", UNIT, 1.0);
+    ok = ok && vtE.set("elevE", "ice_top_elevation", UNIT, 1.0);
 
     // Top layer state from ice model
-    ok = ok && vtE.set("surface_senth", "surface_senth", UNIT, 1.0);
-    ok = ok && vtE.set("surface_senth", UNIT, UNIT, -enth_modele_to_pism);
+    ok = ok && vtE.set("ice_top_senth", "ice_top_senth", UNIT, 1.0);
+    ok = ok && vtE.set("ice_top_senth", UNIT, UNIT, -enth_modele_to_pism);
 
     ok = ok && vtA.set("basal_frictional_heating", "basal_frictional_heating", UNIT, 1.0);
     ok = ok && vtA.set("strain_heating", "strain_heating", UNIT, 1.0);

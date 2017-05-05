@@ -354,8 +354,8 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
 
     // Specific enthalpy (PISM-style) of the top layer
-    ix = contract[OUTPUT].index.at("surface_senth");
-        pism_ovars[ix] = &pism_ice_model->surface_senth;
+    ix = contract[OUTPUT].index.at("ice_top_senth");
+        pism_ovars[ix] = &pism_ice_model->ice_top_senth;
 
     // For MassEnergyBudget variables that have a contract name specified,
     // link them up into pism_ovars now.
