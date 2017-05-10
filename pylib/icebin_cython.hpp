@@ -55,6 +55,10 @@ extern PyObject *CythonWeightedSparse_apply(
     PyObject *A_s_py,
     double fill);            // A_b{nj_s} One row per variable
 
+
+PyObject *CythonWeightedSparse_dense_extent(CythonWeightedSparse const *cself);
+PyObject *CythonWeightedSparse_sparse_extent(CythonWeightedSparse const *cself);
+
 PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself);
 
 void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,

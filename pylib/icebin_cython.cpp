@@ -177,6 +177,21 @@ extern PyObject *CythonWeightedSparse_apply(
     return B_s_py;
 }
 
+PyObject *CythonWeightedSparse_dense_extent(CythonWeightedSparse const *cself)
+{
+    return Py_BuildValue("ll",
+        (long)cself->dims[0].dense_extent(),
+        (long)cself->dims[1].dense_extent());
+}
+
+PyObject *CythonWeightedSparse_sparse_extent(CythonWeightedSparse const *cself)
+{
+    return Py_BuildValue("ll",
+        (long)cself->dims[0].sparse_extent(),
+        (long)cself->dims[1].sparse_extent());
+}
+
+
 PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself)
 {
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices

@@ -27,9 +27,24 @@ np.import_array()
 import scipy.sparse
 from cython.operator cimport dereference as deref, preincrement as inc
 from libcpp cimport bool
+import functools
+import operator
 
 cdef class IceRegridder:
     pass
+
+
+cdef split_shape(ashape, alen):
+    # See if we can find some set of dimensions matching ilen
+    cumlen = np.cumprod(tuple(reversed(ashape)))
+    try:
+        icut = len(ashape) - 1 - next(i for i,x in enumerate(cumlen) if x==alen)
+    except StopIteration:
+        raise ValueError('Cannot find trailing dimension of {} in input of shape {}'.format(alen, ashape)) from None
+
+    return ashape[0:icut], (
+        functools.reduce(operator.mul, ashape[0:icut], 1),
+        functools.reduce(operator.mul, ashape[icut:], 1))
 
 
 cdef class WeightedSparse:
@@ -50,7 +65,6 @@ cdef class WeightedSparse:
                 Weight vector ("area" of input grid cells)
        """
 
-        cdef cicebin.CythonWeightedSparse *xcself
         wM, (data,shape), Mw = cicebin.CythonWeightedSparse_to_tuple(self.cself)
         return wM, scipy.sparse.coo_matrix(data, shape), Mw
 
@@ -63,18 +77,14 @@ cdef class WeightedSparse:
         fill:
             Un-set indices in output array will get this value."""
 
-        rank = len(A_s.shape)
-        if rank == 1:
-            A_s = A_s.reshape((1,A_s.shape[0]))
-        elif rank == 2:
-            pass
-        else:
-            raise ValueError('A_s must be of rank 1 or 2')
+        # Number of elements in sparse in put vector
+        _,alen = cicebin.CythonWeightedSparse_sparse_extent(self.cself)
 
+        leading_shape, new_shape = split_shape(A_s.shape, alen)
+        A_s = A_s.reshape(new_shape)
         B_s = cicebin.CythonWeightedSparse_apply(self.cself, <PyObject *>A_s, fill)
 
-        if rank == 1:
-            B_s = B_s.reshape((B_s.shape[1],))
+        B_s = B_s.reshape( leading_shape + (B_s.shape[1],) )
 
         return B_s
 

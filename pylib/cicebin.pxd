@@ -90,6 +90,8 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         RegridMatrices *self, string spec_name, bool scale, bool correctA,
         double sigma_x, double sigma_y, double sigma_z, bool conserve) except +
 
+    cdef object CythonWeightedSparse_dense_extent(CythonWeightedSparse *self) except +
+    cdef object CythonWeightedSparse_sparse_extent(CythonWeightedSparse *self) except +
     cdef object CythonWeightedSparse_to_tuple(CythonWeightedSparse *self) except +
 
     cdef object CythonWeightedSparse_apply(CythonWeightedSparse *BvA, PyObject *A, double fill) except +
