@@ -256,6 +256,11 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
 
     ice_output.add("calving.mass", nan, "kg m-2 s-1", 0, "");
     ice_output.add("calving.enth", nan, "W m-2", 0, "");
+    // Pass-through from input.  But because we compute with it,
+    // let's store it in output so we can see it.
+    ice_output.add("smb.mass", nan, "kg m-2 s-1", 0, "");
+    ice_output.add("smb.enth", nan, "W m-2", 0, "");
+    // Computed while running PISM; should be the same
     ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", 0, "");
     ice_output.add("pism_smb.enth", nan, "W m-2", 0, "");
 

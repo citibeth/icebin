@@ -285,16 +285,16 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     // We don't really use this, but we do need to store and pass through for conservation computations
     ix = contract[INPUT].index.at("massxfer");        // [kg m-2 s-1]
-        pism_ivars[ix] = &pism_surface_model->icebin_massxfer;
+        pism_ivars[ix] = &pism_surface_model->massxfer;
 
     // Ignore surface_temp, it is not useful...
     ix = contract[INPUT].index.at("enthxfer");
-        pism_ivars[ix] = &pism_surface_model->icebin_enthxfer;
+        pism_ivars[ix] = &pism_surface_model->enthxfer;
 
-    ix = contract[INPUT].index.at("bc_temp");
-        pism_ivars[ix] = &pism_surface_model->icebin_bc_temp;
-    ix = contract[INPUT].index.at("bc_watercontent");
-        pism_ivars[ix] = &pism_surface_model->icebin_bc_waterfraction;
+    ix = contract[INPUT].index.at("ice_top_bc_temp");
+        pism_ivars[ix] = &pism_surface_model->ice_top_bc_temp;
+    ix = contract[INPUT].index.at("ice_top_bc_wc");
+        pism_ivars[ix] = &pism_surface_model->ice_top_bc_wc;
 
 
 
@@ -339,11 +339,8 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     // -------------- Link to PISM-format output variables, used to fill ovars
     pism_ovars.resize(contract[OUTPUT].size(), NULL);
-    ix = contract[OUTPUT].index.at("ice_surface_elevation");       // Elevation of top surface of ice sheet
+    ix = contract[OUTPUT].index.at("ice_top_elevation");       // Elevation of top surface of ice sheet
         pism_ovars[ix] = &pism_ice_model->ice_surface_elevation(); // see PISM's iceModel.hh
-
-    ix = contract[OUTPUT].index.at("ice_surface_elevation");
-        pism_ovars[ix] = &pism_ice_model->ice_surface_elevation();
     ix = contract[OUTPUT].index.at("ice_thickness");
         pism_ovars[ix] = &pism_ice_model->ice_thickness();
     ix = contract[OUTPUT].index.at("bed_topography");
