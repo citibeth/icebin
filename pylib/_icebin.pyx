@@ -123,6 +123,7 @@ cdef class GCMRegridder:
     def __init__(self, *args):
         cdef ibmisc.NcIO ncio
 
+        # Create a brand new GCMRegridder
         try:
             gridA_fname, gridA_vname, hcdefs, correctA = args
             cicebin.GCMRegridder_init(&self.cself, gridA_fname.encode(), gridA_vname.encode(), hcdefs, correctA)
@@ -130,6 +131,7 @@ cdef class GCMRegridder:
         except:
             pass
 
+        # Load an existing GCMRegridder from disk
         (regridder_fname,) = args
         ncio = ibmisc.NcIO(regridder_fname, 'read')
         self.ncio(ncio, str('m'))

@@ -218,6 +218,11 @@ public:
 
     IceRegridder();
     void clear();
+
+    /**
+    @param elevI The elevation of each (unmasked) ice grid cell.
+    Indicate a masked-out grid cell with elevI[i] = NaN
+    */
     void init(
         std::string const &_name,
         std::unique_ptr<Grid> &&_gridI,
