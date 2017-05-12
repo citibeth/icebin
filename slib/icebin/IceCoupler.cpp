@@ -151,6 +151,23 @@ static Eigen::VectorXd to_col_vector(blitz::Array<double,1> const &vec)
     for (int i=vec.lbound(0), j=0; i <= vec.ubound(0); ++i,++j) ret(j) = vec(i);
     return ret;
 }
+
+#if 0
+static void mask_result(EigenDenseMatrixT &ret, blitz::Array<double,1> const &wB_b, double fill)
+{
+    int nB = ret.rows();    // == wB_b.extent(0)
+    int nvar = ret.cols();
+
+    // Mask out cells that slipped into the output because they were
+    // in the SparseSet; but don't actually get any contribution.
+    for (int i=0; i<nB; ++i) {
+        if (wB_b(i) != 0.) continue;
+printf("wB_b-%d = %f\n", wB_b(i));
+        for (int n=0; n<nvar; ++n) ret(i,n) = fill;
+    }
+
+}
+#endif
 // -----------------------------------------------------------
 blitz::Array<double,2> IceCoupler::construct_ice_ivalsI(
 blitz::Array<double,2> const &gcm_ovalsE0,
@@ -184,8 +201,11 @@ ibmisc::TmpAlloc &tmp)
         gcm_ovalsE0.extent(1), gcm_ovalsE0.extent(0));
 
     // Ice inputs calculated as the result of a matrix multiplication
+    // ice_ivalsI_e is |i| x |k|
     ice_ivalsI_e = (*IvE0) * (
         gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
+
+//mask_result(ice_ivalsI_e, wIvE0, 17.0);
 
     // Alias the Eigen matrix to blitz array
     blitz::Array<double,2> ice_ivalsI(
@@ -193,6 +213,22 @@ ibmisc::TmpAlloc &tmp)
         blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
         blitz::neverDeleteData);
 
+
+
+#if 0
+// Mask out the nullsapce of IvE0
+blitz::Array<int,1> keep(nI());
+keep = 0;
+for (auto ii(begin(*IvE0)); ii != end(*IvE0); ++ii) {
+    keep(ii->row()) = 1;
+}
+double const fill = 0;
+int nvar = ice_ivalsI.extent(0);
+for (int i=0; i<nvar; ++i) {
+for (int j=0; j<nI(); ++j) {
+    if (!keep(j)) ice_ivalsI(i,j) = fill;
+}}
+#endif
 
     // Continue construction in a contract-specific manner
     reconstruct_ice_ivalsI(ice_ivalsI, dt);
@@ -285,6 +321,7 @@ bool run_ice)
     ice_regridder->set_elevI(elevI);
     RegridMatrices rm(ice_regridder);
     RegridMatrices::Params regrid_params(true, true, {0,0,0});
+    RegridMatrices::Params regrid_params_nc(true, false, {0,0,0});    // correctA=False
 
     SparseSetT dimA1;
     SparseSetT dimE1;
@@ -311,12 +348,12 @@ bool run_ice)
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
-    auto E1vI(rm.matrix("EvI", {&dimE1, &dimI}, regrid_params));
+    auto E1vI_nc(rm.matrix("EvI", {&dimE1, &dimI}, regrid_params_nc));
 
     // Don't do this on the first round, since we don't yet have an IvE0
     if (run_ice) {
         TupleListLT<2> &out_E1vE0_s(out.E1vE0_s);
-        EigenSparseMatrixT E1vE0(*E1vI->M * *IvE0);
+        EigenSparseMatrixT E1vE0(*E1vI_nc->M * *IvE0);
         spcopy(
             accum::to_sparse(make_array(&dimE1, &dimE0),
             accum::ref(out_E1vE0_s)),
@@ -329,7 +366,7 @@ bool run_ice)
     auto A1vI(rm.matrix("AvI", {&dimA1, &dimI}, regrid_params));
 
     // Do it once for _E variables and once for _A variables.
-    std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI};
+    std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI_nc};
     for (int iAE=0; iAE < GridAE::count; ++iAE) {
 
         // Assuming column-major matrices...
@@ -361,13 +398,15 @@ bool run_ice)
             }
         }
         for (int j=0; j<ice_ovalsI_e.cols(); ++j) {
-        for (int i=0; i<ice_ovalsI_e.rows(); ++i) {
-            auto val(ice_ovalsI_e(i,j));
-            if (std::isnan(val)) {
-                printf("nan found: ice_ovalsI_e[%d, %d] = %g\n", i, j, val);
-                hasnan = true;
+            if (contract[OUTPUT][j].flags & contracts::ALLOW_NAN) continue;
+            for (int i=0; i<ice_ovalsI_e.rows(); ++i) {
+                auto val(ice_ovalsI_e(i,j));
+                if (std::isnan(val)) {
+                    printf("nan found: ice_ovalsI_e[%d, %d] = %g\n", i, j, val);
+                    hasnan = true;
+                }
             }
-        }}
+        }
         for (auto ii(begin(gcmi_v_iceo_T.M)); ii != end(gcmi_v_iceo_T.M); ++ii) {
             if (std::isnan(ii->value())) {
                 printf("nan found: gcmi_v_iceo_T.M[%d, %d] = %g\n", ii->row(), ii->col(), ii->value());
@@ -400,12 +439,13 @@ bool run_ice)
                 vals[nn] = gcm_ivalsX(jj,nn);
             out.gcm_ivalsAE_s[iAE].add(jj_s, vals);
         }
-    }
+    }        // iAE
 
     // Compute IvE (for next timestep)
     auto IvE1(rm.matrix("IvE", {&dimI, &dimE1}, regrid_params));
     dimE0 = std::move(dimE1);
     IvE0 = std::move(IvE1->M);
+    // wIvE0.reference(IvE1->wM);
 
     printf("END IceCoupler::couple(%s)\n", name().c_str());
 }

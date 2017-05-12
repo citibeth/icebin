@@ -348,6 +348,9 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     ix = contract[OUTPUT].index.at("mask");
         pism_ovars[ix] = &pism_ice_model->cell_type();
+    ix = contract[OUTPUT].index.at("elevI");
+        pism_ovars[ix] = &pism_ice_model->elevI;
+
 
 
     // Specific enthalpy (PISM-style) of the top layer

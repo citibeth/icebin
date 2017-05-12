@@ -51,6 +51,7 @@ public:
     // Densified regridding matrix, and dimension, from previous call
     // Used to interpret GCM output
     std::unique_ptr<EigenSparseMatrixT> IvE0;
+    // DenseArrayT<1> wIvE0;    // Provides the mask for I; for debugging only.
     SparseSetT dimE0;
 
     // Output of ice model from the last time we coupled.

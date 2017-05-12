@@ -234,18 +234,25 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
 
     // ============== Ice -> GCM
     VarSet &ice_output(ice_coupler->contract[IceCoupler::OUTPUT]);
+    // Rename certain outputs with "standard" names that other parts of the
+    // coupling can count on, regardless of specifics of this ice model.
+    // Example of use:
+    //    standard_names["elevI"] =
+    //    ice_output.add("ice_top_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
     auto &standard_names(ice_coupler->standard_names[IceCoupler::OUTPUT]);
 
     // All these outputs are on the ICE grid.
     // Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
 
-    standard_names["elevI"] =
     ice_output.add("ice_top_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
     ice_output.add("ice_thickness", nan, "m", contracts::INITIAL, "thickness of ice");
     ice_output.add("bed_topography", nan, "m", contracts::INITIAL, "topography of bedrock");
 
-
     ice_output.add("mask", nan, "", contracts::INITIAL, "PISM land surface type");
+
+    standard_names["elevI"] =
+    ice_output.add("elevI", nan, "", contracts::INITIAL | contracts::ALLOW_NAN,
+        "Elevation; nan for grid cells off ice sheet.");
 
     ice_output.add("ice_top_senth", nan, "J kg-1", contracts::INITIAL, "");
 
@@ -281,7 +288,7 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // ------- Variable and unit conversions, GCM <- Ice
     {
     VarTransformer &vtA(ice_coupler->var_trans_outAE[GridAE::A]);
-    VarTransformer &vtE(ice_coupler->var_trans_outAE[GridAE::E]);
+    VarTransformer &vtE_nc(ice_coupler->var_trans_outAE[GridAE::E]);    // _nc ==> correctA=False
 
     // NOTE: coupler->gcm_inputs is set up through calls to add_gcm_input_xx() in LANDICE_COM.f
     vtA.set_dims(
@@ -289,17 +296,20 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
         ice_output.keys(),            // inputs
         gcm_coupler->scalars.keys());    // scalars
 
-    vtE.set_dims(
+    vtE_nc.set_dims(
         gcm_coupler->gcm_inputsAE[GridAE::E].keys(),    // outputs
         ice_output.keys(),            // inputs
         gcm_coupler->scalars.keys());    // scalars
 
-    ok = ok && vtA.set("elevA", "ice_top_elevation", UNIT, 1.0);
-    ok = ok && vtE.set("elevE", "ice_top_elevation", UNIT, 1.0);
+    // Commented out because this needs to be regridded with correctA=False
+    // For that, we need to add a third segment to GridAE.  For now, that's
+    // just not worth the effort.
+    // ok = ok && vtA.set("elevA", "elevI", UNIT, 1.0);
+    ok = ok && vtE_nc.set("elevE", "elevI", UNIT, 1.0);
 
     // Top layer state from ice model
-    ok = ok && vtE.set("ice_top_senth", "ice_top_senth", UNIT, 1.0);
-    ok = ok && vtE.set("ice_top_senth", UNIT, UNIT, -enth_modele_to_pism);
+    ok = ok && vtE_nc.set("ice_top_senth", "ice_top_senth", UNIT, 1.0);
+    ok = ok && vtE_nc.set("ice_top_senth", UNIT, UNIT, -enth_modele_to_pism);
 
     ok = ok && vtA.set("basal_frictional_heating", "basal_frictional_heating", UNIT, 1.0);
     ok = ok && vtA.set("strain_heating", "strain_heating", UNIT, 1.0);
