@@ -205,8 +205,6 @@ ibmisc::TmpAlloc &tmp)
     ice_ivalsI_e = (*IvE0) * (
         gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
 
-//mask_result(ice_ivalsI_e, wIvE0, 17.0);
-
     // Alias the Eigen matrix to blitz array
     blitz::Array<double,2> ice_ivalsI(
         ice_ivalsI_e.data(),
@@ -278,7 +276,7 @@ bool run_ice)
     // ------------- Form gcm_ovalsE0
     // Densify gcm_ovalsE_s --> gcm_ovalsE
     // This should ONLY involve iE already mentioned in IvE0;
-    // if not, there will be an exception.
+    // if not, ibmisc_error() will be called inside to_dense()
     blitz::Array<double,2> gcm_ovalsE0(gcm_coupler->gcm_outputsE.size(), dimE0.dense_extent());
     gcm_ovalsE0 = 0;
     for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
@@ -329,21 +327,20 @@ bool run_ice)
     auto dimI(id_sparse_set<SparseSetT>(nI()));
 
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
-    {
-        // Adds to dimA1 and dimE1
-        auto AvE1(rm.matrix("AvE", {&dimA1, &dimE1}, regrid_params));
 
-        spcopy(
-            accum::to_sparse(AvE1->dims,
-            accum::ref(out.AvE1_s)),
-            *AvE1->M);
+    // Adds to dimA1 and dimE1
+    auto AvE1(rm.matrix("AvE", {&dimA1, &dimE1}, regrid_params));
 
-        TupleListLT<1> &out_wAvE1_s(out.wAvE1_s);    // Get around bug in gcc@4.9.3
-        spcopy(
-            accum::to_sparse(make_array(AvE1->dims[0]),
-            accum::ref(out_wAvE1_s)),
-            AvE1->wM);    // blitz::Array<double,1>
-    }
+    spcopy(
+        accum::to_sparse(AvE1->dims,
+        accum::ref(out.AvE1_s)),
+        *AvE1->M);
+
+    TupleListLT<1> &out_wAvE1_s(out.wAvE1_s);    // Get around bug in gcc@4.9.3
+    spcopy(
+        accum::to_sparse(make_array(AvE1->dims[0]),
+        accum::ref(out_wAvE1_s)),
+        AvE1->wM);    // blitz::Array<double,1>
 
 
     // ------ Update E1vE0 translation between old and new elevation classes
@@ -443,9 +440,29 @@ bool run_ice)
 
     // Compute IvE (for next timestep)
     auto IvE1(rm.matrix("IvE", {&dimI, &dimE1}, regrid_params));
+    // wIvE0.reference(IvE1->wM);
+
+
+    // Record our matrices for posterity
+    {auto fname(
+        boost::filesystem::path(output_dir) / 
+        ("regrids-" + gcm_coupler->sdate(time_s) + ".nc"));
+    NcIO ncio(fname.string(), NcFile::replace);
+
+        // Write matrices as their dense subspace versions, not the sparsified versions.
+        dimI.ncio(ncio, "dimI");
+        dimA1.ncio(ncio, "dimA");
+        dimE1.ncio(ncio, "dimE");
+
+        AvE1->ncio(ncio, "AvE", {"dimA", "dimE"});
+        E1vI_nc->ncio(ncio, "EvI_nc", {"dimE", "dimI"});
+        A1vI->ncio(ncio, "AvI", {"dimA", "dimI"});
+        IvE1->ncio(ncio, "IvE", {"dimI", "dimE"});
+    }
+
+    // Save stuff for next time around
     dimE0 = std::move(dimE1);
     IvE0 = std::move(IvE1->M);
-    // wIvE0.reference(IvE1->wM);
 
     printf("END IceCoupler::couple(%s)\n", name().c_str());
 }

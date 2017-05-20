@@ -101,6 +101,15 @@ GCMCoupler::GCMCoupler(Type _type, GCMParams &&_gcm_params) :
 }
 
 
+/** Produces a date string in format YYMMDD */
+std::string GCMCoupler::sdate(double time_s) const
+{
+    ibmisc::Datetime dt(time_unit.to_datetime(time_s));
+    return (boost::format
+        ("%04d%02d%02d") % dt[0] % dt[1] % dt[2]).str();
+}
+
+
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
     std::string const &config_fname,        // comes from this->gcm_params
@@ -198,10 +207,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     std::array<double,2> timespan{last_time_s, time_s};
 
     // Figure out our calendar day to format filenames
-    ibmisc::Datetime dt(time_unit.to_datetime(time_s));
-
-    std::string sdate = (boost::format
-        ("%04d%02d%02d") % dt[0] % dt[1] % dt[2]).str();
+    auto sdate(this->sdate(time_s));
     std::string log_dir = "icebin";
 
     if (gcm_params.icebin_logging) {
@@ -372,7 +378,7 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
             gcm_regridder.indexing(iAE), vname_base);
     }
 
-    ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"Ev1Ev0");
+    ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"E1vE0");
     ncio_spsparse(ncio, out.AvE1_s, false, vname_base+"AvE1");
     ncio_spsparse(ncio, out.wAvE1_s, false, vname_base+"wAvE1");
 }

@@ -203,6 +203,9 @@ public:
     GCMCoupler(Type _type, GCMParams &&_params);
     virtual ~GCMCoupler() {}
 
+    /** Produces a date string in format YYMMDD */
+    std::string sdate(double time_s) const;
+
     bool am_i_root() const { return gcm_params.am_i_root(); }
 
     virtual void ncread(
