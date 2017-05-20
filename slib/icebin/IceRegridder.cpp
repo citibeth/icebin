@@ -587,4 +587,36 @@ EigenDenseMatrixT WeightedSparse::apply(
     return ret;
 }
 
+void WeightedSparse::ncio(ibmisc::NcIO &ncio,
+    std::string const &vname,
+    std::array<std::string,2> dim_names)
+{
+
+    auto ncdims(ibmisc::get_or_add_dims(ncio,
+        {dim_names[0] + ".dense_extent", dim_names[1] + ".dense_extent"},
+        {dims[0]->dense_extent(), dims[1]->dense_extent()}));
+
+    // ----------- wM
+    std::string matrix_name(dim_names[0] + "v" + dim_names[1]);
+    ncio_blitz<double,1>(ncio, wM, true,
+        vname + ".wM",
+        {ncdims[0]});
+
+    // --------- M
+    ncio_eigen(ncio, *M,
+        vname + ".M");
+
+    netCDF::NcVar ncvar = ncio.nc->getVar(vname + ".M.info");
+    get_or_put_att(ncvar, ncio.rw,
+        "smooth", get_nc_type<bool>(), &smooth, 1);
+    get_or_put_att(ncvar, ncio.rw,
+        "conserve", get_nc_type<bool>(), &conserve, 1);
+
+    // ---- Mw
+    ncio_blitz<double,1>(ncio, Mw, true,
+        vname + ".Mw",
+        {ncdims[1]});
+}
+
+
 } // namespace
