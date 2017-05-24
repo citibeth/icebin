@@ -154,9 +154,10 @@ extern PyObject *CythonWeightedSparse_apply(
     }
 
     // Apply...
-    auto B_d_eigen(BvA->RM->apply(A_d));    // Column major indexing
+    auto B_d_eigen(BvA->RM->apply_e(A_d));    // Column major indexing
 
     // Allocate output vector and get a Blitz view
+    // We will copy from the Eigen data structure to the Python
     PyObject *B_s_py = ibmisc::cython::new_pyarray<double,2>(
         std::array<int,2>{n_n, bdim.sparse_extent()});
     auto B_s(np_to_blitz<double,2>(B_s_py, "B_s_py", {-1,-1}));

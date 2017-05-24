@@ -529,7 +529,7 @@ static void mask_result(EigenDenseMatrixT &ret, blitz::Array<double,1> const &wB
 
 }
 
-EigenDenseMatrixT WeightedSparse::apply(
+EigenDenseMatrixT WeightedSparse::apply_e(
     // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
     blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
     double fill) const    // Fill value for cells not in BvA matrix

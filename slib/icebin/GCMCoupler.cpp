@@ -72,12 +72,11 @@ GCMParams::GCMParams(MPI_Comm _gcm_comm, int _gcm_root) :
     MPI_Comm_rank(gcm_comm, &gcm_rank);
 }
 
-HCSegmentData &GCMParams::ec_segment()
+HCSegmentData &GCMParams::segment(std::string const &name)
 {
-    auto &ec(hc_segments[hc_segments.size()-1]);
-    if (ec.name != "ec") (*icebin_error)(-1,
-        "The last elevation class segment must be called 'ec'");
-    return ec;
+    for (size_t i=0; i<hc_segments.size(); ++i)
+        if (hc_segments[i].name == name) return hc_segments[i];
+    (*icebin_error)(-1, "Cannot find segment named %s", name.c_str());
 }
 
 // ==========================================================

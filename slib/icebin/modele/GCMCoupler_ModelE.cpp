@@ -193,7 +193,7 @@ int GCMCoupler_ModelE::_read_nhc_gcm()
     int nhc_ice = ncio.nc->getDim("m.nhc").getSize();
 
     // Find the "ec" segment and set its size now...
-    auto &ec(this->gcm_params.ec_segment());
+    auto &ec(this->gcm_params.segment("ec"));
     ec.size = nhc_ice;
     return ec.base + ec.size;
 
@@ -506,7 +506,6 @@ printf("END gcmce_couple_native() every_outs\n");
         boost::mpi::gather(self->gcm_params.world, gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Let root do the work...
-        // TODO... we must call through MPI so ice model can do MPI scatter/gathers..
         self->couple(time_s, gcm_ovalsE_s, run_ice);
 
         // Receive our output back from root

@@ -85,12 +85,41 @@ struct WeightedSparse {
     In the face of smoothing, it also compensates for non-conservation in
     smoothB.
 
+        |i| = Size of B vector space
+        |j| = Size of A vector space
+        |n| = Number of vectors being transformed
+
     @param A The values to regrid, as a series of Eigen column vectors.
     */
-    EigenDenseMatrixT apply(
+    EigenDenseMatrixT apply_e(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
         blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
         double fill = std::numeric_limits<double>::quiet_NaN()) const;    // Fill value for cells not in BvA matrix
+
+
+    /** Apply to multiple variables */
+    blitz::Array<double,2> apply(
+        // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+        blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
+        double fill = std::numeric_limits<double>::quiet_NaN(),    // Fill value for cells not in BvA matrix
+        TmpAlloc &tmp) const
+    {
+        return to_blitz(apply_e(A_b, fill), tmp);
+    }
+
+
+    /** Apply to a single variable */
+    blitz::Array<double,1> apply(
+        // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+        blitz::Array<double,1> const &A_b,       // A_b{j} One variable
+        double fill = std::numeric_limits<double>::quiet_NaN(),    // Fill value for cells not in BvA matrix
+        TmpAlloc &tmp) const
+    {
+        auto A_b2(reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
+        auto ret2(to_blitz(apply_e(A_b2, fill), tmp));
+        return reshape<double,2,1>(ret2, {ret2.shape()[1]});
+    }
+
 
     /** Read/write to NetCDF */
     void ncio(ibmisc::NcIO &ncio,
