@@ -22,6 +22,7 @@
 #include <functional>
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
+#include <ibmisc/memory.hpp>
 #include <spsparse/eigen.hpp>
 
 #include <icebin/Grid.hpp>
@@ -101,10 +102,10 @@ struct WeightedSparse {
     blitz::Array<double,2> apply(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
         blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-        double fill = std::numeric_limits<double>::quiet_NaN(),    // Fill value for cells not in BvA matrix
-        TmpAlloc &tmp) const
+        double fill,    // Fill value for cells not in BvA matrix
+        ibmisc::TmpAlloc &tmp) const
     {
-        return to_blitz(apply_e(A_b, fill), tmp);
+        return spsparse::to_blitz<double>(apply_e(A_b, fill), tmp);
     }
 
 
@@ -112,12 +113,12 @@ struct WeightedSparse {
     blitz::Array<double,1> apply(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
         blitz::Array<double,1> const &A_b,       // A_b{j} One variable
-        double fill = std::numeric_limits<double>::quiet_NaN(),    // Fill value for cells not in BvA matrix
-        TmpAlloc &tmp) const
+        double fill,    // Fill value for cells not in BvA matrix
+        ibmisc::TmpAlloc &tmp) const
     {
-        auto A_b2(reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
-        auto ret2(to_blitz(apply_e(A_b2, fill), tmp));
-        return reshape<double,2,1>(ret2, {ret2.shape()[1]});
+        auto A_b2(ibmisc::reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
+        auto ret2(spsparse::to_blitz(apply_e(A_b2, fill), tmp));
+        return ibmisc::reshape<double,2,1>(ret2, {ret2.shape()[1]});
     }
 
 
@@ -263,12 +264,12 @@ public:
         std::unique_ptr<Grid> &&_gridI,
         std::unique_ptr<Grid> &&_exgrid,
         InterpStyle _interp_style,
-        DenseArrayT<1> &elevI);
+        DenseArrayT<1> const &elevI);
 
     virtual ~IceRegridder();
 
     void set_elevI(DenseArrayT<1> const &_elevI)
-        { elevI = _elevI; }
+        { elevI = _elevI; }        // Copies
 
     // ------------------------------------------------
     /** Number of dimensions of ice vector space */

@@ -145,7 +145,7 @@ void GCMCoupler::ncread(
     std::string segments;
     get_or_put_att(config_info, ncio_config.rw, "segments", segments);
     gcm_params.hc_segments = parse_hc_segments(segments);
-    gcm_params.icebin_base_hc = gcm_params.ec_segment().base;
+    gcm_params.icebin_base_hc = gcm_params.segment("ec").base;
 
     ice_couplers.clear();
     for (size_t i=0; i < gcm_regridder.ice_regridders.size(); ++i) {

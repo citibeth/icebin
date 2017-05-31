@@ -174,7 +174,7 @@ extern "C"
 void gcmce_hc_params(GCMCoupler_ModelE *self, int &nhc_gcm, int &icebin_base_hc, int &nhc_ice)
 {
     nhc_gcm = self->nhc_gcm();
-    icebin_base_hc = self->gcm_params.ec_segment().base;
+    icebin_base_hc = self->gcm_params.segment("ec").base;
     nhc_ice = self->gcm_regridder.nhc(0);
 }
 

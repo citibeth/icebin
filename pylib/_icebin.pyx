@@ -60,7 +60,7 @@ cdef class WeightedSparse:
             wM: np.array
                 Weight vector ("area" of output grid cells)
             M: scipy.sparse.coo_matrix
-                Unscaled regridding matrix (i.e. produces [kg] not [kg m-2])
+               Regridding Matrix
             Mw: np.array
                 Weight vector ("area" of input grid cells)
        """
@@ -156,7 +156,15 @@ cdef class GCMRegridder:
             interp_style.encode(),
             <PyObject *>elevI)   # Borrowed references
 
-    def regrid_matrices(self, str sheet_name):
+    def set_elevI(self, name, elevI):
+        elevI = elevI.reshape(-1)
+        cicebin.GCMRegridder_set_elevI(&self.cself,
+            name.encode(), <PyObject *>elevI)    # Borrowed references
+
+    def regrid_matrices(self, str sheet_name, elevI=None):
+        if elevI is not None:
+            elevI = elevI.reshape(-1)
+
         cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
             self.cself.ice_regridder(sheet_name.encode()))
         rm = RegridMatrices()

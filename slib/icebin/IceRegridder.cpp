@@ -93,7 +93,7 @@ void IceRegridder::init(
     std::unique_ptr<Grid> &&_gridI,
     std::unique_ptr<Grid> &&_exgrid,
     InterpStyle _interp_style,
-    blitz::Array<double,1> &_elevI)
+    blitz::Array<double,1> const &_elevI)
 {
     _name = (name != "" ? name : gridI->name);
     gridI = std::move(_gridI);

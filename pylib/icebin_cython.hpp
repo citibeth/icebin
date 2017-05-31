@@ -32,11 +32,16 @@ extern void GCMRegridder_init(GCMRegridder *cself,
     bool _correctA);
 
 extern void GCMRegridder_add_sheet(GCMRegridder *cself,
-    std::string name,
+    std::string const &name,
     std::string const &gridI_fname, std::string const &gridI_vname,
     std::string const &exgrid_fname, std::string const &exgrid_vname,
     std::string const &sinterp_style,
     PyObject *elevI_py);
+
+extern void GCMRegridder_set_elevI(GCMRegridder *cself,
+    std::string const &name,
+    PyObject *elevI_py);
+
 
 /** Wraps WeightedSparse to keep around the dense/sparse dimension
     translators */

@@ -131,7 +131,7 @@ struct GCMParams {
 
 
     GCMParams(MPI_Comm _gcm_comm, int _gcm_root);
-    HCSegmentData const &segment(std::string const &name) const;
+    HCSegmentData &segment(std::string const &name);
 };
 // =============================================================================
 class GCMCoupler {
@@ -178,7 +178,7 @@ public:
     }
 
     long nE_gcm()
-        { return gcm_regridder->nA() * nhc_gcm(); }
+        { return gcm_regridder.nA() * nhc_gcm(); }
 
 protected:
     virtual int _read_nhc_gcm() = 0;

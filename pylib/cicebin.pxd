@@ -86,6 +86,11 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         string &sinterp_style,
         PyObject *elevI_py) except +        # PyObject=Borrowed reference, object = owned reference
 
+    cdef void GCMRegridder_set_elevI(
+        GCMRegridder *cself,
+        string &name,
+        PyObject *elevI_py) except +        # PyObject=Borrowed reference, object = owned reference
+
     cdef CythonWeightedSparse *RegridMatrices_matrix(
         RegridMatrices *self, string spec_name, bool scale, bool correctA,
         double sigma_x, double sigma_y, double sigma_z, bool conserve) except +
