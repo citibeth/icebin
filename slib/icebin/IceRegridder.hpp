@@ -268,8 +268,7 @@ public:
 
     virtual ~IceRegridder();
 
-    void set_elevI(DenseArrayT<1> const &_elevI)
-        { elevI = _elevI; }        // Copies
+    void set_elevI(DenseArrayT<1> const &_elevI);
 
     // ------------------------------------------------
     /** Number of dimensions of ice vector space */

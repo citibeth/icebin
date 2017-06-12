@@ -22,6 +22,12 @@ IceRegridder::~IceRegridder() {}
 
 
 
+// -------------------------------------------------------------
+void IceRegridder::set_elevI(DenseArrayT<1> const &_elevI)
+{
+    elevI = _elevI;        // Copies
+}
+// -------------------------------------------------------------
 // ==============================================================
 // Different vector spaces:
 //      Description                    Domain
@@ -449,12 +455,14 @@ void RegridMatrices::add_regrid(std::string const &spec,
 // ----------------------------------------------------------------
 RegridMatrices::RegridMatrices(IceRegridder *regridder)
 {
+#if 0
     printf("===== RegridMatrices Grid geometries:\n");
     printf("    nA = %d\n", regridder->gcm->nA());
     printf("    nhc = %d\n", regridder->gcm->nhc());
     printf("    nE = %d\n", regridder->gcm->nE());
     printf("    nI = %d\n", regridder->nI());
     printf("    nG = %d\n", regridder->nG());
+#endif
 
     UrAE urA(regridder->gcm->nA(),
         std::bind(&IceRegridder::GvAp, regridder, _1),
@@ -486,12 +494,15 @@ RegridMatrices::RegridMatrices(IceRegridder *regridder)
     add_regrid("AvE", nullptr,
         std::bind(&compute_EvA, regridder, _1, _2, urA, urE));
 
+#if 0
     // ----- Show what we have!
     printf("Available Regrids:");
     for (auto ii = regrids.begin(); ii != regrids.end(); ++ii) {
         printf(" %s", ii->first.c_str());
     }
     printf("\n");
+#endif
+
 }
 // ----------------------------------------------------------------
 std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
@@ -603,6 +614,7 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
         {ncdims[0]});
 
     // --------- M
+#if 1
     ncio_eigen(ncio, *M,
         vname + ".M");
 
@@ -611,6 +623,7 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
         "smooth", get_nc_type<bool>(), &smooth, 1);
     get_or_put_att(ncvar, ncio.rw,
         "conserve", get_nc_type<bool>(), &conserve, 1);
+#endif
 
     // ---- Mw
     ncio_blitz<double,1>(ncio, Mw, true,
