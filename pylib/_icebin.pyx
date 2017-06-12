@@ -156,15 +156,12 @@ cdef class GCMRegridder:
             interp_style.encode(),
             <PyObject *>elevI)   # Borrowed references
 
-    def set_elevI(self, name, elevI):
+    def set_elevI(self, sheet_name, elevI):
         elevI = elevI.reshape(-1)
         cicebin.GCMRegridder_set_elevI(&self.cself,
-            name.encode(), <PyObject *>elevI)    # Borrowed references
+            sheet_name.encode(), <PyObject *>elevI)    # Borrowed references
 
-    def regrid_matrices(self, str sheet_name, elevI=None):
-        if elevI is not None:
-            elevI = elevI.reshape(-1)
-
+    def regrid_matrices(self, str sheet_name):
         cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
             self.cself.ice_regridder(sheet_name.encode()))
         rm = RegridMatrices()
