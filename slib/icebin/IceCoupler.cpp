@@ -324,7 +324,7 @@ bool run_ice)
     SparseSetT dimA1;
     SparseSetT dimE1;
     // A SparseSet that is identity for the entire range of I
-    auto dimI(id_sparse_set<SparseSetT>(nI()));
+    SparseSetT dimI(id_sparse_set<SparseSetT>(nI()));
 
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
 
@@ -439,7 +439,9 @@ bool run_ice)
     }        // iAE
 
     // Compute IvE (for next timestep)
-    auto IvE1(rm.matrix("IvE", {&dimI, &dimE1}, regrid_params));
+    std::unique_ptr<WeightedSparse> IvE1(
+        rm.matrix("IvE", {&dimI, &dimE1}, regrid_params));
+
     // wIvE0.reference(IvE1->wM);
 
 
