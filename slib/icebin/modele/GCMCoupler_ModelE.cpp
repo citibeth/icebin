@@ -313,15 +313,15 @@ void gcmce_reference_globals(
     F90Array<double, 2> &fgice,
     F90Array<double, 2> &zatmo)
 {
-    ModelEInputs &modele_inputs(self->modele_inputs);
-    modele_inputs.fhc.reference(fhc.to_blitz());
-    modele_inputs.underice.reference(underice.to_blitz());
-    modele_inputs.elevE.reference(elevE.to_blitz());
-    modele_inputs.focean.reference(focean.to_blitz());
-    modele_inputs.flake.reference(flake.to_blitz());
-    modele_inputs.fgrnd.reference(fgrnd.to_blitz());
-    modele_inputs.fgice.reference(fgice.to_blitz());
-    modele_inputs.zatmo.reference(zatmo.to_blitz());
+    Topos *topos(&self->modele_inputs);
+    topos->fhc.reference(fhc.to_blitz());
+    topos->underice.reference(underice.to_blitz());
+    topos->elevE.reference(elevE.to_blitz());
+    topos->focean.reference(focean.to_blitz());
+    topos->flake.reference(flake.to_blitz());
+    topos->fgrnd.reference(fgrnd.to_blitz());
+    topos->fgice.reference(fgice.to_blitz());
+    topos->zatmo.reference(zatmo.to_blitz());
 }
 
 // ===========================================================

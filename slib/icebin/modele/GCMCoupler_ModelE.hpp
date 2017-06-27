@@ -60,15 +60,8 @@ struct ModelEOutputs
     std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ovalsE;
 };
 
-struct ModelEInputs
+struct Topos
 {
-    // Pointers to arrys within ModelE
-
-    // --------- Flux stuff
-    // gcm_ivalsAI[A/E][ivar](i, j, ihc)    Fortran-order 1-based indexing
-    std::vector<std::unique_ptr<blitz::Array<double,2>>> gcm_ivalsA;
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ivalsE;
-
     // --------- State variables we can update inside ModelE
     // i,j,ihc arrays on Elevation grid
     blitz::Array<double,3> fhc;
@@ -81,6 +74,17 @@ struct ModelEInputs
     blitz::Array<double,2> fgrnd;    // Alt: fearth0
     blitz::Array<double,2> fgice;    // Alt: flice
     blitz::Array<double,2> zatmo;      // i,j
+};
+
+
+struct ModelEInputs : public Topos
+{
+    // Pointers to arrys within ModelE
+
+    // --------- Flux stuff
+    // gcm_ivalsAI[A/E][ivar](i, j, ihc)    Fortran-order 1-based indexing
+    std::vector<std::unique_ptr<blitz::Array<double,2>>> gcm_ivalsA;
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ivalsE;
 };
 
 

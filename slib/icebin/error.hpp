@@ -19,6 +19,8 @@
 #ifndef ICEBIN_ERROR_HPP
 #define ICEBIN_ERROR_HPP
 
+#include <exception>
+
 /** @defgroup ibmisc ibmisc.hpp
 @brief Basic stuff common to all ibmisc */
 namespace icebin {
