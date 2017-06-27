@@ -178,3 +178,51 @@ def coo_multiply(M, xx, double fill=np.nan, ignore_nan=False):
         <PyObject *>M.row, <PyObject *>M.col, <PyObject *>M.data)
 
     return yy
+
+# ============================================================
+
+cdef class HntrGrid:
+    cdef cicebin.HntrGrid *cself;
+
+    def __dealloc__(HntrGrid self):
+        del self.cself
+
+    def __init__(HntrGrid self, int im, int jm, float offi, float dlat):
+        self.cself = new cicebin.HntrGrid(im, jm, offi, dlat)
+
+    @property
+    def im(self):
+        return self.cself.im
+
+    @property
+    def jm(self):
+        return self.cself.jm
+
+    @property
+    def size(self):
+        return self.cself.size()
+
+    @property
+    def offi(self):
+        return self.cself.offi
+
+    @property
+    def dlat(self):
+        return self.cself.dlat
+
+    @property
+    def dxyp(self, int j):
+        return self.cself.dxyp(j)
+
+
+cdef class Hntr:
+    cdef cicebin.Hntr *cself;
+
+    def __dealloc__(self):
+        del self.cself
+
+    def __init__(self, HntrGrid Agrid, HntrGrid Bgrid, float DATMIS):
+        self.cself = new cicebin.Hntr(Agrid.cself[0], Bgrid.cself[0], DATMIS)
+
+    def regrid(self, WTA, A, bool mean_polar):
+        cicebin.Hntr_regrid(self.cself, WTA, A, mean_polar)

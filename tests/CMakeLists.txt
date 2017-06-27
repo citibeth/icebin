@@ -16,3 +16,9 @@ foreach(TEST grid)
     target_link_libraries(test_${TEST} ${ALL_LIBS})
     add_test(AllTests test_${TEST})
 endforeach()
+
+
+# This test has a second Fortran file in it
+add_executable(test_hntr test_hntr.cpp HNTR4.F90 Z1QX1N.BS1.F help_hntr.F90)
+target_link_libraries(test_hntr ${ALL_LIBS} gfortran)   # Linking in gfortran is GCC-only
+add_test(AllTests test_hntr)

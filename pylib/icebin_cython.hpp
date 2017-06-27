@@ -21,6 +21,7 @@
 #include <Python.h>
 #include <ibmisc/cython.hpp>
 #include <icebin/GCMRegridder.hpp>
+#include <icebin/modele/hntr.hpp>
 
 namespace icebin {
 namespace cython {
@@ -68,6 +69,8 @@ PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself);
 
 void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
     size_t M_nrow, size_t M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py);
+
+PyObject *Hntr_regrid(modele::Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool mean_polar);
 
 
 }}

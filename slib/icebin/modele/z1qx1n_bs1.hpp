@@ -1,6 +1,35 @@
+#ifndef ICEBIN_Z1QX1N_BS1_HPP
+#define ICEBIN_Z1QX1N_BS1_HPP
+
 #include <cstdio>
 #include <boost/algorithm/string.hpp>
 #include <icebin/modele/hntr.hpp>
+
+
+namespace icebin {
+namespace modele {
+
+int const IM2 = 10800;
+int const JM2 = 5400;
+int const IMS = 2160;
+int const JMS = 1080;
+int const IMH = 720;
+int const JMH = 360;
+int const IM1 = 360;
+int const JM1 = 180;
+int const IM = 288;
+int const JM = 180;
+
+
+extern HntrGrid const g2mx2m;
+extern HntrGrid const g10mx10m;
+extern HntrGrid const ghxh;
+extern HntrGrid const g1x1;
+double const dLATM = 180.*60./JM;  //  latitude spacing (minutes)
+extern HntrGrid const g1qx1;
+
+
+#if 0
 
 #define ALL Range::all()
 
@@ -282,16 +311,6 @@ Input files:
 
 
 
-int const IM2 = 10800;
-int const JM2 = 5400;
-int const IMS = 2160;
-int const JMS = 1080;
-int const IMH = 720;
-int const JMH = 360;
-int const IM1 = 360;
-int const JM1 = 180;
-int const IM = 288;
-int const JM = 180;
 
 class ReadZ2Mx2M_NGDC {
     blitz::Array<double, 2> FOCEN2, ZETOP2;
@@ -302,14 +321,6 @@ class ReadZ2Mx2M_NGDC {
     }
 };
 
-
-
-template<class TypeT, int RANK>
-blitz::Array<TypeT,1> reshape1f(blitz::Array<TypeT, RANK> &arr)
-{
-    return blitz::Array<TypeT<1>(arr.data(),
-        blitz::shape(arr.size()), blitz::fortranArray);
-}
 
 blitz::Array<double,2> regrid(
     Hntr &hntr,
@@ -865,3 +876,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutput &out)
         }
     }}
 }
+#endif
+
+}}
+#endif     // guard

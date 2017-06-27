@@ -1,45 +1,46 @@
-#include <cmath>
+#ifndef ICEBIN_HNTR_HPP
+#define ICEBIN_HNTR_HPP
+
 #include <ibmisc/blitz.hpp>
 
 namespace icebin {
 namespace modele {
 
-struct HntrGrid {
-    int im;    // Number of cells in east-west direction
-    int jm;    // Number of cells in north-south direction
-    blitz::Array<double,1> dxyp;
-
-    int size() { return im * jm; }
+class HntrGrid {
+public:
+    int const im;    // Number of cells in east-west direction
+    int const jm;    // Number of cells in north-south direction
 
     // number (fraction) of cells in east-west direction from
     // International Date Line (180) to western edge of cell IA=1
-    double offi;
+    double const offi;
 
     // minutes of latitude for non-polar cells on grid A
-    double dlat;
+    double const dlat;
 
-    HntrGrid(int _im, int _jm, double _offi, double _dlat) :
-        im(_im), jm(_jm), offi(_offi), dlat(_dlat), dxyp(jm)
-    {
-        // Calculate the sperical area of grid cells
-        double dLON = 2.*M_PI / im;
-        double dLAT = M_PI / jm;
-        for (int j=1; j<=jm; ++j) {
-            double SINS = sin(dLAT*(J-jm/2-1));
-            double SINN = sin(dLAT*(J-jm/2));
-            dxyp(J) = dLON * (SINN - SINS)
-        }
-    }
+//protected:
+    blitz::Array<double,1> _dxyp;
+
+public:
+    int size() const { return im * jm; }
+    double dxyp(int j) const { return _dxyp(j); }
+
+    HntrGrid(int _im, int _jm, double _offi, double _dlat);
 
     template<class TypeT>
-    blitz::Array<TypeT, 2> Array()
-        { return blitz::Array(im,jm, blitz::fortranArray); }
+    blitz::Array<TypeT, 2> Array() const
+        { return blitz::Array<TypeT,2>(im,jm, blitz::fortranArray); }
+
 };
 
+/** Pre-computed overlap details needed to regrid from one lat/lon
+    grid to another on the sphere. */
 class Hntr {
+public:
     HntrGrid const Agrid;
     HntrGrid const Bgrid;
 
+//protected:
     // SINA(JA) = sine of latitude of northern edge of cell JA on grid A
     // SINB(JB) = sine of latitude of northern edge of cell JB on grid B
     // FMIN(IB) = fraction of cell IMIN(IB) on grid A west of cell IB
@@ -53,7 +54,7 @@ class Hntr {
 
     blitz::Array<double, 1> SINA, SINB;
     blitz::Array<double, 1> FMIN, FMAX;
-    blitz::Array<int,1> IMIN, IMAX
+    blitz::Array<int,1> IMIN, IMAX;
     blitz::Array<double, 1> GMIN, GMAX;
     blitz::Array<int,1> JMIN, JMAX;
 
@@ -76,21 +77,35 @@ public:
     ** NOTE **
         All arrays use 1-based (Fortran-style) indexing!!!
 
+    Inputs to this method must all be 1-D 1-based (Fortran-style) arrays.
+    See regrid() for a method accepting "natural" 2-D 1-based arrays.
+
     Input: WTA = weighting array for values on the A grid
              A = per unit area or per unit mass quantity
+             mean_polar: polar values are replaced by their
+                 longitudinal mean.
     Output:  B = horizontally interpolated quantity on B grid
     */
-    void regrid(
+    void regrid1(
         blitz::Array<double,1> const &WTA,
         blitz::Array<double,1> const &A,
-        blitz::Array<double,1> &B);
+        blitz::Array<double,1> &B,
+        bool mean_polar = false) const;
 
-    /** HNTR4P is similar to HNTR4 but polar values are replaced by their
-    longitudinal mean. */
-    void regridp(
-        blitz::Array<double,1> const &WTA,
-        blitz::Array<double,1> const &A,
-        blitz::Array<double,1> &B);
+    /** Works with 0-based or 1-based N-dimensional arrays */
+    template<int RANK>
+    void regrid(
+        blitz::Array<double,RANK> const &WTA,
+        blitz::Array<double,RANK> const &A,
+        blitz::Array<double,RANK> &B,
+        bool mean_polar = false) const
+    {
+        auto B1(ibmisc::reshape1(B, 1));
+        return regrid1(
+            ibmisc::reshape1(WTA, 1),
+            ibmisc::reshape1(A, 1),
+            B1, mean_polar);
+    }
 
 private:
     void partition_east_west();
@@ -100,3 +115,4 @@ private:
 
 }}
 
+#endif    // guard

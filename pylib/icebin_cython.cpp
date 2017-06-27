@@ -26,6 +26,7 @@
 using namespace ibmisc;
 using namespace ibmisc::cython;
 using namespace spsparse;
+using namespace icebin::modele;
 
 namespace icebin {
 namespace cython {
@@ -244,6 +245,31 @@ PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself)
     return Py_BuildValue("OOO", wM_py, M_py, Mw_py);
 }
 
+// ------------------------------------------------------------
+PyObject *Hntr_regrid(Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool mean_polar)
+{
+    // Get Fortran-style (base index = 1) arrays out of this.
+    auto WTA(np_to_blitz<double,1>(WTA_py, "WTA", {hntr->Agrid.size()}, blitz::fortranArray));
+    auto A(np_to_blitz<double,1>(A_py, "WTA", {hntr->Agrid.size()}, blitz::fortranArray));
+    PyObject *B_py(ibmisc::cython::new_pyarray<double,1>(make_array(hntr->Bgrid.size())));
+    auto B(np_to_blitz<double,1>(B_py, "WTA", {-1}, blitz::fortranArray));
+
+    hntr->regrid(WTA, A, B, mean_polar);
+
+    return B_py;
+}
 
 }}
+
+
+#if 0
+     Array(T_numtype* dataFirst, TinyVector<int, N_rank> shape,
+           preexistingMemoryPolicy deletePolicy,
+           GeneralArrayStorage<N_rank> storage);
+
+     Array(T_numtype* _bz_restrict dataFirst, TinyVector<int, N_rank> shape,
+           TinyVector<int, N_rank> stride,
+           preexistingMemoryPolicy deletePolicy,
+           GeneralArrayStorage<N_rank> storage = GeneralArrayStorage<N_rank>())
+#endif
 

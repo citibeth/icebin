@@ -103,3 +103,24 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 
     cdef void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
         int M_nrow, int M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py) except +
+
+    cdef Hntr_regrid(Hntr *hntr, object WTA_py, object A_py, bool mean_polar) except +
+
+cdef extern from "icebin/modele/hntr.hpp" namespace "icebin::modele":
+    pass
+
+    cdef cppclass HntrGrid:
+        const int im
+        const int jm
+        const double offi
+        const double dlat
+
+        HntrGrid(int, int, double, double)
+        int size()
+        double dxyp(int)
+
+    cdef cppclass Hntr:
+        pass
+
+        Hntr(HntrGrid &A, HntrGrid &B, double DATMIS)
+

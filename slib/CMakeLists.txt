@@ -53,6 +53,8 @@ if (BUILD_COUPLER)
         list(APPEND icebin_SOURCES
             icebin/modele/api_f.f90
             icebin/modele/GCMCoupler_ModelE.cpp
+            icebin/modele/hntr.cpp
+            icebin/modele/z1qx1n_bs1.cpp
         )
     endif()
 
