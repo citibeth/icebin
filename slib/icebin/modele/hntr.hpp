@@ -98,20 +98,48 @@ public:
         blitz::Array<double,RANK> const &WTA,
         blitz::Array<double,RANK> const &A,
         blitz::Array<double,RANK> &B,
-        bool mean_polar = false) const
-    {
-        auto B1(ibmisc::reshape1(B, 1));
-        return regrid1(
-            ibmisc::reshape1(WTA, 1),
-            ibmisc::reshape1(A, 1),
-            B1, mean_polar);
-    }
+        bool mean_polar = false) const;
+
+    template<int RANK>
+    blitz::Array<double,RANK> regrid(
+        blitz::Array<double,RANK> const &WTA,
+        blitz::Array<double,RANK> const &A,
+        bool mean_polar = false) const;
 
 private:
     void partition_east_west();
     void partition_north_south();
 
 };    // class Hntr
+
+
+
+/** Works with 0-based or 1-based N-dimensional arrays */
+template<int RANK>
+void Hntr::regrid(
+    blitz::Array<double,RANK> const &WTA,
+    blitz::Array<double,RANK> const &A,
+    blitz::Array<double,RANK> &B,
+    bool mean_polar) const
+{
+    auto B1(ibmisc::reshape1(B, 1));
+    return regrid1(
+        ibmisc::reshape1(WTA, 1),
+        ibmisc::reshape1(A, 1),
+        B1, mean_polar);
+}
+
+template<int RANK>
+blitz::Array<double,RANK> Hntr::regrid(
+    blitz::Array<double,RANK> const &WTA,
+    blitz::Array<double,RANK> const &A,
+    bool mean_polar) const
+{
+    blitz::Array<double,2> B(Bgrid.Array<double>());
+    regrid(WTA, A, B, mean_polar);
+    return B;
+}
+
 
 }}
 

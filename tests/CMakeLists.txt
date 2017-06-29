@@ -11,7 +11,7 @@ message("GTEST_LIBRARY " ${GTEST_LIBRARY})
 SET(ALL_LIBS icebin ${EXTERNAL_LIBS} ${GTEST_LIBRARY})
 
 
-foreach(TEST grid)
+foreach(TEST grid z1qx1n_bs1)
     add_executable(test_${TEST} test_${TEST}.cpp)
     target_link_libraries(test_${TEST} ${ALL_LIBS})
     add_test(AllTests test_${TEST})
