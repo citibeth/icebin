@@ -113,7 +113,7 @@ void cmp_hntr4(HntrGrid const &grida, HntrGrid const &gridb)
         gridb.im, gridb.jm, gridb.offi, gridb.dlat,
         0.);
 
-    std::ifstream fin("hntr4_common", ios::binary | ios::in);
+    fortran::UnformattedInput fin("hntr4_common", Endian::LITTLE);
     float datmcb;
     int ina, jna, inb, jnb;
     fortran::read(fin) >> datmcb >> ina >> jna >> inb >> jnb >> fortran::endr;
@@ -340,7 +340,7 @@ TEST_F(HntrTest, sgeom)
     blitz::Array<double,1> dxyph(Range(1,JMH));
     blitz::Array<double,1> dxyp2(Range(1,JM2));
 
-    std::ifstream fin("sgeom_common", ios::binary | ios::in);
+    fortran::UnformattedInput fin("sgeom_common", Endian::LITTLE);
     fortran::read(fin) >> dxyp >> dxyph >> dxyp2 >> fortran::endr;
     fin.close();
 

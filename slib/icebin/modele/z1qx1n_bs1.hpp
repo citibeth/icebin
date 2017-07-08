@@ -3,9 +3,10 @@
 
 #include <string>
 #include <vector>
-#include <blitz/array.h>
+#include <ibmisc/blitz.hpp>
 #include <ibmisc/IndexSet.hpp>
 #include <ibmisc/netcdf.hpp>
+#include <ibmisc/filesystem.hpp>
 
 //#include <cstdio>
 //#include <boost/algorithm/string.hpp>
@@ -36,11 +37,16 @@ extern HntrGrid const g1qx1;
 
 template<class TypeT, int RANK>
 struct ArrayMeta {
-    std::string name;
+    std::string const name;
     blitz::Array<TypeT, RANK> arr;
+    std::array<std::string,RANK> const dims;
+    std::string description;
 
-    ArrayMeta(std::string const &_name, blitz::Array<TypeT, RANK> const &_arr)
-        : name(_name), arr(_arr) {}
+    ArrayMeta(
+        std::string const &_name,
+        blitz::Array<TypeT, RANK> const &_arr,
+        std::array<std::string,RANK> const &_dims)
+    : name(_name), arr(_arr), dims(_dims) {}
 };
 
 
@@ -49,6 +55,7 @@ struct ArrayMeta {
 Should be pre-allocated before the generator is called. */
 template<class TypeT, int RANK>
 class ArrayBundle {
+public:
     ibmisc::IndexSet<std::string> index;
     std::vector<ArrayMeta<TypeT, RANK>> data;
 //    blitz::TinyVector<int,RANK> const &shape_t;
@@ -67,46 +74,46 @@ public:
 //    int add(std::string const &name);
 
     /** Add a self-allocated array */
-    int add(std::string const &name, blitz::TinyVector<int,RANK> const &shape);
+    int add(
+        std::string const &name,
+        blitz::TinyVector<int,RANK> const &shape,
+        std::array<std::string,RANK> const &dims);
 
 
     /** Add an existing array (must be Fortran-style) */
     int add(
         std::string const &name,
-        blitz::Array<TypeT, RANK> &arr);
+        blitz::Array<TypeT, RANK> &arr,
+        std::array<std::string,RANK> const &dims);
+
 
     /** Add an existing array (must be Fortran-style) */
     int add(
         std::string const &name,
-        blitz::Array<TypeT, RANK> arr);
+        blitz::Array<TypeT, RANK> arr,
+        std::array<std::string,RANK> const &dims);
 
     ArrayMeta<TypeT, RANK> &at(std::string const &name)
         { return data[index.at(name)]; }
 
-    void ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type, std::vector<netCDF::NcDim> const &dims);
+    void ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type);
 
 };
 
 
-#if 0
 /** Add a self-allocated array */
 template<class TypeT, int RANK>
-int ArrayBundle<TypeT,RANK>::add(std::string const &name)
+int ArrayBundle<TypeT,RANK>::add(
+    std::string const &name,
+    blitz::TinyVector<int, RANK> const &shape,
+    std::array<std::string,RANK> const &dims)
 {
     size_t ix = index.insert(name);
     // No array provided, allocate a new one
-    data.push_back(ArrayMeta<TypeT,RANK>(name, blitz::Array<TypeT,RANK>(shape_t, blitz::fortranArray)));
-    return ix;
-}
-#endif
-
-/** Add a self-allocated array */
-template<class TypeT, int RANK>
-int ArrayBundle<TypeT,RANK>::add(std::string const &name, blitz::TinyVector<int, RANK> const &shape)
-{
-    size_t ix = index.insert(name);
-    // No array provided, allocate a new one
-    data.push_back(ArrayMeta<TypeT,RANK>(name, blitz::Array<TypeT,RANK>(shape, blitz::fortranArray)));
+    data.push_back(ArrayMeta<TypeT,RANK>(
+        name,
+        blitz::Array<TypeT,RANK>(shape, blitz::fortranArray),
+        dims));
     return ix;
 }
 
@@ -115,11 +122,12 @@ int ArrayBundle<TypeT,RANK>::add(std::string const &name, blitz::TinyVector<int,
 template<class TypeT, int RANK>
 int ArrayBundle<TypeT,RANK>::add(
     std::string const &name,
-    blitz::Array<TypeT, RANK> &arr)
+    blitz::Array<TypeT, RANK> &arr,
+    std::array<std::string,RANK> const &dims)
 {
     size_t ix = index.insert(name);
     // Array provided, reference it
-    data.push_back(ArrayMeta<TypeT,RANK>(name, arr));
+    data.push_back(ArrayMeta<TypeT,RANK>(name, arr, dims));
     return ix;
 }
 
@@ -127,19 +135,42 @@ int ArrayBundle<TypeT,RANK>::add(
 template<class TypeT, int RANK>
 int ArrayBundle<TypeT,RANK>::add(
     std::string const &name,
-    blitz::Array<TypeT, RANK> arr)
+    blitz::Array<TypeT, RANK> arr,
+    std::array<std::string,RANK> const &dims)
 {
     size_t ix = index.insert(name);
     // Array provided, reference it
-    data.push_back(ArrayMeta<TypeT,RANK>(name, arr));
+    data.push_back(ArrayMeta<TypeT,RANK>(name, arr, dims));
     return ix;
 }
 
+// --------------------------------------------------------------------
+
+
+// --------------------------------------------------------------------
+
+
 template<class TypeT, int RANK>
-void ArrayBundle<TypeT,RANK>::ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type, std::vector<netCDF::NcDim> const &dims)
+void ArrayBundle<TypeT,RANK>::ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type)
 {
+    // NetCDF stores in row-major (C) order.  Reverse dimensions, and convert array to C-style
+
     for (size_t i=0; i<index.size(); ++i) {
-        ibmisc::ncio_blitz(ncio, data[i].arr, false, prefix + data[i].name, snc_type, dims);
+        auto &meta(data[i]);
+
+        auto dims_f(ibmisc::get_or_add_dims(ncio,
+            meta.arr,
+            ibmisc::to_vector(meta.dims)));
+
+        std::vector<netCDF::NcDim> dims_c;
+        for (int j=dims_f.size()-1; j>=0; --j) dims_c.push_back(dims_f[j]);
+
+        auto &arr_c(ncio.tmp.copy<blitz::Array<TypeT,RANK>>(
+            ibmisc::f_to_c(meta.arr)));
+
+        auto ncvar(ibmisc::ncio_blitz(ncio, arr_c, false, prefix + meta.name, snc_type, dims_c));
+        ncvar.putAtt("description", meta.description);
+
     }
 }
 
@@ -209,7 +240,7 @@ TopoInputs make_topo_inputs();
 
 // =================================================================
 
-extern void read_raw(TopoInputs &in, std::string const &dir_s);
+extern void read_raw(TopoInputs &in, ibmisc::FileLocator const &files);
 
 
 /*

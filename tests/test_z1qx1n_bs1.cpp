@@ -65,10 +65,12 @@ TEST_F(Z1qx1n_Bs1Test, read_inputs)
     auto topo_inputs(make_topo_inputs());
 
     NcIO ncio("topo_inputs.nc", 'w');
-    auto dims(get_or_add_dims(ncio,
-        {"im", "jm"}, {IM, JM}));
 
-    topo_inputs.bundle.ncio(ncio, "", "double", dims);
+    // Need to read the files!!!
+    EnvSearchPath locator("MODELE_FILE_PATH");
+    read_raw(topo_inputs, locator);
+
+    topo_inputs.bundle.ncio(ncio, "", "double");
     ncio.close();
 }
 
