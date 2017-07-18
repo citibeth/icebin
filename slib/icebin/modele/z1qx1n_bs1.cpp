@@ -143,7 +143,6 @@ void read_raw(TopoInputs &in, FileLocator const &files)
         printf("ZETOP2 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
-printf("AA1\n");
     // Read in Z10MX10M
     {std::string const fname = "Z10MX10M";
         fortran::UnformattedInput fin(files.locate(fname), Endian::BIG);
@@ -154,7 +153,6 @@ printf("AA1\n");
         printf("FLAKES read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
-printf("AA1\n");
     // Read in ZICEHXH
     {std::string const fname = "ZICEHXH";
         fortran::UnformattedInput fin(files.locate(fname), Endian::BIG);
@@ -174,7 +172,6 @@ printf("AA1\n");
         in.bundle.at("ZSOLDH").description = fortran::trim(titlei);
         printf("ZSOLDH read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
-printf("AA1\n");
 
     // Read in ZNGDC1
     {std::string const fname = "ZNGDC1";
@@ -484,8 +481,6 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     blitz::Array<double, 2> WTH(const_array(blitz::shape(IMH, JMH), 1.0, FortranArray<2>()));
     Hntr hntrhm2(ghxh, g2mx2m, 0);
     auto FGICE2(hntrhm2.regrid(WTH, in.FGICEH));
-printf("FGICE2 lbound=(%d, %d) ubound=(%d, %d) strides=(%d, %d)\n", FGICE2.lbound(0), FGICE2.lbound(1), FGICE2.ubound(0), FGICE2.ubound(1), FGICE2.stride(0), FGICE2.stride(1));
-
     auto dZGIC2(hntrhm2.regrid(in.FGICEH, in.dZGICH));
     auto ZSOLD2(hntrhm2.regrid(in.FGICEH, in.ZSOLDH));
 
