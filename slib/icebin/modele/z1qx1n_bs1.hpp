@@ -8,11 +8,6 @@
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/filesystem.hpp>
 
-//#include <cstdio>
-//#include <boost/algorithm/string.hpp>
-//#include <icebin/modele/hntr.hpp>
-
-
 namespace icebin {
 namespace modele {
 
@@ -136,10 +131,6 @@ int ArrayBundle<TypeT,RANK>::add(
 }
 
 // --------------------------------------------------------------------
-
-
-// --------------------------------------------------------------------
-
 
 template<class TypeT, int RANK>
 void ArrayBundle<TypeT,RANK>::ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type, std::vector<std::string> const &vars)
