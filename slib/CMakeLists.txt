@@ -55,6 +55,7 @@ if (BUILD_COUPLER)
             icebin/modele/GCMCoupler_ModelE.cpp
             icebin/modele/hntr.cpp
             icebin/modele/z1qx1n_bs1.cpp
+            icebin/modele/HNTR4.F90
         )
     endif()
 

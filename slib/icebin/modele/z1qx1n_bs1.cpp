@@ -35,7 +35,60 @@ TopoOutputs::TopoOutputs(ArrayBundle<double, 2> &&_bundle) :
     ZLAKE(bundle.at("ZLAKE").arr),
     ZGRND(bundle.at("ZGRND").arr),
     ZSGHI(bundle.at("ZSGHI").arr),
-    FOCENF(bundle.at("FOCENF").arr) {}
+    FOCENF(bundle.at("FOCENF").arr)
+{}
+
+TopoOutputs make_topo_outputs()
+{
+    ArrayBundle<double, 2> bundle;
+    static const auto shape(blitz::shape(IM,JM));
+    static const std::array<std::string,2> sshape {"im", "jm"};
+
+    bundle.add("FOCEAN", shape, sshape,
+        "0 or 1, Bering Strait 1 cell wide", "", "GISS 1Qx1");
+
+    bundle.add("FLAKE", shape, sshape,
+        "Lake Surface Fraction", "0:1", "GISS 1Qx1");
+
+    bundle.add("FGRND", shape, sshape,
+        "Ground Surface Fraction", "0:1", "GISS 1Qx1");
+
+    bundle.add("FGICE", shape, sshape,
+        "Glacial Ice Surface Fraction", "0:1", "GISS 1Qx1");
+
+    bundle.add("ZATMO", shape, sshape,
+        "Atmospheric Topography", "m", "ETOPO2 1Qx1");
+
+    bundle.add("dZOCEN", shape, sshape,
+        "Ocean Thickness", "m", "ETOPO2 1Qx1");
+
+    bundle.add("dZLAKE", shape, sshape,
+        "Lake Thickness", "m", "ETOPO2 1Qx1");
+
+    bundle.add("dZGICE", shape, sshape,
+        "Glacial Ice Thickness", "m", "Ekholm,Bamber");
+
+    bundle.add("ZSOLDG", shape, sshape,
+        "Solid Ground Topography", "m", "ETOPO2 1Qx1");
+
+    bundle.add("ZSGLO", shape, sshape,
+        "Lowest Solid Topography", "m", "ETOPO2 1Qx1");
+
+    bundle.add("ZLAKE", shape, sshape,
+        "Lake Surface Topography", "m", "ETOPO2 1Qx1");
+
+    bundle.add("ZGRND", shape, sshape,
+        "Topography Break between Ground and GIce", "", "ETOPO2 1Qx1");
+
+    bundle.add("ZSGHI", shape, sshape,
+        "Highest Solid Topography", "m", "ETOPO2 1Qx1");
+
+    bundle.add("FOCENF", shape, sshape,
+        "Fractional ocean ocver", "", "GISS 1Qx1");
+
+    auto ret(TopoOutputs(std::move(bundle)));
+    return ret;
+}
 
 TopoInputs::TopoInputs(ArrayBundle<double, 2> &&_bundle) : bundle(std::move(_bundle)),
     FOCEN2(bundle.at("FOCEN2").arr),
@@ -166,6 +219,36 @@ void callZ(
     blitz::Array<double,2> &ZGRND,
     blitz::Array<double,2> &ZSGHI)
 {
+
+
+{NcIO ncio("int.nc", 'w');
+
+    ArrayBundle<double,2> bundle;
+
+    // (IM2, JM2)
+    bundle.add("FOCEN2", FOCEN2, {"im2", "jm2"});
+    bundle.add("ZSOLD2", ZSOLD2, {"im2", "jm2"});
+    bundle.add("ZSOLG2", ZSOLG2, {"im2", "jm2"});
+
+    // (IM, IM)
+    bundle.add("FOCEAN", FOCEAN, {"im", "jm"});
+    bundle.add("FLAKE", FLAKE, {"im", "jm"});
+    bundle.add("FGRND", FGRND, {"im", "jm"});
+
+    // (IM, IM)
+    bundle.add("ZATMO", ZATMO, {"im", "jm"});
+    bundle.add("dZLAKE", dZLAKE, {"im", "jm"});
+    bundle.add("ZSOLDG", ZSOLDG, {"im", "jm"});
+    bundle.add("ZSGLO", ZSGLO, {"im", "jm"});
+    bundle.add("ZLAKE", ZLAKE, {"im", "jm"});
+    bundle.add("ZGRND", ZGRND, {"im", "jm"});
+    bundle.add("ZSGHI", ZSGHI, {"im", "jm"});
+
+    bundle.ncio(ncio, "", "double");
+}
+
+
+
     //
     // Input:  FOCEN2 = ocean fraction at 2 x 2 (minute)
     //         ZSOLD2 = solid topography (above ice) at 2 x 2 (minute)
@@ -197,7 +280,7 @@ void callZ(
                 ZSGHI(I,J) = 0;
                 ZSGLO(I,J) = 999999;
                 for (int J2=J21; J2 <= J2M; ++J2) {
-                for (int I2=J21; I2 <= I2M; ++I2) {
+                for (int I2=I21; I2 <= I2M; ++I2) {
                     if (ZSGLO(I,J) > ZSOLD2(I2,J2) && FOCEN2(I2,J2) == 1.) {
                         ZSGLO(I,J) = ZSOLD2(I2,J2);
                     }
@@ -224,7 +307,7 @@ void callZ(
                 double SAZSG = 0;
                 int NM = 0;
                 for (int J2=J21; J2 <= J2M; ++J2) {
-                for (int I2=J21; I2 <= I2M; ++I2) {
+                for (int I2=I21; I2 <= I2M; ++I2) {
                     if (FOCEN2(I2,J2) == 1) continue;
                     double area = g2mx2m.dxyp(J2);
                     cells2.push_back(AreaDepth(area, ZSOLD2(I2,J2)));
@@ -343,20 +426,16 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     double const TWOPI = 2. * M_PI;
     double const AREAG = 4. * M_PI;
 
-    // Create weight vector of all 1's
-    // (weight vector is fraction of grid cell occupied by this thing)
-    blitz::Array<double, 2> WT2(IM2,JM2);
-    WT2 = 1;
-
     //
     // Add small ice cap and glacier data to FGICEH and dZGICH
     // north of Antarctic area.
     // Continental cells north of 78N are entirely glacial ice.
     in.FGICE1(Range::all(), Range(JM1*14/15+1, JM1)) = in.FCONT1(Range::all(), Range(JM1*14/15+1, JM1));
 
+    blitz::Array<double, 2> WT1(const_array(blitz::shape(IM1, JM1), 1.0, FortranArray<2>()));
     Hntr hntr1h(g1x1, ghxh, 0);
-    auto FCON1H(hntr1h.regrid(WT2, in.FCONT1));
-    auto FGIC1H(hntr1h.regrid(WT2, in.FGICE1));
+    auto FCON1H(hntr1h.regrid(WT1, in.FCONT1));
+    auto FGIC1H(hntr1h.regrid(WT1, in.FGICE1));
 
     // RGIC1H = areal ratio of glacial ice to continent
     // For smaller ice caps and glaciers, dZGICH = CONSTK * RGIC1H^.3
@@ -365,7 +444,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     //        =  CONSTK * sum(DXYP*FGIC1H*RGIC1H^.3) / sum(DXYP*FGIC1H)
     double SUMDFR = 0;
     double SUMDF = 0;
-    blitz::Array<double,2> RGIC1H(IMH, JMH);
+    blitz::Array<double,2> RGIC1H(IMH, JMH, fortranArray);
     for (int JH=1+JMH/6; JH<=JMH; ++JH) {
         double sum1 = 0;
         double sum2 = 0;
@@ -402,14 +481,17 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     // ZSOLD2 = Solid topography (m)        (above ice)
     // ZSOLG2 = Solid ground topography (m) (beneath ice)
     //
+    blitz::Array<double, 2> WTH(const_array(blitz::shape(IMH, JMH), 1.0, FortranArray<2>()));
     Hntr hntrhm2(ghxh, g2mx2m, 0);
-    auto FGICE2(hntrhm2.regrid(WT2, in.FGICEH));    // WT2 is too big...
+    auto FGICE2(hntrhm2.regrid(WTH, in.FGICEH));
+printf("FGICE2 lbound=(%d, %d) ubound=(%d, %d) strides=(%d, %d)\n", FGICE2.lbound(0), FGICE2.lbound(1), FGICE2.ubound(0), FGICE2.ubound(1), FGICE2.stride(0), FGICE2.stride(1));
+
     auto dZGIC2(hntrhm2.regrid(in.FGICEH, in.dZGICH));
     auto ZSOLD2(hntrhm2.regrid(in.FGICEH, in.ZSOLDH));
 
     // North of Antarctic area: 60S to 90N
-    blitz::Array<double,2> FCONT2(IM2, JM2);
-    blitz::Array<double,2> ZSOLG2(IM2, JM2);
+    blitz::Array<double,2> FCONT2(IM2, JM2, fortranArray);
+    blitz::Array<double,2> ZSOLG2(IM2, JM2, fortranArray);
     for (int J2=JM2/6+1; J2 <= JM2; ++J2) {
         FCONT2(Range::all(), J2) = 1. - in.FOCEN2(Range::all(), J2);
         FGICE2(Range::all(), J2) = FGICE2(Range::all(), J2) * FCONT2(Range::all(), J2);
@@ -420,7 +502,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
 
     // Antarctic area: 90S to 60S
     for (int J2=1; J2<=JM2/6; ++J2) {
-    for (int I2=1; I2<=JM2; ++I2) {
+    for (int I2=1; I2<=IM2; ++I2) {
         if (in.FOCEN2(I2,J2) == 0) {
             // in.FOCEN2(I2,J2) = 0
             FCONT2(I2,J2) = 1;
@@ -451,6 +533,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     // FOCEAN: Ocean Surface Fraction (0:1)
     //
     // Fractional ocean cover FOCENF is interpolated from FOAAH2
+    blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
     Hntr hntr2mq1(g2mx2m, g1qx1, 0);
     hntr2mq1.regrid(WT2, in.FOCEN2, out.FOCENF, true);    // Fractional ocean cover
 
@@ -523,12 +606,12 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
         "         fract    NOfrac      in #\n"
         "   J     cells     cells     cells\n"
         "   =     =====     =====     =====\n");
-    blitz::Array<double,2> FOFLAT(JM);
-    blitz::Array<double,2> FONLAT(JM);
+    blitz::Array<double,1> FOFLAT(JM, fortranArray);
+    blitz::Array<double,1> FONLAT(JM, fortranArray);
     for (int J=JM; J >= 1; --J) {
         FOFLAT(J) = blitz::sum(out.FOCENF(Range::all(),J));
         FONLAT(J) = blitz::sum(out.FOCEAN(Range::all(),J));
-        printf("%4d%102f%10.2f%10.2f\n", J,FOFLAT(J),FONLAT(J),FOFLAT(J)-FONLAT(J));
+        printf("%4d%10.2f%10.2f%10.2f\n", J,FOFLAT(J),FONLAT(J),FOFLAT(J)-FONLAT(J));
     }
     double const factor = IM*JM / AREAG;
 
@@ -549,20 +632,20 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     printf("NH: %f %f %f\n", FOFNH, FONNH, FOFNH-FONNH);
     printf("SH: %f %f %f\n", FOFSH, FONSH, FOFSH-FONSH);
 
-
     //
     // FLAKE: Lake Surface Fraction (0:1)
     //
     // FLAKE is interpolated from FLAKES
+    blitz::Array<double, 2> WTS(const_array(shape(IMS, JMS), 1.0, FortranArray<2>()));
     Hntr hntr10m1q(g10mx10m, g1qx1, 0);
-    hntr10m1q.regrid(WT2, in.FLAKES, out.FLAKE, true);
+    hntr10m1q.regrid(WTS, in.FLAKES, out.FLAKE, true);
 
     // Antarctica and Arctic area have no lakes
     out.FLAKE(Range::all(), Range(1,JM/6)) = 0;             //  90:60 S
     out.FLAKE(Range::all(), Range(JM*14/15+1,JM)) = 0;      //  78:90 N
     out.FLAKE(Range(1,IM/2), Range(JM*41/45+1,JM)) = 0;  //  74:90 N, 0:180 W
 
-    for (int J=JM*5/6; J <= JM*11/12; ++J) {    //  southern
+    for (int J=(JM*5)/6; J <= (JM*11)/12; ++J) {    //  southern
     for (int I=IM/3+1; I <= (int)(.5 + .75*IM*(J-JM*.3)/JM); ++I) {  //  Greenland
        out.FLAKE(I,J) = 0;
     }}
@@ -570,10 +653,9 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     // Apportion out.FLAKE to the nonocean fraction and round to 1/256
     for (int j=1; j<=JM; ++j) {
     for (int i=1; i<=IM; ++i) {
-        out.FLAKE(i,j) = out.FLAKE(i,j)*(1-out.FOCEAN(i,j)) / (1-out.FOCENF(i,j)+1e-20);
-        out.FLAKE(i,j) = std::round(out.FLAKE(i,j)*256) / 256.;
+        out.FLAKE(i,j) = out.FLAKE(i,j)*(1.-out.FOCEAN(i,j)) / (1.-out.FOCENF(i,j)+1e-20);
+        out.FLAKE(i,j) = std::round(out.FLAKE(i,j)*256.) / 256.;
     }}
-
 
     //
     // FGICE: Glacial Ice Surface Fraction (0:1)
@@ -582,35 +664,42 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     hntr2mq1.regrid(FCONT2, FGICE2, out.FGICE, true);
 
     // Antarctica is entirely glacial ice, no lakes nor ground
-    out.FGICE(Range::all(),Range(1,JM/6)) = 1. - out.FOCEAN(Range::all(),Range(1,JM/6));
+    for (int j=1; j<=JM/6; ++j) {
+        out.FGICE(Range::all(), j) = 1. - out.FOCEAN(Range::all(), j);
+    }
 
     // Continental cells north of 78N are entirely glacial ice
-    out.FGICE(Range::all(),Range(JM*14/15+1,JM)) = 1 - out.FOCEAN(Range::all(),Range(JM*14/15+1,JM));
+    for (int j=(JM*14)/15+1; j<=JM; ++j) {
+        out.FGICE(Range::all(), j) = 1. - out.FOCEAN(Range::all(), j);
+    }
 
     // There is no glacial ice over oceans
-    out.FGICE(Range::all(),Range(JM/6+1,JM)) =
-        out.FGICE(Range::all(),Range(JM/6+1,JM)) * (1-out.FOCEAN(Range::all(),Range(JM/6+1,JM)));
+    for (int j=JM/6+1; j<=JM; ++j) {
+        out.FGICE(Range::all(), j) *= (1. - out.FOCEAN(Range::all(), j));
+    }
 
-    // Round out.FGICE to nearest 1/256
+    // Round FGICE to nearest 1/256
     for (int j=1; j<=JM; ++j) {
     for (int i=1; i<=IM; ++i) {
-        out.FGICE(i,j) = std::round(out.FGICE(i,j)*256) / 256.;
+        out.FGICE(i,j) = std::round(out.FGICE(i,j)*256.) / 256.;
     }}
 
-    // Check that out.FGICE is between 0 and 1
+
+
+    // Check that FGICE is between 0 and 1
     // If out.FGICE+FLAKE exceeds 1, reduce FLAKE
     for (int J=JM/6+1; J <= JM; ++J) {
     for (int I=1; I<=IM; ++I) {
         if (out.FGICE(I,J) < 0) {
-            printf("210: out.FGICE(%d,%d) < 0: %g\n" ,I,J,out.FGICE(I,J));
+            fprintf(stderr, "210: out.FGICE(%d,%d) < 0: %g\n" ,I,J,out.FGICE(I,J));
             out.FGICE(I,J) = 0;
         }
         if (out.FGICE(I,J) > 1) {
-            printf("210: out.FGICE(%d,%d) > 1: %g\n" ,I,J,out.FGICE(I,J));
+            fprintf(stderr, "210: out.FGICE(%d,%d) > 1: %g\n" ,I,J,out.FGICE(I,J));
             out.FGICE(I,J) = 1;
         }
         if (out.FLAKE(I,J)+out.FGICE(I,J)+out.FOCEAN(I,J) > 1) {
-            printf("210: FGICE+FLAKE+out.FOCEAN (%d,%d) > 1: %g + %g + %g\n",
+            fprintf(stderr, "210: FGICE+FLAKE+out.FOCEAN (%d,%d) > 1: %g + %g + %g\n",
                 I,J,out.FGICE(I,J), out.FLAKE(I,J),out.FOCEAN(I,J));
             out.FLAKE(I,J) = 1. - out.FGICE(I,J) - out.FOCEAN(I,J);
         }
@@ -643,7 +732,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
 
         // Check that out.dZOCEN is positive
         if (out.FOCEAN(i,j) == 1 && out.dZOCEN(i,j) <= 0) {
-            printf("Error: out.dZOCEN(%d,%d) <= 0 %g",i,j,out.dZOCEN(i,j));
+            printf("Error: out.dZOCEN(%d,%d) <= 0 %g\n",i,j,out.dZOCEN(i,j));
         }
     }}
 

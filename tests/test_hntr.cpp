@@ -163,6 +163,11 @@ printf("Read: %f %d %d %d %d\n", datmcb, ina, jna, inb, jnb);
     cmp_array(hntr.JMIN, jmin);
     printf("------------- JMAX\n");
     cmp_array(hntr.JMAX, jmax);
+
+    for (int i=hntr.JMAX.lbound(0); i <= hntr.JMAX.ubound(0); ++i) {
+        EXPECT_TRUE(hntr.JMAX(i) <= hntr.Agrid.jm);
+    }
+
 }
 
 TEST_F(HntrTest, simple_grids)

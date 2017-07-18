@@ -35,18 +35,25 @@ extern HntrGrid const g1x1;
 double const dLATM = 180.*60./JM;  //  latitude spacing (minutes)
 extern HntrGrid const g1qx1;
 
+/** Array meta-data stored with GISS-type files */
 template<class TypeT, int RANK>
 struct ArrayMeta {
     std::string const name;
     blitz::Array<TypeT, RANK> arr;
     std::array<std::string,RANK> const dims;
     std::string description;
+    std::string units;
+    std::string source;
 
     ArrayMeta(
         std::string const &_name,
         blitz::Array<TypeT, RANK> const &_arr,
-        std::array<std::string,RANK> const &_dims)
-    : name(_name), arr(_arr), dims(_dims) {}
+        std::array<std::string,RANK> const &_dims,
+        std::string const &_description = "",
+        std::string const &_units = "",
+        std::string const &_source = "")
+
+    : name(_name), arr(_arr), dims(_dims), description(_description), units(_units), source(_source) {}
 };
 
 
@@ -58,34 +65,23 @@ class ArrayBundle {
 public:
     ibmisc::IndexSet<std::string> index;
     std::vector<ArrayMeta<TypeT, RANK>> data;
-//    blitz::TinyVector<int,RANK> const &shape_t;
 
 public:
-//    ArrayBundle(
-//        blitz::TinyVector<int,RANK> const &_shape_t) :
-//        shape_t(_shape_t) {}
+    ArrayMeta<TypeT, RANK> const &at(std::string const &name) const
+        { return data[index.at(name)]; }
 
 
     std::vector<std::string> const &keys() const
         { return index.keys(); }
 
-
-    /** Add a self-allocated array */
-//    int add(std::string const &name);
-
     /** Add a self-allocated array */
     int add(
         std::string const &name,
         blitz::TinyVector<int,RANK> const &shape,
-        std::array<std::string,RANK> const &dims);
-
-
-    /** Add an existing array (must be Fortran-style) */
-    int add(
-        std::string const &name,
-        blitz::Array<TypeT, RANK> &arr,
-        std::array<std::string,RANK> const &dims);
-
+        std::array<std::string,RANK> const &dims,
+        std::string const &description = "",
+        std::string const &units = "",
+        std::string const &source = "");
 
     /** Add an existing array (must be Fortran-style) */
     int add(
@@ -93,10 +89,16 @@ public:
         blitz::Array<TypeT, RANK> arr,
         std::array<std::string,RANK> const &dims);
 
+    int add(ArrayMeta<TypeT, RANK> const &datum)
+    {
+        size_t ix = index.insert(datum.name);
+        data.push_back(datum);
+    }
+
     ArrayMeta<TypeT, RANK> &at(std::string const &name)
         { return data[index.at(name)]; }
 
-    void ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type);
+    void ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type, std::vector<std::string> const &vars = {"<all>"});
 
 };
 
@@ -106,28 +108,17 @@ template<class TypeT, int RANK>
 int ArrayBundle<TypeT,RANK>::add(
     std::string const &name,
     blitz::TinyVector<int, RANK> const &shape,
-    std::array<std::string,RANK> const &dims)
+    std::array<std::string,RANK> const &dims,
+    std::string const &description,
+    std::string const &units,
+    std::string const &source)
 {
     size_t ix = index.insert(name);
     // No array provided, allocate a new one
     data.push_back(ArrayMeta<TypeT,RANK>(
         name,
         blitz::Array<TypeT,RANK>(shape, blitz::fortranArray),
-        dims));
-    return ix;
-}
-
-
-/** Add an existing array (must be Fortran-style) */
-template<class TypeT, int RANK>
-int ArrayBundle<TypeT,RANK>::add(
-    std::string const &name,
-    blitz::Array<TypeT, RANK> &arr,
-    std::array<std::string,RANK> const &dims)
-{
-    size_t ix = index.insert(name);
-    // Array provided, reference it
-    data.push_back(ArrayMeta<TypeT,RANK>(name, arr, dims));
+        dims, description, units, source));
     return ix;
 }
 
@@ -151,25 +142,35 @@ int ArrayBundle<TypeT,RANK>::add(
 
 
 template<class TypeT, int RANK>
-void ArrayBundle<TypeT,RANK>::ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type)
+void ArrayBundle<TypeT,RANK>::ncio(ibmisc::NcIO &ncio, std::string const &prefix, std::string const &snc_type, std::vector<std::string> const &vars)
 {
-    // NetCDF stores in row-major (C) order.  Reverse dimensions, and convert array to C-style
+    std::vector<std::string> all_vars;
+    std::vector<std::string> const *myvars;
+    if (vars.size() == 1 && vars[0] == "<all>") {
+        for (size_t i=0; i<index.size(); ++i) {
+            all_vars.push_back(index[i]);
+        }
+        myvars = &all_vars;
+    } else {
+        myvars = &vars;
+    }
 
-    for (size_t i=0; i<index.size(); ++i) {
+    for (auto &var : *myvars) {
+        int i=index.at(var);
+
         auto &meta(data[i]);
 
+        // Set up the dimensions (Fortran order)
         auto dims_f(ibmisc::get_or_add_dims(ncio,
             meta.arr,
             ibmisc::to_vector(meta.dims)));
 
-        std::vector<netCDF::NcDim> dims_c;
-        for (int j=dims_f.size()-1; j>=0; --j) dims_c.push_back(dims_f[j]);
-
-        auto &arr_c(ncio.tmp.copy<blitz::Array<TypeT,RANK>>(
-            ibmisc::f_to_c(meta.arr)));
-
-        auto ncvar(ibmisc::ncio_blitz(ncio, arr_c, false, prefix + meta.name, snc_type, dims_c));
+        // Write the NetCDF variable
+        // (will auto-reverse dims if it detects column major)
+        auto ncvar(ibmisc::ncio_blitz(ncio, meta.arr, false, prefix + meta.name, snc_type, dims_f));
         ncvar.putAtt("description", meta.description);
+        ncvar.putAtt("units", meta.units);
+        ncvar.putAtt("source", meta.source);
 
     }
 }
@@ -179,8 +180,9 @@ void ArrayBundle<TypeT,RANK>::ncio(ibmisc::NcIO &ncio, std::string const &prefix
 /** Area of memory where a TOPO-generating procedure can place its outputs.
 Should be pre-allocated before the generator is called. */
 class TopoOutputs {
-    ArrayBundle<double, 2> bundle;
 public:
+    ArrayBundle<double, 2> bundle;
+
     // 0 or 1, Bering Strait 1 cell wide         GISS 1Qx1,
     blitz::Array<double, 2> FOCEAN;
     // Lake Surface Fraction (0:1)                GISS 1Qx1,
@@ -212,6 +214,8 @@ public:
 
     TopoOutputs(ArrayBundle<double, 2> &&_bundle);
 };
+
+TopoOutputs make_topo_outputs();
 
 /** Input files:
  Z2MX2M.NGDC = FOCEN2: Ocean Fraction (0 or 1)
