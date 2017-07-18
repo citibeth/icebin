@@ -1,16 +1,22 @@
 // Convert GISS-format binary Fortran files to NetCDF
 
+#include <iostream>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/program_options.hpp>
 #include <ibmisc/fortranio.hpp>
 #include <ibmisc/memory.hpp>
 #include <ibmisc/blitz.hpp>
 #include <icebin/error.hpp>
 #include <icebin/modele/z1qx1n_bs1.hpp>
 
+using namespace std;
 using namespace ibmisc;
 using namespace icebin;
 using namespace icebin::modele;
+namespace po = boost::program_options;
+
+
 
 
 std::vector<fortran::Shape<2>> stdshapes {
@@ -64,15 +70,53 @@ Info parse_titlei(std::string const &str)
 
 int main(int argc, char **argv)
 {
-    std::string fname(argv[1]);
+    // Parse comamnd line arguments
+    std::string ifname, ofname;
+    try {
+	    po::options_description desc("Allowed options");
+	    desc.add_options()
+	        ("help,h", "produce help message")
+	        ("input-file", po::value<string>(), "input file")
+	        ("output-file", po::value<string>(), "output file")
+	    ;
+
+	    po::positional_options_description positional;
+	    positional.add("input-file", 1);
+	    positional.add("output-file", 1);
+
+	    if (argc == 1) {
+	        cout << desc << endl;
+	        return 1;
+	    }
+
+	    po::variables_map vm;
+	    po::command_line_parser parser(argc, argv);
+	    po::store(po::command_line_parser(argc, argv).
+	          options(desc).positional(positional).run(), vm);
+	    po::notify(vm);
+	    
+	    if (vm.count("help")) {
+	        cerr << desc << endl;
+	        return 1;
+	    }
+
+        ifname = vm["input-file"].as<std::string>();
+        ofname = vm["output-file"].as<std::string>();
+
+    } catch(std::exception &exp) {
+        cout << "Error parsing arumgnets:" << endl << exp.what() << endl;
+        return 1;
+    }
+
+    printf("ARGS: %s %s\n", ifname.c_str(), ofname.c_str());
 
 
     std::array<char, 80> titlei;
     fortran::Shape<2> const *data_shape;
 
-    {fortran::UnformattedInput fin(fname, Endian::LITTLE);
+    {fortran::UnformattedInput fin(ifname, Endian::LITTLE);
     TmpAlloc tmp;
-    NcIO ncio("out.nc", 'w');
+    NcIO ncio(ofname, 'w');
 
         // Read and then write a single array
         for (;;) {
@@ -94,8 +138,7 @@ int main(int argc, char **argv)
 	        auto ncvar(ncio_blitz(ncio, data, false, info.name,
 	            get_or_add_dims(ncio,
                     to_vector(data_shape->sshape),
-                    to_vector_cast<int,long,2>(data_shape->shape)),
-                true));
+                    to_vector_cast<int,long,2>(data_shape->shape))));
             get_or_put_att(ncvar, ncio.rw, "description", info.description);
             get_or_put_att(ncvar, ncio.rw, "units", info.units);
             get_or_put_att(ncvar, ncio.rw, "source", info.source);

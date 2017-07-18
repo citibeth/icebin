@@ -71,7 +71,7 @@ if (NOT DEFINED BUILD_MODELE)
 endif()
 if (BUILD_MODELE)
     add_definitions(-DBUILD_MODELE)
-    list(APPEND Boost_COMPONENTS regex)
+    list(APPEND Boost_COMPONENTS regex program_options)
 endif()
 
 if (NOT DEFINED BUILD_DOCS)
