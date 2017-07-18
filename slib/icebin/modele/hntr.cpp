@@ -129,22 +129,6 @@ void Hntr::partition_north_south()
 
 }
 
-void Hntr::check(std::string const &label) const
-{
-
-    fprintf(stderr, "--------------------- BEGIN CHECK %s %p %p\n", label.c_str(), &JMIN(0), &JMAX(0));
-    for (int JB=1; JB <= Bgrid.jm; ++JB) {
-        int JAMIN = JMIN(JB);
-        int JAMAX = JMAX(JB);
-
-        if (JAMIN < 1 || JAMAX > Agrid.jm) {
-            fprintf(stderr, "JMIN/MAX[%d of %d] = (%d, %d) out of range (1, %d)\n", JB, Bgrid.jm, JAMIN, JAMAX, JMIN(JB), JMAX(JB));
-        }
-    }
-    fprintf(stderr, "--------------------- END CHECK\n");
-}
-
-
 void Hntr::regrid1(
     blitz::Array<double,1> const &WTA,
     blitz::Array<double,1> const &A,

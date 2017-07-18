@@ -66,8 +66,6 @@ public:
     /** Initialize overlap data structures, get ready to re-grid. */
     Hntr(HntrGrid const &_A, HntrGrid const &_B, double _DATMIS);
 
-    void check(std::string const &label) const;
-
     /**
     HNTR4 performs a horizontal interpolation of per unit area or per
     unit mass quantities defined on grid A, calculating the quantity
