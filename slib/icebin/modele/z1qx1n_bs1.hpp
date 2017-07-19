@@ -212,19 +212,43 @@ TopoOutputs make_topo_outputs();
  Z2MX2M.NGDC = FOCEN2: Ocean Fraction (0 or 1)
                ZETOP2: Solid Topography (m) except for ice shelves
     Z10MX10M = FLAKES: Lake Fraction (0:1)
+
+Ice Sheets:
      ZICEHXH = dZGICH: Glacial Ice Thickness (m)
                FGICEH: Glacial Ice Fraction (0:1)
                ZSOLDH: Ice Top Topography (m)
+
+Mountain Glaciers:
       ZNGDC1 = FCONT1: Continent Fraction (0:1)
-               FGICE1: Glacial Ice Fraction (0:1) */
+               FGICE1: Glacial Ice Fraction (0:1)
+*/
 class TopoInputs {
 public:
     ArrayBundle<double, 2> bundle;
 
-    blitz::Array<double, 2> FOCEN2, ZETOP2;
+    // --- 2 minutes (IM2, JM2)
+    // FOCEAN = Ocean Fraction (0:1)                     NGDC 2x2 (minutes)
+    blitz::Array<double, 2> FOCEN2;
+    // ZSOLID = Solid Ground Topography (m)              NGDC 2x2 (minutes)
+    blitz::Array<double, 2> ZETOP2;
+
+    // --- 10 minute (IMS, JMS)
+    // FLAKE: Lake Fraction (0 to 1)
     blitz::Array<double, 2> FLAKES;
-    blitz::Array<double, 2> dZGICH, FGICEH, ZSOLDH;
-    blitz::Array<double, 2> FCONT1, FGICE1;
+
+    // --- 1/2-degree (IMH, JMH)
+    // Ice Thickness (m) Ekholm, Bamber
+    blitz::Array<double, 2> dZGICH;
+    // Ice Fraction (m) Ekholm, Bamber
+    blitz::Array<double, 2> FGICEH;
+    // Ice Top Topography (m) ETOP05, Bamber
+    blitz::Array<double, 2> ZSOLDH;
+
+    // --- 1-degree (IM1, JM1)
+    // PLAND: = 1-POCEAN
+    blitz::Array<double, 2> FCONT1;
+    // PLICE: % OF LAND ICE
+    blitz::Array<double, 2> FGICE1;
 
     TopoInputs(ArrayBundle<double, 2> &&_bundle);
 };

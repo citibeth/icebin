@@ -426,6 +426,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     //
     // Add small ice cap and glacier data to FGICEH and dZGICH
     // north of Antarctic area.
+
     // Continental cells north of 78N are entirely glacial ice.
     in.FGICE1(Range::all(), Range(JM1*14/15+1, JM1)) = in.FCONT1(Range::all(), Range(JM1*14/15+1, JM1));
 

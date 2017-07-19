@@ -51,10 +51,10 @@ struct GridSpec_LonLat {
     If not, then many triangular grid cells will meet at the north pole. */
     bool north_pole;
 
-    /** Number of segments used to represent each side of a grid cell
+    /** Number of segments (not points) used to represent each side of a grid cell
     with a polygonal approximation.  Increasing this number will
     decrease geometric error at the expense of computation time for
-    the overlap matrix. */
+    the overlap matrix.  Must be at least 1. */
     int points_in_side;
 
     /** Radius of Earth (m), or whatever planet you're looking at.

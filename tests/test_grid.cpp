@@ -18,12 +18,19 @@
 
 // https://github.com/google/googletest/blob/master/googletest/docs/Primer.md
 
-#include <gtest/gtest.h>
-#include <icebin/Grid.hpp>
 #include <iostream>
 #include <cstdio>
 #include <netcdf>
+#include <gtest/gtest.h>
+#include <icebin/Grid.hpp>
+#include <icebin/gridgen/clippers.hpp>
+#include <icebin/gridgen/GridSpec_LonLat.hpp>
+#ifdef BUILD_MODELE
+#include <icebin/modele/GridSpec_Hntr.hpp>
+#endif
 
+using namespace std::placeholders;  // for _1, _2, _3...
+using namespace ibmisc;
 using namespace icebin;
 using namespace netCDF;
 
@@ -251,7 +258,62 @@ TEST_F(GridTest, centroid)
     }
 
 }
+// ------------------------------------------------------------
+#ifdef BUILD_MODELE
 
+
+// Bits...
+const int GREENLAND = 1;
+const int ANTARCTICA = 2;
+
+bool clip(int zone, double lon0, double lat0, double lon1, double lat1)
+{
+    // Is it in Greenland range?
+    if (zone & GREENLAND)
+        if (SphericalClip::lonlat(-74., 59., -10., 87.5,
+            lon0, lat0, lon1, lat1)) return true;
+
+    // Is it in Antarctica range?
+    if (zone & ANTARCTICA)
+        if (lat0 <= -60. || lat1 <= -60) return true;
+
+    // Not in range of either ice sheet, discard
+    return false;
+}
+
+
+TEST_F(GridTest, hntr)
+{
+    // Create a grid with Hntr-style parameterization
+    modele::GridSpec_Hntr hntr(modele::HntrGrid(4, 4, 0., 60.*45.));
+    hntr.name = "hntr";
+    hntr.spherical_clip = std::bind(&clip, GREENLAND|ANTARCTICA, _1, _2, _3, _4);
+    hntr.pole_caps = false;
+    hntr.points_in_side = 1;
+    hntr.eq_rad = 1.;
+
+    // Create a grid with traditional lon/lat parameterization
+    GridSpec_LonLat ll;
+    ll.name = "ll";
+    ll.spherical_clip = hntr.spherical_clip;
+    ll.latb = std::vector<double>{-90., -45., 0., 45., 90.};
+    ll.lonb = std::vector<double>{0., 90., 180., 270., 360.};
+    ll.indexing = ibmisc::Indexing(
+        {"lon", "lat"}, {0,0}, {ll.nlon(), ll.nlat()}, {1,0});  // col major
+    ll.south_pole = hntr.pole_caps;
+    ll.north_pole = hntr.pole_caps;
+    ll.points_in_side = hntr.points_in_side;
+    ll.eq_rad = hntr.eq_rad;
+
+    // Check the two grids are equal.
+    Grid_LonLat ll_grid, hntr_grid;
+    ll.make_grid(ll_grid);
+    hntr.make_grid(hntr_grid);
+    expect_eq(ll_grid, hntr_grid);
+
+}
+#endif // BUILD_MODELE
+// ------------------------------------------------------------
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

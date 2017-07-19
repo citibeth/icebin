@@ -57,6 +57,12 @@ if (BUILD_COUPLER)
             icebin/modele/z1qx1n_bs1.cpp
             icebin/modele/HNTR4.F90
         )
+
+        if (BUILD_GRIDGEN)
+            list(APPEND icebin_SOURCES
+                icebin/modele/GridSpec_Hntr.cpp)
+        endif()
+
     endif()
 
     if (USE_PISM)
@@ -69,7 +75,6 @@ if (BUILD_COUPLER)
             )
         endif()
     endif()
-
 endif()
 
 if (BUILD_GRIDGEN)

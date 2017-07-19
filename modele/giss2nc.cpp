@@ -7,8 +7,10 @@
 #include <ibmisc/fortranio.hpp>
 #include <ibmisc/memory.hpp>
 #include <ibmisc/blitz.hpp>
+#include <ibmisc/endian.hpp>
 #include <icebin/error.hpp>
 #include <icebin/modele/z1qx1n_bs1.hpp>
+#include <ibmisc/string.hpp>
 
 using namespace std;
 using namespace ibmisc;
@@ -16,6 +18,34 @@ using namespace icebin;
 using namespace icebin::modele;
 namespace po = boost::program_options;
 
+
+namespace boost {
+template<>
+Endian lexical_cast<Endian, std::string>(std::string const &token)
+{
+    if (token == "little")
+        return ibmisc::Endian::LITTLE;
+    if (token == "big")
+        return ibmisc::Endian::BIG;
+
+    throw boost::bad_lexical_cast();    
+}
+
+template<>
+std::string lexical_cast<std::string, Endian>(Endian const &endian)
+{
+    switch(endian) {
+        case ibmisc::Endian::LITTLE:
+            return "little";
+        case ibmisc::Endian::BIG:
+            return "big";
+    }
+
+    throw boost::bad_lexical_cast();    
+}
+
+
+}
 
 
 
@@ -29,7 +59,7 @@ std::vector<fortran::Shape<2>> stdshapes {
 
 // ----------------------------------------------------------------------
 static const boost::regex
-    titleiRE("(.*?):(.*?)(\\((.*?)\\))?\\s\\s(.*)");
+    titleiRE("(.*?):(.*?)(\\((.*?)\\))?(\\s\\s(.*))?");
 
 struct Info {
     std::string name;
@@ -52,18 +82,25 @@ std::string const get_match(boost::cmatch const &matches, int i)
     return str;
 }
 
-Info parse_titlei(std::string const &str)
+Info parse_titlei(std::string const &str, std::string const &use_name)
 {
     boost::cmatch matches;
     if (boost::regex_match(str.c_str(), matches, titleiRE)) {
-        return Info(
-            get_match(matches, 1),
-            get_match(matches, 2),
-            get_match(matches, 4),
-            get_match(matches, 5));
+        if (use_name == "") {
+            return Info(
+                get_match(matches, 1),
+                get_match(matches, 2),
+                get_match(matches, 4),
+                get_match(matches, 6));
+        } else {
+            return Info(
+                use_name,
+                get_match(matches, 1) + " " + get_match(matches, 2),
+                get_match(matches, 4),
+                get_match(matches, 6));
+        }
     } else {
-        (*icebin_error)(-1,
-            "Cannot parse titlei='%s'", str.c_str());
+        return Info(use_name, str, "", "");
     }
 }
 // ----------------------------------------------------------------------
@@ -72,12 +109,17 @@ int main(int argc, char **argv)
 {
     // Parse comamnd line arguments
     std::string ifname, ofname;
+    Endian endian;
+    std::vector<std::string> names;
+
     try {
 	    po::options_description desc("Allowed options");
 	    desc.add_options()
 	        ("help,h", "produce help message")
 	        ("input-file", po::value<string>(), "input file")
 	        ("output-file", po::value<string>(), "output file")
+            ("endian", po::value<Endian>()->default_value(Endian::LITTLE), "[big | little]")
+            ("names", po::value<string>()->default_value(""), "(OPTIONAL) comma-separated variable names")
 	    ;
 
 	    po::positional_options_description positional;
@@ -102,6 +144,11 @@ int main(int argc, char **argv)
 
         ifname = vm["input-file"].as<std::string>();
         ofname = vm["output-file"].as<std::string>();
+        endian = vm["endian"].as<Endian>();
+
+        std::string snames = vm["names"].as<std::string>();
+        if (snames != "")
+            boost::algorithm::split(names, snames, boost::is_any_of(","));
 
     } catch(std::exception &exp) {
         cout << "Error parsing arumgnets:" << endl << exp.what() << endl;
@@ -114,12 +161,15 @@ int main(int argc, char **argv)
     std::array<char, 80> titlei;
     fortran::Shape<2> const *data_shape;
 
-    {fortran::UnformattedInput fin(ifname, Endian::LITTLE);
+    {fortran::UnformattedInput fin(ifname, endian);
     TmpAlloc tmp;
     NcIO ncio(ofname, 'w');
 
         // Read and then write a single array
-        for (;;) {
+        for (size_t i=0;; ++i) {
+
+            if (names.size() > 0 && i >= names.size()) break;
+
 	        auto &data(tmp.make<blitz::Array<float,2>>());
 
             // Read from Fortran binary file
@@ -132,16 +182,27 @@ int main(int argc, char **argv)
 
             // Parse titlei
             // https://panthema.net/2007/0314-BoostRegex
-            Info info(parse_titlei(fortran::trim(titlei)));
+            std::string const &use_name = (i < names.size() ? names[i] : "");
+            std::string titlei_cxx(fortran::trim(titlei));
+            Info info(parse_titlei(titlei_cxx, use_name));
+            if (info.name == "") {
+                fprintf(stderr,
+                    "Cannot parse titlei='%s'; try using names parameter\n", titlei_cxx.c_str());
+                info.name = string_printf("var%02d", i);
+            }
 
-            // Write to NetCDF
-	        auto ncvar(ncio_blitz(ncio, data, false, info.name,
-	            get_or_add_dims(ncio,
-                    to_vector(data_shape->sshape),
-                    to_vector_cast<int,long,2>(data_shape->shape))));
-            get_or_put_att(ncvar, ncio.rw, "description", info.description);
-            get_or_put_att(ncvar, ncio.rw, "units", info.units);
-            get_or_put_att(ncvar, ncio.rw, "source", info.source);
+            printf("Read variable named %s: description=\"%s\"\n", info.name.c_str(), info.description.c_str());
+            if (info.name != "_") {
+
+                // Write to NetCDF
+	            auto ncvar(ncio_blitz(ncio, data, false, info.name,
+    	            get_or_add_dims(ncio,
+                        to_vector(data_shape->sshape),
+                        to_vector_cast<int,long,2>(data_shape->shape))));
+                get_or_put_att(ncvar, ncio.rw, "description", info.description);
+                get_or_put_att(ncvar, ncio.rw, "units", info.units);
+                get_or_put_att(ncvar, ncio.rw, "source", info.source);
+            }
         }
     }
 }
