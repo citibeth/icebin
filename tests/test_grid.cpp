@@ -23,16 +23,17 @@
 #include <netcdf>
 #include <gtest/gtest.h>
 #include <icebin/Grid.hpp>
-#include <icebin/gridgen/clippers.hpp>
 #include <icebin/gridgen/GridSpec_LonLat.hpp>
 #ifdef BUILD_MODELE
 #include <icebin/modele/GridSpec_Hntr.hpp>
+#include <icebin/modele/clippers.hpp>
 #endif
 
 using namespace std::placeholders;  // for _1, _2, _3...
 using namespace ibmisc;
 using namespace icebin;
 using namespace netCDF;
+using namespace icebin::modele;
 
 #if 0
 bool operator==(Vertex const &a, Vertex const &b)
@@ -261,33 +262,13 @@ TEST_F(GridTest, centroid)
 // ------------------------------------------------------------
 #ifdef BUILD_MODELE
 
-
-// Bits...
-const int GREENLAND = 1;
-const int ANTARCTICA = 2;
-
-bool clip(int zone, double lon0, double lat0, double lon1, double lat1)
-{
-    // Is it in Greenland range?
-    if (zone & GREENLAND)
-        if (SphericalClip::lonlat(-74., 59., -10., 87.5,
-            lon0, lat0, lon1, lat1)) return true;
-
-    // Is it in Antarctica range?
-    if (zone & ANTARCTICA)
-        if (lat0 <= -60. || lat1 <= -60) return true;
-
-    // Not in range of either ice sheet, discard
-    return false;
-}
-
-
 TEST_F(GridTest, hntr)
 {
     // Create a grid with Hntr-style parameterization
     modele::GridSpec_Hntr hntr(modele::HntrGrid(4, 4, 0., 60.*45.));
     hntr.name = "hntr";
-    hntr.spherical_clip = std::bind(&clip, GREENLAND|ANTARCTICA, _1, _2, _3, _4);
+    hntr.spherical_clip = std::bind(&ice_sheet::clip,
+        ice_sheet::GREENLAND|ice_sheet::ANTARCTICA, _1, _2, _3, _4);
     hntr.pole_caps = false;
     hntr.points_in_side = 1;
     hntr.eq_rad = 1.;
