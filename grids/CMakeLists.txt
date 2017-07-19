@@ -2,7 +2,6 @@ include_directories(${PROJECT_SOURCE_DIR}/slib)
 
 
 foreach (GRID
-    modele_ll
     searise
     overlap
     mar
@@ -24,3 +23,10 @@ foreach (GRID
     target_link_libraries (${GRID} icebin ${EXTERNAL_LIBS})
     install(TARGETS ${GRID} DESTINATION bin)
 endforeach()
+
+
+if (BUILD_MODELE)
+    add_executable(modele_ll modele_ll.cpp)
+    target_link_libraries (modele_ll icebin ${EXTERNAL_LIBS})
+    install(TARGETS modele_ll DESTINATION bin)
+endif()

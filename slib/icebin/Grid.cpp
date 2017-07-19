@@ -139,8 +139,29 @@ void sort_renumber_vertices(Grid &grid)
 }
 
 // ------------------------------------------------------------
+template<int RANK>
+blitz::TinyVector<int,RANK> blitz_extents(NcVar &ncv);
+
+template<int RANK>
+blitz::TinyVector<int,RANK> blitz_extents(NcVar &ncv)
+{
+    std::string name(ncv.getName());
+    if (ncv.getDimCount() != RANK) (*ibmisc_error)(-1,
+        "Dimensions of NetCDF variable %s does not match RANK=%d",
+        name.c_str(), RANK);
+
+    std::vector<NcDim> ncdims(ncv.getDims());
+    blitz::TinyVector<int,RANK> extents;
+    for (int i=0; i<RANK; ++i) {
+        extents[i] = ncdims[i].getSize();
+    }
+
+    return extents;
+}
+// ------------------------------------------------------------
 void Grid::nc_write(netCDF::NcGroup *nc, std::string const &vname) const
 {
+printf("BEGIN Grid::nc_write()\n");
     // ---------- Write out the vertices
     {
         std::vector<size_t> startp = {0,0};
@@ -149,15 +170,19 @@ void Grid::nc_write(netCDF::NcGroup *nc, std::string const &vname) const
         NcVar vertices_xy_v = nc->getVar(vname + ".vertices.xy");
 
         std::vector<Vertex const *> svertices(vertices.sorted());   // Sort by index
-        int i=0;
-        for (auto ii = svertices.begin(); ii != svertices.end(); ++i, ++ii) {
-            auto vertex(*ii);
-            startp[0] = i;
-            vertices_index_v.putVar(startp, countp, &vertex->index);
+        blitz::Array<int,1> vertices_index(blitz_extents<1>(vertices_index_v));
+        blitz::Array<double,2> vertices_xy(blitz_extents<2>(vertices_xy_v));
 
-            std::array<double, 2> point = {vertex->x, vertex->y};
-            vertices_xy_v.putVar(startp, countp, &point[0]);
+        for (int i=0; i<svertices.size(); ++i) {
+            Vertex const * const vertex(svertices[i]);
+            vertices_index(i) = vertex->index;
+            vertices_xy(i,0) = vertex->x;
+            vertices_xy(i,1) = vertex->y;
         }
+
+        countp[0] = svertices.size();
+        vertices_index_v.putVar(startp, countp, vertices_index.data());
+        vertices_xy_v.putVar(startp, countp, vertices_xy.data());
     }
 
     // -------- Write out the cells (and vertex references)
@@ -170,33 +195,57 @@ void Grid::nc_write(netCDF::NcGroup *nc, std::string const &vname) const
         NcVar cells_vertex_refs_start_v = nc->getVar(vname + ".cells.vertex_refs_start");
 
         std::vector<Cell const *> scells(cells.sorted());
-        std::vector<size_t> startp = {0,0};
-        std::vector<size_t> countp = {1,3};
-        std::vector<size_t> ivref = {0};
-        for (auto ii = scells.begin(); ii != scells.end(); ++ii, ++startp[0]) {
-            auto cell(*ii);
+        int const ncells = scells.size();
+
+        blitz::Array<int,1> cells_index(blitz_extents<1>(cells_index_v));
+        blitz::Array<int,2> cells_ijk(blitz_extents<2>(cells_ijk_v));
+        blitz::Array<double,1> cells_native_area(blitz_extents<1>(cells_native_area_v));
+        blitz::Array<int,1> cells_vertex_refs(blitz_extents<1>(cells_vertex_refs_v));
+        blitz::Array<int,1> cells_vertex_refs_start(blitz_extents<1>(cells_vertex_refs_start_v));
+
+        int ivref = 0;
+        int i=0;
+        for (; i<scells.size(); ++i) {
+            Cell const * const cell(scells[i]);
 
             // Write general cell contents
-            cells_index_v.putVar(startp, countp, &cell->index);
+            cells_index(i) = cell->index;
 
-            std::array<int, 3> ijk = {cell->i, cell->j, cell->k};
-            cells_ijk_v.putVar(startp, countp, &ijk[0]);
+            cells_ijk(i,0) = cell->i;
+            cells_ijk(i,1) = cell->j;
+            cells_ijk(i,2) = cell->k;
 
-            cells_native_area_v.putVar(startp, countp, &cell->native_area);
+            cells_native_area(i) = cell->native_area;
 
             // Write vertex indices for this cell
-            cells_vertex_refs_start_v.putVar(startp, countp, &ivref[0]);
+            cells_vertex_refs_start(i) = ivref;
             for (auto vertex = cell->begin(); vertex != cell->end();
-                ++vertex, ++ivref[0])
+                ++vertex, ++ivref)
             {
-                cells_vertex_refs_v.putVar(ivref, countp, &vertex->index);
+                cells_vertex_refs(ivref) = vertex->index;
             }
 
         }
 
         // Write out a sentinel for polygon index bounds
-        cells_vertex_refs_start_v.putVar(startp, countp, &ivref[0]);
+        cells_vertex_refs_start(i) = ivref;
+
+        std::vector<size_t> startp = {0,0};
+        std::vector<size_t> countp = {1,3};
+
+        countp[0] = cells_index.extent(0);
+        cells_index_v.putVar(startp, countp, cells_index.data());
+        cells_ijk_v.putVar(startp, countp, cells_ijk.data());
+        cells_native_area_v.putVar(startp, countp, cells_native_area.data());
+
+        countp[0] = cells_vertex_refs.extent(0);
+        cells_vertex_refs_v.putVar(startp, countp, cells_vertex_refs.data());
+
+        countp[0] = cells_vertex_refs_start.extent(0);
+        cells_vertex_refs_start_v.putVar(startp, countp, cells_vertex_refs_start.data());
+
     }
+printf("END Grid::nc_write()\n");
 }
 
 /** @param fname Name of file to load from (eg, an overlap matrix file)

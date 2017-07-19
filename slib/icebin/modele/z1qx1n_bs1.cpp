@@ -11,14 +11,6 @@ using namespace ibmisc;
 namespace icebin {
 namespace modele {
 
-// Grids we use
-HntrGrid const g2mx2m(HntrGrid(IM2, JM2, 0., 2.));
-HntrGrid const g10mx10m(HntrGrid(IMS, JMS, 0., 10.));
-HntrGrid const ghxh(HntrGrid(IMH, JMH, 0., 30.));
-HntrGrid const g1x1(HntrGrid(IM1, JM1, 0., 60.));
-HntrGrid const g1qx1(HntrGrid(IM, JM, 0., dLATM));
-
-
 // ==================================================================
 TopoOutputs::TopoOutputs(ArrayBundle<double, 2> &&_bundle) :
     bundle(std::move(_bundle)),
@@ -413,13 +405,6 @@ static const std::vector<ElevPoints> resets
 
 void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
 {
-    HntrGrid const g2mx2m(HntrGrid(IM2, JM2, 0., 2.));
-    HntrGrid const g10mx10m(HntrGrid(IMS, JMS, 0., 10.));
-    HntrGrid const ghxh(HntrGrid(IMH, JMH, 0., 30.));
-    HntrGrid const g1x1(HntrGrid(IM1, JM1, 0., 60.));
-    double const dLATM = 180.*60./JM;  //  latitude spacing (minutes)
-    HntrGrid const g1qx1(HntrGrid(IM, JM, 0., dLATM));
-
     double const TWOPI = 2. * M_PI;
     double const AREAG = 4. * M_PI;
 

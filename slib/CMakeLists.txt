@@ -54,6 +54,7 @@ if (BUILD_COUPLER)
             icebin/modele/api_f.f90
             icebin/modele/GCMCoupler_ModelE.cpp
             icebin/modele/hntr.cpp
+            icebin/modele/grids.cpp
             icebin/modele/z1qx1n_bs1.cpp
             icebin/modele/HNTR4.F90
         )

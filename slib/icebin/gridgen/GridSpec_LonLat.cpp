@@ -108,6 +108,7 @@ double polar_graticule_area_exact(double eq_rad,
 */
 void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
 {
+printf("BEGIN GridSpec_LonLat::make_grid()\n");
     grid.clear();
     grid.type = Grid::Type::LONLAT;
     grid.coordinates = Grid::Coordinates::LONLAT;
@@ -238,6 +239,7 @@ void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
     grid.south_pole = south_pole;
     grid.north_pole = north_pole;
     grid.indexing = indexing;
+printf("END GridSpec_LonLat::make_grid()\n");
 }
 
 // ---------------------------------------------------------

@@ -237,11 +237,11 @@ public:
     DenseArrayT<1> elevI;
 protected:
 
-    Type type;
+    Type type;          /// Grid::Parameterization
     std::string _name;  /// "greenland", "antarctica", etc.
     std::unique_ptr<Grid> gridI;            /// Ice grid outlines
     std::unique_ptr<Grid> exgrid;       /// Exchange grid outlines (between GCM and Ice)
-    InterpStyle interp_style;   /// How we interpolate I<-E
+    InterpStyle interp_style;   /// How we interpolate I<-E.  Determines basis functions in E
 
     // ---------------------------------
 
