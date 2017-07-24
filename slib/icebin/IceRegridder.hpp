@@ -91,6 +91,7 @@ struct WeightedSparse {
         |n| = Number of vectors being transformed
 
     @param A The values to regrid, as a series of Eigen column vectors.
+    @return Eigen type
     */
     EigenDenseMatrixT apply_e(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
@@ -98,7 +99,8 @@ struct WeightedSparse {
         double fill = std::numeric_limits<double>::quiet_NaN()) const;    // Fill value for cells not in BvA matrix
 
 
-    /** Apply to multiple variables */
+    /** Apply to multiple variables
+    @return Blitz type */
     blitz::Array<double,2> apply(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
         blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable

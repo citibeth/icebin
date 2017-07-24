@@ -569,6 +569,7 @@ EigenDenseMatrixT WeightedSparse::apply_e(
         return B0;
     }
 
+    // -------------- Apply the Conservation Correction
     // Integrate each variable of input (A) over full domain
     auto &wA_b(BvA.Mw);
     Eigen::Map<EigenRowVectorT> const wA(const_cast<double *>(wA_b.data()), 1, wA_b.extent(0));
@@ -588,7 +589,7 @@ EigenDenseMatrixT WeightedSparse::apply_e(
 
     std::cout << "-------- WeightedSparse::apply() conservation" << std::endl;
     std::cout << "    |input|    = " << TA << std::endl;
-    std::cout << "    |output|   = " << TA << std::endl;
+    std::cout << "    |output|   = " << TB << std::endl;
     std::cout << "    correction = " << Factor << std::endl;
 
     EigenDenseMatrixT ret(B0 * Factor.matrix().asDiagonal());    // ret{in}
