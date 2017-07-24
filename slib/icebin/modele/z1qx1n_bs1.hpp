@@ -202,7 +202,7 @@ Ice Sheets:
                ZSOLDH: Ice Top Topography (m)
 
 Mountain Glaciers:
-      ZNGDC1 = FCONT1: Continent Fraction (0:1)
+      ZNGDC1 = FCONT1: Continent Fraction (0:1); ALL continents, incl. Greenland & Antarctica
                FGICE1: Glacial Ice Fraction (0:1)
 */
 class TopoInputs {
@@ -230,6 +230,10 @@ public:
     // --- 1-degree (IM1, JM1)
     // PLAND: = 1-POCEAN
     blitz::Array<double, 2> FCONT1;
+//    // Greenland separated out from original FCONT1
+//    blitz::Array<double, 2> fcont1_greenland;
+
+
     // PLICE: % OF LAND ICE
     blitz::Array<double, 2> FGICE1;
 

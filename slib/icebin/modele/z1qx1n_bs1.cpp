@@ -12,6 +12,128 @@ namespace icebin {
 namespace modele {
 
 // ==================================================================
+class IceInfo {
+    blitz::Array<double,2> fgice;
+    blitz::Array<double,2> zatmo;    // Bottom of atmosphere
+//    blitz::Array<double,2> zbedrock; // Bedrock elevation
+};
+
+IceInfo get_legacy_ice()
+{
+    IceInfo legacy2;
+
+    IceInfo legacyH(IMH,JMH);
+    IceInfo greenlandH(IMH,JMH);
+    blitz::Array legacyH_fcont(IMH,JMH, fortranArray);
+    blitz::Array legacyH_dzgic(IMH,JMH, fortranArray);
+
+
+    // --------- Legacy Ice: Mountain Glaciers
+    // (North of Antarctica)
+    {
+        // Massage Mountain glaciers on the 1-degree grid
+        blitz::Array legacy1_fgice(IM1, JM1, fortranArray);
+        blitz::Array legacy1_fcont(IM1, JM1, fortranArray);
+
+        // Copy south of 78N
+        for (int j=1; j <= JM1*14/15; ++j) {
+        for (int i=1; i <= IMH; ++i) {
+            legacy1_fgice(i,j) = in.FGICE11(i,j) * in.FCONT1(i,j);    // Make sure only ice on continents (except Greenland)
+        }}
+        // Continental cells north of 78N are entirely glacial ice.
+        for (int j=JM1*14/15+1; j<=JM1; ++j) {
+        for (int i=1; i <= IMH; ++i) {
+            legacy1_fgice(i,j) = in.FCONT1(i,j);
+        }}
+
+        // Regrid to 1/2-degree grid, and add to legacyH
+        blitz::Array<double, 2> WT1(const_array(blitz::shape(IM1, JM1), 1.0, FortranArray<2>()));
+        Hntr hntr1h(g1x1, ghxh, 0);
+        hntr1h.regrid(WT1, in.FCONT1, legacyH_fcont);    // No greenland
+        hntr1h.regrid(WT1, legacy1_fgice, legacyH_fgice);
+    }
+
+    // --------- Legacy Ice: Re-do mountain glacier elevations
+    // (North of Antarctica)
+    {
+        // RGIC1H = (areal ratio of glacial ice to continent) ^.3
+        // For smaller ice caps and glaciers, dZGICH = CONSTK * RGIC1H
+        // Constant is chosen so that average value of dZGICH is 264.7 m
+        // 264.7  =  sum(DXYP*legacyH_fgice*dZGICH) / sum(DXYP*legacyH_fgice)  =
+        //        =  CONSTK * sum(DXYP*legacyH_fgice*RGIC1H) / sum(DXYP*legacyH_fgice)
+        double SUMDFR = 0;
+        double SUMDF = 0;
+        blitz::Array<double,2> RGIC1H(IMH, JMH, fortranArray);
+        for (int JH=JMH/6+1; JH<=JMH; ++JH) {
+            double sum1 = 0;
+            double sum2 = 0;
+            for (int IH=1; IH<=IMH; ++IH) {
+                double const fgice = legacyH_fgice(IH,JH);
+                if (fgice != 0) {
+                    RGIC1H(IH,JH) = std::pow(fgice / legacyH_fcont(IH,JH), .3);
+                    sum1 += fgice * RGIC1H(IJ,JH);
+                    sum2 += fgice;
+                }
+            }
+            SUMDFR += ghxh.dxyp(JH) * sum1;
+            SUMDF += ghxh.dxyp(JH) * sum2;
+        }
+        double CONSTK = 264.7 * SUMDF / SUMDFR;
+
+        // Replace in.FGICEH and dZGICH away from Greenland
+        for (int JH=JMH/6+1; JH <= JMH; ++JH) {
+            for (int IH=1; IH <= IMH; ++IH) {
+                legacyH_dzgic(IJ,JH) = CONSTK * RGIC1H(IH,JH);
+            }
+        }
+    }
+
+    // --------- Legacy Ice: Add in Antarctica
+    {
+        for (int j=1; j <= JMH/6; ++j) {
+        for (int i=1; i <= IMH; ++i) {
+            legacyH_fgice(i,j) = in.FGICEH(i,j);
+            legacyH_dzgic(i,j) = in.dzGICH(i,j);
+            // Bedrock from file is JUST under Antarctica
+            legacyH_zsold(i,j) = in.ZSOLDH(i,j);
+        }}
+    }
+
+
+
+    // ETOPO2 treats Antarctic ice shelves as ocean.
+    // When this happens ETOPO2 data are replaced with interpolated data
+    // from in.FGICEH and dZGICH.  Resulting files are:
+    // FOCEN2 = Ocean fraction (0 or 1) correct for Antarctic ice shelves
+    // FCONT2 = Continental fraction (0 or 1)
+    // FGICE2 = Glacial ice fraction (0 or 1)
+    // dZGIC2 = Thickness of glacial ice (m)
+    // ZSOLD2 = Solid topography (m)        (above ice)
+    // ZSOLG2 = Solid ground topography (m) (beneath ice)
+    //
+    blitz::Array<double, 2> WTH(const_array(blitz::shape(IMH, JMH), 1.0, FortranArray<2>()));
+    Hntr hntrhm2(ghxh, g2mx2m, 0);
+    auto FGICE2(hntrhm2.regrid(WTH, in.FGICEH));
+    auto dZGIC2(hntrhm2.regrid(in.FGICEH, in.dZGICH));
+    auto ZSOLD2(hntrhm2.regrid(in.FGICEH, in.ZSOLDH));
+
+    return legacy2;
+}
+
+IceInfo get_greenland_ice()
+{
+    IceInfo greenland2;
+
+TODO:
+1. Load an IceBin regridder
+2. Load a PISM ice sheet (extent, elevation, bedrock topo)
+3. Generate FGICE, ZATMO and zbedrock from PISM data
+4. Regrid PISM --> IM2/JM2
+
+}
+
+
+// ==================================================================
 TopoOutputs::TopoOutputs(ArrayBundle<double, 2> &&_bundle) :
     bundle(std::move(_bundle)),
     FOCEAN(bundle.at("FOCEAN").arr),
@@ -172,11 +294,14 @@ void read_raw(TopoInputs &in, FileLocator const &files)
         fortran::read(fin) >> fortran::endr;
         fortran::read(fin) >> fortran::endr;
 
+#if 1
+        fortran::read(fin) >> fortran::endr;
+#else
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.FCONT1) >> fortran::endr;
         in.bundle.at("FCONT1").description = fortran::trim(titlei);
         printf("FCONT1 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
-
+#endif
         fortran::read(fin) >> fortran::endr;
 
         fortran::read(fin) >> titlei >>
@@ -185,6 +310,22 @@ void read_raw(TopoInputs &in, FileLocator const &files)
         printf("FGICE1 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
+    // Read hand-modified FCONT1 (formerly from "ZNGDC1")
+    {NcIO ncio(files.locate("fcont1_greenland.nc"), 'r');
+        ncio_blitz(ncio, in.FCONT1, false, "FCONT1", "double",
+            get_dims(ncio, {"im1", "jm1"}));
+
+        // Separate Greenland from the rest
+        for (int j=1; j<=JM1; ++j) {
+        for (int i=1; i<=IM1; ++i) {
+            if (in.FCONT1(i,j) == 2.0) {
+                in.FCONT1(i,j) = 0;
+//                in.fcont1_greenland(i,j) = 1.0;
+            } else {
+//                in.fcont1_greenland(i,j) = 0;
+            }
+        }}
+    }
     printf("END z1qx1n_bs1 Read Input Files\n");
 }
 
@@ -470,21 +611,38 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
     auto dZGIC2(hntrhm2.regrid(in.FGICEH, in.dZGICH));
     auto ZSOLD2(hntrhm2.regrid(in.FGICEH, in.ZSOLDH));
 
-    // North of Antarctic area: 60S to 90N
+
+
+
+
+
+
+    // Invariant: FCONT2 = 1. - in.FOCEN2
     blitz::Array<double,2> FCONT2(IM2, JM2, fortranArray);
     blitz::Array<double,2> ZSOLG2(IM2, JM2, fortranArray);
     for (int J2=JM2/6+1; J2 <= JM2; ++J2) {
         FCONT2(Range::all(), J2) = 1. - in.FOCEN2(Range::all(), J2);
-        FGICE2(Range::all(), J2) = FGICE2(Range::all(), J2) * FCONT2(Range::all(), J2);
-        dZGIC2(Range::all(), J2) = dZGIC2(Range::all(), J2) * FCONT2(Range::all(), J2);
-        ZSOLD2(Range::all(), J2) = in.ZETOP2(Range::all(), J2);
-        ZSOLG2(Range::all(), J2) = in.ZETOP2(Range::all(), J2) - dZGIC2(Range::all(), J2);
     }
+
+    // North of Antarctic area: 60S to 90N
+    blitz::Array<double,2> FCONT2(IM2, JM2, fortranArray);
+    blitz::Array<double,2> ZSOLG2(IM2, JM2, fortranArray);
+    for (int J2=JM2/6+1; J2 <= JM2; ++J2) {
+    for (int i=1; i<=IM2; ++i) {
+        // Zero out ice in ocean grid cells
+        FGICE2(i, J2) = FGICE2(i, J2) * FCONT2(i, J2);
+        // Zero ice topography in ocean grid cells
+        dZGIC2(i, J2) = dZGIC2(i, J2) * FCONT2(i, J2);
+
+        ZSOLD2(i, J2) = in.ZETOP2(i, J2);
+        ZSOLG2(i, J2) = in.ZETOP2(i, J2) - dZGIC2(i, J2);
+    }}
 
     // Antarctic area: 90S to 60S
     for (int J2=1; J2<=JM2/6; ++J2) {
     for (int I2=1; I2<=IM2; ++I2) {
         if (in.FOCEN2(I2,J2) == 0) {
+            // -------- All Continuent
             // in.FOCEN2(I2,J2) = 0
             FCONT2(I2,J2) = 1;
             FGICE2(I2,J2) = 1;
@@ -493,6 +651,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
             if (in.ZETOP2(I2,J2) >= 100)  ZSOLD2(I2,J2) = in.ZETOP2(I2,J2);
             ZSOLG2(I2,J2) = ZSOLD2(I2,J2) - dZGIC2(I2,J2);
         } else if (FGICE2(I2,J2) <= .5) {  //  and in.FOCEN2(I2,J2) == 1
+            // -------- Mostly non-ice --> All Ocean
             // in.FOCEN2(I2,J2) = 1
             FCONT2(I2,J2) = 0;
             FGICE2(I2,J2) = 0;
@@ -500,6 +659,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
             ZSOLD2(I2,J2) = in.ZETOP2(I2,J2);
             ZSOLG2(I2,J2) = in.ZETOP2(I2,J2);
         } else if (FGICE2(I2,J2) > .5) {  //  and in.FOCEN2(I2,J2) == 1
+            // Mostly ice --> All Ice
             in.FOCEN2(I2,J2) = 0;
             FCONT2(I2,J2) = 1;
             FGICE2(I2,J2) = 1;
