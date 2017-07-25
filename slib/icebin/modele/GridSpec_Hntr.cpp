@@ -25,7 +25,7 @@ void GridSpec_Hntr::make_grid(Grid_LonLat &grid)
     // Longitude grid boundaries
     double const deg_by_im = 360. / (double)hntr.im;
     for (int i=0; i<hntr.im; ++i) {
-        spec.lonb.push_back( (hntr.offi + (double)i) * deg_by_im );
+        spec.lonb.push_back( 180. + (hntr.offi + (double)i) * deg_by_im );
     }
     spec.lonb.push_back(spec.lonb[0] + 360.);
 
