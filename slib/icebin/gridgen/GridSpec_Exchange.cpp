@@ -270,7 +270,7 @@ void GridSpec_Exchange::make_grid(Grid &exgrid)
 
         // Logging
         ++nprocessed;
-        if (nprocessed % 10 == 0) {
+        if (nprocessed % 100 == 0) {
             printf("Processed %d of %d from gridA, total overlaps = %d\n",
                 nprocessed+1, ogridA.ocells.size(), exgrid.cells.nrealized());
         }
