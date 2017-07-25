@@ -11,7 +11,7 @@ modele_ll_g2mx2m.nc:
 	modele_ll --zone g --grid 2mx2m --pole-caps=0
 
 # Overlap two grids
-modele_ll_g2mx2m-sr_g20_searise.nc:
+modele_ll_g2mx2m-sr_g20_searise.nc: modele_ll_g2mx2m.nc sr_g20_searise.nc
 	overlap modele_ll_g2mx2m.nc sr_g20_searise.nc
 
 
