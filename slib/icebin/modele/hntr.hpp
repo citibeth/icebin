@@ -62,9 +62,15 @@ public:
     // cell (IB,JB) has integrated value 0 of WTA
     double DATMIS;
 
+    // ALL = Ovewrite entire output array, putting DATMIS in non-present values
+    // PRESENT = Ovewrite only values that are present
+    // ADD = Add prsent values to output
+    enum class {ALL, PRESENT, ADD} Overwrite;
+    Overwrite overwrite;
+
 public:
     /** Initialize overlap data structures, get ready to re-grid. */
-    Hntr(HntrGrid const &_A, HntrGrid const &_B, double _DATMIS);
+    Hntr(HntrGrid const &_A, HntrGrid const &_B, OverwriteMode _overwrite, double _DATMIS);
 
     /**
     HNTR4 performs a horizontal interpolation of per unit area or per

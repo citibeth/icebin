@@ -142,7 +142,7 @@ printf("Read: %f %d %d %d %d\n", datmcb, ina, jna, inb, jnb);
     EXPECT_EQ(gridb.im, inb);
     EXPECT_EQ(gridb.jm, jnb);
 
-    Hntr hntr(grida, gridb, 0);
+    Hntr hntr(grida, gridb, Hntr::Overwrite::ALL, 0);
     printf("------------- SINA\n");
     cmp_array(hntr.SINA, sina);
     printf("------------- SINB\n");
@@ -199,7 +199,7 @@ void cmp_regrid(
 
     // Regrid with C++
     auto Bc(gridB.Array<double>());
-    Hntr hntr(gridA, gridB, 0);
+    Hntr hntr(gridA, gridB, Hntr::Overwrite::ALL, 0);
     hntr.regrid(WTAc, Ac, Bc);
 
     // Regrid with Fortran
@@ -311,7 +311,7 @@ TEST_F(HntrTest, regrid)
     }}
 
 
-    Hntr hntr(g8, g4, 0);
+    Hntr hntr(g8, g4, Hntr::Overwrite::ALL, 0);
     hntr.regrid(wt8, vals8, vals4);
 
     double sum4=0;

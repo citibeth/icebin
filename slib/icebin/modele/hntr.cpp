@@ -22,7 +22,7 @@ HntrGrid::HntrGrid(int _im, int _jm, double _offi, double _dlat) :
 }
 
 
-Hntr::Hntr(HntrGrid const &_Agrid, HntrGrid const &_Bgrid, double _DATMIS)
+Hntr::Hntr(HntrGrid const &_Agrid, HntrGrid const &_Bgrid, OverwriteMode _overwrite, double _DATMIS)
     : Agrid(_Agrid), Bgrid(_Bgrid),
       SINA(Range(0, Agrid.jm)),
       SINB(Range(0, Bgrid.jm)),
@@ -34,7 +34,7 @@ Hntr::Hntr(HntrGrid const &_Agrid, HntrGrid const &_Bgrid, double _DATMIS)
       GMAX(Range(1, Bgrid.jm)),
       JMIN(Range(1, Bgrid.jm)),
       JMAX(Range(1, Bgrid.jm)),
-      DATMIS(_DATMIS)
+      overwrite(_overwrite), DATMIS(_DATMIS)
 {
 
     partition_east_west();
@@ -175,7 +175,17 @@ void Hntr::regrid1(
                     VALUE  += wt*A(IJA);
                 }
             }
-            B(IJB) = (WEIGHT == 0 ? DATMIS : VALUE / WEIGHT);
+            switch(ovewrite) {
+                case Overwrite::ALL :
+                    B(IJB) = (WEIGHT == 0 ? DATMIS : VALUE / WEIGHT);
+                break;
+                case Overwrite::PRESENT :
+                    if (WEIGHT != 0) B(IJB) = VALUE / WEIGHT;
+                break;
+                case Overwrite::ADD :
+                    if (WEIGHT != 0) B(IJB) += VALUE / WEIGHT;
+                break;
+            }
         }
     }
 

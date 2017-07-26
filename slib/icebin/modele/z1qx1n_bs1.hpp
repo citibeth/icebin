@@ -230,8 +230,8 @@ public:
     // --- 1-degree (IM1, JM1)
     // PLAND: = 1-POCEAN
     blitz::Array<double, 2> FCONT1;
-//    // Greenland separated out from original FCONT1
-//    blitz::Array<double, 2> fcont1_greenland;
+    // Greenland separated out from original FCONT1
+    blitz::Array<double, 2> fcont1_greenland;
 
 
     // PLICE: % OF LAND ICE
