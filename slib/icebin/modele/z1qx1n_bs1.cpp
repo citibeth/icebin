@@ -11,106 +11,175 @@ using namespace ibmisc;
 namespace icebin {
 namespace modele {
 
+
+
 // ==================================================================
-TopoOutputs::TopoOutputs(ArrayBundle<double, 2> &&_bundle) :
-    bundle(std::move(_bundle)),
-    FOCEAN(bundle.at("FOCEAN").arr),
-    FLAKE(bundle.at("FLAKE").arr),
-    FGRND(bundle.at("FGRND").arr),
-    FGICE(bundle.at("FGICE").arr),
-    ZATMO(bundle.at("ZATMO").arr),
-    dZOCEN(bundle.at("dZOCEN").arr),
-    dZLAKE(bundle.at("dZLAKE").arr),
-    dZGICE(bundle.at("dZGICE").arr),
-    ZSOLDG(bundle.at("ZSOLDG").arr),
-    ZSGLO(bundle.at("ZSGLO").arr),
-    ZLAKE(bundle.at("ZLAKE").arr),
-    ZGRND(bundle.at("ZGRND").arr),
-    ZSGHI(bundle.at("ZSGHI").arr),
-    FOCENF(bundle.at("FOCENF").arr)
-{}
-
-TopoOutputs make_topo_outputs()
+static ArrayBundle<double,2> topo_outputs_bundle()
 {
-    ArrayBundle<double, 2> bundle;
-    static const auto shape(blitz::shape(IM,JM));
-    static const std::array<std::string,2> sshape {"im", "jm"};
-
-    bundle.add("FOCEAN", shape, sshape,
-        "0 or 1, Bering Strait 1 cell wide", "", "GISS 1Qx1");
-
-    bundle.add("FLAKE", shape, sshape,
-        "Lake Surface Fraction", "0:1", "GISS 1Qx1");
-
-    bundle.add("FGRND", shape, sshape,
-        "Ground Surface Fraction", "0:1", "GISS 1Qx1");
-
-    bundle.add("FGICE", shape, sshape,
-        "Glacial Ice Surface Fraction", "0:1", "GISS 1Qx1");
-
-    bundle.add("ZATMO", shape, sshape,
-        "Atmospheric Topography", "m", "ETOPO2 1Qx1");
-
-    bundle.add("dZOCEN", shape, sshape,
-        "Ocean Thickness", "m", "ETOPO2 1Qx1");
-
-    bundle.add("dZLAKE", shape, sshape,
-        "Lake Thickness", "m", "ETOPO2 1Qx1");
-
-    bundle.add("dZGICE", shape, sshape,
-        "Glacial Ice Thickness", "m", "Ekholm,Bamber");
-
-    bundle.add("ZSOLDG", shape, sshape,
-        "Solid Ground Topography", "m", "ETOPO2 1Qx1");
-
-    bundle.add("ZSGLO", shape, sshape,
-        "Lowest Solid Topography", "m", "ETOPO2 1Qx1");
-
-    bundle.add("ZLAKE", shape, sshape,
-        "Lake Surface Topography", "m", "ETOPO2 1Qx1");
-
-    bundle.add("ZGRND", shape, sshape,
-        "Topography Break between Ground and GIce", "", "ETOPO2 1Qx1");
-
-    bundle.add("ZSGHI", shape, sshape,
-        "Highest Solid Topography", "m", "ETOPO2 1Qx1");
-
-    bundle.add("FOCENF", shape, sshape,
-        "Fractional ocean ocver", "", "GISS 1Qx1");
-
-    auto ret(TopoOutputs(std::move(bundle)));
-    return ret;
+    ArrayBundle<double,2> bundle;
+    bundle.add("FOCEAN", {
+        "description", "0 or 1, Bering Strait 1 cell wide",
+        "units", "1",
+        "source", "GISS 1Qx1",
+    });
+    bundle.add("FLAKE", {
+        "description", "Lake Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    });
+    bundle.add("FGRND", {
+        "description", "Ground Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    });
+    bundle.add("FGICE", {
+        "description", "Glacial Ice Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    });
+    bundle.add("ZATMO", {
+        "description", "Atmospheric Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("dZOCEN", {
+        "description", "Ocean Thickness",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("dZLAKE", {
+        "description", "Lake Thickness",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("dZGICE", {
+        "description", "Glacial Ice Thickness",
+        "units", "m",
+        "sources", "Ekholm,Bamber",
+    });
+    bundle.add("ZSOLDG", {
+        "description", "Solid Ground Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZSGLO", {
+        "description", "Lowest Solid Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZLAKE", {
+        "description", "Lake Surface Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZGRND", {
+        "description", "Topography Break between Ground and GIce",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZSGHI", {
+        "description", "Highest Solid Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("FOCENF", {
+        "description", "Fractional ocean ocver",
+        "units", "1",
+        "sources", "GISS 1Qx1",
+    });
+    return bundle;
 }
 
-TopoInputs::TopoInputs(ArrayBundle<double, 2> &&_bundle) : bundle(std::move(_bundle)),
-    FOCEN2(bundle.at("FOCEN2").arr),
-    ZETOP2(bundle.at("ZETOP2").arr),
-    FLAKES(bundle.at("FLAKES").arr),
-    dZGICH(bundle.at("dZGICH").arr),
-    FGICEH(bundle.at("FGICEH").arr),
-    ZSOLDH(bundle.at("ZSOLDH").arr),
-    FCONT1(bundle.at("FCONT1").arr),
-    FGICE1(bundle.at("FGICE1").arr)
-{}
-
-TopoInputs make_topo_inputs()
+TopoOutputs::TopoOutputs(bool allocate) :
+    bundle(topo_outputs_bundle()),
+    FOCEAN(bundle.array("FOCEAN")),
+    FLAKE(bundle.array("FLAKE")),
+    FGRND(bundle.array("FGRND")),
+    FGICE(bundle.array("FGICE")),
+    ZATMO(bundle.array("ZATMO")),
+    dZOCEN(bundle.array("dZOCEN")),
+    dZLAKE(bundle.array("dZLAKE")),
+    dZGICE(bundle.array("dZGICE")),
+    ZSOLDG(bundle.array("ZSOLDG")),
+    ZSGLO(bundle.array("ZSGLO")),
+    ZLAKE(bundle.array("ZLAKE")),
+    ZGRND(bundle.array("ZGRND")),
+    ZSGHI(bundle.array("ZSGHI")),
+    FOCENF(bundle.array("FOCENF"))
 {
-    ArrayBundle<double, 2> bundle;
-    bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"});
-    bundle.add("ZETOP2", blitz::shape(IM2, JM2), {"im2", "jm2"});
-
-    bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"});
-
-    bundle.add("dZGICH", blitz::shape(IMH, JMH), {"imh", "jmh"});
-    bundle.add("FGICEH", blitz::shape(IMH, JMH), {"imh", "jmh"});
-    bundle.add("ZSOLDH", blitz::shape(IMH, JMH), {"imh", "jmh"});
-
-    bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"});
-    bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"});
-
-    auto ret(TopoInputs(std::move(bundle)));
-    return ret;
+    if (allocate) {
+        bundle.allocate(blitz::shape(IM,JM), {"im", "jm"},
+            true, blitz::fortranArray);
+    }
 }
+
+
+static ArrayBundle<double,2> topo_inputs_bundle()
+{
+
+    ArrayBundle<double,2> bundle;
+    bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {
+        "description", "Ocean Fraction",
+        "units", "0 or 1",
+    });
+    bundle.add("ZETOP2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {
+        "description", "Solid Topography except for ice shelves",
+        "units", "m",
+        "source", "Z2MX2M.NGDC"
+    });
+
+    bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"}, {
+        "description", "Lake Fraction",
+        "units", "0:1",
+        "source", "Z2MX2M.NGDC"
+    });
+
+    bundle.add("dZGICH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {
+        "description", "Glacial Ice Thickness",
+        "units", "m",
+        "source", "ZICEHXH"
+    });
+    bundle.add("FGICEH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {
+        "description", "Glacial Ice Fraction (Antarctica & Greenland only)",
+        "units", "0:1",
+        "source", "ZICEHXH"
+    });
+    bundle.add("ZSOLDH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {
+        "description", "Ice Topography (Antarctica & Greenland only)",
+        "units", "m",
+        "source", "ZICEHXH"
+    });
+
+    bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {
+        "description", "Continental Fraction",
+        "units", "0:1",
+        "SOURCE", "ZNGDC1"
+    });
+    bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {
+        "description", "Glacial Ice Fraction (all ice)",
+        "units", "0:1",
+        "SOURCE", "ZNGDC1"
+    });
+
+    return bundle;
+}
+
+TopoInputs::TopoInputs(bool allocate) :
+    bundle(topo_inputs_bundle()),
+    FOCEN2(bundle.array("FOCEN2")),
+    ZETOP2(bundle.array("ZETOP2")),
+    FLAKES(bundle.array("FLAKES")),
+    dZGICH(bundle.array("dZGICH")),
+    FGICEH(bundle.array("FGICEH")),
+    ZSOLDH(bundle.array("ZSOLDH")),
+    FCONT1(bundle.array("FCONT1")),
+    FGICE1(bundle.array("FGICE1"))
+{
+    if (allocate) {
+        bundle.allocate(true, blitz::fortranArray);
+    }
+}
+
 
 
 
@@ -126,12 +195,12 @@ void read_raw(TopoInputs &in, FileLocator const &files)
         fortran::UnformattedInput fin(files.locate(fname), Endian::BIG);
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.FOCEN2) >> fortran::endr;
-        in.bundle.at("FOCEN2").description = fortran::trim(titlei);
+        //in.bundle.at("FOCEN2").set_attr("description", fortran::trim(titlei));
         printf("FOCEN2 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
 
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.ZETOP2) >> fortran::endr;
-        in.bundle.at("ZETOP2").description = fortran::trim(titlei);
+        //in.bundle.at("ZETOP2").description = fortran::trim(titlei);
         printf("ZETOP2 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
@@ -141,7 +210,7 @@ void read_raw(TopoInputs &in, FileLocator const &files)
         fortran::read(fin) >> fortran::endr;
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.FLAKES) >> fortran::endr;
-        in.bundle.at("FLAKES").description = fortran::trim(titlei);
+        //in.bundle.at("FLAKES").description = fortran::trim(titlei);
         printf("FLAKES read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
@@ -151,17 +220,17 @@ void read_raw(TopoInputs &in, FileLocator const &files)
 
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.dZGICH) >> fortran::endr;
-        in.bundle.at("dZGICH").description = fortran::trim(titlei);
+        //in.bundle.at("dZGICH").description = fortran::trim(titlei);
         printf("dZGICH read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
 
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.FGICEH) >> fortran::endr;
-        in.bundle.at("FGICEH").description = fortran::trim(titlei);
+        //in.bundle.at("FGICEH").description = fortran::trim(titlei);
         printf("FGICEH read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
 
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.ZSOLDH) >> fortran::endr;
-        in.bundle.at("ZSOLDH").description = fortran::trim(titlei);
+        //in.bundle.at("ZSOLDH").description = fortran::trim(titlei);
         printf("ZSOLDH read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
@@ -174,14 +243,14 @@ void read_raw(TopoInputs &in, FileLocator const &files)
 
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.FCONT1) >> fortran::endr;
-        in.bundle.at("FCONT1").description = fortran::trim(titlei);
+        //in.bundle.at("FCONT1").description = fortran::trim(titlei);
         printf("FCONT1 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
 
         fortran::read(fin) >> fortran::endr;
 
         fortran::read(fin) >> titlei >>
             fortran::blitz_cast<float, double, 2>(in.FGICE1) >> fortran::endr;
-        in.bundle.at("FGICE1").description = fortran::trim(titlei);
+        //in.bundle.at("FGICE1").description = fortran::trim(titlei);
         printf("FGICE1 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
@@ -215,25 +284,25 @@ void callZ(
     ArrayBundle<double,2> bundle;
 
     // (IM2, JM2)
-    bundle.add("FOCEN2", FOCEN2, {"im2", "jm2"});
-    bundle.add("ZSOLD2", ZSOLD2, {"im2", "jm2"});
-    bundle.add("ZSOLG2", ZSOLG2, {"im2", "jm2"});
+    bundle.add("FOCEN2", FOCEN2, {"im2", "jm2"}, {});
+    bundle.add("ZSOLD2", ZSOLD2, {"im2", "jm2"}, {});
+    bundle.add("ZSOLG2", ZSOLG2, {"im2", "jm2"}, {});
 
     // (IM, IM)
-    bundle.add("FOCEAN", FOCEAN, {"im", "jm"});
-    bundle.add("FLAKE", FLAKE, {"im", "jm"});
-    bundle.add("FGRND", FGRND, {"im", "jm"});
+    bundle.add("FOCEAN", FOCEAN, {"im", "jm"}, {});
+    bundle.add("FLAKE", FLAKE, {"im", "jm"}, {});
+    bundle.add("FGRND", FGRND, {"im", "jm"}, {});
 
     // (IM, IM)
-    bundle.add("ZATMO", ZATMO, {"im", "jm"});
-    bundle.add("dZLAKE", dZLAKE, {"im", "jm"});
-    bundle.add("ZSOLDG", ZSOLDG, {"im", "jm"});
-    bundle.add("ZSGLO", ZSGLO, {"im", "jm"});
-    bundle.add("ZLAKE", ZLAKE, {"im", "jm"});
-    bundle.add("ZGRND", ZGRND, {"im", "jm"});
-    bundle.add("ZSGHI", ZSGHI, {"im", "jm"});
+    bundle.add("ZATMO", ZATMO, {"im", "jm"}, {});
+    bundle.add("dZLAKE", dZLAKE, {"im", "jm"}, {});
+    bundle.add("ZSOLDG", ZSOLDG, {"im", "jm"}, {});
+    bundle.add("ZSGLO", ZSGLO, {"im", "jm"}, {});
+    bundle.add("ZLAKE", ZLAKE, {"im", "jm"}, {});
+    bundle.add("ZGRND", ZGRND, {"im", "jm"}, {});
+    bundle.add("ZSGHI", ZSGHI, {"im", "jm"}, {});
 
-    bundle.ncio(ncio, "", "double");
+    bundle.ncio(ncio, {}, false, "", "double");
 }
 
 

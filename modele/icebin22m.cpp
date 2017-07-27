@@ -156,14 +156,14 @@ printf("dimI: ndense=%d nsparse%ld\n", dimI.dense_extent(), dimI.sparse_extent()
 
     // ---------------- Store in output
     // Extract output variables
-    auto WT2_1(reshape1(obundle.at("WT").arr));
-    auto FCONT2_1(reshape1(obundle.at("FCONT").arr));
-    auto FOCEN2_1(reshape1(obundle.at("FOCEN").arr));
-    auto FGICE_SHEET2_1(reshape1(obundle.at("FGICE_SHEET").arr));
-    auto FGICE2_1(reshape1(obundle.at("FGICE").arr));
-    auto dZGIC2_1(reshape1(obundle.at("dZGIC").arr));
-    auto ZSOLD2_1(reshape1(obundle.at("ZSOLD").arr));
-    auto ZSOLG2_1(reshape1(obundle.at("ZSOLG").arr));
+    auto WT2_1(reshape1(obundle.array("WT")));
+    auto FCONT2_1(reshape1(obundle.array("FCONT")));
+    auto FOCEN2_1(reshape1(obundle.array("FOCEN")));
+    auto FGICE_SHEET2_1(reshape1(obundle.array("FGICE_SHEET")));
+    auto FGICE2_1(reshape1(obundle.array("FGICE")));
+    auto dZGIC2_1(reshape1(obundle.array("dZGIC")));
+    auto ZSOLD2_1(reshape1(obundle.array("ZSOLD")));
+    auto ZSOLG2_1(reshape1(obundle.array("ZSOLG")));
 
     ibmisc::Proj_LL2XY proj(ice_regridder->gridI->sproj);
     for (int i_d=0; i_d<dimA.dense_extent(); ++i_d) {
@@ -184,25 +184,26 @@ printf("dimI: ndense=%d nsparse%ld\n", dimI.dense_extent(), dimI.sparse_extent()
 }
 
 
-ArrayBundle<double, 2> make_bundle(TinyVector<int,2> const &shape, std::array<std::string,2> const &dims)
+ArrayBundle<double,2> make_bundle()
 {
     ArrayBundle<double, 2> bundle;
 
-    bundle.add("WT", shape, dims);            // Fortran Arrays
-    bundle.add("FCONT", shape, dims);
-    bundle.add("FOCEN", shape, dims);
-    bundle.add("FGICE_SHEET", shape, dims);
-    bundle.add("FGICE", shape, dims);
-    bundle.add("dZGIC", shape, dims);
-    bundle.add("ZSOLD", shape, dims);
-    bundle.add("ZSOLG", shape, dims);
+    bundle.add("WT", {});            // Fortran Arrays
+    bundle.add("FCONT", {});
+    bundle.add("FOCEN", {});
+    bundle.add("FGICE_SHEET", {});
+    bundle.add("FGICE", {});
+    bundle.add("dZGIC", {});
+    bundle.add("ZSOLD", {});
+    bundle.add("ZSOLG", {});
 
     return bundle;
 }
 
 void do_main()
 {
-    auto bundle2(make_bundle(blitz::shape(IM2, JM2), {"im2", "jm2"}));
+    auto bundle2(make_bundle());
+    bundle2.allocate(blitz::shape(IM2, JM2), {"im2", "jm2"});
 
     for (size_t i=0; i<bundle2.data.size(); ++i) {
         bundle2.data[i].arr = NaN;
@@ -222,7 +223,8 @@ void do_main()
     icebin::modele::greenland_2m(pism_fname, gcm_regridder, bundle2);
 
     // Regrid to 1/2-degree --- because the 2-minute file is too slow for ncview
-    auto bundleH(make_bundle(blitz::shape(IMH, JMH), {"imh", "jmh"}));
+    auto bundleH(make_bundle());
+    bundleH.allocate(blitz::shape(IMH, JMH), {"imh", "jmh"});
     Hntr hntr(g2mx2m, ghxh, NaN);
     for (size_t i=0; i<bundleH.data.size(); ++i) {
         bundleH.data[i].arr.reference(hntr.regrid(bundle2.at("WT").arr, bundle2.data[i].arr));
@@ -230,7 +232,7 @@ void do_main()
 
     printf("BEGIN writing output\n");
     {NcIO ncio("greenland2m.nc", 'w');
-        bundleH.ncio(ncio, "", "double");
+        bundleH.ncio(ncio, {}, false, "", "double");
     }
     printf("END writing output\n");
 

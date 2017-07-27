@@ -55,19 +55,19 @@ int main(int argc, char** argv)
 
     // Read the input files
     printf("============ Reading Input Files\n");
-    auto topo_inputs(make_topo_inputs());    // Allocate
+    TopoInputs topo_inputs(true);
     read_raw(topo_inputs, EnvSearchPath("MODELE_FILE_PATH"));
 
     // Do the calculation
     printf("============ Calculating TOPO\n");
-    auto topo_outputs(make_topo_outputs());
+    TopoOutputs topo_outputs(true);
     z1qx1n_bs1(topo_inputs, topo_outputs);
 
 
     printf("============ Writing Output\n");
     {NcIO ncio(args.ofname, 'w');
 
-        topo_outputs.bundle.ncio(ncio, "", "double");
+        topo_outputs.bundle.ncio(ncio, {}, false, "", "double");
     }
 
 }

@@ -62,7 +62,7 @@ protected:
 
 TEST_F(Z1qx1n_Bs1Test, read_inputs)
 {
-    auto topo_inputs(make_topo_inputs());
+    TopoInputs topo_inputs(true);
 
     NcIO ncio("topo_inputs.nc", 'w');
 
@@ -70,7 +70,7 @@ TEST_F(Z1qx1n_Bs1Test, read_inputs)
     EnvSearchPath locator("MODELE_FILE_PATH");
     read_raw(topo_inputs, locator);
 
-    topo_inputs.bundle.ncio(ncio, "", "double");
+    topo_inputs.bundle.ncio(ncio, {}, true, "", "double");
     ncio.close();
 }
 
