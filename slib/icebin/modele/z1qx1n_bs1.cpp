@@ -11,6 +11,7 @@ using namespace ibmisc;
 namespace icebin {
 namespace modele {
 
+static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 
 // ==================================================================
@@ -113,32 +114,34 @@ TopoOutputs::TopoOutputs(bool allocate) :
     }
 }
 // -------------------------------------------------------
-GreenlandInputs::GreenlandInputs(ArrayBundle<double, 2> &&_bundle) : bundle(std::move(_bundle)),
-    FOCEN2(bundle.at("FOCEN2").arr),
-    ZETOP2(bundle.at("ZETOP2").arr),
-    FLAKES(bundle.at("FLAKES").arr),
-    dZGICH(bundle.at("dZGICH").arr),
-    FGICEH(bundle.at("FGICEH").arr),
-    ZSOLDH(bundle.at("ZSOLDH").arr),
-    FCONT1(bundle.at("FCONT1").arr),
-    FGICE1(bundle.at("FGICE1").arr)
-{}
-
-GreenlandInputs make_greenland_inputs()
+ArrayBundle<double,2> greenland_inputs_bundle()
 {
     ArrayBundle<double, 2> bundle;
-    bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"});
+    bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {});
+    bundle.add("FOCENS", blitz::shape(IMS, JMS), {"ims", "jms"}, {});
 
-    bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"});
+    bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"}, {});
 
-    bundle.add("FGICEH", blitz::shape(IMH, JMH), {"imh", "jmh"});
+    bundle.add("FGICEH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {});
 
-    bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"});
-    bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"});
+    bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {});
+    bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {});
 
-    auto ret(GreenlandInputs(std::move(bundle)));
-    return ret;
+    return bundle;
 }
+
+GreenlandInputs::GreenlandInputs(bool allocate) :
+    bundle(greenland_inputs_bundle()),
+    FOCEN2(bundle.array("FOCEN2")),
+    FOCENS(bundle.array("FOCENS")),
+    FLAKES(bundle.array("FLAKES")),
+    FGICEH(bundle.array("FGICEH")),
+    FCONT1(bundle.array("FCONT1")),
+    FGICE1(bundle.array("FGICE1"))
+{
+    if (allocate) bundle.allocate(true, blitz::fortranArray);
+}
+
 
 
 static ArrayBundle<double,2> topo_inputs_bundle()
@@ -211,7 +214,7 @@ TopoInputs::TopoInputs(bool allocate) :
 
 
 // ======================================================================
-void read_raw(TopoInputs &in, TopoInputs *greenland, FileLocator const &files)
+void read_raw(TopoInputs &in, GreenlandInputs *greenland, FileLocator const &files)
 {
     std::array<char,80> titlei;
 
@@ -220,6 +223,8 @@ void read_raw(TopoInputs &in, TopoInputs *greenland, FileLocator const &files)
     // ---------------------------------------------------------
     // Read in Z2MX2M.NGDC
     // Read hand-modified FOCEN2
+    blitz::Array<double,2> greenland_focen2(
+        greenland ? greenland->FOCEN2 : blitz::Array<double,2>(IM2,JM2,fortranArray));
     {NcIO ncio(files.locate("Z2MX2M.NGDC-SeparateGreenland.nc"), 'r');
         ncio_blitz(ncio, in.FOCEN2, false, "FOCEN2", "double",
             get_dims(ncio, {"im2", "jm2"}));
@@ -228,17 +233,13 @@ void read_raw(TopoInputs &in, TopoInputs *greenland, FileLocator const &files)
             get_dims(ncio, {"im2", "jm2"}));
 
         // Separate Greenland from the rest
-        if (greenland) {
-            greenland->FOCEN2 = NaN;
-            // We can use in.ZETOP2 in place of greenland->ZETOP2
-        }
-        for (int j=1; j<=JM1; ++j) {
-        for (int i=1; i<=IM1; ++i) {
+        greenland_focen2 = NaN;
+
+        for (int j=1; j<=JM2; ++j) {
+        for (int i=1; i<=IM2; ++i) {
             if (in.FOCEN2(i,j) == 2.0) {
                 in.FOCEN2(i,j) = 1.0;
-                if (greenland) {
-                    greenland->FOCEN2(i,j) = 0.0;
-                }
+                greenland_focen2(i,j) = 0.0;
             }
         }}
     }
@@ -255,17 +256,21 @@ void read_raw(TopoInputs &in, TopoInputs *greenland, FileLocator const &files)
     }
 
 
-    // Separate Greenland from the rest
+    // Zero out lakes over Greenland
     blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
     Hntr hntr2mh(g2mx2m, g10mx10m, 0);
-    auto greenland_focens(hntr2mh.regrid(WT2, greenland->FOCEN2, 0));
+    blitz::Array<double,2> greenland_focens(
+        greenland ? greenland->FOCENS : blitz::Array<double,2>(IMS,JMS,fortranArray));
+
+    hntr2mh.regrid(WT2, greenland_focen2, greenland_focens, 0);
 
     if (greenland) greenland->FLAKES = NaN;
+printf("Range (%d %d) (%d %d)\n", IMS, JMS, in.FLAKES.extent(0), in.FLAKES.extent(1));
     for (int j=1; j<=JMS; ++j) {
     for (int i=1; i<=IMS; ++i) {
-        if (greenland_focens(i,j) == 0.0) {
-            if (greenland) greenland->FLAKES(i,j) = in.FLAKES(i,j)
-            in.FLAKES(i,j) = 0;
+        if (std::abs(greenland_focens(i,j)) < 1e-14) {
+            if (greenland) greenland->FLAKES(i,j) = in.FLAKES(i,j);
+            in.FLAKES(i,j) = 0.0;
         }
     }}
 
@@ -311,15 +316,17 @@ void read_raw(TopoInputs &in, TopoInputs *greenland, FileLocator const &files)
             get_dims(ncio, {"im1", "jm1"}));
 
         // Separate Greenland from the rest
-        if (grenland) {
+        if (greenland) {
             greenland->FCONT1 = NaN;
             greenland->FGICE1 = NaN;
         }
         for (int j=1; j<=JM1; ++j) {
         for (int i=1; i<=IM1; ++i) {
             if (in.FCONT1(i,j) == 2.0) {
-                greenland->FCONT1(i,j) = 1.0;
-                greenland->FGICE1(i,j) = in.FGICE1(i,j);
+                if (greenland) {
+                    greenland->FCONT1(i,j) = 1.0;
+                    greenland->FGICE1(i,j) = in.FGICE1(i,j);
+                }
                 in.FCONT1(i,j) = 0;
                 in.FGICE1(i,j) = 0;
             }

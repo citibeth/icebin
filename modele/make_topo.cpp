@@ -56,18 +56,20 @@ int main(int argc, char** argv)
     // Read the input files
     printf("============ Reading Input Files\n");
     TopoInputs topo_inputs(true);
-    read_raw(topo_inputs, EnvSearchPath("MODELE_FILE_PATH"));
+    read_raw(topo_inputs, NULL, EnvSearchPath("MODELE_FILE_PATH"));
 
     // Do the calculation
     printf("============ Calculating TOPO\n");
     TopoOutputs topo_outputs(true);
     z1qx1n_bs1(topo_inputs, topo_outputs);
 
-
     printf("============ Writing Output\n");
     {NcIO ncio(args.ofname, 'w');
 
         topo_outputs.bundle.ncio(ncio, {}, false, "", "double");
+
+        ncio.close();
     }
+    printf("Done Writing Output\n");
 
 }

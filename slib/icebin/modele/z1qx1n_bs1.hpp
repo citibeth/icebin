@@ -98,9 +98,38 @@ public:
     TopoInputs(bool allocate=true);
 };
 
+
+class GreenlandInputs {
+public:
+    ibmisc::ArrayBundle<double, 2> bundle;
+
+    // --- 2 minutes (IM2, JM2)
+    // FOCEAN = Ocean Fraction (0:1)                     NGDC 2x2 (minutes)
+    blitz::Array<double, 2> &FOCEN2;
+    // ...regridded to 10-minute grid
+    blitz::Array<double, 2> &FOCENS;
+
+    // --- 10 minute (IMS, JMS)
+    // FLAKE: Lake Fraction (0 to 1)
+    blitz::Array<double, 2> &FLAKES;
+
+    // --- 1/2-degree (IMH, JMH)
+    // Ice Fraction (m) Ekholm, Bamber
+    blitz::Array<double, 2> &FGICEH;
+
+    // --- 1-degree (IM1, JM1)
+    // PLAND: = 1-POCEAN
+    blitz::Array<double, 2> &FCONT1;
+    // PLICE: % OF LAND ICE
+    blitz::Array<double, 2> &FGICE1;
+
+    GreenlandInputs(bool allocate=true);
+};
+
+
 // =================================================================
 
-extern void read_raw(TopoInputs &in, ibmisc::FileLocator const &files);
+extern void read_raw(TopoInputs &in, GreenlandInputs *greenland, ibmisc::FileLocator const &files);
 
 
 /*

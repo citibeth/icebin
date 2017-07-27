@@ -63,14 +63,16 @@ protected:
 TEST_F(Z1qx1n_Bs1Test, read_inputs)
 {
     TopoInputs topo_inputs(true);
+    GreenlandInputs greenland_inputs(true);
 
     NcIO ncio("topo_inputs.nc", 'w');
 
     // Need to read the files!!!
     EnvSearchPath locator("MODELE_FILE_PATH");
-    read_raw(topo_inputs, locator);
+    read_raw(topo_inputs, &greenland_inputs, locator);
 
     topo_inputs.bundle.ncio(ncio, {}, true, "", "double");
+    greenland_inputs.bundle.ncio(ncio, {}, true, "gr:", "double");
     ncio.close();
 }
 
