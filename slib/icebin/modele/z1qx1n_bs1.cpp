@@ -112,6 +112,33 @@ TopoOutputs::TopoOutputs(bool allocate) :
             true, blitz::fortranArray);
     }
 }
+// -------------------------------------------------------
+GreenlandInputs::GreenlandInputs(ArrayBundle<double, 2> &&_bundle) : bundle(std::move(_bundle)),
+    FOCEN2(bundle.at("FOCEN2").arr),
+    ZETOP2(bundle.at("ZETOP2").arr),
+    FLAKES(bundle.at("FLAKES").arr),
+    dZGICH(bundle.at("dZGICH").arr),
+    FGICEH(bundle.at("FGICEH").arr),
+    ZSOLDH(bundle.at("ZSOLDH").arr),
+    FCONT1(bundle.at("FCONT1").arr),
+    FGICE1(bundle.at("FGICE1").arr)
+{}
+
+GreenlandInputs make_greenland_inputs()
+{
+    ArrayBundle<double, 2> bundle;
+    bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"});
+
+    bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"});
+
+    bundle.add("FGICEH", blitz::shape(IMH, JMH), {"imh", "jmh"});
+
+    bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"});
+    bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"});
+
+    auto ret(GreenlandInputs(std::move(bundle)));
+    return ret;
+}
 
 
 static ArrayBundle<double,2> topo_inputs_bundle()
@@ -184,26 +211,39 @@ TopoInputs::TopoInputs(bool allocate) :
 
 
 // ======================================================================
-void read_raw(TopoInputs &in, FileLocator const &files)
+void read_raw(TopoInputs &in, TopoInputs *greenland, FileLocator const &files)
 {
     std::array<char,80> titlei;
 
     printf("BEGIN z1qx1n_bs1 Read Input Files\n");
 
+    // ---------------------------------------------------------
     // Read in Z2MX2M.NGDC
-    {std::string const fname = "Z2MX2M.NGDC";
-        fortran::UnformattedInput fin(files.locate(fname), Endian::BIG);
-        fortran::read(fin) >> titlei >>
-            fortran::blitz_cast<float, double, 2>(in.FOCEN2) >> fortran::endr;
-        //in.bundle.at("FOCEN2").set_attr("description", fortran::trim(titlei));
-        printf("FOCEN2 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
+    // Read hand-modified FOCEN2
+    {NcIO ncio(files.locate("Z2MX2M.NGDC-SeparateGreenland.nc"), 'r');
+        ncio_blitz(ncio, in.FOCEN2, false, "FOCEN2", "double",
+            get_dims(ncio, {"im2", "jm2"}));
 
-        fortran::read(fin) >> titlei >>
-            fortran::blitz_cast<float, double, 2>(in.ZETOP2) >> fortran::endr;
-        //in.bundle.at("ZETOP2").description = fortran::trim(titlei);
-        printf("ZETOP2 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
+        ncio_blitz(ncio, in.ZETOP2, false, "ZETOP2", "double",
+            get_dims(ncio, {"im2", "jm2"}));
+
+        // Separate Greenland from the rest
+        if (greenland) {
+            greenland->FOCEN2 = NaN;
+            // We can use in.ZETOP2 in place of greenland->ZETOP2
+        }
+        for (int j=1; j<=JM1; ++j) {
+        for (int i=1; i<=IM1; ++i) {
+            if (in.FOCEN2(i,j) == 2.0) {
+                in.FOCEN2(i,j) = 1.0;
+                if (greenland) {
+                    greenland->FOCEN2(i,j) = 0.0;
+                }
+            }
+        }}
     }
 
+    // ---------------------------------------------------------
     // Read in Z10MX10M
     {std::string const fname = "Z10MX10M";
         fortran::UnformattedInput fin(files.locate(fname), Endian::BIG);
@@ -214,6 +254,22 @@ void read_raw(TopoInputs &in, FileLocator const &files)
         printf("FLAKES read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
+
+    // Separate Greenland from the rest
+    blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
+    Hntr hntr2mh(g2mx2m, g10mx10m, 0);
+    auto greenland_focens(hntr2mh.regrid(WT2, greenland->FOCEN2, 0));
+
+    if (greenland) greenland->FLAKES = NaN;
+    for (int j=1; j<=JMS; ++j) {
+    for (int i=1; i<=IMS; ++i) {
+        if (greenland_focens(i,j) == 0.0) {
+            if (greenland) greenland->FLAKES(i,j) = in.FLAKES(i,j)
+            in.FLAKES(i,j) = 0;
+        }
+    }}
+
+    // ---------------------------------------------------------
     // Read in ZICEHXH
     {std::string const fname = "ZICEHXH";
         fortran::UnformattedInput fin(files.locate(fname), Endian::BIG);
@@ -234,26 +290,41 @@ void read_raw(TopoInputs &in, FileLocator const &files)
         printf("ZSOLDH read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
     }
 
+    // Separate Greenland
+    if (greenland) greenland->FGICEH = NaN;
+    for (int j=JMH*3/4+1; j<=JMH; ++j) {
+    for (int i=1; i<=IMH; ++i) {
+        if (in.FGICEH(i,j) != 0) {
+            if (greenland) greenland->FGICEH(i,j) = in.FGICEH(i,j);
+            in.FGICEH(i,j) = 0;
+        }
+    }}
+
+
+    // -------------------------------------------------------------------
     // Read in ZNGDC1
-    {std::string const fname = "ZNGDC1";
-        fortran::UnformattedInput fin(files.locate(fname), Endian::BIG);
-        fortran::read(fin) >> fortran::endr;
-        fortran::read(fin) >> fortran::endr;
-        fortran::read(fin) >> fortran::endr;
+    // Read hand-modified FCONT1 (formerly from "ZNGDC1")
+    {NcIO ncio(files.locate("ZNGDC1-SeparateGreenland.nc"), 'r');
+        ncio_blitz(ncio, in.FCONT1, false, "FCONT1", "double",
+            get_dims(ncio, {"im1", "jm1"}));
+        ncio_blitz(ncio, in.FGICE1, false, "FGICE1", "double",
+            get_dims(ncio, {"im1", "jm1"}));
 
-        fortran::read(fin) >> titlei >>
-            fortran::blitz_cast<float, double, 2>(in.FCONT1) >> fortran::endr;
-        //in.bundle.at("FCONT1").description = fortran::trim(titlei);
-        printf("FCONT1 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
-
-        fortran::read(fin) >> fortran::endr;
-
-        fortran::read(fin) >> titlei >>
-            fortran::blitz_cast<float, double, 2>(in.FGICE1) >> fortran::endr;
-        //in.bundle.at("FGICE1").description = fortran::trim(titlei);
-        printf("FGICE1 read from %s: %s\n", fname.c_str(), fortran::trim(titlei).c_str());
+        // Separate Greenland from the rest
+        if (grenland) {
+            greenland->FCONT1 = NaN;
+            greenland->FGICE1 = NaN;
+        }
+        for (int j=1; j<=JM1; ++j) {
+        for (int i=1; i<=IM1; ++i) {
+            if (in.FCONT1(i,j) == 2.0) {
+                greenland->FCONT1(i,j) = 1.0;
+                greenland->FGICE1(i,j) = in.FGICE1(i,j);
+                in.FCONT1(i,j) = 0;
+                in.FGICE1(i,j) = 0;
+            }
+        }}
     }
-
     printf("END z1qx1n_bs1 Read Input Files\n");
 }
 
@@ -470,6 +541,7 @@ static const std::vector<ElevPoints> resets
         {75,138}
     })
 };
+
 
 
 void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
@@ -838,7 +910,6 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
         }
     }}
 }
-
 
 
 }}
