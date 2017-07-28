@@ -106,6 +106,7 @@ public:
     // --- 2 minutes (IM2, JM2)
     // FOCEAN = Ocean Fraction (0:1)                     NGDC 2x2 (minutes)
     blitz::Array<double, 2> &FOCEN2;
+    blitz::Array<double, 2> &ZETOP2;
     // ...regridded to 10-minute grid
     blitz::Array<double, 2> &FOCENS;
 

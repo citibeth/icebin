@@ -33,7 +33,7 @@ ZICEHXH.nc: $(ZICEHXH)
 
 ZNGDC1 = $(shell ./searchenv ZNGDC1 MODELE_FILE_PATH)
 ZNGDC1.nc: $(ZNGDC1)
-	giss2nc $(ZNGDC1) ZNGDC1.nc --endian=big --names=_,_,_,FCONT1,FGICE1
+	giss2nc $(ZNGDC1) ZNGDC1.nc --endian=big --names=_,_,_,FCONT1,_,FGICE1
 
 
 

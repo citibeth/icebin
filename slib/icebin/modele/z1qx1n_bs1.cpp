@@ -118,6 +118,12 @@ ArrayBundle<double,2> greenland_inputs_bundle()
 {
     ArrayBundle<double, 2> bundle;
     bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {});
+    bundle.add("ZETOP2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {
+        "description", "Solid Topography except for ice shelves",
+        "units", "m",
+        "source", "Z2MX2M.NGDC"
+    });
+
     bundle.add("FOCENS", blitz::shape(IMS, JMS), {"ims", "jms"}, {});
 
     bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"}, {});
@@ -133,6 +139,7 @@ ArrayBundle<double,2> greenland_inputs_bundle()
 GreenlandInputs::GreenlandInputs(bool allocate) :
     bundle(greenland_inputs_bundle()),
     FOCEN2(bundle.array("FOCEN2")),
+    ZETOP2(bundle.array("ZETOP2")),
     FOCENS(bundle.array("FOCENS")),
     FLAKES(bundle.array("FLAKES")),
     FGICEH(bundle.array("FGICEH")),
@@ -238,8 +245,10 @@ void read_raw(TopoInputs &in, GreenlandInputs *greenland, FileLocator const &fil
         for (int j=1; j<=JM2; ++j) {
         for (int i=1; i<=IM2; ++i) {
             if (in.FOCEN2(i,j) == 2.0) {
-                in.FOCEN2(i,j) = 1.0;
                 greenland_focen2(i,j) = 0.0;
+                if (greenland) greenland->ZETOP2(i,j) = in.ZETOP2(i,j);
+                in.FOCEN2(i,j) = 1.0;
+                in.ZETOP2(i,j) = -300.0;    // Greenland -> -300m ocean basin
             }
         }}
     }
