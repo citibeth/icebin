@@ -69,7 +69,7 @@ TEST_F(Z1qx1n_Bs1Test, read_inputs)
 
     // Need to read the files!!!
     EnvSearchPath locator("MODELE_FILE_PATH");
-    read_raw(topo_inputs, &greenland_inputs, locator);
+    read_raw(topo_inputs, true, &greenland_inputs, locator);
 
     topo_inputs.bundle.ncio(ncio, {}, true, "", "double");
     greenland_inputs.bundle.ncio(ncio, {}, true, "gr:", "double");

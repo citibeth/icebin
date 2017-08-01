@@ -1,4 +1,4 @@
-
+all : z1qx1n_bs1-onlygr.nc
 
 # Generate grid: SeaRISE-Greenland-20km
 sr_g20_searise.nc :
@@ -13,6 +13,18 @@ modele_ll_g2mx2m.nc:
 # Overlap two grids
 modele_ll_g2mx2m-sr_g20_searise.nc: modele_ll_g2mx2m.nc sr_g20_searise.nc
 	overlap modele_ll_g2mx2m.nc sr_g20_searise.nc
+
+
+
+# Generate the ocean grid
+modele_ll_g1qx1.nc:
+	modele_ll --zone g --grid 1qx1 --pole-caps=0
+
+# Overlap two grids
+modele_ll_g1qx1-sr_g20_searise.nc: modele_ll_g1qx1.nc sr_g20_searise.nc
+	overlap modele_ll_g1qx1.nc sr_g20_searise.nc
+
+
 
 
 # ------------------------------------------------------------------
@@ -34,6 +46,18 @@ ZICEHXH.nc: $(ZICEHXH)
 ZNGDC1 = $(shell ./searchenv ZNGDC1 MODELE_FILE_PATH)
 ZNGDC1.nc: $(ZNGDC1)
 	giss2nc $(ZNGDC1) ZNGDC1.nc --endian=big --names=_,_,_,FCONT1,_,FGICE1
+
+
+# ------------------------------------------------------------------
+# Construct TOPO file, separating out Greenland
+z1qx1n_bs1-withgr.nc :
+	make_topo --greenland z1qx1n_bs1-withgr.nc
+
+z1qx1n_bs1-nogr.nc :
+	make_topo z1qx1n_bs1-nogr.nc
+
+z1qx1n_bs1-onlygr.nc : z1qx1n_bs1-withgr.nc z1qx1n_bs1-nogr.nc
+	python3 make_legacy_greenland.py z1qx1n_bs1
 
 
 

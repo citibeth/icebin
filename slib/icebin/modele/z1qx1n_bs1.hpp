@@ -130,7 +130,7 @@ public:
 
 // =================================================================
 
-extern void read_raw(TopoInputs &in, GreenlandInputs *greenland, ibmisc::FileLocator const &files);
+extern void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, ibmisc::FileLocator const &files);
 
 
 /*

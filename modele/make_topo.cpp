@@ -9,6 +9,7 @@ using namespace icebin::modele;
 
 struct ParseArgs {
     std::string ofname;
+    bool greenland;
 
     ParseArgs(int argc, char **argv);
 };
@@ -30,13 +31,14 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
         TCLAP::UnlabeledValueArg<std::string> ofname_a(
             "ofname", "Name of output file", true, "", "output filename", cmd);
-
+        TCLAP::SwitchArg greenland_a("g", "greenland", "Include Greenland?", cmd, false);
 
         // Parse the argv array.
         cmd.parse( argc, argv );
 
         // Get the value parsed by each arg.
         ofname = ofname_a.getValue();
+        greenland = greenland_a.getValue();
 
     } catch (TCLAP::ArgException &e) { // catch any exceptions
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
@@ -56,7 +58,8 @@ int main(int argc, char** argv)
     // Read the input files
     printf("============ Reading Input Files\n");
     TopoInputs topo_inputs(true);
-    read_raw(topo_inputs, NULL, EnvSearchPath("MODELE_FILE_PATH"));
+printf("greenland = %d\n", args.greenland);
+    read_raw(topo_inputs, !args.greenland, NULL, EnvSearchPath("MODELE_FILE_PATH"));
 
     // Do the calculation
     printf("============ Calculating TOPO\n");

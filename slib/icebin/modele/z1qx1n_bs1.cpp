@@ -221,7 +221,7 @@ TopoInputs::TopoInputs(bool allocate) :
 
 
 // ======================================================================
-void read_raw(TopoInputs &in, GreenlandInputs *greenland, FileLocator const &files)
+void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLocator const &files)
 {
     std::array<char,80> titlei;
 
@@ -245,10 +245,14 @@ void read_raw(TopoInputs &in, GreenlandInputs *greenland, FileLocator const &fil
         for (int j=1; j<=JM2; ++j) {
         for (int i=1; i<=IM2; ++i) {
             if (in.FOCEN2(i,j) == 2.0) {
-                greenland_focen2(i,j) = 0.0;
-                if (greenland) greenland->ZETOP2(i,j) = in.ZETOP2(i,j);
-                in.FOCEN2(i,j) = 1.0;
-                in.ZETOP2(i,j) = -300.0;    // Greenland -> -300m ocean basin
+                if (separate) {
+                    greenland_focen2(i,j) = 0.0;
+                    if (greenland) greenland->ZETOP2(i,j) = in.ZETOP2(i,j);
+                    in.FOCEN2(i,j) = 1.0;
+                    in.ZETOP2(i,j) = -300.0;    // Greenland -> -300m ocean basin
+                } else {
+                    in.FOCEN2(i,j) = 0.0;
+                }
             }
         }}
     }
@@ -265,23 +269,24 @@ void read_raw(TopoInputs &in, GreenlandInputs *greenland, FileLocator const &fil
     }
 
 
-    // Zero out lakes over Greenland
-    blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
-    Hntr hntr2mh(g2mx2m, g10mx10m, 0);
-    blitz::Array<double,2> greenland_focens(
-        greenland ? greenland->FOCENS : blitz::Array<double,2>(IMS,JMS,fortranArray));
+    if (separate) {
+        // Zero out lakes over Greenland
+        blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
+        Hntr hntr2mh(g2mx2m, g10mx10m, 0);
+        blitz::Array<double,2> greenland_focens(
+            greenland ? greenland->FOCENS : blitz::Array<double,2>(IMS,JMS,fortranArray));
 
-    hntr2mh.regrid(WT2, greenland_focen2, greenland_focens, 0);
+        hntr2mh.regrid(WT2, greenland_focen2, greenland_focens, 0);
 
-    if (greenland) greenland->FLAKES = NaN;
-printf("Range (%d %d) (%d %d)\n", IMS, JMS, in.FLAKES.extent(0), in.FLAKES.extent(1));
-    for (int j=1; j<=JMS; ++j) {
-    for (int i=1; i<=IMS; ++i) {
-        if (std::abs(greenland_focens(i,j)) < 1e-14) {
-            if (greenland) greenland->FLAKES(i,j) = in.FLAKES(i,j);
-            in.FLAKES(i,j) = 0.0;
-        }
-    }}
+        if (greenland) greenland->FLAKES = NaN;
+        for (int j=1; j<=JMS; ++j) {
+        for (int i=1; i<=IMS; ++i) {
+            if (std::abs(greenland_focens(i,j)) < 1e-14) {
+                if (greenland) greenland->FLAKES(i,j) = in.FLAKES(i,j);
+                in.FLAKES(i,j) = 0.0;
+            }
+        }}
+    }
 
     // ---------------------------------------------------------
     // Read in ZICEHXH
@@ -305,15 +310,16 @@ printf("Range (%d %d) (%d %d)\n", IMS, JMS, in.FLAKES.extent(0), in.FLAKES.exten
     }
 
     // Separate Greenland
-    if (greenland) greenland->FGICEH = NaN;
-    for (int j=JMH*3/4+1; j<=JMH; ++j) {
-    for (int i=1; i<=IMH; ++i) {
-        if (in.FGICEH(i,j) != 0) {
-            if (greenland) greenland->FGICEH(i,j) = in.FGICEH(i,j);
-            in.FGICEH(i,j) = 0;
-        }
-    }}
-
+    if (separate) {
+        if (greenland) greenland->FGICEH = NaN;
+        for (int j=JMH*3/4+1; j<=JMH; ++j) {
+        for (int i=1; i<=IMH; ++i) {
+            if (in.FGICEH(i,j) != 0) {
+                if (greenland) greenland->FGICEH(i,j) = in.FGICEH(i,j);
+                in.FGICEH(i,j) = 0;
+            }
+        }}
+    }
 
     // -------------------------------------------------------------------
     // Read in ZNGDC1
@@ -332,12 +338,16 @@ printf("Range (%d %d) (%d %d)\n", IMS, JMS, in.FLAKES.extent(0), in.FLAKES.exten
         for (int j=1; j<=JM1; ++j) {
         for (int i=1; i<=IM1; ++i) {
             if (in.FCONT1(i,j) == 2.0) {
-                if (greenland) {
-                    greenland->FCONT1(i,j) = 1.0;
-                    greenland->FGICE1(i,j) = in.FGICE1(i,j);
+                if (separate) {
+                    if (greenland) {
+                        greenland->FCONT1(i,j) = 1.0;
+                        greenland->FGICE1(i,j) = in.FGICE1(i,j);
+                    }
+                    in.FCONT1(i,j) = 0;
+                    in.FGICE1(i,j) = 0;
+                } else {
+                    in.FCONT1(i,j) = 1.0;
                 }
-                in.FCONT1(i,j) = 0;
-                in.FGICE1(i,j) = 0;
             }
         }}
     }

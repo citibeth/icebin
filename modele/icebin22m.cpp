@@ -224,8 +224,8 @@ void do_main()
 
     // Regrid to 1/2-degree --- because the 2-minute file is too slow for ncview
     auto bundleH(make_bundle());
-    bundleH.allocate(blitz::shape(IMH, JMH), {"imh", "jmh"});
-    Hntr hntr(g2mx2m, ghxh, NaN);
+    bundleH.allocate(blitz::shape(IMH, JMH), {"im", "jm"});
+    Hntr hntr(g2mx2m, g1qx1, NaN);
     for (size_t i=0; i<bundleH.data.size(); ++i) {
         bundleH.data[i].arr.reference(hntr.regrid(bundle2.at("WT").arr, bundle2.data[i].arr));
     }
