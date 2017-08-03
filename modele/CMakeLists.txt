@@ -4,7 +4,7 @@ find_package(TCLAP REQUIRED)
 include_directories(${TCLAP_INCLUDE_DIR})
 
 foreach (PRG
-    giss2nc make_topo icebin22m
+    giss2nc make_topo icebin22m make_topo_icebin
 )
     add_executable(${PRG} ${PRG}.cpp)
     target_link_libraries (${PRG} icebin ${EXTERNAL_LIBS})

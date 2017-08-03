@@ -62,8 +62,8 @@ protected:
 
 TEST_F(Z1qx1n_Bs1Test, read_inputs)
 {
-    TopoInputs topo_inputs(true);
-    GreenlandInputs greenland_inputs(true);
+    TopoInputs topo_inputs(topo_inputs_bundle(true));
+    GreenlandInputs greenland_inputs(greenland_inputs_bundle(true));
 
     NcIO ncio("topo_inputs.nc", 'w');
 

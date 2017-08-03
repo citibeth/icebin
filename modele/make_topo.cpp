@@ -57,13 +57,13 @@ int main(int argc, char** argv)
 
     // Read the input files
     printf("============ Reading Input Files\n");
-    TopoInputs topo_inputs(true);
+    TopoInputs topo_inputs(topo_inputs_bundle(true));
 printf("greenland = %d\n", args.greenland);
     read_raw(topo_inputs, !args.greenland, NULL, EnvSearchPath("MODELE_FILE_PATH"));
 
     // Do the calculation
     printf("============ Calculating TOPO\n");
-    TopoOutputs topo_outputs(true);
+    TopoOutputs<2> topo_outputs(topo_outputs_bundle2(true));
     z1qx1n_bs1(topo_inputs, topo_outputs);
 
     printf("============ Writing Output\n");

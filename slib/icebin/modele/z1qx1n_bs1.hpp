@@ -15,43 +15,173 @@ namespace icebin {
 namespace modele {
 
 
+template<int RANK>
+extern ibmisc::ArrayBundle<double,RANK> topo_outputs_bundle();
+
+inline ibmisc::ArrayBundle<double,2> topo_outputs_bundle2(bool allocate)
+{
+    auto ret(topo_outputs_bundle<2>());
+    if (allocate) ret.allocate(blitz::shape(IM,JM), {"im", "jm"},
+            true, blitz::fortranArray);
+    return ret;
+}
+
 /** Area of memory where a TOPO-generating procedure can place its outputs.
 Should be pre-allocated before the generator is called. */
+template <int RANK>
 class TopoOutputs {
 public:
-    ibmisc::ArrayBundle<double,2> bundle;
+    ibmisc::ArrayBundle<double,RANK> bundle;
 
     // 0 or 1, Bering Strait 1 cell wide         GISS 1Qx1,
-    blitz::Array<double, 2> &FOCEAN;
+    blitz::Array<double,RANK> &FOCEAN;
     // Lake Surface Fraction (0:1)                GISS 1Qx1,
-    blitz::Array<double, 2> &FLAKE;
+    blitz::Array<double,RANK> &FLAKE;
     // Ground Surface Fraction (0:1)              GISS 1Qx1,
-    blitz::Array<double, 2> &FGRND;
-    // Glacial Ice Surface Fraction (0:1)         GISS 1Qx1,
-    blitz::Array<double, 2> &FGICE;
+    blitz::Array<double,RANK> &FGRND;
+    // Glacial Ice Surface Fraction except Greenland (0:1)         GISS 1Qx1,
+    blitz::Array<double,RANK> &FGICE;
+    // Greenland Ice surface
+    blitz::Array<double,RANK> &FGICE_greenland;
     // Atmospheric Topography (m)                 ETOPO2 1Qx1,
-    blitz::Array<double, 2> &ZATMO;
+    blitz::Array<double,RANK> &ZATMO;
     // Ocean Thickness (m)                       ETOPO2 1Qx1,
-    blitz::Array<double, 2> &dZOCEN;
+    blitz::Array<double,RANK> &dZOCEN;
     // Lake Thickness (m)                        ETOPO2 1Qx1,
-    blitz::Array<double, 2> &dZLAKE;
+    blitz::Array<double,RANK> &dZLAKE;
     // Glacial Ice Thickness (m)                 Ekholm,Bamber,
-    blitz::Array<double, 2> &dZGICE;
+    blitz::Array<double,RANK> &dZGICE;
     // Solid Ground Topography (m)               ETOPO2 1Qx1,
-    blitz::Array<double, 2> &ZSOLDG;
+    blitz::Array<double,RANK> &ZSOLDG;
     // Lowest Solid Topography (m)                ETOPO2 1Qx1,
-    blitz::Array<double, 2> &ZSGLO;
+    blitz::Array<double,RANK> &ZSGLO;
     // Lake Surface Topography (m)                ETOPO2 1Qx1,
-    blitz::Array<double, 2> &ZLAKE;
+    blitz::Array<double,RANK> &ZLAKE;
     // Topography Break between Ground and GIce   ETOPO2 1Qx1,
-    blitz::Array<double, 2> &ZGRND;
+    blitz::Array<double,RANK> &ZGRND;
     // Highest Solid Topography (m)               ETOPO2 1Qx1/
-    blitz::Array<double, 2> &ZSGHI;
+    blitz::Array<double,RANK> &ZSGHI;
     // Fractional Ocean Cover (0:1)              ETOPO2 1Qx1/
-    blitz::Array<double, 2> &FOCENF;
+    blitz::Array<double,RANK> &FOCENF;
 
-    TopoOutputs(bool allocate=true);
+    TopoOutputs(ibmisc::ArrayBundle<double,RANK> &&_bundle);
+
 };
+
+template<int RANK>
+ibmisc::ArrayBundle<double,RANK> topo_outputs_bundle();
+
+template<int RANK>
+ibmisc::ArrayBundle<double,RANK> topo_outputs_bundle()
+{
+    ibmisc::ArrayBundle<double,RANK> bundle;
+    bundle.add("FOCEAN", {
+        "description", "0 or 1, Bering Strait 1 cell wide",
+        "units", "1",
+        "source", "GISS 1Qx1",
+    });
+    bundle.add("FLAKE", {
+        "description", "Lake Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    });
+    bundle.add("FGRND", {
+        "description", "Ground Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    });
+    bundle.add("FGICE", {
+        "description", "Glacial Ice Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    });
+    bundle.add("FGICE_greenland", {
+        "description", "Greenland Ice Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    });
+    bundle.add("ZATMO", {
+        "description", "Atmospheric Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("dZOCEN", {
+        "description", "Ocean Thickness",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("dZLAKE", {
+        "description", "Lake Thickness",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("dZGICE", {
+        "description", "Glacial Ice Thickness",
+        "units", "m",
+        "sources", "Ekholm,Bamber",
+    });
+    bundle.add("ZSOLDG", {
+        "description", "Solid Ground Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZSGLO", {
+        "description", "Lowest Solid Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZLAKE", {
+        "description", "Lake Surface Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZGRND", {
+        "description", "Topography Break between Ground and GIce",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("ZSGHI", {
+        "description", "Highest Solid Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    });
+    bundle.add("FOCENF", {
+        "description", "Fractional ocean ocver",
+        "units", "1",
+        "sources", "GISS 1Qx1",
+    });
+#if 0
+    if (allocate) {
+        bundle.allocate(blitz::shape(IM,JM), {"im", "jm"},
+            true, blitz::fortranArray);
+    }
+#endif
+    return bundle;
+}
+
+template<int RANK>
+TopoOutputs<RANK>::TopoOutputs(ibmisc::ArrayBundle<double,RANK> &&_bundle) :
+    bundle(std::move(_bundle)),
+    FOCEAN(bundle.array("FOCEAN")),
+    FLAKE(bundle.array("FLAKE")),
+    FGRND(bundle.array("FGRND")),
+    FGICE(bundle.array("FGICE")),
+    FGICE_greenland(bundle.array("FGICE_greenland")),
+    ZATMO(bundle.array("ZATMO")),
+    dZOCEN(bundle.array("dZOCEN")),
+    dZLAKE(bundle.array("dZLAKE")),
+    dZGICE(bundle.array("dZGICE")),
+    ZSOLDG(bundle.array("ZSOLDG")),
+    ZSGLO(bundle.array("ZSGLO")),
+    ZLAKE(bundle.array("ZLAKE")),
+    ZGRND(bundle.array("ZGRND")),
+    ZSGHI(bundle.array("ZSGHI")),
+    FOCENF(bundle.array("FOCENF"))
+{}
+
+
+
+extern ibmisc::ArrayBundle<double,2> topo_inputs_bundle(bool allocate);
 
 /** Input files:
  Z2MX2M.NGDC = FOCEN2: Ocean Fraction (0 or 1)
@@ -95,10 +225,11 @@ public:
     // PLICE: % OF LAND ICE
     blitz::Array<double, 2> &FGICE1;
 
-    TopoInputs(bool allocate=true);
+    TopoInputs(ibmisc::ArrayBundle<double,2> &&_bundle);
 };
 
 
+extern ibmisc::ArrayBundle<double,2> greenland_inputs_bundle(bool allocate);
 class GreenlandInputs {
 public:
     ibmisc::ArrayBundle<double, 2> bundle;
@@ -124,7 +255,8 @@ public:
     // PLICE: % OF LAND ICE
     blitz::Array<double, 2> &FGICE1;
 
-    GreenlandInputs(bool allocate=true);
+    GreenlandInputs(ibmisc::ArrayBundle<double,2> &&_bundle);
+
 };
 
 
@@ -181,7 +313,7 @@ extern void callZ(
     blitz::Array<double,2> &ZGRND,
     blitz::Array<double,2> &ZSGHI);
 
-extern void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out);
+extern void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out);
 
 
 }}

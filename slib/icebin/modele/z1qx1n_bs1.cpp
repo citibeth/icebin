@@ -15,106 +15,8 @@ static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 
 // ==================================================================
-static ArrayBundle<double,2> topo_outputs_bundle()
-{
-    ArrayBundle<double,2> bundle;
-    bundle.add("FOCEAN", {
-        "description", "0 or 1, Bering Strait 1 cell wide",
-        "units", "1",
-        "source", "GISS 1Qx1",
-    });
-    bundle.add("FLAKE", {
-        "description", "Lake Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    });
-    bundle.add("FGRND", {
-        "description", "Ground Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    });
-    bundle.add("FGICE", {
-        "description", "Glacial Ice Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    });
-    bundle.add("ZATMO", {
-        "description", "Atmospheric Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("dZOCEN", {
-        "description", "Ocean Thickness",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("dZLAKE", {
-        "description", "Lake Thickness",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("dZGICE", {
-        "description", "Glacial Ice Thickness",
-        "units", "m",
-        "sources", "Ekholm,Bamber",
-    });
-    bundle.add("ZSOLDG", {
-        "description", "Solid Ground Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("ZSGLO", {
-        "description", "Lowest Solid Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("ZLAKE", {
-        "description", "Lake Surface Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("ZGRND", {
-        "description", "Topography Break between Ground and GIce",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("ZSGHI", {
-        "description", "Highest Solid Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    });
-    bundle.add("FOCENF", {
-        "description", "Fractional ocean ocver",
-        "units", "1",
-        "sources", "GISS 1Qx1",
-    });
-    return bundle;
-}
-
-TopoOutputs::TopoOutputs(bool allocate) :
-    bundle(topo_outputs_bundle()),
-    FOCEAN(bundle.array("FOCEAN")),
-    FLAKE(bundle.array("FLAKE")),
-    FGRND(bundle.array("FGRND")),
-    FGICE(bundle.array("FGICE")),
-    ZATMO(bundle.array("ZATMO")),
-    dZOCEN(bundle.array("dZOCEN")),
-    dZLAKE(bundle.array("dZLAKE")),
-    dZGICE(bundle.array("dZGICE")),
-    ZSOLDG(bundle.array("ZSOLDG")),
-    ZSGLO(bundle.array("ZSGLO")),
-    ZLAKE(bundle.array("ZLAKE")),
-    ZGRND(bundle.array("ZGRND")),
-    ZSGHI(bundle.array("ZSGHI")),
-    FOCENF(bundle.array("FOCENF"))
-{
-    if (allocate) {
-        bundle.allocate(blitz::shape(IM,JM), {"im", "jm"},
-            true, blitz::fortranArray);
-    }
-}
 // -------------------------------------------------------
-ArrayBundle<double,2> greenland_inputs_bundle()
+ArrayBundle<double,2> greenland_inputs_bundle(bool allocate)
 {
     ArrayBundle<double, 2> bundle;
     bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {});
@@ -133,11 +35,13 @@ ArrayBundle<double,2> greenland_inputs_bundle()
     bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {});
     bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {});
 
+    if (allocate) bundle.allocate(true, blitz::fortranArray);
+
     return bundle;
 }
 
-GreenlandInputs::GreenlandInputs(bool allocate) :
-    bundle(greenland_inputs_bundle()),
+GreenlandInputs::GreenlandInputs(ArrayBundle<double,2> &&_bundle) :
+    bundle(std::move(_bundle)),
     FOCEN2(bundle.array("FOCEN2")),
     ZETOP2(bundle.array("ZETOP2")),
     FOCENS(bundle.array("FOCENS")),
@@ -146,12 +50,11 @@ GreenlandInputs::GreenlandInputs(bool allocate) :
     FCONT1(bundle.array("FCONT1")),
     FGICE1(bundle.array("FGICE1"))
 {
-    if (allocate) bundle.allocate(true, blitz::fortranArray);
 }
 
 
 
-static ArrayBundle<double,2> topo_inputs_bundle()
+ArrayBundle<double,2> topo_inputs_bundle(bool allocate)
 {
 
     ArrayBundle<double,2> bundle;
@@ -198,11 +101,14 @@ static ArrayBundle<double,2> topo_inputs_bundle()
         "SOURCE", "ZNGDC1"
     });
 
+    if (allocate) {
+        bundle.allocate(true, blitz::fortranArray);
+    }
     return bundle;
 }
 
-TopoInputs::TopoInputs(bool allocate) :
-    bundle(topo_inputs_bundle()),
+TopoInputs::TopoInputs(ArrayBundle<double,2> &&_bundle) :
+    bundle(std::move(_bundle)),
     FOCEN2(bundle.array("FOCEN2")),
     ZETOP2(bundle.array("ZETOP2")),
     FLAKES(bundle.array("FLAKES")),
@@ -212,9 +118,6 @@ TopoInputs::TopoInputs(bool allocate) :
     FCONT1(bundle.array("FCONT1")),
     FGICE1(bundle.array("FGICE1"))
 {
-    if (allocate) {
-        bundle.allocate(true, blitz::fortranArray);
-    }
 }
 
 
@@ -570,7 +473,7 @@ static const std::vector<ElevPoints> resets
 
 
 
-void z1qx1n_bs1(TopoInputs &in, TopoOutputs &out)
+void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
 {
     double const TWOPI = 2. * M_PI;
     double const AREAG = 4. * M_PI;
