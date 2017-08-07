@@ -2,6 +2,7 @@
 #define ICEBIN_HNTR_HPP
 
 #include <ibmisc/blitz.hpp>
+#include <spsparse/eigen.hpp>
 
 namespace icebin {
 namespace modele {
@@ -91,6 +92,11 @@ public:
         blitz::Array<double,1> const &A,
         blitz::Array<double,1> &B,
         bool mean_polar = false) const;
+
+    void matrix(
+        spsparse::TupleList<int,double,2> &accum,        // The output (sparse) matrix; 0-based indexing
+        blitz::Array<double,1> const &_WTA);
+
 
     /** Works with 0-based or 1-based N-dimensional arrays */
     template<int RANK>

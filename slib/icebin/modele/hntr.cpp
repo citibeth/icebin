@@ -3,6 +3,7 @@
 #include <icebin/modele/hntr.hpp>
 
 using namespace blitz;
+using namespace spsparse;
 
 namespace icebin {
 namespace modele {
@@ -202,6 +203,88 @@ void Hntr::regrid1(
         }
     }
 }
+
+void Hntr::matrix(
+    TupleList<int,double,2> &accum,        // The output (sparse) matrix; 0-based indexing
+    blitz::Array<double,1> const &_WTA)
+{
+    // Convert input to 1-based indexing
+    blitz::Array<double,1> const WTA(ibmisc::reshape1(_WTA,1));
+
+
+    // Check array dimensions
+    if (WTA.extent(0) != Agrid.size()) {
+        (*icebin_error)(-1, "Error in dimensions: (%d) vs. (%d, %d)\n",
+            WTA.extent(0),
+            Agrid.size(), Bgrid.size());
+    }
+
+    // ------------------
+    // Interpolate the A grid onto the B grid
+    std::vector<std::tuple<int,double>> values;
+    for (int JB=1; JB <= Bgrid.jm; ++JB) {
+        int JAMIN = JMIN(JB);
+        int JAMAX = JMAX(JB);
+
+        for (int IB=1; IB <= Bgrid.im; ++IB) {
+            int const IJB = IB + Bgrid.im * (JB-1);
+            double WEIGHT= 0;
+            values.clear();
+            int const IAMIN = IMIN(IB);
+            int const IAMAX = IMAX(IB);
+            for (int JA=JAMIN; JA <= JAMAX; ++JA) {
+                double G = SINA(JA) - SINA(JA-1);
+                if (JA==JAMIN) G -= GMIN(JB);
+                if (JA==JAMAX) G -= GMAX(JB);
+
+                for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
+                    int const IA  = 1 + ((IAREV-1) % Agrid.im);
+                    int const IJA = IA + Agrid.im * (JA-1);
+                    double F = 1;
+                    if (IAREV==IAMIN) F -= FMIN(IB);
+                    if (IAREV==IAMAX) F -= FMAX(IB);
+
+                    double const wt = F*G*WTA(IJA);
+                    WEIGHT += wt;
+                    values.push_back(std::make_tuple(IJA, wt));
+                    //VALUE  += wt*A(IJA);
+                }
+            }
+            double const by_WEIGHT = 1.0 / WEIGHT;
+            for (auto &pair : values) {
+                int ija = std::get<0>(pair);
+                double val = std::get<1>(pair);
+                accum.add({IJB-1, ija-1}, val * by_WEIGHT);    // -1 ==> convert to 0-based indexing
+            }
+        }
+    }
+#if 0
+    if (mean_polar) {
+        // Replace individual values near the poles by longitudinal mean
+        for (int JB=1; JB <= Bgrid.jm; JB += Bgrid.jm-1) {
+            double BMEAN  = DATMIS;
+            double WEIGHT = 0;
+            double VALUE  = 0;
+            for (int IB=1; ; ++IB) {
+                if (IB > Bgrid.im) {
+                    if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
+                    break;
+                }
+                int IJB = IB + Bgrid.im * (JB-1);
+                if (B(IJB) == DATMIS) break;
+                WEIGHT += 1;
+                VALUE  += B(IJB);
+            }
+            for (int IB=1; IB <= Bgrid.im; ++IB) {
+                int IJB = IB + Bgrid.im * (JB-1);
+                B(IJB) = BMEAN;
+            }
+        }
+    }
+#endif
+
+}
+
 
 
 
