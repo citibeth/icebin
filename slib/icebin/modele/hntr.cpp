@@ -205,7 +205,7 @@ void Hntr::regrid1(
 }
 
 void Hntr::matrix(
-    TupleList<int,double,2> &accum,        // The output (sparse) matrix; 0-based indexing
+    MakeDenseEigenT::AccumT &accum,        // The output (sparse) matrix; 0-based indexing
     blitz::Array<double,1> const &_WTA)
 {
     // Convert input to 1-based indexing

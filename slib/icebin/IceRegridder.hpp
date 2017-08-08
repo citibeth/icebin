@@ -78,7 +78,9 @@ struct WeightedSparse {
     // Area of A cells
     DenseArrayT<1> Mw;
 
-    WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims), smooth(false) {}
+    WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims), smooth(false), conserve(false) {}
+    WeightedSparse(WeightedSparse const &base) :
+        dims(base.dims), smooth(base.smooth), conserve(base.conserve) {}
 
     /** Applies a regrid matrix.
     Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}

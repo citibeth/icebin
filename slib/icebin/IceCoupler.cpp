@@ -188,8 +188,6 @@ ibmisc::TmpAlloc &tmp)
     // |k| = # variables in ice_input
     // |l| = # variables in gcm_output
 
-    auto &ice_ivalsI_e(tmp.make<EigenDenseMatrixT>());    // Memory for ice_ivalsI
-
     // Get the sparse matrix to convert GCM output variables to ice model inputs
     // This will be transposed: M(input, output).  b is a row-vector here.
     auto icei_v_gcmo_T(var_trans_inE.apply_scalars(scalars, 'T'));    // Mxb
@@ -202,8 +200,13 @@ ibmisc::TmpAlloc &tmp)
 
     // Ice inputs calculated as the result of a matrix multiplication
     // ice_ivalsI_e is |i| x |k|
-    ice_ivalsI_e = (*IvE0) * (
-        gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
+    auto ice_ivalsE_b(to_blitz(
+        gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1),
+        tmp));
+
+    auto &ice_ivalsI_e(tmp.make<EigenDenseMatrixT>(
+        IvE0->apply_e(ice_ivalsE_b, 0)));
+$$$$$ TODO: Use apply_IvE_m from dualice instead
 
     // Alias the Eigen matrix to blitz array
     blitz::Array<double,2> ice_ivalsI(

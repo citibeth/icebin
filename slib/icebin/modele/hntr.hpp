@@ -94,7 +94,7 @@ public:
         bool mean_polar = false) const;
 
     void matrix(
-        spsparse::TupleList<int,double,2> &accum,        // The output (sparse) matrix; 0-based indexing
+        spsparse::TupleList<int,double,2> &accum,        // The output (sparse) matrix; 0-based sparse indexing
         blitz::Array<double,1> const &_WTA);
 
 

@@ -540,6 +540,19 @@ static void mask_result(EigenDenseMatrixT &ret, blitz::Array<double,1> const &wB
 
 }
 
+/** Applies a regrid matrix.
+Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
+(where BvA is this)
+In the face of smoothing, it also compensates for non-conservation in
+smoothB.
+
+    |i| = Size of B vector space
+    |j| = Size of A vector space
+    |n| = Number of vectors being transformed
+
+@param A The values to regrid, as a series of Eigen column vectors.
+@return Eigen type
+*/
 EigenDenseMatrixT WeightedSparse::apply_e(
     // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
     blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
@@ -557,7 +570,7 @@ EigenDenseMatrixT WeightedSparse::apply_e(
     // |j| = size of input vector space (A)
     // |n| = number of variables being processed together
 
-    // Apply initial regridding.
+    // Apply initial regridding.   [nB x nA] * [nA x nvar]
     EigenDenseMatrixT B0(*BvA.M * A);        // B0{in}
 
     // Only apply conservation correction if all of:
