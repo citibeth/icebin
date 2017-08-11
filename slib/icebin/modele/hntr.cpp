@@ -3,6 +3,7 @@
 #include <icebin/modele/hntr.hpp>
 
 using namespace blitz;
+using namespace spsparse;
 
 namespace icebin {
 namespace modele {
@@ -203,6 +204,70 @@ void Hntr::regrid1(
     }
 }
 
+void Hntr::raw_BvA(
+    MakeDenseEigenT::AccumT &accum,        // The output (sparse) matrix; 0-based indexing
+    SparseSetT *dimB_filter)        // OPTIONAL: Fast-filter out things not in B
+{
+    // ------------------
+    // Interpolate the A grid onto the B grid
+    for (int JB=1; JB <= Bgrid.jm; ++JB) {
+        int JAMIN = JMIN(JB);
+        int JAMAX = JMAX(JB);
+
+        for (int IB=1; IB <= Bgrid.im; ++IB) {
+            int const IJB = IB + Bgrid.im * (JB-1);
+            if (dimB && !dimB_filter->in_sparse(IJB-1)) continue;
+
+            int const IAMIN = IMIN(IB);
+            int const IAMAX = IMAX(IB);
+            for (int JA=JAMIN; JA <= JAMAX; ++JA) {
+                double G = SINA(JA) - SINA(JA-1);
+                if (JA==JAMIN) G -= GMIN(JB);
+                if (JA==JAMAX) G -= GMAX(JB);
+
+                for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
+                    int const IA  = 1 + ((IAREV-1) % Agrid.im);
+                    int const IJA = IA + Agrid.im * (JA-1);
+                    double F = 1;
+                    if (IAREV==IAMIN) F -= FMIN(IB);
+                    if (IAREV==IAMAX) F -= FMAX(IB);
+
+                    if (wt != 0) accum.add({IJB-1, IJA-1}, F*G);    // -1 ==> convert to 0-based indexing
+                }
+            }
+        }
+    }
+}
+
+#if 0
+/** Produce an almost-identity matrix that takes the mean of the polar grid cells */
+void Hntr::mean_polar_matrix()
+{
+    if (mean_polar) {
+        // Replace individual values near the poles by longitudinal mean
+        for (int JB=1; JB <= Bgrid.jm; JB += Bgrid.jm-1) {
+            double BMEAN  = DATMIS;
+            double WEIGHT = 0;
+            double VALUE  = 0;
+            for (int IB=1; ; ++IB) {
+                if (IB > Bgrid.im) {
+                    if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
+                    break;
+                }
+                int IJB = IB + Bgrid.im * (JB-1);
+                if (B(IJB) == DATMIS) break;
+                WEIGHT += 1;
+                VALUE  += B(IJB);
+            }
+            for (int IB=1; IB <= Bgrid.im; ++IB) {
+                int IJB = IB + Bgrid.im * (JB-1);
+                B(IJB) = BMEAN;
+            }
+        }
+    }
+#endif
+
+}
 
 
 }}

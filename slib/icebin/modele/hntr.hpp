@@ -2,6 +2,7 @@
 #define ICEBIN_HNTR_HPP
 
 #include <ibmisc/blitz.hpp>
+#include <icebin/eigen_types.hpp>
 
 namespace icebin {
 namespace modele {
@@ -30,6 +31,8 @@ public:
     template<class TypeT>
     blitz::Array<TypeT, 2> Array() const
         { return blitz::Array<TypeT,2>(im,jm, blitz::fortranArray); }
+
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };
 
@@ -91,6 +94,11 @@ public:
         blitz::Array<double,1> const &A,
         blitz::Array<double,1> &B,
         bool mean_polar = false) const;
+
+    void matrix(
+        MakeDenseEigenT::AccumT &accum,        // The output (sparse) matrix; 0-based indexing
+        blitz::Array<double,1> const &_WTA);
+
 
     /** Works with 0-based or 1-based N-dimensional arrays */
     template<int RANK>
