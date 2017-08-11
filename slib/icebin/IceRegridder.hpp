@@ -72,6 +72,12 @@ struct WeightedSparse {
     // Area of A cells
     DenseArrayT<1> Mw;
 
+
+    /** True if this regridding matrix is conservative.  Matrices could be
+    non-conservative, for example, in the face of smoothing on I.  Or when
+    regridding between the IceBin and ModelE ice sheets. */
+    bool conservative;
+
     WeightedSparse(std::array<SparseSetT *,2> _dims, ApplyFn &&__apply_e) : dims(_dims), _apply_e(std::move(__apply_e)) {}
     WeightedSparse(WeightedSparse const &base) :
         dims(base.dims), _apply_e(base._apply_e) {}
@@ -162,14 +168,10 @@ public:
         scale length of the smoothing.  Used for IvA and IvE. */
         std::array<double,3> const sigma;
 
-        /** Should we enforce conservation (in the face of smoothing)?
-        Unsmoothed regrid matrices are already conservative... */
-        bool const conserve;
-
         bool smooth() const { return sigma[0] != 0; }
 
-        Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma, bool _conserve=false) :
-            scale(_scale), correctA(_correctA), sigma(_sigma), conserve(_conserve) {}
+        Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
+            scale(_scale), correctA(_correctA), sigma(_sigma) {}
     };
 
 protected:

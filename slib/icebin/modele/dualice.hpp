@@ -187,19 +187,18 @@ EigenDenseMatrixT apply_dualice_AvI_e(
 
 /** Assumes elevation grid is local in A and O.  */
 std::unique_ptr<WeightedSparse> compute_EAvEO(
-    SparseSetT *_dimEA,
-    std::array<Indexing const *,2> indexingHC,
+    std::array<SparseSetT, 2> dims,
     WeightedSparse const &AvO,
-    WeightedSparse const &EOvI,
+    blitz::Array<double,1> const &wEO,    // From IvEO_p or IvEO_m
+    std::array<Indexing const *,2> indexingHC)
 {
-    auto &dimEA(*_dimEA);
+    auto &dimEA(dims[0]);
+    auto &dimEO(dims[1]);
     Indexing const &indexingHCA(indexingHC[0]);
     Indexing const &indexingHCO(indexingHC[1]);
     int const nhc = indexingHCO[1].extent;
     auto const &dimA(AvO.dims[0]);
     auto const &dimO(AvO.dims[1]);
-    auto const &dimEO(EOvI.dims[0]);
-    auto const &wEO(EOvI.wM);
 
     // Create an unscaled matrix
     std::unique_ptr<EigenSparseMatrixT> EAvEO;
