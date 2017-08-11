@@ -9,7 +9,7 @@ struct ice_sheet {
     static const int ANTARCTICA = 2;
 
     /** Clipping function clips around ice sheets */
-    static bool clip(int zone, double lon0, double lat0, double lon1, double lat1);
+    static bool clip(int zone, long index, double lon0, double lat0, double lon1, double lat1);
 };
 
 
