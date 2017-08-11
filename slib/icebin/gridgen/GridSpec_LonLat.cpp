@@ -146,7 +146,13 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
             double lon0 = this->lonb[ilon];
             double lon1 = this->lonb[ilon+1];
 
-            if (!this->spherical_clip(lon0, lat0, lon1, lat1)) continue;
+            // Figure out how to number this grid cell
+            cell.j = ilat + south_pole_offset;  // 0-based 2-D index
+            cell.i = ilon;
+            cell.index = indexing.tuple_to_index<int,2>({cell.i, cell.j});
+            cell.native_area = graticule_area_exact(this->eq_rad, lat0,lat1,lon0,lon1);
+
+            if (!this->spherical_clip(cell.index, lon0, lat0, lon1, lat1)) continue;
 
             // Project the grid cell boundary to a planar polygon
             int n = this->points_in_side;
@@ -175,12 +181,6 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
 
             for (int i=n; i>0; --i)
                 vcache.add_vertex(cell, lon0, lats[i]);
-
-            // Figure out how to number this grid cell
-            cell.j = ilat + south_pole_offset;  // 0-based 2-D index
-            cell.i = ilon;
-            cell.index = indexing.tuple_to_index<int,2>({cell.i, cell.j});
-            cell.native_area = graticule_area_exact(this->eq_rad, lat0,lat1,lon0,lon1);
 
 //printf("Adding lon/lat cell %d (%d, %d) area=%f\n", cell.index, cell.i, cell.j, cell.area);
             grid.cells.add(std::move(cell));

@@ -31,7 +31,7 @@ north and south pole, if needed. */
 struct GridSpec_LonLat {
 
     std::string name;
-    std::function<bool(double, double, double, double)> spherical_clip;
+    std::function<bool(long, double, double, double, double)> spherical_clip;
     ibmisc::Indexing indexing;
 
     /** Longitude of cell boundaries (degrees), sorted low to high.
