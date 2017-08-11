@@ -20,6 +20,7 @@
 
 #include <gtest/gtest.h>
 #include <ibmisc/fortranio.hpp>
+#include <spsparse/eigen.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/z1qx1n_bs1.hpp>
 #include <iostream>
@@ -31,6 +32,7 @@ using namespace std;
 using namespace ibmisc;
 using namespace icebin::modele;
 using namespace blitz;
+using namespace spsparse;
 
 extern "C" void write_hntr40(
     int const &ima, int const &jma, float const &offia, float const &dlata,
@@ -223,6 +225,18 @@ void cmp_regrid(
 
     // Compare C++ vs. Fortran
     cmp_array(reshape1(Bc,1), reshape1(Bf,1));
+
+    // Regrid by generating a matrix and multiplying by it
+    TupleList<int,double,2> BvA;
+    auto Bc1(reshape1(Bc,0));
+    auto Ac1(reshape1(Ac,0));
+    Bc1 = 0;
+    hntr.matrix(BvA, reshape1(WTAc,0));
+    for (auto ii=BvA.begin(); ii != BvA.end(); ++ii) {
+        // Simple matrix multiply
+        Bc1(ii->row()) += ii->value() * Ac1(ii->col());
+    }
+    cmp_array(reshape1(Bc1,1), reshape1(Bf,1));
 
 #if 0
     // Make sure sum matches (in C++)
