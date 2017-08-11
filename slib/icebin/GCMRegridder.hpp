@@ -244,9 +244,8 @@ public:
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> sheets_index;
 
-    typedef std::vector<std::unique_ptr<IceRegridder>> RegriddersT;
     /** Ice sheets stored by index defined in sheets_index */
-    RegriddersT ice_regridders;
+    std::vector<std::unique_ptr<IceRegridder>> ice_regridders;
 
 public:
 
@@ -303,7 +302,10 @@ public:
     Indices are in C order with 0-based indexing. */
     void filter_cellsA(ibmisc::Domain const &domainA);
 
-    typedef ibmisc::DerefRandomAccessIter<const IceRegridder, typename RegriddersT::const_iterator> const_iterator;
+    typedef ibmisc::DerefRandomAccessIter<
+        const IceRegridder,
+        typename std::vector<std::unique_ptr<IceRegridder>>::const_iterator
+    > const_iterator;
 
     const_iterator begin() const
         { return const_iterator(ice_regridders.cbegin()); }

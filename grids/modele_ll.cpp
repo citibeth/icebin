@@ -113,7 +113,7 @@ int main(int argc, char **argv)
     spec.name = "modele_ll_" + szone + sgrid;
     spec.pole_caps = vm["pole-caps"].as<bool>();
 
-    spec.spherical_clip = std::bind(&ice_sheet::clip, zone, _1, _2, _3, _4);
+    spec.spherical_clip = std::bind(&ice_sheet::clip, zone, _1, _2, _3, _4, _5);
     spec.points_in_side = (hntr_grid->im > IM1 ? 1 : 2);    // Use 2 for comparison with past experiments
     spec.eq_rad = EQ_RAD;
     

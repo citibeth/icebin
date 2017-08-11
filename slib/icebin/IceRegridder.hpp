@@ -64,23 +64,17 @@ typedef Eigen::DiagonalMatrix<val_type, Eigen::Dynamic> EigenDiagonalMatrixT;
 struct WeightedSparse {
     std::array<SparseSetT *,2> dims;            // Dense-to-sparse mapping for the dimensions
 
-
     // If M=BvA, then wM = wBvA = area of B cells
     DenseArrayT<1> wM;           // Dense indexing
 
     std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
-    bool smooth;    // Is M smoothed?
-
-    /** Should we enforce conservation (in the face of smoothing)?
-    Unsmoothed regrid matrices are already conservative... */
-    bool conserve;
 
     // Area of A cells
     DenseArrayT<1> Mw;
 
-    WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims), smooth(false), conserve(false) {}
+    WeightedSparse(std::array<SparseSetT *,2> _dims, ApplyFn &&__apply_e) : dims(_dims), _apply_e(std::move(__apply_e)) {}
     WeightedSparse(WeightedSparse const &base) :
-        dims(base.dims), smooth(base.smooth), conserve(base.conserve) {}
+        dims(base.dims), _apply_e(base._apply_e) {}
 
     /** Applies a regrid matrix.
     Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
@@ -95,10 +89,12 @@ struct WeightedSparse {
     @param A The values to regrid, as a series of Eigen column vectors.
     @return Eigen type
     */
-    EigenDenseMatrixT apply_e(
-        // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    typedef std::function<EigenDenseMatrixT (WeightedSparse const &, blitz::Array<double,2> const &, double)> ApplyFn;
+    ApplyFn const _apply_e;
+    inline EigenDenseMatrixT apply_e(
         blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-        double fill = std::numeric_limits<double>::quiet_NaN()) const;    // Fill value for cells not in BvA matrix
+        double fill = std::numeric_limits<double>::quiet_NaN()) const    // Fill value for cells not in BvA matrix
+    { return _apply_e(*this, A_b, fill); }
 
 
     /** Apply to multiple variables
@@ -139,6 +135,7 @@ class IceRegridder;
 /** Holds the set of "Ur" (original) matrices produced by an
     IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices {
+    friend class IceRegridder;
 public:
     class Params;
     typedef std::function<std::unique_ptr<WeightedSparse>(
@@ -178,10 +175,9 @@ public:
 protected:
     struct Binding {
         MatrixFunction const matrix;
-        SmoothingFunction const *smooth;
 
-        Binding(MatrixFunction const &_matrix, SmoothingFunction const *_smooth) :
-            matrix(_matrix), smooth(_smooth) {}
+        Binding(MatrixFunction const &_matrix) :
+            matrix(_matrix) {}
     };
 
     // Smoothing functions for the different grids
@@ -193,7 +189,6 @@ protected:
         MatrixFunction const &regrid);
 
 
-public:
     /** Use this to construct a RegridMatrices instance:
            GCMRegridder gcm_regridder(...);
            auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
@@ -203,6 +198,9 @@ public:
            AvI.wM       // The weight vector
     */
     RegridMatrices(IceRegridder *sheet);
+
+public:
+    virtual ~RegridMatrices() {}
 
     /** Retrieves a regrid matrix, and weights (area) of the input and
         output grid cells.
@@ -214,7 +212,7 @@ public:
     @param correctA: Correct for projection error in A or E grids?
     @return The regrid matrix and weights
     */
-    std::unique_ptr<WeightedSparse> matrix(
+    virtual std::unique_ptr<WeightedSparse> matrix(
         std::string const &spec_name,
         std::array<SparseSetT *,2> dims,
         Params const &_params) const;

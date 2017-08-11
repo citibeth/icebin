@@ -79,8 +79,6 @@ std::unique_ptr<WeightedSparse> new_OvE_m(
     return OvE_m;
 }
 
-static void nop(MakeDenseEigenT::AccumT &accum) {}
-
 std::unique_ptr<WeightedSparse> AvX_v_OvX(
     WeightedSparse const &OvX,
     Indexing const &indexingO,
@@ -182,4 +180,134 @@ EigenDenseMatrixT apply_dualice_AvI_e(
     return AvI_p.apply_e(I, fill) * correct;
 }
 
+
+
+
+
+
+/** Assumes elevation grid is local in A and O.  */
+std::unique_ptr<WeightedSparse> compute_EAvEO(
+    SparseSetT *_dimEA,
+    std::array<Indexing const *,2> indexingHC,
+    WeightedSparse const &AvO,
+    WeightedSparse const &EOvI,
+{
+    auto &dimEA(*_dimEA);
+    Indexing const &indexingHCA(indexingHC[0]);
+    Indexing const &indexingHCO(indexingHC[1]);
+    int const nhc = indexingHCO[1].extent;
+    auto const &dimA(AvO.dims[0]);
+    auto const &dimO(AvO.dims[1]);
+    auto const &dimEO(EOvI.dims[0]);
+    auto const &wEO(EOvI.wM);
+
+    // Create an unscaled matrix
+    std::unique_ptr<EigenSparseMatrixT> EAvEO;
+    {EigenSparseMatrixT EAvEO_m(MakeDenseEigenT(
+        SparsifyTransform::ADD_DENSE,
+        {&dimEA, &dimEO}, '.'));
+
+        for (auto ii(begin(*AvO->M)); ii != end(*AvO->M); ++ii) {
+            int lA_s = dimA.to_sparse(ii->row());
+            int lO_s = dimO.to_sparse(ii->col());
+
+            // Iterate through all possible elevation classes for this gridcell pair
+            for (int ihc=0; ihc<nhc; ++ihc) {
+                int lEO_s = indexingHCO.tuple_to_index({lO_s,ihc});
+                int lEA_s = indexingHCA.tuple_to_index({lA_s,ihc});
+                double weightEO = wEO(lEO);
+                if (weightEO != 0) EAvEO_m.accum.add({lEA_s,lEO_s}, weightEO);
+            }
+        }
+
+        EAvEO = EAvEO_m.to_eigen();
+    }
+
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(
+        {&dimEA, &dimEO}, &icebin::apply_matrix));
+
+    // Add scaling stuff
+    {auto _sums(sums(EAvEO, '+'));
+        ret->wM.reference(_sums[0]);
+        ret->Mw.reference(_sums[1]);
+    }
+
+    if (params.scale) {
+        blitz::Array<double,1> sM(1. / ret->wM);
+        reset_ptr(ret.M, map_eigen_diagonal(sM) * *EAvEO);
+//        ret.M.reset(new EigenSparseMatrixT(
+//            map_eigen_diagonal(sM) * *EAvEO));
+    } else {
+        ret.M = std::move(EAvEO);
+    }
+    return ret;
+}
+
+/** Helper function: clip a cell according to its index */
+static bool clip_index(SparseSetT *dim, long index,
+    double lon0, double lat0, double lon1, double lat1)
+{
+    return dim->in_sparse(index);
+}
+
+/** Given gcmO (based on the ocean grid), constructs a GCMRegridder based
+on the Atmosphere grid. */
+GCMRegridder A_v_O(
+    GCMRegridder &gcmA,
+    GCMRegridder const &gcmO,
+{
+    Grid_LonLat const *gridO(dynamc_cast<Grid_LonLat *>(&*gcmO.gridA));
+    HntrGrid const &hntrO(*gridO->hntr);
+
+    // Define Atmosphere grid to be exactly twice the Ocean grid
+    HntrGrid const hntrA(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
+
+
+    // ------- Produce a full gridA, based on hntrA and realized cells in dimA
+    GridSpec_Hntr spec(hntrA);
+    spec.name = gridO->name + "_A";
+    if (gridO->north_pole != gridO->south_pole) (*icebin_error)(-1,
+        "north_pole=%d and south_pole=%d must match in gridO",
+        gridO->north_pole, gridO->south_pole);
+    spec.pole_caps = gridO->north_pole;
+
+    // Keep cells listed in dimA
+    spec.spherical_clip = std::bind(&clip_index, &dimA, _1, _2, _3, _4, _5);
+    spec.points_in_side = 1;    // Keep it simple, we don't need this anyway
+    spec.eq_rad = gridO->eq_rad;
+
+    std::unique_ptr<Grid_LonLat *> gridA(new Grid_LonLat);
+    spec.make_grid(*gridA);
+
+
+    // -------- Fill in gcmA
+    gcmA.gridA.reset(gridA.release());
+    gcmA.correctA = gcmO.correctA;
+    gcmA.indexingHC = gcmO.indexingHC;
+    gcmA.indexingE = derive_indexingE(gcmA.gridA->indexing, gcmA.indexingHC);
+    gcmA.hcdefs = gcmO.hcdefs;
+    gcmA.sheets_index = gcmO.sheets_index;
+
+    // -------- Get the AvO matrix (but only for realized cells in gridO)
+    SparseSetT dimA, dimO;
+    for (auto cellO=gridO->cells.begin(); cellO != gridO->cells.end(); ++cellO) {
+        dimO.add(cellO->index);
+    }
+    EigenSparseMatrixT AvO(MakeDenseEigenT(
+        std::bind(&Hntr::matrix, std::placeholders::_1,
+            const_array(blitz::shape(Ogrid.size()), 1.0, FortranArray<1>())),
+        {SparsifyTransform::ADD_DENSE, SparsifyTransform::TO_DENSE_IGNORE_MISSING},
+        {&dimA, &dimO}, '.').to_eigen());
+
+
+    // -------- Get AEvOE, based on AvO
+    ibmisc::Tuple<int,double,2> AEvOE_t;
+    for (auto ii(begin(AvO)); ii != end(AvO); ++ii) {
+        int iA = ii->row();
+        int iO = ii->col();
+        for (int ihc=0; ihc<
+    }
+
+    // --------- Convert gcmO.ice_regridders
+}
 

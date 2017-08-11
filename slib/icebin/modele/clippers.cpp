@@ -4,7 +4,7 @@
 namespace icebin {
 namespace modele {
 
-bool ice_sheet::clip(int zone, double lon0, double lat0, double lon1, double lat1)
+bool ice_sheet::clip(int zone, long index, double lon0, double lat0, double lon1, double lat1)
 {
     // Is it in Greenland range?
     if (zone & GREENLAND)

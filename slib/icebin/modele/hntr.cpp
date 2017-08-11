@@ -204,32 +204,20 @@ void Hntr::regrid1(
     }
 }
 
-void Hntr::matrix(
+void Hntr::raw_BvA(
     MakeDenseEigenT::AccumT &accum,        // The output (sparse) matrix; 0-based indexing
-    blitz::Array<double,1> const &_WTA)
+    SparseSetT *dimB_filter)        // Fast-filter out things not in B
 {
-    // Convert input to 1-based indexing
-    blitz::Array<double,1> const WTA(ibmisc::reshape1(_WTA,1));
-
-
-    // Check array dimensions
-    if (WTA.extent(0) != Agrid.size()) {
-        (*icebin_error)(-1, "Error in dimensions: (%d) vs. (%d, %d)\n",
-            WTA.extent(0),
-            Agrid.size(), Bgrid.size());
-    }
-
     // ------------------
     // Interpolate the A grid onto the B grid
-    std::vector<std::tuple<int,double>> values;
     for (int JB=1; JB <= Bgrid.jm; ++JB) {
         int JAMIN = JMIN(JB);
         int JAMAX = JMAX(JB);
 
         for (int IB=1; IB <= Bgrid.im; ++IB) {
             int const IJB = IB + Bgrid.im * (JB-1);
-            double WEIGHT= 0;
-            values.clear();
+            if (dimB && !dimB_filter->in_sparse(IJB-1)) continue;
+
             int const IAMIN = IMIN(IB);
             int const IAMAX = IMAX(IB);
             for (int JA=JAMIN; JA <= JAMAX; ++JA) {
@@ -244,21 +232,17 @@ void Hntr::matrix(
                     if (IAREV==IAMIN) F -= FMIN(IB);
                     if (IAREV==IAMAX) F -= FMAX(IB);
 
-                    double const wt = F*G*WTA(IJA);
-                    WEIGHT += wt;
-                    values.push_back(std::make_tuple(IJA, wt));
-                    //VALUE  += wt*A(IJA);
+                    if (wt != 0) accum.add({IJB-1, IJA-1}, F*G);    // -1 ==> convert to 0-based indexing
                 }
-            }
-            double const by_WEIGHT = 1.0 / WEIGHT;
-            for (auto &pair : values) {
-                int ija = std::get<0>(pair);
-                double val = std::get<1>(pair);
-                accum.add({IJB-1, ija-1}, val * by_WEIGHT);    // -1 ==> convert to 0-based indexing
             }
         }
     }
+}
+
 #if 0
+/** Produce an almost-identity matrix that takes the mean of the polar grid cells */
+void Hntr::mean_polar_matrix()
+{
     if (mean_polar) {
         // Replace individual values near the poles by longitudinal mean
         for (int JB=1; JB <= Bgrid.jm; JB += Bgrid.jm-1) {
@@ -286,10 +270,44 @@ void Hntr::matrix(
 }
 
 
-
-
 }}
 
+static std::unique_ptr<WeightedSparse> compute_hntr_BvA(
+    std::array<SparseSetT *,2> dims,
+    HntrGrid const &B,
+    HntrGrid const &A,
+    Grid const *gridA)
+{
+
+    SparseSetT &dimB(dims[0]);
+    SparseSetT &dimA(dims[1]);
+
+    // Add all known cells in A (don't generate matrix for unknown cells)
+    if (gridA) {
+        for (auto cellA=gridA->cells.begin(); cellA != gridA->cells.end(); ++cellA) {
+            dimA.add(cellA->index);
+        }
+    }
+
+    // Create the unscaled matrix
+    Hntr(B, A, 0.);    // Prepare for Hntr to generate AvB natively
+    std::unique_ptr<EigenSparseMatrixT> BvA(new EigenSparseMatrixT(
+        MakeDenseEigenT(
+            std::bind(&Hntr::raw_matrix, std::placeholders::_1, &dimA),
+            {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
+            {&dimA, &dimB}, 'T').to_eigen()));
+
+    ret->wM.reference(sum(BvA,0,'+'));
+    ret->Mw.reference(sum(BvA,1,'+'));
+
+    if (params.scale) {
+        ret->M.reset(new EigenSparseMatrixT(
+            (1. / to_eigen_maparray(ret->wM)).matrix().asDiagonal() * BvA));
+    } else {
+        ret->M = std::move(BvA);
+    }
+
+}
 
 
 // =================================================================

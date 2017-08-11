@@ -339,6 +339,9 @@ class Grid_LonLat : public Grid
 public:
     ~Grid_LonLat() {}
 
+    /** The HntrGrid used to generate this, if such was used... */
+    std::unique_ptr<HntrGrid> hntr;
+
     /** Longitude of cell boundaries (degrees), sorted low to high.
     <b>NOTE:</b> lon_boundares.last() = 360.0 + lonb.first() */
     std::vector<double> lonb;
