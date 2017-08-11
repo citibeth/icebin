@@ -217,7 +217,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &AE)
 {
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims));
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
     SparseSetT * const dimA(ret->dims[0]);
     SparseSetT * const dimI(ret->dims[1]);
     SparseSetT _dimG;
@@ -230,11 +230,11 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
     // ----- Get the Ur matrices (which determines our dense dimensions)
     MakeDenseEigenT GvI_m(
         std::bind(&IceRegridder::GvI, regridder, _1),
-        SparsifyTransform::ADD_DENSE,
+        {SparsifyTransform::ADD_DENSE},
         {dimG, dimI}, '.');
     MakeDenseEigenT ApvG_m(        // _m ==> type MakeDenseEigenT
         AE.GvAp,
-        SparsifyTransform::ADD_DENSE,
+        {SparsifyTransform::ADD_DENSE},
         {dimG, dimA}, 'T');
 
     // ----- Convert to Eigen and multiply
@@ -251,7 +251,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
         // ----- Compute the final weight matrix
         auto wAvAp(MakeDenseEigenT(                   // diagonal
             AE.sApvA,
-            SparsifyTransform::TO_DENSE_IGNORE_MISSING,
+            {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
             {dimA, dimA}, '.').to_eigen());
         auto wApvI(sum_to_diagonal(*ApvI, 0, '+'));        // diagonal
         EigenSparseMatrixT wAvI(wAvAp * wApvI);    // diagonal...
@@ -297,7 +297,7 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &AE)
 {
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims));
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, !params.smooth));
     SparseSetT * const dimA(ret->dims[1]);
     SparseSetT * const dimI(ret->dims[0]);
     SparseSetT _dimG;
@@ -310,11 +310,11 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
     // ----- Get the Ur matrices (which determines our dense dimensions)
     MakeDenseEigenT GvAp_m(
         AE.GvAp,
-        SparsifyTransform::ADD_DENSE,
+        {SparsifyTransform::ADD_DENSE},
         {dimG, dimA}, '.');
     MakeDenseEigenT IvG_m(
         std::bind(&IceRegridder::GvI, regridder, _1),
-        SparsifyTransform::ADD_DENSE,
+        {SparsifyTransform::ADD_DENSE},
         {dimG, dimI}, 'T');
 
     // ----- Convert to Eigen
@@ -334,7 +334,7 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
         // Scaling matrix
         auto sApvA(MakeDenseEigenT(
             AE.sApvA,
-            SparsifyTransform::TO_DENSE_IGNORE_MISSING,
+            {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
             {dimA, dimA}, '.').to_eigen());
 
         // Compute area of A grid cells
@@ -362,6 +362,18 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
         }
     }
 
+    // Smooth the result on I, if needed
+    if (params.smooth) {
+
+        // Obtain the smoothing matrix (smoother.hpp)
+        TupleListT<2> smoothI_t({dimI.dense_extent(), dimI.dense_extent()});
+        smoothing_matrix(smoothI_t, &*regridder->gridI,
+            dimI, &regridder->elevI, ret->wM, params.sigma);
+        auto smoothI(to_eigen(smoothI_t));
+
+        // Smooth the underlying unsmoothed regridding transformation
+        ret->M.reset(new EigenSparseMatrixT(smoothI * *ret->M));
+    }
     return ret;
 }
 
@@ -369,7 +381,7 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &E, UrAE const &A)
 {
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims));
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
     SparseSetT * const dimE(ret->dims[0]);
     SparseSetT * const dimA(ret->dims[1]);
     SparseSetT _dimG;
@@ -383,11 +395,11 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
 
     MakeDenseEigenT GvAp_m(
         A.GvAp,
-        SparsifyTransform::ADD_DENSE,
+        {SparsifyTransform::ADD_DENSE},
         {dimG, dimA}, '.');
     MakeDenseEigenT EpvG_m(
         E.GvAp,
-        SparsifyTransform::ADD_DENSE,
+        {SparsifyTransform::ADD_DENSE},
         {dimG, dimE}, 'T');
 
     // ----- Convert to Eigen and multiply
@@ -405,12 +417,12 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
     if (params.correctA) {
         auto sApvA(MakeDenseEigenT(
             A.sApvA,
-            SparsifyTransform::TO_DENSE_IGNORE_MISSING,
+            {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
             {dimA, dimA}, '.').to_eigen());
 
         auto wEvEp(MakeDenseEigenT(
             E.sApvA,
-            SparsifyTransform::TO_DENSE_IGNORE_MISSING,
+            {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
             {dimE, dimE}, '.').to_eigen());
 
         // +correctA: Weight matrix in E space
@@ -447,10 +459,9 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
 }
 // ----------------------------------------------------------------
 void RegridMatrices::add_regrid(std::string const &spec,
-    RegridMatrices::SmoothingFunction const *smooth,
     RegridMatrices::MatrixFunction const &regrid)
 {
-    regrids.insert(make_pair(spec, Binding(regrid, smooth)));
+    regrids.insert(make_pair(spec, regrid));
 }
 // ----------------------------------------------------------------
 RegridMatrices::RegridMatrices(IceRegridder *regridder)
@@ -477,21 +488,21 @@ RegridMatrices::RegridMatrices(IceRegridder *regridder)
         _1, &*regridder->gridI, _2, &regridder->elevI, _3, _4);
 
     // ------- AvI, IvA
-    add_regrid("AvI", nullptr,
+    add_regrid("AvI",
         std::bind(&compute_AEvI, regridder, _1, _2, urA));
-    add_regrid("IvA", &smoothI,
+    add_regrid("IvA",
         std::bind(&compute_IvAE, regridder, _1, _2, urA));
 
     // ------- EvI, IvE
-    add_regrid("EvI", nullptr,
+    add_regrid("EvI",
         std::bind(&compute_AEvI, regridder, _1, _2, urE));
-    add_regrid("IvE", &smoothI,
+    add_regrid("IvE",
         std::bind(&compute_IvAE, regridder, _1, _2, urE));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, this, _1, _2, urE, urA) ));
-    add_regrid("EvA", nullptr,
+    add_regrid("EvA",
         std::bind(&compute_EvA, regridder, _1, _2, urE, urA));
-    add_regrid("AvE", nullptr,
+    add_regrid("AvE",
         std::bind(&compute_EvA, regridder, _1, _2, urA, urE));
 
 #if 0
@@ -512,17 +523,6 @@ std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
 {
     auto &bindings(regrids.at(spec_name));
     auto BvA(bindings.matrix(dims, params));
-    // If the user asked for smoothing and we can smooth this kind of matrix...
-    if (params.smooth() && bindings.smooth) {
-        TupleListT<2> smoothB_t({dims[0]->dense_extent(), dims[0]->dense_extent()});
-        (*bindings.smooth)(smoothB_t, *dims[0], BvA->wM, params.sigma);
-        auto smoothB(to_eigen(smoothB_t));
-
-        // Smooth the underlying unsmoothed regridding transformation
-        BvA->M.reset(new EigenSparseMatrixT(smoothB * *BvA->M));
-        BvA->smooth = true;
-        BvA->conserve = params.conserve;
-    }
     return BvA;
 }
 // ----------------------------------------------------------------
@@ -539,11 +539,12 @@ static void mask_result(EigenDenseMatrixT &ret, blitz::Array<double,1> const &wB
     }
 
 }
-
+// -----------------------------------------------------------------------
 EigenDenseMatrixT WeightedSparse::apply_e(
     // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
     blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-    double fill) const    // Fill value for cells not in BvA matrix
+    double fill, const    // Fill value for cells not in BvA matrix
+    bool force_conservation)
 {
     auto &BvA(*this);
 
@@ -563,12 +564,11 @@ EigenDenseMatrixT WeightedSparse::apply_e(
     // Only apply conservation correction if all of:
     //   a) Matrix is smoothed, so it needs a conservation correction
     //   b) User requested conservation be maintained
-    if (!(BvA.smooth && BvA.conserve)) {
+    if (BvA.conservative || !force_conservation) {
         // Remove cells not in the sparse matrix
         mask_result(B0, BvA.wM, fill);
         return B0;
     }
-
     // -------------- Apply the Conservation Correction
     // Integrate each variable of input (A) over full domain
     auto &wA_b(BvA.Mw);
@@ -598,7 +598,7 @@ EigenDenseMatrixT WeightedSparse::apply_e(
 
     return ret;
 }
-
+// -----------------------------------------------------------------------
 void WeightedSparse::ncio(ibmisc::NcIO &ncio,
     std::string const &vname,
     std::array<std::string,2> dim_names)

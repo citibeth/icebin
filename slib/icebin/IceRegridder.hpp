@@ -23,7 +23,7 @@
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/memory.hpp>
-#include <spsparse/eigen.hpp>
+#include <ibmisc/eigen_types.hpp>
 
 #include <icebin/Grid.hpp>
 
@@ -41,44 +41,25 @@ BOOST_ENUM_VALUES( InterpStyle, int,
 
 // ================================================
 
-// Types that will be used throughout as template arguments
-typedef long sparse_index_type;
-typedef int dense_index_type;
-typedef double val_type;
-
-// -----------------------------------------
-typedef spsparse::MakeDenseEigen<sparse_index_type, val_type, 0, dense_index_type> MakeDenseEigenT;
-template<int RANK>
-    using TupleListT = MakeDenseEigenT::TupleListT<RANK>;
-template<int RANK>
-    using DenseArrayT = blitz::Array<val_type,RANK>;
-typedef MakeDenseEigenT::SparseSetT SparseSetT;
-typedef MakeDenseEigenT::EigenSparseMatrixT EigenSparseMatrixT;
-typedef Eigen::Matrix<val_type, Eigen::Dynamic, Eigen::Dynamic> EigenDenseMatrixT;
-typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1> EigenColVectorT;
-typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic> EigenRowVectorT;
-typedef Eigen::DiagonalMatrix<val_type, Eigen::Dynamic> EigenDiagonalMatrixT;
-// -----------------------------------------
-
 /** Return value of a sparse matrix */
 struct WeightedSparse {
     std::array<SparseSetT *,2> dims;            // Dense-to-sparse mapping for the dimensions
-
 
     // If M=BvA, then wM = wBvA = area of B cells
     DenseArrayT<1> wM;           // Dense indexing
 
     std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
-    bool smooth;    // Is M smoothed?
-
-    /** Should we enforce conservation (in the face of smoothing)?
-    Unsmoothed regrid matrices are already conservative... */
-    bool conserve;
 
     // Area of A cells
     DenseArrayT<1> Mw;
 
-    WeightedSparse(std::array<SparseSetT *,2> _dims) : dims(_dims), smooth(false) {}
+
+    /** True if this regridding matrix is conservative.  Matrices could be
+    non-conservative, for example, in the face of smoothing on I.  Or when
+    regridding between the IceBin and ModelE ice sheets. */
+    bool conservative;
+
+    WeightedSparse(std::array<SparseSetT *,2> _dims, bool _conservative) : dims(_dims), conservative(_conservative) {}
 
     /** Applies a regrid matrix.
     Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
@@ -96,7 +77,8 @@ struct WeightedSparse {
     EigenDenseMatrixT apply_e(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
         blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-        double fill = std::numeric_limits<double>::quiet_NaN()) const;    // Fill value for cells not in BvA matrix
+        double fill = std::numeric_limits<double>::quiet_NaN(),    // Fill value for cells not in BvA matrix
+        bool force_conservation=true);     // Set if you want apply_e() to conserve, even if !M->conservative
 
 
     /** Apply to multiple variables
@@ -105,6 +87,7 @@ struct WeightedSparse {
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
         blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
         double fill,    // Fill value for cells not in BvA matrix
+        bool force_conservation,
         ibmisc::TmpAlloc &tmp) const
     {
         return spsparse::to_blitz<double>(apply_e(A_b, fill), tmp);
@@ -116,6 +99,7 @@ struct WeightedSparse {
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
         blitz::Array<double,1> const &A_b,       // A_b{j} One variable
         double fill,    // Fill value for cells not in BvA matrix
+        bool force_conservation,
         ibmisc::TmpAlloc &tmp) const
     {
         auto A_b2(ibmisc::reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
@@ -137,6 +121,7 @@ class IceRegridder;
 /** Holds the set of "Ur" (original) matrices produced by an
     IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices {
+    friend class IceRegridder;
 public:
     class Params;
     typedef std::function<std::unique_ptr<WeightedSparse>(
@@ -163,44 +148,23 @@ public:
         scale length of the smoothing.  Used for IvA and IvE. */
         std::array<double,3> const sigma;
 
-        /** Should we enforce conservation (in the face of smoothing)?
-        Unsmoothed regrid matrices are already conservative... */
-        bool const conserve;
-
         bool smooth() const { return sigma[0] != 0; }
 
-        Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma, bool _conserve=false) :
-            scale(_scale), correctA(_correctA), sigma(_sigma), conserve(_conserve) {}
+        Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
+            scale(_scale), correctA(_correctA), sigma(_sigma) {}
     };
 
 protected:
-    struct Binding {
-        MatrixFunction const matrix;
-        SmoothingFunction const *smooth;
-
-        Binding(MatrixFunction const &_matrix, SmoothingFunction const *_smooth) :
-            matrix(_matrix), smooth(_smooth) {}
-    };
 
     // Smoothing functions for the different grids
     RegridMatrices::SmoothingFunction smoothI;
 
-    std::map<std::string, Binding> regrids;
+    std::map<std::string, MatrixFunction> regrids;
     void add_regrid(std::string const &spec,
-        SmoothingFunction const *smooth,
         MatrixFunction const &regrid);
 
 
 public:
-    /** Use this to construct a RegridMatrices instance:
-           GCMRegridder gcm_regridder(...);
-           auto rm(RegridMatrices(gcm_regridder.sheet("greenland")));
-           // rm.regrid("AvI", scale=true, correctA=true)
-           auto AvI(rm.regrid("AvI", true, true));
-           AvI.M        // The matrix
-           AvI.wM       // The weight vector
-    */
-    RegridMatrices(IceRegridder *sheet);
 
     /** Retrieves a regrid matrix, and weights (area) of the input and
         output grid cells.
