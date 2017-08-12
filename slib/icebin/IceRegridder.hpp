@@ -121,18 +121,10 @@ class IceRegridder;
 /** Holds the set of "Ur" (original) matrices produced by an
     IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices {
-    friend class IceRegridder;
 public:
     class Params;
     typedef std::function<std::unique_ptr<WeightedSparse>(
         std::array<SparseSetT *,2> dims, Params const &params)> MatrixFunction;
-
-    typedef std::function<void(
-        TupleListT<2> &ret,
-        SparseSetT const &dimX,
-        DenseArrayT<1> const &area_d,    // RM.regrid()->wM
-        std::array<double,3> const &sigma
-        )> SmoothingFunction;
 
     /** Parameters controlling the generation of regridding matrices */
     struct Params {
@@ -148,23 +140,18 @@ public:
         scale length of the smoothing.  Used for IvA and IvE. */
         std::array<double,3> const sigma;
 
+        /** Tells if these parameters are asking us to smooth */
         bool smooth() const { return sigma[0] != 0; }
 
         Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
             scale(_scale), correctA(_correctA), sigma(_sigma) {}
     };
 
-protected:
-
-    // Smoothing functions for the different grids
-    RegridMatrices::SmoothingFunction smoothI;
-
     std::map<std::string, MatrixFunction> regrids;
+
     void add_regrid(std::string const &spec,
         MatrixFunction const &regrid);
 
-
-public:
 
     /** Retrieves a regrid matrix, and weights (area) of the input and
         output grid cells.
@@ -270,9 +257,14 @@ public:
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
     virtual void GvAp(MakeDenseEigenT::AccumT &ret) const = 0;
 
+    /** Produce regridding matrices for this setup. */
+    RegridMatrices regrid_matrices();
+
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
+
+
 };  // class IceRegridder
 
 std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type);

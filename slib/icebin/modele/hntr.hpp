@@ -66,7 +66,8 @@ public:
     double DATMIS;
 
 public:
-    /** Initialize overlap data structures, get ready to re-grid. */
+    /** Initialize overlap data structures, get ready to re-grid.
+    TODO: Reference, don't copy, these HntrGrid instances. */
     Hntr(HntrGrid const &_A, HntrGrid const &_B, double _DATMIS);
 
     /**
@@ -96,7 +97,7 @@ public:
         bool mean_polar = false) const;
 
     void matrix(
-        MakeDenseEigenT::AccumT &accum,        // The output (sparse) matrix; 0-based indexing
+        MakeDenseEigenT::AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
         blitz::Array<double,1> const &_WTA);
 
 
@@ -118,7 +119,53 @@ private:
     void partition_east_west();
     void partition_north_south();
 
+public:
+
+    template<class AcummT>
+    void matrix(
+        AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
+        std::function<bool(long)> const &Bindex_clip)    // OPTIONAL: Fast-filter out things in B, by their index
+
+
 };    // class Hntr
+
+
+
+template<class AcummT>
+void Hntr::matrix(
+    AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
+    std::function<bool(long)> const &Bindex_clip)    // OPTIONAL: Fast-filter out things in B, by their index
+{
+    // ------------------
+    // Interpolate the A grid onto the B grid
+    for (int JB=1; JB <= Bgrid.jm; ++JB) {
+        int JAMIN = JMIN(JB);
+        int JAMAX = JMAX(JB);
+
+        for (int IB=1; IB <= Bgrid.im; ++IB) {
+            int const IJB = IB + Bgrid.im * (JB-1);
+            if (!Bindex_clip(IJB-1)) continue;
+
+            int const IAMIN = IMIN(IB);
+            int const IAMAX = IMAX(IB);
+            for (int JA=JAMIN; JA <= JAMAX; ++JA) {
+                double G = SINA(JA) - SINA(JA-1);
+                if (JA==JAMIN) G -= GMIN(JB);
+                if (JA==JAMAX) G -= GMAX(JB);
+
+                for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
+                    int const IA  = 1 + ((IAREV-1) % Agrid.im);
+                    int const IJA = IA + Agrid.im * (JA-1);
+                    double F = 1;
+                    if (IAREV==IAMIN) F -= FMIN(IB);
+                    if (IAREV==IAMAX) F -= FMAX(IB);
+
+                    if (wt != 0) accum.add({IJB-1, IJA-1}, F*G);    // -1 ==> convert to 0-based indexing
+                }
+            }
+        }
+    }
+}
 
 
 

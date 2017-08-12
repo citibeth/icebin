@@ -131,8 +131,10 @@ class GridMap {
     friend class GridSpec_LonLat;
     friend class GridSpec_Exchange;
 protected:
-    typedef std::unordered_map<long, std::unique_ptr<CellT>> MapT;
-    MapT _cells;
+    spsparse::SparseSet<long,int> _dim;
+    std::vector<std::unique_ptr<Cell>> _cells;    // Dense array of cells, according to _dim
+//    typedef std::unordered_map<long, std::unique_ptr<CellT>> MapT;
+//    MapT _cells;
     long _nfull = -1;
     long _max_realized_index = -1;
 
@@ -147,31 +149,20 @@ protected:
 #endif
 
 public:
+    spsparse::SparseSet<long,int> const &dim() { return _dim; }
 
-    typedef ibmisc::DerefSecondIter<long, CellT, typename MapT::iterator> iterator;
-    typedef ibmisc::DerefSecondIter<long, const CellT, typename MapT::const_iterator> const_iterator;
+    typedef std::vector<Cell> const_iterator;
 
-
-    iterator begin()
-        { return iterator(_cells.begin()); }
-    iterator end()
-        { return iterator(_cells.end()); }
-    const_iterator cbegin() const
-        { return const_iterator(_cells.cbegin()); }
-    const_iterator cend() const
-        { return const_iterator(_cells.cend()); }
     const_iterator begin() const
-        { return const_iterator(_cells.cbegin()); }
+        { return _cells.begin(); }
     const_iterator end() const
-        { return const_iterator(_cells.cend()); }
-
-    iterator erase(iterator const &ii)
-        { return iterator(_cells.erase(ii.wrapped)); }
+        { return _cells.end(); }
 
     void clear() { _cells.clear(); }
 
     CellT *at(long index) { return &*_cells.at(index); }
     CellT const *at(long index) const { return &*_cells.at(index); }
+    bool contains(long index) const { return _cells.find(index) != _cells.end(); }
     size_t nrealized() const { return _cells.size(); }
     size_t nfull() const { return _nfull >=0 ? _nfull : _max_realized_index+1; }
 
@@ -215,16 +206,13 @@ CellT *GridMap<CellT>::add(CellT &&cell)
     if (cell.index < 0) cell.index = _cells.size();
     _max_realized_index = std::max(_max_realized_index, cell.index);
 
-    std::unique_ptr<CellT> ptr(new CellT(std::move(cell)));
-    auto ret = _cells.insert(std::make_pair(cell.index, std::move(ptr)));
-    CellT *valp = ret.first->second.get();
-    bool inserted = ret.second;
-
-    if (!inserted) {        // Key already existed
+    if (dim.contains(cell.index))
         (*icebin_error)(-1, "Error adding repeat cell/vertex index=%d.  "
             "Cells and Vertices must have unique indices.", cell.index);
-    }
-    return valp;
+
+    int ix_d = dim.add(cell.index);
+    _cells.push_back(std::unique_ptr<CellT>(new CellT(std::move(cell))));
+    return &*_cells.back();
 }
 
 template<class CellT>
