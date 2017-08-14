@@ -149,7 +149,7 @@ protected:
 #endif
 
 public:
-    spsparse::SparseSet<long,int> const &dim() { return _dim; }
+    spsparse::SparseSet<long,int> const &dim() const { return _dim; }
 
     typedef std::vector<Cell> const_iterator;
 

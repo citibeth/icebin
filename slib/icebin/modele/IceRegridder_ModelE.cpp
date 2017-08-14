@@ -167,7 +167,6 @@ std::unique_ptr<WeightedSparse> compute_EAmvIp(
     IceRegridder_ModelE *regridderA,
     RegridMatrices const &rmO)
 {
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
     SparseSetT &dimEAm(dims[0]);
     SparseSetT &dimIp(dims[1]);
     SparseSetT dimEOm, dimEOp, dimIp, dimOm;
@@ -201,26 +200,30 @@ std::unique_ptr<WeightedSparse> compute_EAmvIp(
     // ---------------- Compute the main matrix
     // ---------------- EAmvIp = EAmvEOm * EOpvIp
 
-    auto EOpvIp(rmO.matrix("EvI"));
+    std::unique_ptr<WeightedSparse> EOpvIp(rmO.matrix("EvI"));
 
-TODO: Get dimA out of somewhere...
     auto EAmvEOm(MakeDenseEigenT(
-        std::bind(&raw_EAvEO, _1, &hntrA, &hntrO, &dimA, &wEOm),
+        std::bind(&raw_EAvEO, _1, &hntrA, &hntrO, &regridderA->gridA->dim(), &wEOm),
+        {SparsifyTransform::ADD_DENSE},
         {&dimEAm, &dimEOm}, '.').to_eigen());
-
-    EigenSparseMatrixT EAmvIp(EAmvEOm * EOpvIp);
-
 
     // ---------- wEAm = EAmvEOm * wEOm
     auto wEAm(EAmvEOm * wEOm_e);
 
 
-
-
-
-
-
-
+    // ----------- Put it all together (EAmvIp)
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
+    ret->wM.reference(wEAm);
+    if (paramsA.scale) {
+        blitz::Array<double,1> sEAm(1. / wEAm);
+        ret->M.reset(new EigenSparseMatrixT(
+            map_eigen_diagonal(sEAm) * EAmvEOm * *EOpvIp->M));
+    } else {
+        ret->M.reset(new EigenSparseMatrixT(
+            EAmvEOm * EOpvIp));
+    }
+    sum->Mw.reference(EOpvIp.Mw);
+    return ret;
 }
 
 // ========================================================================
