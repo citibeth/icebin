@@ -241,6 +241,38 @@ public:
     grid cells) */
     std::vector<double> hcdefs; // [nhc]
 
+public:
+
+    virtual ~GCMRegridder() {}
+
+
+    /** @return Number of elevation points for grid cells in general */
+    /** @return Number of elevation points for a given grid cell */
+    unsigned int nhc(int i1) const { return hcdefs.size(); }
+    unsigned int nhc() const { return nhc(-1); }
+
+    unsigned long nA() const { return gridA->ndata(); }
+    unsigned long nE() const { return nA() * nhc(-1); }
+
+
+    /** Produce regridding matrices for this setup. */
+    virtual RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) = 0;
+
+    /**
+    @param rw_full If true, read the entire data structure.  If false (i.e. we
+                   are using MPI and this is not the root), then avoid reading
+                   grid details, etc.
+    */
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true) = 0;
+
+}
+
+// ----------------------------------------------------------------------
+/** Generates the matrices required in the GCM */
+class GCMRegridder_Standard : public GCMRegridder
+{
+
+public:
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> sheets_index;
 
@@ -292,6 +324,9 @@ public:
     IceRegridder *ice_regridder(std::string const &name)
         { return ice_regridders[sheets_index.at(name)].get(); }
 
+    /** Produce regridding matrices for this setup. */
+    RegridMatrices const regrid_matrices(std::string const &ice_sheet_name);
+
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):
         Function returns true for cells we wish to keep. */
@@ -314,17 +349,7 @@ public:
 
     // -----------------------------------------
 
-    /** Computes the weight (native area) of each cell of the Atmosphere grid (A).
-    These weights are added to an existing TupleListT<1>. */
-    void wA(TupleListT<1> &w) const;
 
-    /** @return Number of elevation points for a given grid cell */
-    unsigned int nhc(int i1) const { return hcdefs.size(); }
-
-    /** @return Number of elevation points for grid cells in general */
-    unsigned int nhc() const { return nhc(-1); }
-    unsigned long nA() const { return gridA->ndata(); }
-    unsigned long nE() const { return nA() * nhc(-1); }
 
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we

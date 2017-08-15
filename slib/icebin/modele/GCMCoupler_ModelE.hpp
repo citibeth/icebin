@@ -140,7 +140,11 @@ public:
     // Called from LISnow::allocate()
     GCMCoupler_ModelE(GCMParams &&_params);
 
-    virtual std::string locate_input_file(
+    void ncread(   // virtual
+        std::string const &config_fname,
+        std::string const &vname);
+
+    std::string locate_input_file(   // virtual
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 

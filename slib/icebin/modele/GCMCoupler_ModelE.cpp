@@ -100,6 +100,16 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
     scalars.add("by_dt", nan, "s-1", 1., "Inverse of coupling timestep");
 }
 // -----------------------------------------------------
+void GCMCoupler_ModelE::ncread(
+    std::string const &config_fname,        // comes from this->gcm_params
+    std::string const &vname)        // comes from this->gcm_params
+{
+    GCMCoupler::ncread(config_fname, vname);
+    // Replace the GCMRegridder with a wrapped version that understands
+    // the ocean-vs-atmosphere grid complexity of ModelE
+    gcm_regridder.reset(new GCMRegridder_ModelE(std::move(gcm_regridder)));
+}
+// -----------------------------------------------------
 // Called from LISnow::allocate()
 
 std::string GCMCoupler_ModelE::locate_input_file(
@@ -175,7 +185,7 @@ void gcmce_hc_params(GCMCoupler_ModelE *self, int &nhc_gcm, int &icebin_base_hc,
 {
     nhc_gcm = self->nhc_gcm();
     icebin_base_hc = self->gcm_params.segment("ec").base;
-    nhc_ice = self->gcm_regridder.nhc(0);
+    nhc_ice = self->gcm_regridder->nhc();
 }
 
 int GCMCoupler_ModelE::_read_nhc_gcm()
@@ -415,11 +425,11 @@ bool run_ice)    // if false, only initialize
     VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());
     std::vector<double> val(self->gcm_outputsE.size());    // Temporary
 
-    auto &indexingA(self->gcm_regridder.gridA->indexing);
+    auto &indexingA(self->gcm_regridder->gridA->indexing);
 
     // domain uses alphabetical order, 0-based indexing...
     const auto base_hc(self->gcm_params.icebin_base_hc);
-    const auto nhc_ice(self->gcm_regridder.nhc(0));
+    const auto nhc_ice(self->gcm_regridder->nhc());
 
     auto &domainA(self->domainA);
 printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc, nhc_ice);
@@ -437,7 +447,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
             const int j_f = j+1;
 
             if (self->modele_inputs.underice(i_f,j_f,ihc_f) != UI_ICEBIN) continue;    // C2F indexing
-            long iE_s = self->gcm_regridder.indexingE.tuple_to_index(
+            long iE_s = self->gcm_regridder->indexingE.tuple_to_index(
                 make_array(i, j, ihc_ice));
 
             if (iE_s < 0) (*ibmisc_error)(-1,
@@ -541,7 +551,7 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) (*gcm_ivalsA[ivar]) = 0;
     for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {    // Iterate through elements of parallel arrays
         long iA = gcm_ivalsA_s.index[i];
-        auto ij(gcm_regridder.indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
+        auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
         int const i_f = ij[0]+1;    // C2F
         int const j_f = ij[1]+1;
         for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
@@ -561,7 +571,7 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) (*gcm_ivalsE[ivar]) = 0;
     for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
         long iE = gcm_ivalsE_s.index[i];
-        auto ijk(gcm_regridder.indexing(GridAE::E).index_to_tuple<int,3>(iE));
+        auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
         int const i_f = ijk[0]+1;    // C2F
         int const j_f = ijk[1]+1;
         int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model

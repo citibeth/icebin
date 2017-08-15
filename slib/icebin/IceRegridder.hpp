@@ -122,6 +122,7 @@ class IceRegridder;
     IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices {
 public:
+    TmpAlloc tmp;
     class Params;
     typedef std::function<std::unique_ptr<WeightedSparse>(
         std::array<SparseSetT *,2> dims, Params const &params)> MatrixFunction;
@@ -175,12 +176,11 @@ class UrAE;
 Produces low-level unscaled matrices *for that single ice sheet*. */
 class IceRegridder {
     friend class IceCoupler;
-    friend class RegridMatrices;
+    friend class GCMRegridder;
+    friend class IceWriter;
 public:
     typedef Grid::Parameterization Type;
 
-    friend class GCMRegridder;
-    friend class IceWriter;
 
     /** Parent pointer; holds the IceRegridder for ALL ice sheets */
     GCMRegridder const *gcm;
@@ -256,9 +256,6 @@ public:
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
     virtual void GvAp(MakeDenseEigenT::AccumT &ret) const = 0;
-
-    /** Produce regridding matrices for this setup. */
-    RegridMatrices regrid_matrices();
 
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */

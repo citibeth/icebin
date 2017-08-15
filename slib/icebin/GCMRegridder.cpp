@@ -81,6 +81,62 @@ void GCMRegridder::clear()
     ice_regridders.clear();
 }
 // -------------------------------------------------------------
+RegridMatrices const GCMRegridder::regrid_matrices(std::string const &ice_sheet_name)
+{
+    IceRegridder *regridder = ice_regridder(ice_sheet_name);
+#if 0
+    printf("===== RegridMatrices Grid geometries:\n");
+    printf("    nA = %d\n", this->nA());
+    printf("    nhc = %d\n", this->nhc());
+    printf("    nE = %d\n", this->nE());
+    printf("    nI = %d\n", regridder->nI());
+    printf("    nG = %d\n", regridder->nG());
+#endif
+
+    RegridMatrices rm;
+
+    UrAE urA(this->nA(),
+        std::bind(&IceRegridder::GvAp, this, _1),
+        std::bind(&IceRegridder::sApvA, this, _1));
+
+    UrAE urE(this->nE(),
+        std::bind(&IceRegridder::GvEp, this, _1),
+        std::bind(&IceRegridder::sEpvE, this, _1));
+
+    // Get a smoothing function for each output grid
+     smoothI = std::bind(&smoothing_matrix,
+        _1, &*regridder->gridI, _2, &regridder->elevI, _3, _4);
+
+    // ------- AvI, IvA
+    rm.add_regrid("AvI",
+        std::bind(&compute_AEvI, this, _1, _2, urA));
+    rm.add_regrid("IvA",
+        std::bind(&compute_IvAE, this, _1, _2, urA));
+
+    // ------- EvI, IvE
+    rm.add_regrid("EvI",
+        std::bind(&compute_AEvI, this, _1, _2, urE));
+    rm.add_regrid("IvE",
+        std::bind(&compute_IvAE, this, _1, _2, urE));
+
+    // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, this, _1, _2, urE, urA) ));
+    rm.add_regrid("EvA",
+        std::bind(&compute_EvA, this, _1, _2, urE, urA));
+    rm.add_regrid("AvE",
+        std::bind(&compute_EvA, this, _1, _2, urA, urE));
+
+#if 0
+    // ----- Show what we have!
+    printf("Available Regrids:");
+    for (auto ii = regrids.begin(); ii != regrids.end(); ++ii) {
+        printf(" %s", ii->first.c_str());
+    }
+    printf("\n");
+#endif
+
+    return rm;
+}
+// -----------------------------------------------------------------------
 void GCMRegridder::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 {
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});

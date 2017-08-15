@@ -57,14 +57,14 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
     cdef cppclass IceRegridder:
         pass
 
+    cdef cppclass RegridMatrices:
+        pass
+
     cdef cppclass GCMRegridder:
         GCMRegridder() except +
         void ncio(cibmisc.NcIO &, string vname) except +
         IceRegridder *ice_regridder(string name) except +
-
-
-    cdef cppclass RegridMatrices:
-        RegridMatrices(IceRegridder *) except +
+        RegridMatrices regrid_matrices(string name) except +
 
 
 cdef extern from "icebin_cython.hpp" namespace "icebin::cython":

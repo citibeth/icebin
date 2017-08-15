@@ -129,7 +129,7 @@ void GCMCoupler::ncread(
     // Also load the ice sheets
     {
         NcIO ncio_grid(grid_fname, NcFile::read);
-        gcm_regridder.ncio(ncio_grid, vname, rw_full);
+        gcm_regridder->ncio(ncio_grid, vname, rw_full);
     }
 
     std::cout << "========= GCM Constants" << std::endl;
@@ -148,8 +148,8 @@ void GCMCoupler::ncread(
     gcm_params.icebin_base_hc = gcm_params.segment("ec").base;
 
     ice_couplers.clear();
-    for (size_t i=0; i < gcm_regridder.ice_regridders.size(); ++i) {
-        IceRegridder *ice_regridder = &*gcm_regridder.ice_regridders[i];
+    for (size_t i=0; i < gcm_regridder->ice_regridders.size(); ++i) {
+        IceRegridder *ice_regridder = &*gcm_regridder->ice_regridders[i];
 
         // Create an IceCoupler corresponding to this IceSheet.
         std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname, ice_regridder->name(), this, ice_regridder));
@@ -374,7 +374,7 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
 
     for (int iAE=0; iAE<GridAE::count; ++iAE) {
         ncio_dense(ncio, out.gcm_ivalsAE_s[iAE], gcm_inputsAE[iAE],
-            gcm_regridder.indexing(iAE), vname_base);
+            gcm_regridder->indexing(iAE), vname_base);
     }
 
     ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"E1vE0");
@@ -392,7 +392,7 @@ void GCMCoupler::ncio_gcm_output(NcIO &ncio,
 printf("BEGIN GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
     ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
     ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
-        gcm_regridder.indexingE, vname_base);
+        gcm_regridder->indexingE, vname_base);
 printf("END GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
 }
 // ------------------------------------------------------------

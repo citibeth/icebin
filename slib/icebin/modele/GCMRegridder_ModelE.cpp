@@ -10,7 +10,7 @@ NOTES:
  1. focean_m is fixed over the course of a run, since ModelE can not change its ocean mask.
  2. Matrix is diagonal in sparse indexing, not necessarily in dense indexing.
 */
-void raw_OmvOp(
+static void raw_OmvOp(
     MageDenseEigenT::AcccumT &&ret,        // {dimA, dimO}
     blitz::Array<double,1> const *_focean_m,    // sparse indexing
     blitz::Array<double,1> const *_focean_p,    // sparse indexing
@@ -47,7 +47,7 @@ void raw_OmvOp(
     }
 }
 // ----------------------------------------------------------------
-void raw_AvO(
+static void raw_AvO(
     MageDenseEigenT::AcccumT &&ret,        // {dimA, dimO}
     HntrGrid const &hntrA,
     HntrGrid const &hntrO)
@@ -96,7 +96,7 @@ static bool clip_true(long ix) { return true; }
     Xi = Grid X for IceBin (PISM) ice sheet
     Xm = Grid X for ModelE ice sheet
 */
-void raw_EAvEO(
+static void raw_EAvEO(
     MageDenseEigenT::AcccumT &&ret,        // {dimEA, dimEO}
     HntrGrid const *hntrA,
     HntrGrid const *hntrO,
@@ -113,6 +113,25 @@ void raw_EAvEO(
 static bool dim_clip(SparseSetT const *dim, long index)
     { return dim->in_sparse(index); }
 
+// ----------------------------------------------------------------
+// ========================================================================
+
+/* std::unique_ptr<WeightedSparse> compute_EAmvIp(
+    std::array<SparseSet *,2> dims,
+    RegridMatrices::Params const &paramsA,
+    IceRegridder_ModelE *regridderA,
+    RegridMatrices const &rmO)
+*/
+#define URAE E
+#include "compute_EA.hpp"
+#undef URAE
+
+#define URAE A
+#include "compute_EA.hpp"
+#undef URAE
+// ========================================================================
+
+// ========================================================================
 /** Creates Atmosphere grid from an existing Hntr-type Ocean grid. */
 static std::unique_ptr<Grid> make_gridA(Grid const *_gridO)
 {
@@ -159,104 +178,35 @@ static std::unique_ptr<Grid> make_gridA(Grid const *_gridO)
     std::unique_ptr<Grid_LonLat *> gridA(new Grid_LonLat);
     spec.make_grid(*gridA);
 }
-// ----------------------------------------------------------------
-// ========================================================================
-std::unique_ptr<WeightedSparse> compute_EAmvIp(
-    std::array<SparseSet *,2> dims,
-    RegridMatrices::Params const &paramsA,
-    IceRegridder_ModelE *regridderA,
-    RegridMatrices const &rmO)
+
+
+GCMRegridder_ModelE(std::unique_ptr<icebin::GCMRegridder> &&_gcmO) :
+    : gcmO(std::move(_gcmO))
 {
-    SparseSetT &dimEAm(dims[0]);
-    SparseSetT &dimIp(dims[1]);
-    SparseSetT dimEOm, dimEOp, dimIp, dimOm;
-
-    // ------------ Params for generating sub-matrices
-    RegridMatrices::Params paramsO(paramsA);
-    paramsO.scale = false;
-
-
-    // ---------------- Take along the non-conservative weights
-
-    // ----------- wEOm = sEOmvOm * EOmvOm * OmvOp * wOp
-    // wOp
-    auto OpvIp(rmO.matrix("AvI"));
-    blitz::Array<double,1> const &wOp(OpvIp.mW);
-
-    // OmvOp
-    auto OmvOp(MakeDenseEigenT(
-        std::bind(&raw_OmvOp, _1, focean_m, focean_p, &wOp),
-        {SparsifyTransform::ADD_DENSE},
-        {&dimOm, &dimOp}, '.').to_eigen());
-
-    // EOmvOm
-    auto EOmvOm(rmO.matrix("EvA", {&dimEOm, &dimOm}, paramsO));
-    auto sEOmvOm(1. / EOmvOm->wM);
-
-    EigenColVectorT wEOm_e(
-        map_eigen_diagonal(sEOmvOm) * EOmvOm->M * OmvOp * map_eigen_colvector(wOp));
-    blitz::Array<double,1> wEOm(wEOm_e.....)    FIX THIS!
-
-    // ---------------- Compute the main matrix
-    // ---------------- EAmvIp = EAmvEOm * EOpvIp
-
-    std::unique_ptr<WeightedSparse> EOpvIp(rmO.matrix("EvI"));
-
-    auto EAmvEOm(MakeDenseEigenT(
-        std::bind(&raw_EAvEO, _1, &hntrA, &hntrO, &regridderA->gridA->dim(), &wEOm),
-        {SparsifyTransform::ADD_DENSE},
-        {&dimEAm, &dimEOm}, '.').to_eigen());
-
-    // ---------- wEAm = EAmvEOm * wEOm
-    auto wEAm(EAmvEOm * wEOm_e);
-
-
-    // ----------- Put it all together (EAmvIp)
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
-    ret->wM.reference(wEAm);
-    if (paramsA.scale) {
-        blitz::Array<double,1> sEAm(1. / wEAm);
-        ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sEAm) * EAmvEOm * *EOpvIp->M));
-    } else {
-        ret->M.reset(new EigenSparseMatrixT(
-            EAmvEOm * EOpvIp));
-    }
-    sum->Mw.reference(EOpvIp.Mw);
-    return ret;
+    // Initialize baseclass members
+    gridA = make_gridA(gcmO->gridA);
+    correctA = gcmO->correctA;
+    hcdefs = gcmO->hcdefs;
+    indexingHC = gcmO->indexingHC;
+    indexingE = derive_indexingE(gridA->indexing, indexingHC);
 }
 
-// ========================================================================
-RegridMatrices const modele_regrid_matrices(
-    IceRegridder const &ice_regridderO,    // "Regular" IceRegridder
-)
+RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name)
 {
-    RegridMatrices rm;
+    IceModelRegridder const *ice_regridderO = gcmO->ice_regridder(ice_sheet_name);
 
-    // Rename the grids...
-    auto &gcmO(ice_regridderO.gcm_regridder);
+    // Navigate the data structures
+    Grid_LonLat const *gridO = dynamic_cast<Grid_LonLat const *>(&*gcmO->gridA);
     HntrGrid const &hntrO(*gridO->hntr);
 
-    std::unique_ptr<Grid> gridA(make_gridA(hntrO));
 
-
-
-    Grid const *gridO = &*ice_regridder.gcm_regridder.gridA;
-
-
-    // Add matrices we already know how to produce
-    // These are renamed for our case...
-    MatrixFunction IpvEOp_fn(ice_regridder.regrids.at("IvA"));
-    MatrixFunction EOpvIp_fn(ice_regridder.regrids.at("AvI"));
-    MatrixFunction OmvEOm_fn(ice_regridder.regrids.at("AvE"));
-    MatrixFunction EOmvOm_fn(ice_Regridder.regrids.at("EvA"));
-
-
-    rm.add_regrid("IpvEOp", ice_regridder.regrids.at("IvA");
-    rm.add_regrid("EOpvIp"
-
-
+    RegridMatrices rm;
+    RegridMatrices const &rmO(rm.tmp.make<RegridMatrices>(
+        ice_regridderO->regrid_matrices()));
+    rm.add_regrid("EAmvIp", std::bind(&compute_EAmvIp, _1, _2,
+        &gridA->dim(), &rmO));
+    rm.add_regrid("AmvIp", std::bind(&compute_AmvIp, _1, _2,
+        &gridA->dim(), &rmO));
 
     return rm;
 }
-

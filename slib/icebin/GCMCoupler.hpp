@@ -163,7 +163,7 @@ public:
     bool use_smb;
 
     /** Main access to the core regridding of Icebin */
-    GCMRegridder gcm_regridder;
+    std::unique_ptr<GCMRegridder> gcm_regridder;
 
     /** Parameters (not physical constants) passed from the GCM
     through to the ice model.  These parameters cannot be specific to
@@ -178,7 +178,7 @@ public:
     }
 
     long nE_gcm()
-        { return gcm_regridder.nA() * nhc_gcm(); }
+        { return gcm_regridder->nA() * nhc_gcm(); }
 
 protected:
     virtual int _read_nhc_gcm() = 0;
