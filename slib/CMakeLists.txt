@@ -52,6 +52,7 @@ if (BUILD_COUPLER)
     if (BUILD_MODELE)
         list(APPEND icebin_SOURCES
             icebin/modele/api_f.f90
+            icebin/modele/GCMRegridder_ModelE.cpp
             icebin/modele/GCMCoupler_ModelE.cpp
             icebin/modele/hntr.cpp
             icebin/modele/grids.cpp
