@@ -199,14 +199,18 @@ RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice
     Grid_LonLat const *gridO = dynamic_cast<Grid_LonLat const *>(&*gcmO->gridA);
     HntrGrid const &hntrO(*gridO->hntr);
 
+    // Construct set of cells in A
+    SparseSetT dimA;
+    for (auto cell = gridA->cells.begin(); cell != gridA->cells.end(); ++cell)
+        dimA.add_dense(cell->index);
 
     RegridMatrices rm;
     RegridMatrices const &rmO(rm.tmp.make<RegridMatrices>(
         ice_regridderO->regrid_matrices()));
     rm.add_regrid("EAmvIp", std::bind(&compute_EAmvIp, _1, _2,
-        &gridA->dim(), &rmO));
+        &dimA, &rmO));
     rm.add_regrid("AmvIp", std::bind(&compute_AmvIp, _1, _2,
-        &gridA->dim(), &rmO));
+        &dimA, &rmO));
 
     return rm;
 }
