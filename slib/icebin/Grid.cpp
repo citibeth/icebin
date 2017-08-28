@@ -500,23 +500,30 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
     cells._nfull = cells.nfull();
     vertices._nfull = vertices.nfull();
 
-    // Remove cells that don't fit our filter
+    // New vertex sets we will use
+    spsparse::SparseSet<long,int> new_dim;
+    std::vector<std::unique_ptr<Cell>> new_cells;    // Dense array of cells, according to _dim
+
+    // Copy cells from old set to new set (if they fit the filter)
     _max_realized_cell_index = -1;
-    for (auto cell = cells.begin(); cell != cells.end(); ) { //++cell) {
+    for (int ix_d=0; ix_d < cells._dim.dense_extent(); ++ix_d) {
+        long ix_s = cells._dim.to_sparse(ix_d);
+        std::unique_ptr<Cell> &cell(_cells[ix_d]);
+
         if (keep_fn(cell->index)) {
             _max_realized_cell_index = std::max(_max_realized_cell_index, cell->index);
 
             // Make sure we don't delete this cell's vertices
             for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex)
                 good_vertices.insert(vertex->index);
-            ++cell;
-        } else {
-            // Remove the cell, maybe remove its vertices later
-            // Careful with iterators: invalidated after erase()
-            cell = cells.erase(cell);   // Increments too
-(This must change, now that we're using a SparseSet to number the cells)
+
+            new_dim.add_dense(ix_s);
+            new_cells.push_back(std::move(cell));
         }
     }
+
+    cells._dim = std::move(new_dim);
+    cells._cells = std::move(new_cells);
 
     // Remove vertices that don't fit our filter
     _max_realized_vertex_index = -1;

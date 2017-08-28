@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <functional>
 
+#include <spsparse/SparseSet.hpp>
 #include <ibmisc/enum.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/iter.hpp>
@@ -150,7 +151,7 @@ public:
     spsparse::SparseSet<long,int> const &dim() const { return _dim; }
 
 
-    typedef ibmisc::DerefRandomAccessIterator<
+    typedef ibmisc::DerefRandomAccessIter<Cell,
         std::vector<std::unique_ptr<Cell>>::iterator> const_iterator;
 
     const_iterator begin() const
@@ -328,7 +329,7 @@ public:
     ~Grid_LonLat() {}
 
     /** The HntrGrid used to generate this, if such was used... */
-    std::unique_ptr<HntrGrid> hntr;
+//    std::unique_ptr<HntrGrid> hntr;
 
     /** Longitude of cell boundaries (degrees), sorted low to high.
     <b>NOTE:</b> lon_boundares.last() = 360.0 + lonb.first() */
