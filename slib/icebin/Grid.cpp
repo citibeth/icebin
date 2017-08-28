@@ -514,6 +514,7 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
             // Remove the cell, maybe remove its vertices later
             // Careful with iterators: invalidated after erase()
             cell = cells.erase(cell);   // Increments too
+(This must change, now that we're using a SparseSet to number the cells)
         }
     }
 
