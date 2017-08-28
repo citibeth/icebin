@@ -256,7 +256,7 @@ public:
 
 
     /** Produce regridding matrices for this setup. */
-    virtual RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) = 0;
+    virtual RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const = 0;
 
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we
@@ -325,7 +325,7 @@ public:
         { return ice_regridders[sheets_index.at(name)].get(); }
 
     /** Produce regridding matrices for this setup. */
-    RegridMatrices const regrid_matrices(std::string const &ice_sheet_name);
+    RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const;
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):

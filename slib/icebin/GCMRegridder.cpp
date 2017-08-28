@@ -81,7 +81,7 @@ void GCMRegridder::clear()
     ice_regridders.clear();
 }
 // -------------------------------------------------------------
-RegridMatrices const GCMRegridder::regrid_matrices(std::string const &ice_sheet_name)
+RegridMatrices const GCMRegridder::regrid_matrices(std::string const &ice_sheet_name) const
 {
     IceRegridder *regridder = ice_regridder(ice_sheet_name);
 #if 0

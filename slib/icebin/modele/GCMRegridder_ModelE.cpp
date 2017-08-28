@@ -191,7 +191,7 @@ GCMRegridder_ModelE(std::unique_ptr<icebin::GCMRegridder> &&_gcmO) :
     indexingE = derive_indexingE(gridA->indexing, indexingHC);
 }
 
-RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name)
+RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name) const
 {
     IceModelRegridder const *ice_regridderO = gcmO->ice_regridder(ice_sheet_name);
 
