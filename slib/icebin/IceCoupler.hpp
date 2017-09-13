@@ -42,7 +42,7 @@ public:
 
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
-    IceRegridder *ice_regridder;   // This is not const; see IceCoupler.IceRegridder::set_elevI()
+    IceRegridder *ice_regridder;   // Set from gcm_coupler.  This is not const; see IceCoupler.IceRegridder::set_elevI()
     std::string _name;              // Name of the ice sheet (in case ice_regridder is NULL)
 
     /** Place where we can write stuff related to this ice sheet */
@@ -179,7 +179,7 @@ public:
 extern
 std::unique_ptr<IceCoupler> new_ice_coupler(ibmisc::NcIO &ncio,
     std::string const &vname, std::string const &sheet_name,
-    GCMCoupler const *_gcm_coupler, IceRegridder *_regridder);
+    GCMCoupler const *_gcm_coupler);
 
 
 // =========================================================

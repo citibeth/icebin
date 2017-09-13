@@ -28,7 +28,7 @@
 #include <spsparse/eigen.hpp>
 
 #include <icebin/IceRegridder.hpp>
-
+#include <icebin/RegridMatrices.hpp>
 
 /** 
 
@@ -254,9 +254,19 @@ public:
     unsigned long nA() const { return gridA->ndata(); }
     unsigned long nE() const { return nA() * nhc(-1); }
 
+    /** Produce an IceRegridder for a particular ice sheet.
+    NOTE: ice_regridder(x)->gcm is not necessarily equal to this. */
+    virtual IceRegridder *ice_regridder(std::string const &name) const = 0;
 
     /** Produce regridding matrices for this setup. */
-    virtual RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const = 0;
+    virtual RegridMatrices const regrid_matrices(IceRegridder const *regridder) const = 0;
+
+
+    RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const
+    {
+        IceRegridder const *regridder = ice_regridder(ice_sheet_name);
+        return regrid_matrices(regridder);
+    }
 
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we
@@ -265,7 +275,7 @@ public:
     */
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true) = 0;
 
-}
+};
 
 // ----------------------------------------------------------------------
 /** Generates the matrices required in the GCM */
@@ -283,7 +293,7 @@ public:
 
     /** Constructs a blank GCMRegridder.  Typically one will use
         ncio() afterwards to read from a file. */
-    GCMRegridder() {}
+    GCMRegridder_Standard() {}
 
     void clear();
 
@@ -321,11 +331,10 @@ public:
         add_sheet(std::move(regridder));
     }
 
-    IceRegridder *ice_regridder(std::string const &name)
-        { return ice_regridders[sheets_index.at(name)].get(); }
+    IceRegridder *ice_regridder(std::string const &name) const;
 
     /** Produce regridding matrices for this setup. */
-    RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const;
+    RegridMatrices const regrid_matrices(IceRegridder const *regridder) const;
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):

@@ -43,7 +43,7 @@ namespace icebin {
 
 std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     std::string const &vname, std::string const &sheet_name,
-    GCMCoupler const *_gcm_coupler, IceRegridder *_ice_regridder)
+    GCMCoupler const *_gcm_coupler)
 {
     std::string vname_sheet(vname + "." + sheet_name);
     auto info_v = get_or_add_var(ncio, vname_sheet + ".info", "int64", {});
@@ -72,7 +72,7 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     // Do basic initialization...
     self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
-    self->ice_regridder = _ice_regridder;
+    self->ice_regridder = _gcm_coupler->gcm_regridder->ice_regridder(sheet_name);
 
 //    self->ice_constants.init(&_coupler->ut_system);
 
@@ -317,7 +317,7 @@ bool run_ice)
         "ice_ovalsI <%p> != elevI <%p>\n", &ice_ovalsI(elevI_ix,0), &elevI(0));
 
     ice_regridder->set_elevI(elevI);
-    RegridMatrices rm(ice_regridder);
+    RegridMatrices rm(gcm_coupler->gcm_regridder->regrid_matrices(name()));
     RegridMatrices::Params regrid_params(true, true, {0,0,0});
     RegridMatrices::Params regrid_params_nc(true, false, {0,0,0});    // correctA=False
 

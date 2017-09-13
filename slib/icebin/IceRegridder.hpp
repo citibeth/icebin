@@ -19,13 +19,12 @@
 #ifndef ICEBIN_ICEREGRIDDER_H
 #define ICEBIN_ICEREGRIDDER_H
 
-#include <functional>
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
-#include <ibmisc/memory.hpp>
-#include <ibmisc/eigen_types.hpp>
 
 #include <icebin/Grid.hpp>
+#include <icebin/eigen_types.hpp>
+#include <icebin/RegridMatrices.hpp>
 
 namespace icebin {
 
@@ -41,142 +40,17 @@ BOOST_ENUM_VALUES( InterpStyle, int,
 
 // ================================================
 
-/** Return value of a sparse matrix */
-struct WeightedSparse {
-    std::array<SparseSetT *,2> dims;            // Dense-to-sparse mapping for the dimensions
-
-    // If M=BvA, then wM = wBvA = area of B cells
-    DenseArrayT<1> wM;           // Dense indexing
-
-    std::unique_ptr<EigenSparseMatrixT> M;    // Dense indexing
-
-    // Area of A cells
-    DenseArrayT<1> Mw;
-
-
-    /** True if this regridding matrix is conservative.  Matrices could be
-    non-conservative, for example, in the face of smoothing on I.  Or when
-    regridding between the IceBin and ModelE ice sheets. */
-    bool conservative;
-
-    WeightedSparse(std::array<SparseSetT *,2> _dims, bool _conservative) : dims(_dims), conservative(_conservative) {}
-
-    /** Applies a regrid matrix.
-    Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
-    (where BvA is this)
-    In the face of smoothing, it also compensates for non-conservation in
-    smoothB.
-
-        |i| = Size of B vector space
-        |j| = Size of A vector space
-        |n| = Number of vectors being transformed
-
-    @param A The values to regrid, as a series of Eigen column vectors.
-    @return Eigen type
-    */
-    EigenDenseMatrixT apply_e(
-        // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-        blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-        double fill = std::numeric_limits<double>::quiet_NaN(),    // Fill value for cells not in BvA matrix
-        bool force_conservation=true);     // Set if you want apply_e() to conserve, even if !M->conservative
-
-
-    /** Apply to multiple variables
-    @return Blitz type */
-    blitz::Array<double,2> apply(
-        // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-        blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-        double fill,    // Fill value for cells not in BvA matrix
-        bool force_conservation,
-        ibmisc::TmpAlloc &tmp) const
-    {
-        return spsparse::to_blitz<double>(apply_e(A_b, fill), tmp);
-    }
-
-
-    /** Apply to a single variable */
-    blitz::Array<double,1> apply(
-        // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-        blitz::Array<double,1> const &A_b,       // A_b{j} One variable
-        double fill,    // Fill value for cells not in BvA matrix
-        bool force_conservation,
-        ibmisc::TmpAlloc &tmp) const
-    {
-        auto A_b2(ibmisc::reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
-        auto ret2(spsparse::to_blitz(apply_e(A_b2, fill), tmp));
-        return ibmisc::reshape<double,2,1>(ret2, {ret2.shape()[1]});
-    }
-
-
-    /** Read/write to NetCDF */
-    void ncio(ibmisc::NcIO &ncio,
-        std::string const &vname,
-        std::array<std::string,2> dim_names);
-
-};
 
 // ------------------------------------------------------------
 class IceRegridder;
 
-/** Holds the set of "Ur" (original) matrices produced by an
-    IceRegridder for a SINGLE ice sheet. */
-class RegridMatrices {
-public:
-    TmpAlloc tmp;
-    class Params;
-    typedef std::function<std::unique_ptr<WeightedSparse>(
-        std::array<SparseSetT *,2> dims, Params const &params)> MatrixFunction;
 
-    /** Parameters controlling the generation of regridding matrices */
-    struct Params {
-        /** Produce a scaled vs. unscaled matrix (Scaled means divide
-        by the weights vector).  Used for all matrices. */
-        bool const scale;
-
-        /** Correct for changes in area due to projections?  Used for
-        all matrices. */
-        bool const correctA;
-
-        /** If non-zero, smooth the resulting matrix, with sigma as the
-        scale length of the smoothing.  Used for IvA and IvE. */
-        std::array<double,3> const sigma;
-
-        /** Tells if these parameters are asking us to smooth */
-        bool smooth() const { return sigma[0] != 0; }
-
-        Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
-            scale(_scale), correctA(_correctA), sigma(_sigma) {}
-    };
-
-    std::map<std::string, MatrixFunction> regrids;
-
-    void add_regrid(std::string const &spec,
-        MatrixFunction const &regrid);
-
-
-    /** Retrieves a regrid matrix, and weights (area) of the input and
-        output grid cells.
-    @param spec_name: The matrix to produce.
-        Should be "AvI", "IvA", "EvI", "IvE", "AvE" or "EvA".
-    @param scale: Produce scaled matrix?
-        true  --> [kg m-2]
-        false --> [kg]
-    @param correctA: Correct for projection error in A or E grids?
-    @return The regrid matrix and weights
-    */
-    std::unique_ptr<WeightedSparse> matrix(
-        std::string const &spec_name,
-        std::array<SparseSetT *,2> dims,
-        Params const &_params) const;
-};
-// -----------------------------------------------------------------
-class UrAE;
 
 /** Represents a single ice sheet.
 Produces low-level unscaled matrices *for that single ice sheet*. */
 class IceRegridder {
     friend class IceCoupler;
-    friend class GCMRegridder;
+    friend class GCMRegridder_Standard;
     friend class IceWriter;
 public:
     typedef Grid::Parameterization Type;
@@ -242,11 +116,11 @@ public:
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sApvA(MakeDenseEigenT::AccumT &w);
+    void sApvA(MakeDenseEigenT::AccumT &w) const;
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sEpvE(MakeDenseEigenT::AccumT &w);
+    void sEpvE(MakeDenseEigenT::AccumT &w) const;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
     virtual void GvEp(MakeDenseEigenT::AccumT &ret) const = 0;
@@ -257,10 +131,11 @@ public:
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
     virtual void GvAp(MakeDenseEigenT::AccumT &ret) const = 0;
 
+    RegridMatrices const regrid_matrices() const;
+
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
-
 
 };  // class IceRegridder
 

@@ -1,9 +1,18 @@
 #ifndef ICEBIN_REGRID_MATRICES_CPP
 #define ICEBIN_REGRID_MATRICES_CPP
 
-#include <icebin/RegridMatrices.hpp>
+#include <functional>
 
-namespcae icebin {
+#include <icebin/RegridMatrices.hpp>
+#include <icebin/IceRegridder.hpp>
+#include <icebin/GCMRegridder.hpp>
+#include <icebin/smoother.hpp>
+
+using namespace std::placeholders;
+using namespace spsparse;
+using namespace ibmisc;
+
+namespace icebin {
 
 // =======================================================================
 // Regrid Matrix Generation
@@ -24,7 +33,7 @@ struct UrAE {
 
 
 // ------------------------------------------------------------
-static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
+static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &AE)
 {
@@ -104,7 +113,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder *regridder,
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
+std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &AE)
 {
@@ -187,7 +196,7 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder *regridder,
     return ret;
 }
 
-static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
+static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &E, UrAE const &A)
 {
@@ -269,10 +278,8 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder *regridder,
 }
 
 
-
-RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &ice_sheet_name) const
+RegridMatrices const GCMRegridder_Standard::regrid_matrices(IceRegridder const *regridder) const
 {
-    IceRegridder *regridder = ice_regridder(ice_sheet_name);
 #if 0
     printf("===== RegridMatrices Grid geometries:\n");
     printf("    nA = %d\n", this->nA());
@@ -285,30 +292,30 @@ RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &i
     RegridMatrices rm;
 
     UrAE urA(this->nA(),
-        std::bind(&IceRegridder::GvAp, this, _1),
-        std::bind(&IceRegridder::sApvA, this, _1));
+        std::bind(&IceRegridder::GvAp, regridder, _1),
+        std::bind(&IceRegridder::sApvA, regridder, _1));
 
     UrAE urE(this->nE(),
-        std::bind(&IceRegridder::GvEp, this, _1),
-        std::bind(&IceRegridder::sEpvE, this, _1));
+        std::bind(&IceRegridder::GvEp, regridder, _1),
+        std::bind(&IceRegridder::sEpvE, regridder, _1));
 
     // ------- AvI, IvA
     rm.add_regrid("AvI",
-        std::bind(&compute_AEvI, this, _1, _2, urA));
+        std::bind(&compute_AEvI, regridder, _1, _2, urA));
     rm.add_regrid("IvA",
-        std::bind(&compute_IvAE, this, _1, _2, urA));
+        std::bind(&compute_IvAE, regridder, _1, _2, urA));
 
     // ------- EvI, IvE
     rm.add_regrid("EvI",
-        std::bind(&compute_AEvI, this, _1, _2, urE));
+        std::bind(&compute_AEvI, regridder, _1, _2, urE));
     rm.add_regrid("IvE",
-        std::bind(&compute_IvAE, this, _1, _2, urE));
+        std::bind(&compute_IvAE, regridder, _1, _2, urE));
 
-    // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, this, _1, _2, urE, urA) ));
+    // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, regridder, _1, _2, urE, urA) ));
     rm.add_regrid("EvA",
-        std::bind(&compute_EvA, this, _1, _2, urE, urA));
+        std::bind(&compute_EvA, regridder, _1, _2, urE, urA));
     rm.add_regrid("AvE",
-        std::bind(&compute_EvA, this, _1, _2, urA, urE));
+        std::bind(&compute_EvA, regridder, _1, _2, urA, urE));
 
 #if 0
     // ----- Show what we have!
@@ -322,6 +329,127 @@ RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &i
     return rm;
 }
 // -----------------------------------------------------------------------
+// ----------------------------------------------------------------
+void RegridMatrices::add_regrid(std::string const &spec,
+    RegridMatrices::MatrixFunction const &regrid)
+{
+    regrids.insert(make_pair(spec, regrid));
+}
+// ----------------------------------------------------------------
+// ----------------------------------------------------------------
+std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
+    std::string const &spec_name,
+    std::array<SparseSetT *,2> dims,
+    Params const &params) const
+{
+    auto &matrix_fn(regrids.at(spec_name));
+    auto BvA(matrix_fn(dims, params));
+    return BvA;
+}
+// ----------------------------------------------------------------
+static void mask_result(EigenDenseMatrixT &ret, blitz::Array<double,1> const &wB_b, double fill)
+{
+    int nB = ret.rows();    // == wB_b.extent(0)
+    int nvar = ret.cols();
+
+    // Mask out cells that slipped into the output because they were
+    // in the SparseSet; but don't actually get any contribution.
+    for (int i=0; i<nB; ++i) {
+        if (wB_b(i) != 0.) continue;
+        for (int n=0; n<nvar; ++n) ret(i,n) = fill;
+    }
+
+}
+// -----------------------------------------------------------------------
+EigenDenseMatrixT WeightedSparse::apply_e(
+    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
+    double fill, const    // Fill value for cells not in BvA matrix
+    bool force_conservation) const
+{
+    auto &BvA(*this);
+
+    // A{jn}   One col per variable
+    int nvar = A_b.extent(0);
+    int nA = A_b.extent(1);
+    Eigen::Map<EigenDenseMatrixT> const A(
+        const_cast<double *>(A_b.data()), nA, nvar);
+
+    // |i| = size of output vector space (B)
+    // |j| = size of input vector space (A)
+    // |n| = number of variables being processed together
+
+    // Apply initial regridding.
+    EigenDenseMatrixT B0(*BvA.M * A);        // B0{in}
+
+    // Only apply conservation correction if all of:
+    //   a) Matrix is smoothed, so it needs a conservation correction
+    //   b) User requested conservation be maintained
+    if (BvA.conservative || !force_conservation) {
+        // Remove cells not in the sparse matrix
+        mask_result(B0, BvA.wM, fill);
+        return B0;
+    }
+    // -------------- Apply the Conservation Correction
+    // Integrate each variable of input (A) over full domain
+    auto &wA_b(BvA.Mw);
+    Eigen::Map<EigenRowVectorT> const wA(const_cast<double *>(wA_b.data()), 1, wA_b.extent(0));
+    typedef Eigen::Array<double,Eigen::Dynamic,Eigen::Dynamic> EigenArrayT;
+    EigenArrayT TA((wA * A).array());        // TA{n} row array
+
+    // Integrate each variable of output (B) over full domain
+    auto &wB_b(BvA.wM);
+    int nB = wB_b.extent(0);
+    Eigen::Map<EigenRowVectorT> const wB(const_cast<double *>(wB_b.data()), 1, wB_b.extent(0));
+    EigenArrayT TB((wB * B0).array());
+    EigenArrayT TB_inv(1. / TB);    // TB_inv{n} row array
+
+    // Factor{nn}: Conservation correction for each variable.
+
+    auto Factor(TA * TB_inv);    // Factor{n} row array
+
+    std::cout << "-------- WeightedSparse::apply() conservation" << std::endl;
+    std::cout << "    |input|    = " << TA << std::endl;
+    std::cout << "    |output|   = " << TB << std::endl;
+    std::cout << "    correction = " << Factor << std::endl;
+
+    EigenDenseMatrixT ret(B0 * Factor.matrix().asDiagonal());    // ret{in}
+    // Remove cells not in the sparse matrix
+    mask_result(B0, BvA.wM, fill);
+
+    return ret;
+}
+// -----------------------------------------------------------------------
+void WeightedSparse::ncio(ibmisc::NcIO &ncio,
+    std::string const &vname,
+    std::array<std::string,2> dim_names)
+{
+
+    auto ncdims(ibmisc::get_or_add_dims(ncio,
+        {dim_names[0] + ".dense_extent", dim_names[1] + ".dense_extent"},
+        {dims[0]->dense_extent(), dims[1]->dense_extent()}));
+
+    // ----------- wM
+    std::string matrix_name(dim_names[0] + "v" + dim_names[1]);
+    ncio_blitz<double,1>(ncio, wM, true,
+        vname + ".wM",
+        {ncdims[0]});
+
+    // --------- M
+    ncio_eigen(ncio, *M,
+        vname + ".M");
+
+    netCDF::NcVar ncvar = ncio.nc->getVar(vname + ".M.info");
+    get_or_put_att(ncvar, ncio.rw,
+        "conservative", get_nc_type<bool>(), &conservative, 1);
+
+    // ---- Mw
+    ncio_blitz<double,1>(ncio, Mw, true,
+        vname + ".Mw",
+        {ncdims[1]});
+}
+
+
 // -----------------------------------------------------------------
 }    // namespace
 #endif    // guard

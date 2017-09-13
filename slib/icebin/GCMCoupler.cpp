@@ -127,9 +127,10 @@ void GCMCoupler::ncread(
 
     // Load the MatrixMaker (filtering by our domain, of course)
     // Also load the ice sheets
+    std::unique_ptr<GCMRegridder_Standard> gcmr(new GCMRegridder_Standard());
     {
         NcIO ncio_grid(grid_fname, NcFile::read);
-        gcm_regridder->ncio(ncio_grid, vname, rw_full);
+        gcmr->ncio(ncio_grid, vname, rw_full);
     }
 
     std::cout << "========= GCM Constants" << std::endl;
@@ -148,14 +149,16 @@ void GCMCoupler::ncread(
     gcm_params.icebin_base_hc = gcm_params.segment("ec").base;
 
     ice_couplers.clear();
-    for (size_t i=0; i < gcm_regridder->ice_regridders.size(); ++i) {
-        IceRegridder *ice_regridder = &*gcm_regridder->ice_regridders[i];
+    for (size_t i=0; i < gcmr->ice_regridders.size(); ++i) {
+        std::string const &sheet_name(gcmr->ice_regridders[i]->name());
 
         // Create an IceCoupler corresponding to this IceSheet.
-        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname, ice_regridder->name(), this, ice_regridder));
+        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname, sheet_name, this));
 
         ice_couplers.push_back(std::move(ice_coupler));
     }
+
+    static_move(gcm_regridder, gcmr);    // Move gcm_regridder <- gcmr
 
     printf("END GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 }

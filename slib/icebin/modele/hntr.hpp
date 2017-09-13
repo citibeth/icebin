@@ -70,6 +70,10 @@ public:
     TODO: Reference, don't copy, these HntrGrid instances. */
     Hntr(HntrGrid const &_A, HntrGrid const &_B, double _DATMIS);
 
+    Hntr(std::array<HntrGrid const *,2> grids, double _DATMIS)
+        : Hntr(*grids[1], *grids[0], _DATMIS) {}
+
+
     /**
     HNTR4 performs a horizontal interpolation of per unit area or per
     unit mass quantities defined on grid A, calculating the quantity
@@ -121,20 +125,23 @@ private:
 
 public:
 
-    template<class AcummT>
+    template<class AccumT>
     void matrix(
         AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
-        std::function<bool(long)> const &Bindex_clip)    // OPTIONAL: Fast-filter out things in B, by their index
+        std::function<bool(long)> const &Bindex_clip);    // OPTIONAL: Fast-filter out things in B, by their index
 
 
 };    // class Hntr
 
 
+To make unscaled BvA scaled, must multiply by WTB
 
-template<class AcummT>
+
+template<class AccumT>
 void Hntr::matrix(
     AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
-    std::function<bool(long)> const &Bindex_clip)    // OPTIONAL: Fast-filter out things in B, by their index
+    std::function<bool(long)> const &Bindex_clip,    // OPTIONAL: Fast-filter out things in B, by their index
+    blitz::Array<double,1> const &WTB)    // Weight (size) of each basis function in Bgrid
 {
     // ------------------
     // Interpolate the A grid onto the B grid
@@ -144,6 +151,8 @@ void Hntr::matrix(
 
         for (int IB=1; IB <= Bgrid.im; ++IB) {
             int const IJB = IB + Bgrid.im * (JB-1);
+            double const wtb_ijb = WTB(IJB);
+
             if (!Bindex_clip(IJB-1)) continue;
 
             int const IAMIN = IMIN(IB);
@@ -160,7 +169,7 @@ void Hntr::matrix(
                     if (IAREV==IAMIN) F -= FMIN(IB);
                     if (IAREV==IAMAX) F -= FMAX(IB);
 
-                    if (wt != 0) accum.add({IJB-1, IJA-1}, F*G);    // -1 ==> convert to 0-based indexing
+                    accum.add({IJB-1, IJA-1}, wtb_ijb*F*G);    // -1 ==> convert to 0-based indexing
                 }
             }
         }
