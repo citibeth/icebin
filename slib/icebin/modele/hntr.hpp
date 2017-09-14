@@ -128,14 +128,10 @@ public:
     template<class AccumT>
     void matrix(
         AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
-        std::function<bool(long)> const &Bindex_clip);    // OPTIONAL: Fast-filter out things in B, by their index
-
+        std::function<bool(long)> const &Bindex_clip,    // OPTIONAL: Fast-filter out things in B, by their index
+        blitz::Array<double,1> const &WTB);    // Weight (size) of each basis function in Bgrid
 
 };    // class Hntr
-
-
-To make unscaled BvA scaled, must multiply by WTB
-
 
 template<class AccumT>
 void Hntr::matrix(

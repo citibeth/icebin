@@ -48,12 +48,12 @@ NOTES:
    invert='-', which produces the inverse matrix of invet='+'.
 */
 static void scaled_AOmvAOp(
-    MakeDenseEigenT::AccumT &&ret,        // {dimAOm, dimAOp}
+    MakeDenseEigenT::AccumT &ret,        // {dimAOm, dimAOp}
     blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
     blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
     char invert = '+')
 {
-    SparseSetT &dimAOp(*ret.dims(1).sparse_set);
+    SparseSetT &dimAOp(*ret.dim(1).sparse_set);
 
     // By looping over only things in IceBin ice sheet, we implicitly only
     // look at ice on ocean grid cells where both ModelE and IceBin have something.
@@ -95,7 +95,7 @@ NOTES:
    Weight (norm) of grid cells in AO. Dense indexing.
 */
 static void raw_AOvAA(
-    MakeDenseEigenT::AccumT &&ret,        // {dimA, dimO}
+    MakeDenseEigenT::AccumT &ret,        // {dimA, dimO}
     std::array<HntrGrid const *, 2> hntrs,    // hntrAO, hntrAA
     blitz::Array<double,1> const &wAO_d)    // Size of each grid cell in AO
 {
@@ -103,7 +103,7 @@ static void raw_AOvAA(
     Hntr hntr_AOvAA(hntrs, 0);    // AOvAA
     hntr_AOvAA.matrix(std::move(ret),
         std::bind(&dim_clip, &dimAO, _1),
-        *wAO_d);
+        wAO_d);
 }
 // ----------------------------------------------------------------
 /** Helper class for raw_EOvEA().
@@ -118,7 +118,7 @@ public:
         MakeDenseEigenT::AccumT &&_ret,
         GCMRegridder_ModelE const *_gcmA,
         blitz::Array<double,1> const &_wEO_d)
-    : ret(std::move(_ret)), gcmA(_gcmA), wEO_d(*_wEO_d) {}
+    : ret(std::move(_ret)), gcmA(_gcmA), wEO_d(_wEO_d) {}
 
     /** Called by Hntr::matrix() (AvO) */
     void add(std::array<long,2> index, double value)
@@ -169,7 +169,7 @@ NOTES:
           EOvEA_corrected = EOvEA_raw * diag(sum(EOvEA,1,'-') .* wEA)
 */
 static void raw_EOvEA(
-    MakeDenseEigenT::AccumT &&ret,        // {dimEA, dimEO}; dimEO should not change here.
+    MakeDenseEigenT::AccumT &ret,        // {dimEA, dimEO}; dimEO should not change here.
     std::array<HntrGrid const *, 2> hntrs,    // {hntrAO, hntrAA}
     SparseSetT const *dimEO,            // Used to clip in Hntr::matrix()
     GCMRegridder_ModelE const *gcmA,
@@ -177,11 +177,48 @@ static void raw_EOvEA(
 {
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
     Hntr hntr_AOvAA(hntrs, 0);    // dimB=A,  dimA=O
-    RawEOvEA raw(std::move(ret), gcmA, wEO);
+    RawEOvEA raw(std::move(ret), gcmA, *wEO_d);
+    auto wtEO(ibmisc::const_array(blitz::shape(dimEO->dense_extent()), 1.0));
     hntr_AOvAA.matrix(raw,
-        std::bind(&dim_clip, dimEO, _1));
+        std::bind(&dim_clip, dimEO, _1),
+        wtEO);
 }
 // ----------------------------------------------------------------
+// ========================================================================
+class ConstUniverse {
+    std::vector<std::string> names;
+    std::vector<SparseSetT *> dims;
+    std::vector<int> extents;
+
+public:
+    ConstUniverse(
+        std::vector<std::string> &&_names,
+        std::vector<SparseSetT *> &&_dims) :
+        names(std::move(_names)), dims(std::move(_dims))
+    {
+        if (names.size() != dims.size()) (*icebin_error)(-1,
+            "names.size() and dims.size() must match");
+
+        extents.reserve(dims.size());
+        for (size_t i=0; i<dims.size(); ++i)
+            extents.push_back(dims[i]->dense_extent());
+    }
+
+    ~ConstUniverse()
+    {
+        bool err = false;
+        for (size_t i=0; i<dims.size(); ++i) {
+            if (extents[i] != dims[i]->dense_extent()) {
+                fprintf(stderr, "Dimension %s changed from %d to %d\n",
+                    names[i].c_str(), extents[i], dims[i]->dense_extent());
+                err = true;
+            }
+        }
+        if (err) (*icebin_error)(-1,
+            "At least one dimension changed");
+    }
+};
+
 // ========================================================================
 
 /** Top-level subroutine produces the matrix EAmvIp or AAmvIp.
@@ -197,6 +234,8 @@ static void raw_EOvEA(
 static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
+    blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
+    blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
     char X,    // Either 'A' or 'E', determines the destination matrix.
     RegridMatrices const &rmO)
 {
@@ -220,7 +259,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     // We need AOpvIp for wAOP; used below.
     SparseSetT dimAOp;
     std::unique_ptr<WeightedSparse> AOpvIp(rmO.matrix("AvI", {&dimAOp, &dimIp}, paramsO));
-    blitz::Array<double,1> const &wAOp(AOpvIp.mW);
+    blitz::Array<double,1> const &wAOp(AOpvIp->wM);
 
     // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
     SparseSetT &dimAOm(dimAOp);
@@ -238,14 +277,14 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         {SparsifyTransform::TO_DENSE},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
-    EigenColVectorT wAOm_e(scaled_AOmvAOp * map_eigen_colvector(wAOp));
+    EigenColVectorT wAOm_e(sc_AOmvAOp * map_eigen_colvector(wAOp));
 
 
     EigenColVectorT *wXOm_e;
     if (X == 'E') {
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
-        const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp});
+        const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
         std::unique_ptr<WeightedSparse> EOpvIp(rmO.matrix("EvI", {&dimEOp, &dimIp}, paramsO));
         const_universe.reset();        // Check that dimIp hasn't changed
 
@@ -253,10 +292,11 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         SparseSetT &dimEOm(dimEOp);
 
         // EOmvAOm: Repeat A values in E
-        const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm});
-        WeightedSparse EOmvAOm(rmO.matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
+        const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
+        std::unique_ptr<WeightedSparse> EOmvAOm(
+            rmO.matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
         const_universe.reset();        // Check that dims didn't change
-        auto sEOmvOm(1. / EOmvAOm->wM);
+        auto sEOmvAOm(1. / EOmvAOm->wM);
 
         // wEOm_e
         tmp.reset_ptr(wXOm_e, map_eigen_diagonal(sEOmvAOm) * *EOmvOm->M * wAOm_e);
@@ -394,10 +434,10 @@ RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice
     RegridMatrices rm;
     RegridMatrices const &rmO(rm.tmp.make<RegridMatrices>(
         ice_regridderO->regrid_matrices()));
-    rm.add_regrid("EAmvIp", std::bind(&compute_EAmvIp, _1, _2,
-        &dimA, &foceanAOm, &foceanAOp, &rmO));
-    rm.add_regrid("AmvIp", std::bind(&compute_AmvIp, _1, _2,
-        &dimA, &foceanAOm, &foceanAOp, &rmO));
+    rm.add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+        foceanAOm, foceanAOp, 'E', &rmO));
+    rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+        foceanAOm, foceanAOp, 'A', &rmO));
 
     return rm;
 }
