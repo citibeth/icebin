@@ -26,6 +26,7 @@
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/domain_splitter.hpp>
 #include <boost/filesystem.hpp>
+#include <icebin/modele/GCMRegridder_ModelE.hpp>
 
 // See here to serialize objects with non-default constructor
 //    http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
@@ -105,6 +106,7 @@ void GCMCoupler_ModelE::ncread(
     std::string const &vname)        // comes from this->gcm_params
 {
     GCMCoupler::ncread(config_fname, vname);
+
     // Replace the GCMRegridder with a wrapped version that understands
     // the ocean-vs-atmosphere grid complexity of ModelE
     gcm_regridder.reset(new GCMRegridder_ModelE(std::move(gcm_regridder)));

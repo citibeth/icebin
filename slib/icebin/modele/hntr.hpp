@@ -100,11 +100,6 @@ public:
         blitz::Array<double,1> &B,
         bool mean_polar = false) const;
 
-    void matrix(
-        MakeDenseEigenT::AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
-        blitz::Array<double,1> const &_WTA);
-
-
     /** Works with 0-based or 1-based N-dimensional arrays */
     template<int RANK>
     void regrid(

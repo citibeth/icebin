@@ -26,12 +26,12 @@ const int MASK_ICE_FREE_OCEAN   = 4;
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
-GCMRegridder load_AI_regridder(
+std::unique_ptr<GCMRegridder_Standard> load_AI_regridder(
     std::string const &gridA_fname,
     std::string const &gridA_vname,
     std::vector<std::tuple<std::string,std::string>> const &overlap_fnames)    // sheet name, fname
 {
-    GCMRegridder gcm_regridder;
+    std::unique_ptr<GCMRegridder_Standard> gcm_regridder(new GCMRegridder_Standard());
 
     // Read gridA
     printf("Opening %s\n", gridA_fname.c_str());
@@ -44,7 +44,7 @@ GCMRegridder load_AI_regridder(
     // Initialize the gcm_regridder with gridA
     std::vector<double> hcdefs {0};    // Dummy
     int nhc = hcdefs.size();
-    gcm_regridder.init(
+    gcm_regridder->init(
         std::move(gridA),
         std::move(hcdefs),
         Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhc}, {1,0}),
@@ -70,7 +70,7 @@ GCMRegridder load_AI_regridder(
         auto sheet(new_ice_regridder(gridI->parameterization));
         sheet->init(sheet_name, std::move(gridI), std::move(exgrid),
             InterpStyle::Z_INTERP, elevI);
-        gcm_regridder.add_sheet(std::move(sheet));
+        gcm_regridder->add_sheet(std::move(sheet));
 
     }
 
@@ -219,7 +219,7 @@ void write_regrid_nc(blitz::Array<double,2> &AA_d, SparseSetT &dimA)
 void pism_replace_greenland(
     TopoOutputs<2> &tout,
     PISMOutputs &pout,
-    GCMRegridder &gcm_regridder)
+    GCMRegridder_Standard &gcm_regridder)
 {
     // ----------------------- Regrid to ModelE grid
 
@@ -393,11 +393,11 @@ void do_main()
     }
 
     // Load the IceBin Regridder
-    GCMRegridder gcm_regridder(load_AI_regridder(
+    std::unique_ptr<GCMRegridder_Standard> gcm_regridder(load_AI_regridder(
         overlap_fname, "gridA",
         {std::make_tuple("greenland", overlap_fname)}));
 
-    pism_replace_greenland(tout, pout, gcm_regridder);
+    pism_replace_greenland(tout, pout, *gcm_regridder);
 
     printf("BEGIN writing output\n");
     {NcIO ncio("out-pism.nc", 'w');

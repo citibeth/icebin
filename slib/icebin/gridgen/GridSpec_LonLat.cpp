@@ -191,8 +191,11 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
 
     // North Pole cap
     double lat = this->latb.back();
-    if (this->north_pole && this->spherical_clip(0, lat, 360, 90)) {
-        Cell pole;
+    Cell pole;
+    pole.i = this->nlon()-1;
+    pole.j = this->nlat();
+    long index = (pole.j * this->nlon() + pole.i);
+    if (this->north_pole && this->spherical_clip(index, 0, lat, 360, 90)) {
         for (int ilon=0; ilon< this->lonb.size()-1; ++ilon) {
             double lon0 = this->lonb[ilon];
             double lon1 = this->lonb[ilon+1];
@@ -204,17 +207,16 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
             }
         }
 
-        pole.i = this->nlon()-1;
-        pole.j = this->nlat();
-        pole.index = (pole.j * this->nlon() + pole.i);
+        pole.index = index;
         pole.native_area = polar_graticule_area_exact(this->eq_rad, 90.0 - lat);
 
         grid.cells.add(std::move(pole));
     }
 
     // South Pole cap
+    index = 0;
     lat = this->latb[0];
-    if (this->south_pole && this->spherical_clip(0, -90, 360, lat)) {
+    if (this->south_pole && this->spherical_clip(index, 0, -90, 360, lat)) {
         Cell pole;
         for (int ilon=this->lonb.size()-1; ilon >= 1; --ilon) {
             double lon0 = this->lonb[ilon];     // Make the circle counter-clockwise
@@ -228,7 +230,7 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
         }
         pole.i = 0;
         pole.j = 0;
-        pole.index = 0;
+        pole.index = index;
         pole.native_area = polar_graticule_area_exact(this->eq_rad, 90.0 + lat);
 
         grid.cells.add(std::move(pole));

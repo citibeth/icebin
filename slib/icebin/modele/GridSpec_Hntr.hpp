@@ -11,7 +11,7 @@ namespace modele {
 struct GridSpec_Hntr {
     std::string name;
     HntrGrid hntr;
-    std::function<bool(double, double, double, double)> spherical_clip;
+    std::function<bool(long, double, double, double, double)> spherical_clip;
 
     /** True if this grid contains a circular cap on the north pole.
     If not, then many triangular grid cells will meet at the north pole. */

@@ -31,7 +31,7 @@ namespace icebin {
 // ========================================================
 /** Determines correct indexing for the E grid.
 Returns: im,jm,...,iHC*/
-static ibmisc::Indexing derive_indexingE(
+ibmisc::Indexing derive_indexingE(
 ibmisc::Indexing const &indexingA,      // im,jm,...
 ibmisc::Indexing const &indexingHC)    // iA,iHC
 {
@@ -145,6 +145,10 @@ void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 }
 
 // ---------------------------------------------------------------------
+// RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &sheet_name) const
+//        ---> see RegridMatrices.cpp
+// ---------------------------------------------------------------------
+
 
 
 

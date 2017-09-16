@@ -73,9 +73,6 @@ void IceRegridder::clear()
     elevI = nan;
 }
 // -------------------------------------------------------------
-RegridMatrices const IceRegridder::regrid_matrices() const
-    { return gcm->regrid_matrices(this); }
-// -------------------------------------------------------------
 void IceRegridder::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 {
 printf("BEGIN IceRegridder::ncio(%s, %d)\n", vname.c_str(), rw_full);

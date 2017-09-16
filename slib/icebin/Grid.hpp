@@ -30,6 +30,10 @@
 
 #include <icebin/error.hpp>
 
+#ifdef BUILD_MODELE
+#include <icebin/modele/hntr.hpp>
+#endif
+
 namespace icebin {
 
 class Cell;
@@ -366,6 +370,12 @@ public:
     Used to compute theoretical exact areas of graticules. That's different
     from the radius (or elliptical shape) used in the projection. */
     double eq_rad;
+
+#ifdef BUILD_MODELE
+    /** The grid description, as needed for Hntr regridding algorithm. */
+    std::unique_ptr<modele::HntrGrid> hntr;
+#endif
+
 
     /** Number of grid cell indices in longitude dimension */
     int nlon() const { return lonb.size() - 1; }

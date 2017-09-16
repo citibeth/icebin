@@ -190,6 +190,9 @@ class IceModel;
 
 // ----------------------------------------------------
 
+extern ibmisc::Indexing derive_indexingE(
+    ibmisc::Indexing const &indexingA,      // im,jm,...
+    ibmisc::Indexing const &indexingHC);    // iA,iHC
 
 
 // ----------------------------------------------------
@@ -259,21 +262,7 @@ public:
     virtual IceRegridder *ice_regridder(std::string const &name) const = 0;
 
     /** Produce regridding matrices for this setup. */
-    virtual RegridMatrices const regrid_matrices(IceRegridder const *regridder) const = 0;
-
-
-    RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const
-    {
-        IceRegridder const *regridder = ice_regridder(ice_sheet_name);
-        return regrid_matrices(regridder);
-    }
-
-    /**
-    @param rw_full If true, read the entire data structure.  If false (i.e. we
-                   are using MPI and this is not the root), then avoid reading
-                   grid details, etc.
-    */
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true) = 0;
+    virtual RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const = 0;
 
 };
 
@@ -334,7 +323,7 @@ public:
     IceRegridder *ice_regridder(std::string const &name) const;
 
     /** Produce regridding matrices for this setup. */
-    RegridMatrices const regrid_matrices(IceRegridder const *regridder) const;
+    RegridMatrices const regrid_matrices(std::string const &name) const;
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):
@@ -357,8 +346,6 @@ public:
         { return const_iterator(ice_regridders.cend()); }
 
     // -----------------------------------------
-
-
 
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we

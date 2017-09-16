@@ -12,6 +12,8 @@ namespace icebin {
 
 /** Return value of a sparse matrix */
 struct WeightedSparse {
+    ibmisc::TmpAlloc tmp;            // Stuff that needs same lifetime as WeightedSparse
+
     std::array<SparseSetT *,2> dims;            // Dense-to-sparse mapping for the dimensions
 
     // If M=BvA, then wM = wBvA = area of B cells

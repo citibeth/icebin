@@ -1,12 +1,12 @@
+#include <spsparse/eigen.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/hntr.hpp>
+#include <icebin/modele/GridSpec_Hntr.hpp>
 
 using namespace icebin;
 using namespace ibmisc;
 using namespace spsparse;
 using namespace std::placeholders;
-
-
 
 
 
@@ -96,7 +96,7 @@ NOTES:
 */
 static void raw_AOvAA(
     MakeDenseEigenT::AccumT &ret,        // {dimA, dimO}
-    std::array<HntrGrid const *, 2> hntrs,    // hntrAO, hntrAA
+    std::array<HntrGrid const *, 2> hntrs,    // hntrO, hntrA
     blitz::Array<double,1> const &wAO_d)    // Size of each grid cell in AO
 {
     auto &dimAO(*ret.dim(0).sparse_set);
@@ -170,14 +170,14 @@ NOTES:
 */
 static void raw_EOvEA(
     MakeDenseEigenT::AccumT &ret,        // {dimEA, dimEO}; dimEO should not change here.
-    std::array<HntrGrid const *, 2> hntrs,    // {hntrAO, hntrAA}
+    std::array<HntrGrid const *, 2> hntrs,    // {hntrO, hntrA}
     SparseSetT const *dimEO,            // Used to clip in Hntr::matrix()
     GCMRegridder_ModelE const *gcmA,
-    blitz::Array<double,1> *wEO_d)            // == EOvI.wM.  Dense indexing.
+    blitz::Array<double,1> &wEO_d)            // == EOvI.wM.  Dense indexing.
 {
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
     Hntr hntr_AOvAA(hntrs, 0);    // dimB=A,  dimA=O
-    RawEOvEA raw(std::move(ret), gcmA, *wEO_d);
+    RawEOvEA raw(std::move(ret), gcmA, wEO_d);
     auto wtEO(ibmisc::const_array(blitz::shape(dimEO->dense_extent()), 1.0));
     hntr_AOvAA.matrix(raw,
         std::bind(&dim_clip, dimEO, _1),
@@ -219,6 +219,77 @@ public:
     }
 };
 
+
+static Grid_LonLat const *cast_gridO(Grid const *_gridO)
+{
+    // -------- Check types on gridO
+    Grid_LonLat const *gridO(dynamic_cast<Grid_LonLat const *>(_gridO));
+    if (!gridO) (*icebin_error)(-1,
+        "make_gridA() requires type Grid_LonLat");
+
+    if (gridO->north_pole != gridO->south_pole) (*icebin_error)(-1,
+        "north_pole=%d and south_pole=%d must match in gridO",
+        gridO->north_pole, gridO->south_pole);
+
+    HntrGrid const *_hntrO(&*gridO->hntr);
+    if (!_hntrO) (*icebin_error)(-1,
+        "make_gridA() requires gridO have a Hntr source");
+
+    return gridO;
+}
+
+
+static HntrGrid const make_hntrA(Grid_LonLat const *gridO)
+{
+    HntrGrid const &hntrO(*gridO->hntr);
+
+    if ((hntrO.im % 2 != 0) || (hntrO.jm % 2 != 0)) (*icebin_error)(-1,
+        "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
+        hntrO.im, hntrO.jm);
+
+    // --------------------------
+    // Define Atmosphere grid to be exactly twice the Ocean grid
+    HntrGrid const hntrA(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
+
+    return hntrA;
+}
+
+
+/** Creates Atmosphere grid from an existing Hntr-type Ocean grid. */
+static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
+{
+    HntrGrid const &hntrO(*gridO->hntr);
+    HntrGrid const hntrA(make_hntrA(gridO));
+
+    // Determine set of used grid cells in gridO
+    SparseSetT dimO;
+    for (auto cell=gridO->cells.begin(); cell != gridO->cells.end(); ++cell) {
+        dimO.add_dense(cell->index);
+    }
+
+    // Use hntr to figure out which grid cells should be realized in A, based
+    // on realized grid cells in O
+    SparseSetT dimA;
+    Hntr hntrOvA({&hntrO, &hntrA}, 0);
+    hntrOvA.matrix(
+        accum::SparseSetAccum<SparseSetT,double,2>({nullptr, &dimA}),
+        std::bind(&dim_clip, &dimO, _1),
+        ibmisc::const_array(blitz::shape(dimA.dense_extent()), 1.0));
+
+    // ------- Produce a full gridA, based on hntrA and realized cells in dimA
+    GridSpec_Hntr spec(hntrA);
+    spec.name = gridO->name + "_A";
+    spec.pole_caps = gridO->north_pole;
+
+    // Keep cells listed in dimA
+    spec.spherical_clip = std::bind(&dim_clip, &dimA, _1);
+    spec.points_in_side = 1;    // Keep it simple, we don't need this anyway
+    spec.eq_rad = gridO->eq_rad;
+
+    std::unique_ptr<Grid_LonLat> gridA(new Grid_LonLat);
+    spec.make_grid(*gridA);
+}
+
 // ========================================================================
 
 /** Top-level subroutine produces the matrix EAmvIp or AAmvIp.
@@ -234,10 +305,9 @@ public:
 static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
-    blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
-    blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
+    GCMRegridder_ModelE const *gcmA,
     char X,    // Either 'A' or 'E', determines the destination matrix.
-    RegridMatrices const &rmO)
+    RegridMatrices const *rmO)
 {
     TmpAlloc tmp;
 
@@ -258,7 +328,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     // We need AOpvIp for wAOP; used below.
     SparseSetT dimAOp;
-    std::unique_ptr<WeightedSparse> AOpvIp(rmO.matrix("AvI", {&dimAOp, &dimIp}, paramsO));
+    std::unique_ptr<WeightedSparse> AOpvIp(rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp->wM);
 
     // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
@@ -273,19 +343,33 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     // OmvOp
     EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
-        std::bind(&scaled_AOmvAOp, _1, foceanAOm, foceanAOp, '-'),
+        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOm, gcmA->foceanAOp, '-'),
         {SparsifyTransform::TO_DENSE},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
     EigenColVectorT wAOm_e(sc_AOmvAOp * map_eigen_colvector(wAOp));
 
 
+    std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
+
+    // Obtain hntrA and hntrO for process below.
+    GCMRegridder const *gcmO(&*gcmA->gcmO);
+    Grid_LonLat const *gridO(cast_gridO(&*gcmO->gridA));
+    HntrGrid const &hntrO(*gridO->hntr);
+    HntrGrid const hntrA(make_hntrA(gridO));
+
+
     EigenColVectorT *wXOm_e;
+    WeightedSparse *XOpvIp;
     if (X == 'E') {
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
-        std::unique_ptr<WeightedSparse> EOpvIp(rmO.matrix("EvI", {&dimEOp, &dimIp}, paramsO));
+        WeightedSparse *EOpvIp = tmp.take(rmO->matrix("EvI", {&dimEOp, &dimIp}, paramsO));
+
+//        std::unique_ptr<WeightedSparse> EOpvIp();
+        XOpvIp = &*EOpvIp;
+
         const_universe.reset();        // Check that dimIp hasn't changed
 
         // dimEOm is a subset of dimEOp
@@ -294,40 +378,48 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         // EOmvAOm: Repeat A values in E
         const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
         std::unique_ptr<WeightedSparse> EOmvAOm(
-            rmO.matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
+            rmO->matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
         const_universe.reset();        // Check that dims didn't change
-        auto sEOmvAOm(1. / EOmvAOm->wM);
+        blitz::Array<double,1> sEOmvAOm(1. / EOmvAOm->wM);
+
 
         // wEOm_e
-        tmp.reset_ptr(wXOm_e, map_eigen_diagonal(sEOmvAOm) * *EOmvOm->M * wAOm_e);
-    } else {
-        wXOm_e = &wAOm_e;
-    }
+        tmp.move<EigenColVectorT>(wXOm_e,
+            EigenColVectorT(map_eigen_diagonal(sEOmvAOm) * *EOmvAOm->M * wAOm_e));
 
-    // ---------------- Compute the main matrix
-    // ---------------- XAmvIp = XAmvXOm * XOpvIp
-    std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
-    if (X == 'E') {
+        // ---------------- Compute the main matrix
+        // ---------------- XAmvIp = XAmvXOm * XOpvIp
         // Rename variables
         SparseSetT &dimEAm(dimXAm);
-        blitz::Array<double,1> wEOm(to_blitz(wXOm_e));
+        blitz::Array<double,1> wEOm(to_blitz(*wXOm_e));
 
+        blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
         reset_ptr(XAmvXOm, MakeDenseEigenT(
-            std::bind(&raw_EOvEA, _1, {&hntrAO, &hntrAA}, &dimEOm, to_blitz(*wXOm_e)),
+            std::bind(&raw_EOvEA, _1,
+                std::array<HntrGrid const *,2>{&hntrO, &hntrA}, &dimEOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
+
     } else {
+        XOpvIp = &*AOpvIp;
+        wXOm_e = &wAOm_e;
+
+        // ---------------- Compute the main matrix
+        // ---------------- XAmvIp = XAmvXOm * XOpvIp
+
         SparseSetT &dimAAm(dimXAm);
 
         // Actually AAmvAOm
         reset_ptr(XAmvXOm, MakeDenseEigenT(
-            std::bind(&raw_AOvAA, _1, {&hntrAO, &hntrAA}, to_blitz(*wXOm_e)),
+            std::bind(&raw_AOvAA, _1,
+                std::array<HntrGrid const *,2>{&hntrO, &hntrA}, to_blitz(*wXOm_e)),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimAOm, &dimAAm}, 'T').to_eigen());
     }
 
+
     // ---------- wEAm = [scale] * XAmvXOm * wEOm
-    blitz::Array<double,1> sXAmvXOm(sum(XAmvXOm, 0, '-'));
+    blitz::Array<double,1> sXAmvXOm(sum(*XAmvXOm, 0, '-'));
     auto &wXAm_e(ret->tmp.make<EigenColVectorT>(
         map_eigen_diagonal(sXAmvXOm) * *XAmvXOm * *wXOm_e));
 
@@ -341,77 +433,36 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         ret->M.reset(new EigenSparseMatrixT(
             *XAmvXOm * *XOpvIp->M));
     }
-    sum->Mw.reference(EOpvIp->Mw);
+    ret->Mw.reference(XOpvIp->Mw);
     return ret;
 }
 // ========================================================================
-/** Creates Atmosphere grid from an existing Hntr-type Ocean grid. */
-static std::unique_ptr<Grid> make_gridAA(Grid const *_gridAO)
-{
-    // -------- Check types on gridAO
-    Grid_LonLat const *gridAO(dynamc_cast<Grid_LonLat *>(_gridAO));
-    if (!gridAO) (*icebin_error)(-1,
-        "make_gridAA() requires type Grid_LonLat");
-
-    if (gridAO->north_pole != gridAO->south_pole) (*icebin_error)(-1,
-        "north_pole=%d and south_pole=%d must match in gridAO",
-        gridAO->north_pole, gridAO->south_pole);
-
-    HntrGrid const *_hntrAO(&*gridAO->hntr);
-    if (!_hntrAO) (*icebin_error)(-1,
-        "make_gridAA() requires gridAO have a Hntr source");
-    HntrGrid const &hntrAO(*_hntrAO);
-
-    if ((hntrAO.im % 2 != 0) || (hntrAO.jm % 2 != 0)) (*icebin_error)(-1,
-        "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
-        hntrAO.im, hntrAO.jm);
-
-    // --------------------------
-    // Define Atmosphere grid to be exactly twice the Ocean grid
-    HntrGrid const hntrAA(hntrAO.im/2, hntrAO.jm/2, hntrAO.offi*0.5, hntrAO.dlat*2.);
-
-    // Use hntr to figure out which grid cells should be realized in A, based
-    // on realized grid cells in O
-    SparseSetT dimA;
-    Hntr hntrAOvA({&hntrAO, &hntrAA}, 0);
-    hntrAOvA.matrix(
-        accum::SparseSetAccum<SparseSetT,double,2>({nullptr, &dimA}),
-        std::bind(&dim_clip, &gridAO->dim, _1));
-
-    // ------- Produce a full gridAA, based on hntrAA and realized cells in dimA
-    GridSpec_Hntr spec(hntrAA);
-    spec.name = gridAO->name + "_A";
-    spec.pole_caps = gridAO->north_pole;
-
-    // Keep cells listed in dimA
-    spec.spherical_clip = std::bind(&dim_clip, &dimA, _1);
-    spec.points_in_side = 1;    // Keep it simple, we don't need this anyway
-    spec.eq_rad = gridAO->eq_rad;
-
-    std::unique_ptr<Grid_LonLat *> gridAA(new Grid_LonLat);
-    spec.make_grid(*gridAA);
-}
 
 // ============================================================
 // Methods for GCMRegridder_ModelE
 
 GCMRegridder_ModelE::GCMRegridder_ModelE(
-        std::unique_ptr<icebin::GCMRegridder> &&_gcmO,
-        blitz::Array<double,1> const &_foceanAOm,
-        blitz::Array<double,1> const &_foceanAOp) :
-    : foceanAOm(reshape1(_foceanAOm)), foceanAOp(reshape1(foceanAOp)),
-        gcmO(std::move(_gcmO))
+        std::unique_ptr<icebin::GCMRegridder> &&_gcmO)
+    : gcmO(std::move(_gcmO))
 {
     // Initialize baseclass members
-    gridAA = make_gridAA(gcmO->gridAA);
+    gridA = make_gridA(cast_gridO(&*gcmO->gridA));
     correctA = gcmO->correctA;
     hcdefs = gcmO->hcdefs;
     indexingHC = Indexing(
         {"O", "HC"},
         {0L, 0L},
-        {gridAA->size(), gcmO->indexingHC[1].extent},
+        {gridA->ndata(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
-    indexingE = derive_indexingE(gridAA->indexing, indexingHC);
+    indexingE = derive_indexingE(gridA->indexing, indexingHC);
+}
+
+void GCMRegridder_ModelE::set_focean(
+        blitz::Array<double,1> &_foceanAOm,
+        blitz::Array<double,1> &_foceanAOp)
+{
+    foceanAOm.reference(_foceanAOm);
+    foceanAOp.reference(_foceanAOp);
 }
 
 IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
@@ -420,24 +471,14 @@ IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
 
 RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name) const
 {
-    IceModelRegridder const *ice_regridderO = gcmO->ice_regridder(ice_sheet_name);
-
-    // Navigate the data structures
-    Grid_LonLat const *gridAO = dynamic_cast<Grid_LonLat const *>(&*gcmO->gridAA);
-    HntrGrid const &hntrAO(*gridAO->hntr);
-
-    // Construct set of cells in A
-    SparseSetT dimA;
-    for (auto cell = gridAA->cells.begin(); cell != gridAA->cells.end(); ++cell)
-        dimA.add_dense(cell->index);
-
     RegridMatrices rm;
     RegridMatrices const &rmO(rm.tmp.make<RegridMatrices>(
-        ice_regridderO->regrid_matrices()));
+        gcmO->regrid_matrices(ice_sheet_name)));
+
     rm.add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        foceanAOm, foceanAOp, 'E', &rmO));
+        this, 'E', &rmO));
     rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        foceanAOm, foceanAOp, 'A', &rmO));
+        this, 'A', &rmO));
 
     return rm;
 }

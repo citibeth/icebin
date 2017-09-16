@@ -231,9 +231,8 @@ void Hntr::mean_polar_matrix()
             }
         }
     }
-#endif
-
 }
+#endif
 
 
 }}

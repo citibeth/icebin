@@ -131,8 +131,6 @@ public:
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
     virtual void GvAp(MakeDenseEigenT::AccumT &ret) const = 0;
 
-    RegridMatrices const regrid_matrices() const;
-
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);

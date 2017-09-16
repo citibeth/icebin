@@ -142,7 +142,12 @@ public:
 
     void ncread(   // virtual
         std::string const &config_fname,
-        std::string const &vname);
+        std::string const &vname);        // comes from this->gcm_params
+
+
+    void set_focean(
+        blitz::Array<double,1> const &foceanOm,
+        blitz::Array<double,1> const &foceanOp);
 
     std::string locate_input_file(   // virtual
         std::string const &sheet_name,        // eg: greenland

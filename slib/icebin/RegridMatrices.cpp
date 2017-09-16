@@ -278,8 +278,10 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder
 }
 
 
-RegridMatrices const GCMRegridder_Standard::regrid_matrices(IceRegridder const *regridder) const
+RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &sheet_name) const
 {
+    IceRegridder const *regridder = ice_regridder(sheet_name);
+
 #if 0
     printf("===== RegridMatrices Grid geometries:\n");
     printf("    nA = %d\n", this->nA());
