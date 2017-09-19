@@ -18,12 +18,12 @@ namespace modele {
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
-GCMRegridder load_AI_regridder(
+std::unique_ptr<GCMRegridder_Standard> load_AI_regridder(
     std::string const &gridA_fname,
     std::string const &gridA_vname,
     std::vector<std::tuple<std::string,std::string>> const &overlap_fnames)    // sheet name, fname
 {
-    GCMRegridder gcm_regridder;
+    std::unique_ptr<GCMRegridder_Standard> gcm_regridder(new GCMRegridder_Standard());
 
     // Read gridA
     printf("Opening %s\n", gridA_fname.c_str());
@@ -36,7 +36,7 @@ GCMRegridder load_AI_regridder(
     // Initialize the gcm_regridder with gridA
     std::vector<double> hcdefs {0};    // Dummy
     int nhc = hcdefs.size();
-    gcm_regridder.init(
+    gcm_regridder->init(
         std::move(gridA),
         std::move(hcdefs),
         Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhc}, {1,0}),
@@ -62,7 +62,7 @@ GCMRegridder load_AI_regridder(
         auto sheet(new_ice_regridder(gridI->parameterization));
         sheet->init(sheet_name, std::move(gridI), std::move(exgrid),
             InterpStyle::Z_INTERP, elevI);
-        gcm_regridder.add_sheet(std::move(sheet));
+        gcm_regridder->add_sheet(std::move(sheet));
 
     }
 
@@ -121,13 +121,13 @@ void greenland_2m(
 
     // Obtain regridding matrix
     SparseSetT dimA,dimI;
-    RegridMatrices::Params params(true, false, {0.,0.,0.}, true);
+    RegridMatrices::Params params(true, false, {0.,0.,0.});
     //    params.scale = true;
     //    params.correctA = true;
     //    params.sigma = {0,0,0};
     //    params.conserve = true;
     IceRegridder *ice_regridder = gcm_regridder.ice_regridder("greenland");
-    RegridMatrices rm(ice_regridder);
+    RegridMatrices rm(gcm_regridder.regrid_matrices(ice_regridder->name()));
     auto AvI(rm.matrix("AvI", {&dimA, &dimI}, params));
 
 printf("dimA: ndense=%d nsparse%ld\n", dimA.dense_extent(), dimA.sparse_extent());
@@ -151,7 +151,7 @@ printf("dimI: ndense=%d nsparse%ld\n", dimI.dense_extent(), dimI.sparse_extent()
     }
 
     TmpAlloc tmp;    // Must live for scope of AA_d
-    auto AA_d(AvI->apply(II_d, NaN, tmp));
+    auto AA_d(AvI->apply(II_d, NaN, false, tmp));
     II_d.free();
 
     // ---------------- Store in output
@@ -216,11 +216,11 @@ void do_main()
     std::string const overlap_fname = "modele_ll_g2mx2m-sr_g20_searise.nc";
     std::string const pism_fname = "/home2/rpfische/f15/modelE/init_cond/pism/std-greenland/ex_g20km_10ka.nc";
 
-    GCMRegridder gcm_regridder(load_AI_regridder(
+    std::unique_ptr<GCMRegridder_Standard> gcm_regridder(load_AI_regridder(
         overlap_fname, "gridA",
         {std::make_tuple("greenland", overlap_fname)}));
 
-    icebin::modele::greenland_2m(pism_fname, gcm_regridder, bundle2);
+    icebin::modele::greenland_2m(pism_fname, *gcm_regridder, bundle2);
 
     // Regrid to 1/2-degree --- because the 2-minute file is too slow for ncview
     auto bundleH(make_bundle());

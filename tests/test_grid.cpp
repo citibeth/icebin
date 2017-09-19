@@ -268,7 +268,7 @@ TEST_F(GridTest, hntr)
     modele::GridSpec_Hntr hntr(modele::HntrGrid(4, 4, 0., 60.*45.));
     hntr.name = "hntr";
     hntr.spherical_clip = std::bind(&ice_sheet::clip,
-        ice_sheet::GREENLAND|ice_sheet::ANTARCTICA, _1, _2, _3, _4);
+        ice_sheet::GREENLAND|ice_sheet::ANTARCTICA, _1, _2, _3, _4, _5);
     hntr.pole_caps = false;
     hntr.points_in_side = 1;
     hntr.eq_rad = 1.;

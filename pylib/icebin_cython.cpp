@@ -33,12 +33,14 @@ namespace cython {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-void GCMRegridder_init(GCMRegridder *cself,
+GCMRegridder_Standard *new_GCMRegridder_Standard(
     std::string const &gridA_fname,
     std::string const &gridA_vname,
     std::vector<double> &hcdefs,
     bool _correctA)
 {
+    std::unique_ptr<GCMRegridder_Standard> cself(new GCMRegridder_Standard());
+
     // Read gridA
     NcIO ncio(gridA_fname, netCDF::NcFile::read);
     std::unique_ptr<Grid> gridA = new_grid(ncio, gridA_vname);
@@ -53,6 +55,7 @@ void GCMRegridder_init(GCMRegridder *cself,
         Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhc}, {1,0}),
         _correctA);
 
+    return cself.release();
 }
 
 
@@ -80,7 +83,8 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
     auto sheet(new_ice_regridder(gridI->parameterization));
     sheet->init(name, std::move(gridI), std::move(exgrid),
         interp_style, elevI);
-    cself->add_sheet(std::move(sheet));
+    dynamic_cast<GCMRegridder_Standard *>(cself)
+        ->add_sheet(std::move(sheet));
 }
 
 void GCMRegridder_set_elevI(GCMRegridder *cself,
@@ -135,7 +139,7 @@ extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::s
 
     CRM->RM = cself->matrix(spec_name,
         {&CRM->dims[0], &CRM->dims[1]},
-        RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z}, conserve));
+        RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z}));
 
     CythonWeightedSparse *ret = CRM.release();
     return ret;

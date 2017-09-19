@@ -173,6 +173,7 @@ void PISMOutputs::ncio_read(NcIO &ncio)
     usurf.reference((load_pism<double>(ncio.nc, "usurf")));
 }
 // ---------------------------------------------------------------------
+#if 0
 template<class TypeT, int RANK>
 ArrayBundle<TypeT,1> reshape1(
     ArrayBundle<TypeT, RANK> &bundle,
@@ -190,6 +191,7 @@ ArrayBundle<TypeT,1> reshape1(
     }
     return bundle1;
 }
+#endif
 
 void write_regrid_nc(blitz::Array<double,2> &AA_d, SparseSetT &dimA)
 {
@@ -225,13 +227,13 @@ void pism_replace_greenland(
 
     // Obtain regridding matrix
     SparseSetT dimA,dimI;
-    RegridMatrices::Params params(true, false, {0.,0.,0.}, true);
+    RegridMatrices::Params params(true, false, {0.,0.,0.});
     //    params.scale = true;
     //    params.correctA = false;
     //    params.sigma = {0,0,0};
-    //    params.conserve = true;
-    IceRegridder *ice_regridder = gcm_regridder.ice_regridder("greenland");
-    RegridMatrices rm(ice_regridder);
+    std::string const sheet = "greenland";
+    RegridMatrices rm(gcm_regridder.regrid_matrices(sheet));
+    IceRegridder *ice_regridder = gcm_regridder.ice_regridder(sheet);
     auto AvI(rm.matrix("AvI", {&dimA, &dimI}, params));
 
 printf("dimA: ndense=%d nsparse%ld\n", dimA.dense_extent(), dimA.sparse_extent());
@@ -271,7 +273,7 @@ printf("dimI: ndense=%d nsparse%ld\n", dimI.dense_extent(), dimI.sparse_extent()
     }
 
     TmpAlloc tmp;    // Must live for scope of AA_d
-    auto AA_d(AvI->apply(II_d, NaN, tmp));
+    auto AA_d(AvI->apply(II_d, NaN, false, tmp));
     II_d.free();
 
     //write_regrid_nc(AA_d, dimA);    // Testing / Debugging

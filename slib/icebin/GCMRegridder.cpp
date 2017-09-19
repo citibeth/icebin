@@ -74,6 +74,11 @@ IceRegridder *GCMRegridder_Standard::ice_regridder(std::string const &name) cons
 
 // -------------------------------------------------------------
 // ==============================================================
+void GCMRegridder::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
+{
+    (*icebin_error)(-1, "Not implemented");
+}
+// ==============================================================
 void GCMRegridder_Standard::clear()
 {
     gridA.reset();

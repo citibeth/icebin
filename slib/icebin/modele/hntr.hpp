@@ -24,6 +24,8 @@ public:
 
 public:
     int size() const { return im * jm; }
+    int ndata() const { return size(); }    // Convention makes this more like regular ModelE grids
+
     double dxyp(int j) const { return _dxyp(j); }
 
     HntrGrid(int _im, int _jm, double _offi, double _dlat);

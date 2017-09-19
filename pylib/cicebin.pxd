@@ -58,7 +58,7 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
         pass
 
     cdef cppclass RegridMatrices:
-        pass
+        RegridMatrices(RegridMatrices) except +
 
     cdef cppclass GCMRegridder:
         GCMRegridder() except +

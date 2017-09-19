@@ -264,6 +264,13 @@ public:
     /** Produce regridding matrices for this setup. */
     virtual RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const = 0;
 
+    /**
+    @param rw_full If true, read the entire data structure.  If false (i.e. we
+                   are using MPI and this is not the root), then avoid reading
+                   grid details, etc.
+    */
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
+
 };
 
 // ----------------------------------------------------------------------
@@ -346,12 +353,6 @@ public:
         { return const_iterator(ice_regridders.cend()); }
 
     // -----------------------------------------
-
-    /**
-    @param rw_full If true, read the entire data structure.  If false (i.e. we
-                   are using MPI and this is not the root), then avoid reading
-                   grid details, etc.
-    */
     void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 
 };  // class GCMRegridder

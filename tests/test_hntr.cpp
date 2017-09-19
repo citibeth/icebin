@@ -231,7 +231,7 @@ void cmp_regrid(
     auto Bc1(reshape1(Bc,0));
     auto Ac1(reshape1(Ac,0));
     Bc1 = 0;
-    hntr.matrix(BvA, reshape1(WTAc,0));
+    hntr.matrix(BvA, reshape1(WTAc,0), const_array(blitz::shape(gridB.ndata()), 1.0));
     for (auto ii=BvA.begin(); ii != BvA.end(); ++ii) {
         // Simple matrix multiply
         Bc1(ii->row()) += ii->value() * Ac1(ii->col());
