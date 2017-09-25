@@ -86,11 +86,11 @@ void cmp_array(blitz::Array<double,1> const &cval, blitz::Array<double,1> const 
     }
 }
 
-void cmp_array(blitz::Array<int,1> const &cval, blitz::Array<int,1> const &val)
+void cmp_array(blitz::Array<int,1> const &cval, blitz::Array<int,1> const &val, std::string msg)
 {
     printf("Array range %d %d\n", cval.lbound(0), cval.ubound(0));
     for (int i=cval.lbound(0); i <= cval.ubound(0); ++i) {
-        EXPECT_EQ(cval(i), val(i));
+        EXPECT_EQ(cval(i), val(i)) << msg;
     }
 }
 
@@ -174,8 +174,8 @@ printf("Read: %f %d %d %d %d\n", datmcb, ina, jna, inb, jnb);
 
 TEST_F(HntrTest, simple_grids)
 {
-    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0);
-    HntrGrid g8(16, 8, 0.0, 22.5);
+    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0*60);
+    HntrGrid g8(16, 8, 0.0, 22.5*60);
 
 //    for (int j=1; j<=g4.jm; ++j) printf("dxyp4(%d) = %g\n", j, g4.dxyp(j));
 //    for (int j=1; j<=g8.jm; ++j) printf("dxyp8(%d) = %g\n", j, g8.dxyp(j));
@@ -195,8 +195,8 @@ extern "C" void call_hntr4(
 
 void cmp_regrid(
     HntrGrid const &gridA, HntrGrid const &gridB,
-    blitz::Array<double,2> const &WTAc,
-    blitz::Array<double,2> const &Ac)
+    blitz::Array<double,2> const &WTAc,    // 1-based indexing
+    blitz::Array<double,2> const &Ac)      // 1-based indexing
 {
 
     // Regrid with C++
@@ -224,21 +224,39 @@ void cmp_regrid(
         Bf.data(), Bf.extent(0));
 
     // Compare C++ vs. Fortran
-    cmp_array(reshape1(Bc,1), reshape1(Bf,1));
+    cmp_array(reshape1(Bc,1), reshape1(Bf,1), "FORTRAN");
+
+    // ----------------------------------------------------
+    // Check conservation
+    double Asum = 0;
+    for (int j=1; j<=gridA.jm; ++j) {
+    for (int i=1; i<=gridA.im; ++i) {
+        Asum += Ac(i,j) * gridA.dxyp(j);
+    }}
+
+    double Bsum = 0;
+    for (int j=1; j<=gridB.jm; ++j) {
+    for (int i=1; i<=gridB.im; ++i) {
+        Bsum += Bc(i,j) * gridB.dxyp(j);
+    }}
+
+    EXPECT_DOUBLE_EQ(Asum, Bsum);
+    // ----------------------------------------------------
 
     // Regrid by generating a matrix and multiplying by it
     TupleList<int,double,2> BvA;
     auto Bc1(reshape1(Bc,0));
     auto Ac1(reshape1(Ac,0));
+    auto WTAc1(reshape1(WTAc,0));
     Bc1 = 0;
-    hntr.matrix(BvA, reshape1(WTAc,0), const_array(blitz::shape(gridB.ndata()), 1.0));
+    hntr.matrix(BvA, nullptr, &WTAc1);
+
+    // Simple matrix multiply
     for (auto ii=BvA.begin(); ii != BvA.end(); ++ii) {
-        // Simple matrix multiply
         Bc1(ii->row()) += ii->value() * Ac1(ii->col());
     }
-    cmp_array(reshape1(Bc1,1), reshape1(Bf,1));
+    cmp_array(reshape1(Bc1,1), reshape1(Bf,1), "MATRIX");
 
-#if 0
     // Make sure sum matches (in C++)
     double sumA = 0;
     for (int j=1; j<=gridA.jm; ++j) {
@@ -251,7 +269,6 @@ void cmp_regrid(
         sumB += Bc(i,j) * gridB.dxyp(j);
     }}
     EXPECT_DOUBLE_EQ(sumA, sumB);
-#endif
 
 }
 
@@ -274,11 +291,108 @@ void cmp_random_regrid(HntrGrid const &gridA, HntrGrid const &gridB)
     cmp_regrid(gridA, gridB, WTA, A);
 }
 
-TEST_F(HntrTest, regrid1)
+/** Tests the overlap matrix (area of exchange grid) conforms to
+some basic properties such a matrix should have. */
+TEST_F(HntrTest, overlap)
 {
-    HntrGrid g2(4, 2, 0.0, 90.0);
-    HntrGrid g4(8, 4, 0.0, 45.0);
-    HntrGrid g8(16, 8, 0.0, 22.5);
+//    std::vector<double> Rvals {1.0, 2.0, 3.0};
+    std::vector<double> Rvals {1.0,2.0};
+
+    HntrGrid gB(4, 2, 0.0, 90.0*60);
+    HntrGrid gA(8, 4, 0.0, 45.0*60);
+//    HntrGrid gA(16, 8, 0.0, 22.5*60);
+
+    Hntr hntrBvA({&gB, &gA}, 0);
+
+    for (double R : Rvals) {
+        TupleList<int,double,2> mBvA;
+        double const R2 = R*R;
+        hntrBvA.overlap(mBvA, R);
+
+#if 0
+for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
+    int ijB = ii->index(0);
+    int const jB = ijB / gB.im;
+    int const iB = ijB - (jB * gB.im);
+
+    int ijA = ii->index(0);
+    int const jA = ijA / gA.im;
+    int const iA = ijA - (jA * gA.im);
+
+    printf("mBvA[(%d %d), (%d %d)] = %f\n", iB,jB,iA,jA,ii->value());
+}
+#endif
+
+
+        // Compute sums of areas for grids A and B
+        blitz::Array<double,1> areaB(gB.ndata());
+        areaB = 0;
+        blitz::Array<double,1> areaA(gA.ndata());
+        areaA = 0;
+        for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
+            areaB(ii->index(0)) += ii->value();
+            areaA(ii->index(1)) += ii->value();
+        }
+
+        // Check that computed B areas match
+        for (int ijB=0; ijB<gB.ndata(); ++ijB) {
+            int const jB = ijB / gB.im;
+            int const iB = ijB - (jB * gB.im);
+
+            EXPECT_DOUBLE_EQ(gB.dxyp(jB+1)*R2, areaB(ijB)) << "Grid B R=" << R;
+        }
+
+        // Check that computed A areas match
+        for (int ijA=0; ijA<gA.ndata(); ++ijA) {
+            int const jA = ijA / gA.im;
+            int const iA = ijA - (jA * gA.im);
+
+            EXPECT_DOUBLE_EQ(gA.dxyp(jA+1)*R2, areaA(ijA)) << "Grid A(" << iA << ", " << jA << ") R=" << R;
+        }
+
+        // Check total area
+        double const epsilon = 1.e-12;
+
+        double sumB = 0;
+        for (int i=0; i<areaB.extent(0); ++i) sumB += areaB(i);
+        EXPECT_NEAR(1., 4.*M_PI*R2 / sumB, epsilon);
+
+        double sumA = 0;
+        for (int i=0; i<areaA.extent(0); ++i) sumA += areaA(i);
+        EXPECT_NEAR(1., 4.*M_PI*R2 / sumA, epsilon);
+    }
+
+}
+
+
+TEST_F(HntrTest, regrid1_fortran)
+{
+//    HntrGrid g2(4, 2, 0.0, 90.0*60);
+//    HntrGrid g4(8, 4, 0.0, 45.0*60);
+//    HntrGrid g8(16, 8, 0.0, 22.5*60);
+
+    HntrGrid g2(8, 4, 0.0, 45.0*60);
+    HntrGrid g4(16, 8, 0.0, 22.5*60);
+
+
+
+    auto vals4(g4.Array<double>());
+    auto wt4(g4.Array<double>());
+
+    for (int i=1; i<=g4.im; ++i) {
+    for (int j=1; j<=g4.jm; ++j) {
+        wt4(i,j) = 1.0;
+        vals4(i,j) = i+j;
+    }}
+
+    cmp_regrid(g4, g2, wt4, vals4, Operation::FORTRAN);
+}
+
+TEST_F(HntrTest, regrid1_matrix)
+{
+    HntrGrid g2(4, 2, 0.0, 90.0*60);
+    HntrGrid g4(8, 4, 0.0, 45.0*60);
+    HntrGrid g8(16, 8, 0.0, 22.5*60);
 
 
     auto vals4(g4.Array<double>());
@@ -298,8 +412,8 @@ TEST_F(HntrTest, regrid1)
 
 TEST_F(HntrTest, random_regrids)
 {
-    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0);
-    HntrGrid g8(16, 8, 0.0, 22.5);
+    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0*60);
+    HntrGrid g8(16, 8, 0.0, 22.5*60);
 
     cmp_random_regrid(g8, g4);
     cmp_random_regrid(g2mx2m, g1qx1);
@@ -310,8 +424,8 @@ TEST_F(HntrTest, random_regrids)
 
 TEST_F(HntrTest, regrid)
 {
-    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0);
-    HntrGrid g8(16, 8, 0.0, 22.5);
+    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0*60);
+    HntrGrid g8(16, 8, 0.0, 22.5*60);
     auto vals8(g8.Array<double>());
     auto wt8(g8.Array<double>());
     auto vals4(g4.Array<double>());

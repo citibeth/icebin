@@ -79,8 +79,22 @@ static void scaled_AOmvAOp(
 }
 // ----------------------------------------------------------------
 /** Helper function: clip a cell according to its index */
-static bool dim_clip(SparseSetT const *dim, long index)
+static bool dim_clip_fn(SparseSetT const *dim, long index)
     { return dim->in_sparse(index); }
+
+static blitz::Array<double,1> dim_clip(SparseSetT const &dim)
+{
+    // Prepare weight vector to clip
+    blitz::Array<double,1> wt(dim.sparse_extent());
+    wt = 0.0;
+    for (int i_d=0; i_d < dim.dense_extent(); ++i_d) {
+        int i_s = dim.to_sparse(i_d);
+
+        wt(i_s) = 1.0;
+    }
+
+    return wt;
+}
 
 
 /** Matrix converts AO <- AA, based on Hntr.
@@ -101,9 +115,9 @@ static void raw_AOvAA(
 {
     auto &dimAO(*ret.dim(0).sparse_set);
     Hntr hntr_AOvAA(hntrs, 0);    // AOvAA
-    hntr_AOvAA.matrix(std::move(ret),
-        std::bind(&dim_clip, &dimAO, _1),
-        wAO_d);
+
+    blitz::Array<double,1> wtAO(dim_clip(dimAO));
+    hntr_AOvAA.overlap(std::move(ret), &wtAO, nullptr);
 }
 // ----------------------------------------------------------------
 /** Helper class for raw_EOvEA().
@@ -178,10 +192,9 @@ static void raw_EOvEA(
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
     Hntr hntr_AOvAA(hntrs, 0);    // dimB=A,  dimA=O
     RawEOvEA raw(std::move(ret), gcmA, wEO_d);
-    auto wtEO(ibmisc::const_array(blitz::shape(dimEO->dense_extent()), 1.0));
-    hntr_AOvAA.matrix(raw,
-        std::bind(&dim_clip, dimEO, _1),
-        wtEO);
+
+    blitz::Array<double,1> wtEO(dim_clip(*dimEO));
+    hntr_AOvAA.matrix(raw, &wtEO, nullptr);
 }
 // ----------------------------------------------------------------
 // ========================================================================
@@ -271,10 +284,11 @@ static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
     // on realized grid cells in O
     SparseSetT dimA;
     Hntr hntrOvA({&hntrO, &hntrA}, 0);
+
+    blitz::Array<double,1> wtO(dim_clip(dimO));
     hntrOvA.matrix(
         accum::SparseSetAccum<SparseSetT,double,2>({nullptr, &dimA}),
-        std::bind(&dim_clip, &dimO, _1),
-        ibmisc::const_array(blitz::shape(dimA.dense_extent()), 1.0));
+        &wtO, nullptr);
 
     // ------- Produce a full gridA, based on hntrA and realized cells in dimA
     GridSpec_Hntr spec(hntrA);
@@ -282,7 +296,7 @@ static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
     spec.pole_caps = gridO->north_pole;
 
     // Keep cells listed in dimA
-    spec.spherical_clip = std::bind(&dim_clip, &dimA, _1);
+    spec.spherical_clip = std::bind(&dim_clip_fn, &dimA, _1);
     spec.points_in_side = 1;    // Keep it simple, we don't need this anyway
     spec.eq_rad = gridO->eq_rad;
 
@@ -365,10 +379,10 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
-        WeightedSparse *EOpvIp = tmp.take(rmO->matrix("EvI", {&dimEOp, &dimIp}, paramsO));
+        WeightedSparse &EOpvIp(tmp.take(rmO->matrix("EvI", {&dimEOp, &dimIp}, paramsO)));
 
 //        std::unique_ptr<WeightedSparse> EOpvIp();
-        XOpvIp = &*EOpvIp;
+        XOpvIp = &EOpvIp;
 
         const_universe.reset();        // Check that dimIp hasn't changed
 
@@ -384,7 +398,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
 
         // wEOm_e
-        tmp.move<EigenColVectorT>(wXOm_e,
+        tmp.take<EigenColVectorT>(wXOm_e,
             EigenColVectorT(map_eigen_diagonal(sEOmvAOm) * *EOmvAOm->M * wAOm_e));
 
         // ---------------- Compute the main matrix

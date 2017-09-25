@@ -120,33 +120,59 @@ private:
     void partition_east_west();
     void partition_north_south();
 
+    // Default function argument for overlap() template below
+    template<typename Typ, bool Val>
+    struct IncludeConst
+    {
+        bool operator()(const Typ& y) const
+            { return Val; }
+    };
+
 public:
 
-    template<class AccumT>
-    void matrix(
+    /** Generates the overlap matrix between two Hntr grids.
+    An overlap matrix gives the area of the overlap of gridcells
+    (regions on a 2D surface) between two grids.
+    Compare to the "original" code in regrid1().
+    @param accum Destination for the (sparse) overlap matrix.
+    @param R Radius of the sphere, used to calculate area of the grid cells.
+    @param includeB Template-type function: bool(int ix) returning True
+        if the grid cell from gridB of 1-D index ix is to be included in
+        the overlap matrix.
+    @see regrid1 */
+    template<class AccumT, class IncludeT = IncludeConst<int,true>>
+    void overlap(
         AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
-        std::function<bool(long)> const &Bindex_clip,    // OPTIONAL: Fast-filter out things in B, by their index
-        blitz::Array<double,1> const &WTB);    // Weight (size) of each basis function in Bgrid
+        double R,        // Radius of the Earth
+        IncludeT includeB = IncludeT());
 
 };    // class Hntr
 
-template<class AccumT>
-void Hntr::matrix(
+
+template<class AccumT, class IncludeT>
+void Hntr::overlap(
     AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
-    std::function<bool(long)> const &Bindex_clip,    // OPTIONAL: Fast-filter out things in B, by their index
-    blitz::Array<double,1> const &WTB)    // Weight (size) of each basis function in Bgrid
+    double R,        // Radius of the Earth
+    IncludeT includeB)
 {
+    ibmisc::TmpAlloc tmp;
+
     // ------------------
     // Interpolate the A grid onto the B grid
+    double const R2 = R*R;
     for (int JB=1; JB <= Bgrid.jm; ++JB) {
         int JAMIN = JMIN(JB);
         int JAMAX = JMAX(JB);
 
+        // Buffer for unscaled matrix elements for a single B gridcell
+        std::vector<std::pair<int,double>> bvals;
+
         for (int IB=1; IB <= Bgrid.im; ++IB) {
             int const IJB = IB + Bgrid.im * (JB-1);
-            double const wtb_ijb = WTB(IJB);
+            if (!includeB(IJB)) continue;
 
-            if (!Bindex_clip(IJB-1)) continue;
+            bvals.clear();
+            double WEIGHT = 0;
 
             int const IAMIN = IMIN(IB);
             int const IAMAX = IMAX(IB);
@@ -158,17 +184,26 @@ void Hntr::matrix(
                 for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
                     int const IA  = 1 + ((IAREV-1) % Agrid.im);
                     int const IJA = IA + Agrid.im * (JA-1);
+
                     double F = 1;
                     if (IAREV==IAMIN) F -= FMIN(IB);
                     if (IAREV==IAMAX) F -= FMAX(IB);
 
-                    accum.add({IJB-1, IJA-1}, wtb_ijb*F*G);    // -1 ==> convert to 0-based indexing
+                    double const wt = F*G;
+                    WEIGHT += wt;
+                    bvals.push_back(std::make_pair(IJA-1, wt));
                 }
+            }
+            // Scale the values we just constructed
+            double const byWEIGHT = 1. / WEIGHT;
+            for (auto ii=bvals.begin(); ii != bvals.end(); ++ii) {
+            	    double const area = R2*Bgrid.dxyp(JB);
+                accum.add({IJB-1, ii->first},
+                    ii->second * byWEIGHT * area );
             }
         }
     }
 }
-
 
 
 /** Works with 0-based or 1-based N-dimensional arrays */

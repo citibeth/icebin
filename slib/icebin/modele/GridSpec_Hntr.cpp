@@ -31,7 +31,7 @@ void GridSpec_Hntr::make_grid(Grid_LonLat &grid)
 
     // Latitude grid boundaries
     spec.latb.push_back(0);
-    double dlat_d = hntr.dlat / 60.;
+    double dlat_d = hntr.dlat / 60.;    // Convert minutes -> degrees
     for (int j=1; j<hntr.jm/2; ++j) {
         double lat = j * dlat_d;
         spec.latb.push_back(lat);
