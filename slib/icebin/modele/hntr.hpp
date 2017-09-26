@@ -142,7 +142,7 @@ public:
     @see regrid1 */
     template<class AccumT, class IncludeT = IncludeConst<int,true>>
     void overlap(
-        AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
+        AccumT &accum,        // The output (sparse) matrix; 0-based indexing
         double R,        // Radius of the Earth
         IncludeT includeB = IncludeT());
 
@@ -151,11 +151,10 @@ public:
 
 template<class AccumT, class IncludeT>
 void Hntr::overlap(
-    AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
+    AccumT &accum,        // The output (sparse) matrix; 0-based indexing
     double R,        // Radius of the Earth
     IncludeT includeB)
 {
-    ibmisc::TmpAlloc tmp;
 
     // ------------------
     // Interpolate the A grid onto the B grid
@@ -169,7 +168,7 @@ void Hntr::overlap(
 
         for (int IB=1; IB <= Bgrid.im; ++IB) {
             int const IJB = IB + Bgrid.im * (JB-1);
-            if (!includeB(IJB)) continue;
+            if (!includeB(IJB-1)) continue;
 
             bvals.clear();
             double WEIGHT = 0;
@@ -231,6 +230,26 @@ blitz::Array<double,RANK> Hntr::regrid(
     regrid(WTA, A, B, mean_polar);
     return B;
 }
+
+
+/** Standardized raw-matrix generation function to get an overlap matrix
+via hunter.  Produces a matrix of the overlap area between grid cells in
+hntrs[0] vs. grid cells in hntrs[1].  This can also be viewd as an UNSCALED
+regridding matrix.  This function is meant to be used with class
+MakeDenseEigenT.
+@param hntrs
+   Hntr grid definitions for {B,A} = {output, input} grids
+@param R Radius of the earth.
+
+NOTE:
+  * Uses SparseSetT from dimension 0 (part of ret) to filter out
+    cells in the overlap matrix.  This dimension must be propertly
+    populated BEFORE the call to hntr_overlap() */
+void hntr_overlap(
+    icebin::MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
+    std::array<HntrGrid const *, 2> hntrs,    // {hntrB, hntrA}
+    double R);            // Radius of the earth
+
 
 
 }}

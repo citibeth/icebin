@@ -96,30 +96,7 @@ static blitz::Array<double,1> dim_clip(SparseSetT const &dim)
     return wt;
 }
 
-
-/** Matrix converts AO <- AA, based on Hntr.
-Produces an UNSCALED (raw) matrix.
-
-NOTES:
- 1. Meant to be used with class MakeDenseEigenT.
-
-@param hntrs
-   Hntr grid definitions for {AO, AA}
-@param wAO_d
-   Weight (norm) of grid cells in AO. Dense indexing.
-*/
-static void raw_AOvAA(
-    MakeDenseEigenT::AccumT &ret,        // {dimA, dimO}
-    std::array<HntrGrid const *, 2> hntrs,    // hntrO, hntrA
-    blitz::Array<double,1> const &wAO_d)    // Size of each grid cell in AO
-{
-    auto &dimAO(*ret.dim(0).sparse_set);
-    Hntr hntr_AOvAA(hntrs, 0);    // AOvAA
-
-    blitz::Array<double,1> wtAO(dim_clip(dimAO));
-    hntr_AOvAA.overlap(std::move(ret), &wtAO, nullptr);
-}
-// ----------------------------------------------------------------
+// -------------------------------------------------------------
 /** Helper class for raw_EOvEA().
 @see raw_EOvEA */
 class RawEOvEA {
@@ -172,7 +149,7 @@ Strategy: Group and sum EO elevation classes to produce EA elevation
 
 NOTES:
 
-   1. This strategy assumes that every cell in AO is fully contained
+   1. This strategy assumes that every cell in EO is fully contained
       in a cell of AO.
 
    2. We should have:
@@ -425,10 +402,10 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
         // Actually AAmvAOm
         reset_ptr(XAmvXOm, MakeDenseEigenT(
-            std::bind(&raw_AOvAA, _1,
-                std::array<HntrGrid const *,2>{&hntrO, &hntrA}, to_blitz(*wXOm_e)),
+            std::bind(&raw_AAvAO, _1,
+                std::array<HntrGrid const *,2>{&hntrA, &hntrO}),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
-            {&dimAOm, &dimAAm}, 'T').to_eigen());
+            {&dimAAm, &dimAOm}, '.').to_eigen());
     }
 
 

@@ -11,6 +11,10 @@ namespace modele {
 HntrGrid::HntrGrid(int _im, int _jm, double _offi, double _dlat) :
     im(_im), jm(_jm), offi(_offi), dlat(_dlat), _dxyp(blitz::Range(1,jm))
 {
+    // Check for common error of degrees instead of minutes
+    // (this is heuristic)
+    if (dlat < .1 * (180.*60./jm)) (*icebin_error)(-1,
+        "dlat in HntrGrid(%d,%d,%f,%f) seems to small; it should be in MINUTES ,not DEGREES: %f", im,jm,offi,dlat, .1 * (180.*60./jm));
 
     // Calculate the sperical area of grid cells
     double dLON = (2.*M_PI) / im;
@@ -233,6 +237,31 @@ void Hntr::mean_polar_matrix()
     }
 }
 #endif
+
+
+
+
+// -------------------------------------------------------------
+// Default function argument for overlap() template below
+class DimClip {
+    SparseSetT const *dim;
+public:
+    DimClip(SparseSetT const *_dim) : dim(_dim) {}
+
+    bool operator()(int ix) const
+        { return dim->in_sparse(ix); }
+};
+
+void hntr_overlap(
+    MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
+    std::array<HntrGrid const *, 2> hntrs,    // {hntrB, hntrA}
+    double R)            // Radius of the earth
+{
+    auto &dimB(*ret.dim(0).sparse_set);
+    Hntr hntr_BvA(hntrs, 0);    // BvA
+
+    hntr_BvA.overlap(ret, R, DimClip(&dimB));
+}
 
 
 }}
