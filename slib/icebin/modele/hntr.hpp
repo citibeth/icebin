@@ -143,7 +143,7 @@ public:
     template<class AccumT, class IncludeT = IncludeConst<int,true>>
     void overlap(
         AccumT &accum,        // The output (sparse) matrix; 0-based indexing
-        double R,        // Radius of the Earth
+        double const R,        // Radius of the Earth
         IncludeT includeB = IncludeT());
 
 };    // class Hntr
@@ -152,7 +152,7 @@ public:
 template<class AccumT, class IncludeT>
 void Hntr::overlap(
     AccumT &accum,        // The output (sparse) matrix; 0-based indexing
-    double R,        // Radius of the Earth
+    double const R,        // Radius of the Earth
     IncludeT includeB)
 {
 
@@ -193,6 +193,7 @@ void Hntr::overlap(
                     bvals.push_back(std::make_pair(IJA-1, wt));
                 }
             }
+
             // Scale the values we just constructed
             double const byWEIGHT = 1. / WEIGHT;
             for (auto ii=bvals.begin(); ii != bvals.end(); ++ii) {
@@ -231,24 +232,15 @@ blitz::Array<double,RANK> Hntr::regrid(
     return B;
 }
 
+/** Helper for Hntr::overlap() */
+class DimClip {
+    SparseSetT const *dim;
+public:
+    DimClip(SparseSetT const *_dim) : dim(_dim) {}
 
-/** Standardized raw-matrix generation function to get an overlap matrix
-via hunter.  Produces a matrix of the overlap area between grid cells in
-hntrs[0] vs. grid cells in hntrs[1].  This can also be viewd as an UNSCALED
-regridding matrix.  This function is meant to be used with class
-MakeDenseEigenT.
-@param hntrs
-   Hntr grid definitions for {B,A} = {output, input} grids
-@param R Radius of the earth.
-
-NOTE:
-  * Uses SparseSetT from dimension 0 (part of ret) to filter out
-    cells in the overlap matrix.  This dimension must be propertly
-    populated BEFORE the call to hntr_overlap() */
-void hntr_overlap(
-    icebin::MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
-    std::array<HntrGrid const *, 2> hntrs,    // {hntrB, hntrA}
-    double R);            // Radius of the earth
+    bool operator()(int ix) const
+        { return dim->in_sparse(ix); }
+};
 
 
 

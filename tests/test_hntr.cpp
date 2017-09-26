@@ -183,6 +183,18 @@ TEST_F(HntrTest, simple_grids)
 }
 
 // ----------------------------------------------------------------
+void hntr_overlap(
+    MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
+    std::array<HntrGrid const *, 2> hntrs,    // {hntrB, hntrA}
+    double const R            // Radius of the earth
+    bool const scale)
+{
+    auto &dimB(*ret.dim(0).sparse_set);
+    Hntr hntr_BvA(hntrs, 0);    // BvA
+
+    hntr_BvA.overlap(ret, R, scale, DimClip(&dimB));
+}
+// ----------------------------------------------------------------
 extern "C" void call_hntr4(
     float const *WTA, int const &lwta,
     float const *A, int const &la,

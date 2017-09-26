@@ -162,16 +162,60 @@ NOTES:
 static void raw_EOvEA(
     MakeDenseEigenT::AccumT &ret,        // {dimEA, dimEO}; dimEO should not change here.
     std::array<HntrGrid const *, 2> hntrs,    // {hntrO, hntrA}
-    SparseSetT const *dimEO,            // Used to clip in Hntr::matrix()
+    SparseSetT const *dimAO,            // Used to clip in Hntr::overlap()
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> &wEO_d)            // == EOvI.wM.  Dense indexing.
 {
-    // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
-    Hntr hntr_AOvAA(hntrs, 0);    // dimB=A,  dimA=O
-    RawEOvEA raw(std::move(ret), gcmA, wEO_d);
+#if 0
+    // Compute AAvAO (scaled)
+    SparseSetT dimAA;
+    Hntr hntr_AOvAA(hntrs, 0);
+    EigenSparseMatrixT AAvAO_raw(MakeDenseEigenT(
+            std::bind(&Hntr::overlap, &hntr_AOvAA, _1, R, DimClip(dimAO)),
+            {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
+            {dimAO, &dimAA}, 'T').to_eigen());
+    EigenSparseMatrixT AOvAA(map_eigen_diagonal(sum(AOvAA,1,'-')) * AAvAO);
+    for (auto ii(begin(AOvAA)); ii != end(AOvAA); ++ii) {}
+#endif
 
-    blitz::Array<double,1> wtEO(dim_clip(*dimEO));
-    hntr_AOvAA.matrix(raw, &wtEO, nullptr);
+
+    // Call Hntr to generate AOvAA
+    TupleListT<2> AOvAA_s;    // Sparse indices
+    hntr_AOvAA.overlap(AOvAA_s, 1.0, DimClip(dimAO));
+
+    // Use AOvAA to generate EOvEA
+    for (auto ii=AOvAA.begin(); ii != AOvAA.end(); ++ii) {
+        int iAO = ii->index(0);
+        int iAA = ii->index(1);
+
+
+
+
+
+
+
+
+
+
+
+    // Scale to create AAvAO^T
+    blitz::Array<double,1> AAs(hntrs[1]->ndata());
+    AAs = 0;
+    for (auto ii=AOvAA.begin(); ii != AOvAA.end(); ++ii) {
+        AAs[ii->col()] += ii->value();
+    }
+    for (int i=0; i<AAs.extent(0); ++i) {
+        if (AAs[i] != 0) AAs[i] = 1. / AAs[i];
+    }
+
+
+
+
+
+
+    RawEOvEA raw(ret, gcmA, wEO_d);
+
+    hntr_AOvAA.overlap(raw, DimClip(dimEO));
 }
 // ----------------------------------------------------------------
 // ========================================================================
@@ -400,12 +444,12 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
         SparseSetT &dimAAm(dimXAm);
 
-        // Actually AAmvAOm
+        // Actually AOmvAAm
+        Hntr hntr_XOmvXAm(std::array<HntrGrid const *,2>{&hntrO, &hntrA});
         reset_ptr(XAmvXOm, MakeDenseEigenT(
-            std::bind(&raw_AAvAO, _1,
-                std::array<HntrGrid const *,2>{&hntrA, &hntrO}),
+            std::bind(&Hntr::overlap, &hntr_XOmvXAm, _1, R, DimClip(&dimAOm)),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
-            {&dimAAm, &dimAOm}, '.').to_eigen());
+            {&dimAOm, &dimAAm}, 'T').to_eigen());
     }
 
 

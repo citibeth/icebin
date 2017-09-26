@@ -242,26 +242,6 @@ void Hntr::mean_polar_matrix()
 
 
 // -------------------------------------------------------------
-// Default function argument for overlap() template below
-class DimClip {
-    SparseSetT const *dim;
-public:
-    DimClip(SparseSetT const *_dim) : dim(_dim) {}
-
-    bool operator()(int ix) const
-        { return dim->in_sparse(ix); }
-};
-
-void hntr_overlap(
-    MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
-    std::array<HntrGrid const *, 2> hntrs,    // {hntrB, hntrA}
-    double R)            // Radius of the earth
-{
-    auto &dimB(*ret.dim(0).sparse_set);
-    Hntr hntr_BvA(hntrs, 0);    // BvA
-
-    hntr_BvA.overlap(ret, R, DimClip(&dimB));
-}
 
 
 }}
