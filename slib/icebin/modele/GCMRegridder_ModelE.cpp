@@ -115,7 +115,8 @@ public:
     void add(std::array<long,2> index, double value)
     {
         // Ignore stray overlaps
-        if (std::abs(value) < 1e-8) return;
+        if (std::abs(value) < 1e-8) (*icebin_error)(-1,
+            "Found a stray overlap; what should we do about it?");
 
         SparseSetT &dimEO(*ret.dim(0).sparse_set);
         long lAO_s = index[0];
@@ -162,61 +163,18 @@ NOTES:
 static void raw_EOvEA(
     MakeDenseEigenT::AccumT &ret,        // {dimEA, dimEO}; dimEO should not change here.
     std::array<HntrGrid const *, 2> hntrs,    // {hntrO, hntrA}
-    SparseSetT const *dimAO,            // Used to clip in Hntr::overlap()
+    SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> &wEO_d)            // == EOvI.wM.  Dense indexing.
 {
-#if 0
-    // Compute AAvAO (scaled)
-    SparseSetT dimAA;
-    Hntr hntr_AOvAA(hntrs, 0);
-    EigenSparseMatrixT AAvAO_raw(MakeDenseEigenT(
-            std::bind(&Hntr::overlap, &hntr_AOvAA, _1, R, DimClip(dimAO)),
-            {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
-            {dimAO, &dimAA}, 'T').to_eigen());
-    EigenSparseMatrixT AOvAA(map_eigen_diagonal(sum(AOvAA,1,'-')) * AAvAO);
-    for (auto ii(begin(AOvAA)); ii != end(AOvAA); ++ii) {}
-#endif
+    // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
+    Hntr hntr_AOvAA(hntrs, 0);    // dimB=A,  dimA=O
+    RawEOvEA raw(std::move(ret), gcmA, wEO_d);
 
-
-    // Call Hntr to generate AOvAA
-    TupleListT<2> AOvAA_s;    // Sparse indices
-    hntr_AOvAA.overlap(AOvAA_s, 1.0, DimClip(dimAO));
-
-    // Use AOvAA to generate EOvEA
-    for (auto ii=AOvAA.begin(); ii != AOvAA.end(); ++ii) {
-        int iAO = ii->index(0);
-        int iAA = ii->index(1);
-
-
-
-
-
-
-
-
-
-
-
-    // Scale to create AAvAO^T
-    blitz::Array<double,1> AAs(hntrs[1]->ndata());
-    AAs = 0;
-    for (auto ii=AOvAA.begin(); ii != AOvAA.end(); ++ii) {
-        AAs[ii->col()] += ii->value();
-    }
-    for (int i=0; i<AAs.extent(0); ++i) {
-        if (AAs[i] != 0) AAs[i] = 1. / AAs[i];
-    }
-
-
-
-
-
-
-    RawEOvEA raw(ret, gcmA, wEO_d);
-
-    hntr_AOvAA.overlap(raw, DimClip(dimEO));
+    hntr_AOvAA.overlap(raw, 1.0, DimClip(dimAO));
 }
+
+
 // ----------------------------------------------------------------
 // ========================================================================
 class ConstUniverse {
@@ -307,9 +265,9 @@ static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
     Hntr hntrOvA({&hntrO, &hntrA}, 0);
 
     blitz::Array<double,1> wtO(dim_clip(dimO));
-    hntrOvA.matrix(
-        accum::SparseSetAccum<SparseSetT,double,2>({nullptr, &dimA}),
-        &wtO, nullptr);
+
+    accum::SparseSetAccum<SparseSetT,double,2> acc({nullptr, &dimA});
+    hntrOvA.overlap(acc, 1.0, DimClip(&dimO));
 
     // ------- Produce a full gridA, based on hntrA and realized cells in dimA
     GridSpec_Hntr spec(hntrA);
@@ -342,6 +300,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     RegridMatrices::Params const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     char X,    // Either 'A' or 'E', determines the destination matrix.
+    double const R,    // Radius of the earth
     RegridMatrices const *rmO)
 {
     TmpAlloc tmp;
@@ -431,7 +390,8 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
         reset_ptr(XAmvXOm, MakeDenseEigenT(
             std::bind(&raw_EOvEA, _1,
-                std::array<HntrGrid const *,2>{&hntrO, &hntrA}, &dimEOm, gcmA, wXOm),
+                std::array<HntrGrid const *,2>{&hntrO, &hntrA},
+                &dimEOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
 
@@ -447,7 +407,8 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         // Actually AOmvAAm
         Hntr hntr_XOmvXAm(std::array<HntrGrid const *,2>{&hntrO, &hntrA});
         reset_ptr(XAmvXOm, MakeDenseEigenT(
-            std::bind(&Hntr::overlap, &hntr_XOmvXAm, _1, R, DimClip(&dimAOm)),
+            std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
+                &hntr_XOmvXAm, _1, R, DimClip(&dimAOm)),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimAOm, &dimAAm}, 'T').to_eigen());
     }
@@ -506,14 +467,16 @@ IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
 
 RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name) const
 {
+    Grid_LonLat const *gridO(cast_gridO(&*gcmO->gridA));
+
     RegridMatrices rm;
     RegridMatrices const &rmO(rm.tmp.make<RegridMatrices>(
         gcmO->regrid_matrices(ice_sheet_name)));
 
     rm.add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'E', &rmO));
+        this, 'E', gridO->eq_rad, &rmO));
     rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'A', &rmO));
+        this, 'A', gridO->eq_rad, &rmO));
 
     return rm;
 }

@@ -72,7 +72,7 @@ public:
     TODO: Reference, don't copy, these HntrGrid instances. */
     Hntr(HntrGrid const &_A, HntrGrid const &_B, double _DATMIS);
 
-    Hntr(std::array<HntrGrid const *,2> grids, double _DATMIS)
+    Hntr(std::array<HntrGrid const *,2> grids, double _DATMIS = 0)
         : Hntr(*grids[1], *grids[0], _DATMIS) {}
 
 
