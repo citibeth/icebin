@@ -129,7 +129,8 @@ cdef class GCMRegridder:
         # Create a brand new GCMRegridder
         try:
             gridA_fname, gridA_vname, hcdefs, correctA = args
-            cicebin.GCMRegridder_init(self.cself, gridA_fname.encode(), gridA_vname.encode(), hcdefs, correctA)
+            self.cself = cicebin.new_GCMRegridder_Standard(
+                gridA_fname.encode(), gridA_vname.encode(), hcdefs, correctA)
             return
         except:
             pass

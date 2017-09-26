@@ -26,10 +26,10 @@
 namespace icebin {
 namespace cython {
 
-extern void GCMRegridder_init(GCMRegridder *cself,
+extern GCMRegridder_Standard *new_GCMRegridder_Standard(
     std::string const &gridA_fname,
     std::string const &gridA_vname,
-    std::vector<double> &hpdefs,
+    std::vector<double> &hcdefs,
     bool _correctA);
 
 extern void GCMRegridder_add_sheet(GCMRegridder *cself,
