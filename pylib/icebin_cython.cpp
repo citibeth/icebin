@@ -21,6 +21,9 @@
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/cython.hpp>
 #include <spsparse/SparseSet.hpp>
+#ifdef BUILD_MODELE
+#include <icebin/modele/GCMRegridder_ModelE.hpp>
+#endif
 #include "icebin_cython.hpp"
 
 using namespace ibmisc;
@@ -56,6 +59,16 @@ GCMRegridder_Standard *new_GCMRegridder_Standard(
         _correctA);
 
     return cself.release();
+}
+
+GCMRegridder *new_GCMRegridder_ModelE(GCMRegridder *gcmO)
+{
+#ifdef BUILD_MODELE
+    return new GCMRegridder_ModelE(
+        std::unique_ptr<icebin::GCMRegridder>(gcmO));
+#else
+    return nullptr;
+#endif
 }
 
 

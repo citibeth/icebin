@@ -141,6 +141,13 @@ cdef class GCMRegridder:
         self.ncio(ncio, str('m'))
         ncio.close()
 
+    def to_modele(self):
+        cdef cicebin.GCMRegridder *gcm
+        gcm = cicebin.new_GCMRegridder_ModelE(self.cself)
+        if not gcm:
+            raise RuntimeError('IceBin must be built with USE_MODELE in order to use ModelE features')
+        self.cself = gcm
+
     def ncio(self, ibmisc.NcIO ncio, vname):
         self.cself.ncio(deref(ncio.cself), vname.encode())
 

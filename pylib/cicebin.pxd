@@ -77,6 +77,9 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         vector[double] &hcdefs,
         bool correctA) except +
 
+    cdef GCMRegridder *new_GCMRegridder_ModelE(
+        GCMRegridder *gcmO) except +
+
     cdef void GCMRegridder_add_sheet(
         GCMRegridder *cself,
         string &name,

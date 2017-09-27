@@ -32,6 +32,8 @@ extern GCMRegridder_Standard *new_GCMRegridder_Standard(
     std::vector<double> &hcdefs,
     bool _correctA);
 
+extern GCMRegridder *new_GCMRegridder_ModelE(GCMRegridder *gcmO);
+
 extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &name,
     std::string const &gridI_fname, std::string const &gridI_vname,
