@@ -7,6 +7,7 @@
 #include <icebin/IceRegridder.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/smoother.hpp>
+#include <icebin/IceRegridder_L0.hpp>
 
 using namespace std::placeholders;
 using namespace spsparse;
@@ -20,6 +21,7 @@ namespace icebin {
 /** Used to generate Ur matrices for Atm or Elevation grids.
 This allows us to exploit an algebraic symmetry between A and E. */
 struct UrAE {
+    std::string name;    // For deugging
     const long nfull;
 
     typedef std::function<void(MakeDenseEigenT::AccumT &)> matrix_fn;
@@ -27,7 +29,7 @@ struct UrAE {
     const matrix_fn GvAp;
     const matrix_fn sApvA;
 
-    UrAE(long _nfull, matrix_fn _GvAp, matrix_fn _sApvA) : nfull(_nfull), GvAp(_GvAp), sApvA(_sApvA) {}
+    UrAE(std::string const &_name, long _nfull, matrix_fn _GvAp, matrix_fn _sApvA) : name(_name), nfull(_nfull), GvAp(_GvAp), sApvA(_sApvA) {}
 };
 
 
@@ -293,11 +295,11 @@ RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &s
 
     RegridMatrices rm;
 
-    UrAE urA(this->nA(),
+    UrAE urA("UrA", this->nA(),
         std::bind(&IceRegridder::GvAp, regridder, _1),
         std::bind(&IceRegridder::sApvA, regridder, _1));
 
-    UrAE urE(this->nE(),
+    UrAE urE("UrE", this->nE(),
         std::bind(&IceRegridder::GvEp, regridder, _1),
         std::bind(&IceRegridder::sEpvE, regridder, _1));
 

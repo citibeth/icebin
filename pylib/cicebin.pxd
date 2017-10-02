@@ -66,6 +66,8 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
         IceRegridder *ice_regridder(string name) except +
         RegridMatrices regrid_matrices(string name) except +
 
+    cdef cppclass GCMRegridder_Standard(GCMRegridder):
+        GCMRegridder_Standard() except +
 
 cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
     cdef cppclass CythonWeightedSparse:

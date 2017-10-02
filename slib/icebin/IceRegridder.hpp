@@ -82,6 +82,8 @@ public:
     std::string const &name() const { return _name; }
 
     IceRegridder();
+    virtual ~IceRegridder();
+
     void clear();
 
     /**
@@ -95,7 +97,6 @@ public:
         InterpStyle _interp_style,
         DenseArrayT<1> const &elevI);
 
-    virtual ~IceRegridder();
 
     void set_elevI(DenseArrayT<1> const &_elevI);
 

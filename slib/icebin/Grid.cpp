@@ -251,7 +251,7 @@ printf("END Grid::nc_write()\n");
 /** @param fname Name of file to load from (eg, an overlap matrix file)
 @param vname Eg: "gridA" or "gridI" */
 void Grid::nc_read(
-NcGroup *nc,
+netCDF::NcGroup *nc,
 std::string const &vname)
 {
     clear();

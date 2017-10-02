@@ -127,19 +127,20 @@ cdef class GCMRegridder:
         cdef ibmisc.NcIO ncio
 
         # Create a brand new GCMRegridder
-        try:
+        if len(args) == 4:
             gridA_fname, gridA_vname, hcdefs, correctA = args
             self.cself = cicebin.new_GCMRegridder_Standard(
                 gridA_fname.encode(), gridA_vname.encode(), hcdefs, correctA)
-            return
-        except:
-            pass
+        elif len(args) == 1:
+            self.cself = new cicebin.GCMRegridder_Standard()
+            (regridder_fname,) = args
 
-        # Load an existing GCMRegridder from disk
-        (regridder_fname,) = args
-        ncio = ibmisc.NcIO(regridder_fname, 'read')
-        self.ncio(ncio, str('m'))
-        ncio.close()
+            # Load an existing GCMRegridder from disk
+            ncio = ibmisc.NcIO(regridder_fname, 'read')
+            self.ncio(ncio, str('m'))
+            ncio.close()
+        else:
+            raise ValueError('Invalid arguments: {}'.format(args))
 
     def to_modele(self):
         cdef cicebin.GCMRegridder *gcm

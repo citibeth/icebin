@@ -158,7 +158,6 @@ void IceRegridder_L0::GvI(
 // --------------------------------------------------------
 void IceRegridder_L0::GvAp(MakeDenseEigenT::AccumT &ret) const
 {
-int n=0;
     for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
         int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
         int iA = cell->i;
