@@ -33,20 +33,22 @@ using namespace netCDF;
 
 int main(int argc, char **argv)
 {
-    std::string fname1(argv[1]);
-    std::string fname2(argv[2]);
+    std::string fnameA(argv[1]);
+    std::string fnameI(argv[2]);
 
-    printf("------------- Read gridA (GCM Grid)\n");
-    NcIO ncio1(fname1, 'r');
+    printf("------------- Read gridA (GCM Grid): %s\n", fnameA.c_str());
+    NcIO ncio1(fnameA, 'r');
     Grid gridA;
     gridA.ncio(ncio1, "grid");
     ncio1.close();
+    printf("Done reading gridA\n");
 
-    printf("------------- Read gridI (Ice Grid)\n");
-    NcIO ncio2(fname2, 'r');
+    printf("------------- Read gridI (Ice Grid): %s\n", fnameI.c_str());
+    NcIO ncio2(fnameI, 'r');
     Grid gridI;
     gridI.ncio(ncio2, "grid");
     ncio2.close();
+    printf("Done reading gridI\n");
 
     printf("--------------- Overlapping\n");
     GridSpec_Exchange spec;
