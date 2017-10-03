@@ -184,6 +184,8 @@ cdef class GCMRegridder:
         return rm
 
 def coo_multiply(M, xx, double fill=np.nan, ignore_nan=False):
+    """M:
+        SciPy sparse matrix"""
     xx = xx.reshape(-1)
     yy = np.zeros(M._shape[0])
     yy[:] = fill

@@ -114,11 +114,116 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridde
     return ret;
 }
 // ---------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+// ================================================================
+// ================================================================
+// ================================================================
+
+
+#define ARGS _Scalar,_Options,_StorageIndex
+template<class _Scalar, int _Options, class _StorageIndex>
+class EigenSparseMatrixIterator2 :
+    public ibmisc::forward_iterator<
+        EigenSparseMatrixIterator2<ARGS>,
+        EigenSparseMatrixIterator2<ARGS>>
+{
+    typedef EigenSparseMatrixIterator2<ARGS> IteratorT;
+public:
+    typedef _StorageIndex index_type;
+    typedef _Scalar val_type;
+    static const int RANK = 2;
+
+    Eigen::SparseMatrix<ARGS> const &M;
+    int k;
+    typename Eigen::SparseMatrix<ARGS>::InnerIterator ii;
+    
+    EigenSparseMatrixIterator2(Eigen::SparseMatrix<ARGS> const &_M, int _k)
+        : M(_M), k(_k),
+        ii(typename Eigen::SparseMatrix<ARGS>::InnerIterator(M,k)) {}
+
+    // ---------------------------------------------------------
+    // http://www.cplusplus.com/reference/iterator/
+
+    IteratorT &operator++();
+
+    bool operator==(IteratorT const &other) const
+    {
+        if (k != other->k) return false;
+        return (k == M.outerSize()) || (ii == other->ii);
+    }
+//    bool operator==(IteratorT const other) const
+//        { return (k == other->k) && (ii == other->ii); }
+
+    IteratorT &operator*()
+        { return *this; }
+    IteratorT const &operator*() const
+        { return *this; }
+//    IteratorT *operator->()
+//        { return this; }
+
+    // ---------- What you get once you dereference
+
+    _Scalar const &value()
+        { return ii.value(); }
+    _StorageIndex row()
+        { return ii.row(); }
+    _StorageIndex col()
+        { return ii.col(); }
+    _StorageIndex index(int ix)
+        { return ix == 0 ? row() : col(); }
+    std::array<_StorageIndex,2> index()
+        { return {row(), col()}; }
+};
+
+template<class _Scalar, int _Options, class _StorageIndex>
+EigenSparseMatrixIterator2<ARGS> &EigenSparseMatrixIterator2<ARGS>::operator++() 
+{    // Prefix ++
+    ++ii;
+    while (!ii) {
+        ++k;
+        if (k == M.outerSize()) break;    // Iteration is over
+        ii.~InnerIterator();
+        new (&ii) typename Eigen::SparseMatrix<ARGS>::InnerIterator(M,k);
+    }
+    return *this;
+}
+
+
+// -----------------------------------
+
+template<class _Scalar, int _Options, class _StorageIndex>
+EigenSparseMatrixIterator2<ARGS> begin2(Eigen::SparseMatrix<ARGS> const &M)
+    { return EigenSparseMatrixIterator2<ARGS>(M,0); }
+
+template<class _Scalar, int _Options, class _StorageIndex>
+EigenSparseMatrixIterator2<ARGS> end2(Eigen::SparseMatrix<ARGS> const &M)
+    { return EigenSparseMatrixIterator2<ARGS>(M,M.outerSize()); }
+
+#undef ARGS
+
+// ================================================================
+// ================================================================
+// ================================================================
+
+
+
+
 // ---------------------------------------------------------
 std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &AE)
 {
+printf("BEGIN compute_IvAE(%s)\n", AE.name.c_str());
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
     SparseSetT _dimG;
@@ -138,14 +243,84 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimI}, 'T');
 
+int n=0;
+
+n=0;
+for (auto ii(IvG_m.accum.base().begin()); ii != IvG_m.accum.base().end(); ++ii, ++n) {
+    if (ii->index(0) == 0)
+    printf("%d: IvG_x(%d, %d) = %f\n", n, ii->index(0), ii->index(1), ii->value());
+}
+
+long IvG_size_m = IvG_m.accum.base().size();
+
+
+
+
+
+
     // ----- Convert to Eigen
     auto GvAp(GvAp_m.to_eigen());
     auto IvG(IvG_m.to_eigen());
     auto sGvAp(sum_to_diagonal(GvAp, 0, '-'));
 
+
+
+long IvG_size_e=  0;
+for (int k=0; k<IvG.outerSize(); ++k) {
+  for (Eigen::SparseMatrix<double>::InnerIterator it(IvG,k); it; ++it)
+  {
+    if (it.row() == 0 || IvG_size_e == 0)
+    printf("%d: IvG_y(%d, %d) = %f\n", IvG_size_e, it.row(), it.col(), it.value());
+    ++ IvG_size_e;
+
+//    it.value();
+//    it.row();   // row index
+//    it.col();   // col index (here it is equal to k)
+//    it.index(); // inner index, here it is equal to it.row()
+  }
+}
+
+
+
+std::set<long> Gs;
+n=0;
+for (auto ii(begin2(IvG)); ii != end2(IvG); ++ii, ++n) {
+    int iG_d = ii->col();
+    long iG_s = dimG->to_sparse(iG_d);
+    int iI_d = ii->row();
+    long iI_s = dimI->to_sparse(iI_d);
+
+    if (iI_s==8227 || iI_d==0 || n==0 || n==1) {
+        printf("%d: IvG_e(%d:%ld, %d:%ld) = %f\n", n, iI_d,iI_s, iG_d,iG_s, ii->value());
+        Gs.insert(iG_s);
+    }
+}
+
+printf("IvG size %ld -> %ld %d\n", IvG_size_m, IvG_size_e, n);
+
+#if 0
+n=0;
+for (auto ii(begin(GvAp)); ii != end(GvAp); ++ii, ++n) {
+    int iG_d = ii->row();
+    long iG_s = dimG->to_sparse(iG_d);
+    int iAp_d = ii->col();
+    long iAp_s = dimA->to_sparse(iAp_d);
+
+
+    if (Gs.find(iG_s) != Gs.end() || n==0 || n==1)
+    printf("%d: GvAp_e(%d:%ld, %d:%ld) = %f\n", n, iG_d,iG_s, iAp_d,iAp_s, ii->value());
+}
+#endif
+
+
+
+
+
     // Unscaled matrix
     std::unique_ptr<EigenSparseMatrixT> IvAp(
         new EigenSparseMatrixT(IvG * sGvAp * GvAp));
+//    std::unique_ptr<EigenSparseMatrixT> IvAp(
+//        new EigenSparseMatrixT(IvG * GvAp));
 
     // Get weight vector from IvAp_e
     ret->wM.reference(sum(*IvAp, 0, '+'));
@@ -181,6 +356,20 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
         } else {
             ret->M = std::move(IvAp);
         }
+
+if (AE.name == "UrA") {
+for (auto ii=begin(*ret->M); ii != end(*ret->M); ++ii) {
+    int iI_d = ii->row();
+    long iI_s = dimI->to_sparse(iI_d);
+    int iAE_d = ii->col();
+    long iAE_s = dimA->to_sparse(iAE_d);
+
+    if (iI_s == 8227) {
+        printf("IvAE(%d:%d, %d:%d) = %f\n", iI_d,iI_s, iAE_d,iAE_s, ii->value());
+    }
+}}
+fflush(stdout);
+
     }
 
     // Smooth the result on I, if needed
@@ -195,6 +384,8 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
         // Smooth the underlying unsmoothed regridding transformation
         ret->M.reset(new EigenSparseMatrixT(smoothI * *ret->M));
     }
+printf("END compute_IvAE(%s)\n", AE.name.c_str());
+fflush(stdout);
     return ret;
 }
 

@@ -144,27 +144,34 @@ void IceRegridder_L0::GvI(
                 ret.add({iI, iI}, cell->native_area);
         }
     } else {
+printf("BEGIN GvI\n");
         // Exchange <- Ice
         for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
             // cell->i = index in atmosphere grid
             long const iI = cell->j;        // index in ice grid
             long const iX = cell->index;    // index in exchange grid
 
-            if (!std::isnan(elevI(iI)))
+            if (!std::isnan(elevI(iI))) {
+if (iI == 8227) printf("GvI(%d, %d) = %f\n", iX, iI, cell->native_area);
                 ret.add({iX,iI}, cell->native_area);
+            }
         }
+printf("END GvI\n");
     }
 }
 // --------------------------------------------------------
 void IceRegridder_L0::GvAp(MakeDenseEigenT::AccumT &ret) const
 {
+printf("BEGIN GvAp\n");
     for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
         int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
         int iA = cell->i;
         if (cell->native_area > 0) {
+if (iG==19442 || iG==8243 || iG==8310 || iG==10778 || iG==19454) printf("GvAp(%d, %d) = %f\n", iG, iA, cell->native_area);
             ret.add({iG, iA}, cell->native_area);
         }
     }
+printf("END GvAp\n");
 }
 // --------------------------------------------------------
 void IceRegridder_L0::ncio(NcIO &ncio, std::string const &vname)

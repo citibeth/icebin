@@ -75,7 +75,7 @@ int main(int argc, char **argv)
     desc.add_options()
         ("help", "produce help message")
         ("zone", po::value<std::string>(), "Greenland, Antarctica or Both")
-        ("grid", po::value<std::string>(), "2mx2m, 10mx10m, hxh, 1x1, q1x1, 2hx2, 5x4")
+        ("grid", po::value<std::string>(), "2mx2m, 10mx10m, hxh, 1x1, 1qx1, 2hx2, 5x4")
         ("pole-caps", po::value<bool>()->default_value(true), "Combined cap grid cell at poles?")
     ;
     po::variables_map vm;
