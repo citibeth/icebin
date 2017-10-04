@@ -454,11 +454,11 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 }
 
 void GCMRegridder_ModelE::set_focean(
-        blitz::Array<double,1> &_foceanAOm,
-        blitz::Array<double,1> &_foceanAOp)
+        blitz::Array<double,1> &_foceanAOp,
+        blitz::Array<double,1> &_foceanAOm)
 {
-    foceanAOm.reference(_foceanAOm);
-    foceanAOp.reference(_foceanAOp);
+    foceanAOm.reference(reshape1(_foceanAOm));    // set lbound=0
+    foceanAOp.reference(reshape1(_foceanAOp));
 }
 
 IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const

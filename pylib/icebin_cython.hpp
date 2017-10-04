@@ -32,7 +32,10 @@ extern GCMRegridder_Standard *new_GCMRegridder_Standard(
     std::vector<double> &hcdefs,
     bool _correctA);
 
-extern GCMRegridder *new_GCMRegridder_ModelE(GCMRegridder *gcmO);
+extern GCMRegridder *new_GCMRegridder_ModelE(
+    GCMRegridder *gcmO,
+    PyObject *foceanAOp_py,
+    PyObject *foceanAOm_py);
 
 extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &name,

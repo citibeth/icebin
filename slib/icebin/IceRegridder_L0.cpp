@@ -150,8 +150,9 @@ void IceRegridder_L0::GvI(
             long const iI = cell->j;        // index in ice grid
             long const iX = cell->index;    // index in exchange grid
 
-            if (!std::isnan(elevI(iI)))
+            if (!std::isnan(elevI(iI))) {
                 ret.add({iX,iI}, cell->native_area);
+            }
         }
     }
 }

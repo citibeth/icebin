@@ -61,8 +61,17 @@ GCMRegridder_Standard *new_GCMRegridder_Standard(
     return cself.release();
 }
 
-GCMRegridder *new_GCMRegridder_ModelE(GCMRegridder *gcmO)
+GCMRegridder *new_GCMRegridder_ModelE(
+    GCMRegridder *gcmO,
+    PyObject *foceanAOp_py,
+    PyObject *foceanAOm_py)
 {
+    // Check types and convert Numpy Arrays
+    size_t nO = gcmO->nA();
+    auto foceanAOp(np_to_blitz<double,1>(foceanAOp_py, "foceanAOp", {nO}));
+    auto foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
+
+
 #ifdef BUILD_MODELE
     return new GCMRegridder_ModelE(
         std::unique_ptr<icebin::GCMRegridder>(gcmO));

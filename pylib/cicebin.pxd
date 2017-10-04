@@ -80,7 +80,9 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         bool correctA) except +
 
     cdef GCMRegridder *new_GCMRegridder_ModelE(
-        GCMRegridder *gcmO) except +
+        GCMRegridder *gcmO,
+        PyObject *foceanAOp_py,
+        PyObject *foceanAOm_py) except +
 
     cdef void GCMRegridder_add_sheet(
         GCMRegridder *cself,

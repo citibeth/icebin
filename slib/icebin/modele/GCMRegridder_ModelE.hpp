@@ -82,8 +82,8 @@ public:
     @param _foceanAOp Ocean surface fraction array (FOCEAN), as seen by
        ice model; sparse indexing.  On Ocean grid. */
     void set_focean(
-        blitz::Array<double,1> &_foceanAOm,
-        blitz::Array<double,1> &_foceanAOp);
+        blitz::Array<double,1> &_foceanAOp,
+        blitz::Array<double,1> &_foceanAOm);
 
     // ------------------------------------------------------------
     // Override virtual functions

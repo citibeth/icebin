@@ -142,9 +142,11 @@ cdef class GCMRegridder:
         else:
             raise ValueError('Invalid arguments: {}'.format(args))
 
-    def to_modele(self):
+    def to_modele(self, foceanAOp, foceanAOm):
+        foceanAOp = foceanAOp.reshape(-1)
+        foceanAOm = foceanAOm.reshape(-1)
         cdef cicebin.GCMRegridder *gcm
-        gcm = cicebin.new_GCMRegridder_ModelE(self.cself)
+        gcm = cicebin.new_GCMRegridder_ModelE(self.cself, <PyObject *>foceanAOp, <PyObject *>foceanAOm)
         if not gcm:
             raise RuntimeError('IceBin must be built with USE_MODELE in order to use ModelE features')
         self.cself = gcm
@@ -184,6 +186,8 @@ cdef class GCMRegridder:
         return rm
 
 def coo_multiply(M, xx, double fill=np.nan, ignore_nan=False):
+    """M:
+        SciPy sparse matrix"""
     xx = xx.reshape(-1)
     yy = np.zeros(M._shape[0])
     yy[:] = fill
