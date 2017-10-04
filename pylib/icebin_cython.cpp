@@ -68,8 +68,16 @@ GCMRegridder *new_GCMRegridder_ModelE(
 {
     // Check types and convert Numpy Arrays
     size_t nO = gcmO->nA();
-    auto foceanAOp(np_to_blitz<double,1>(foceanAOp_py, "foceanAOp", {nO}));
-    auto foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
+    auto _foceanAOp(np_to_blitz<double,1>(foceanAOp_py, "foceanAOp", {nO}));
+    auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
+
+
+    // Those Numpy arrays came from Python, and could be de-allocated.
+    // So let's copy them now.
+    blitz::Array<double,1> foceanAOp(_foceanAOp.shape());
+    foceanAOp = _foceanAOp;
+    blitz::Array<double,1> foceanAOm(_foceanAOm.shape());
+    foceanAOm = _foceanAOm;
 
 
 #ifdef BUILD_MODELE
