@@ -9,18 +9,21 @@ namespace modele {
 
 class HntrGrid {
 public:
-    int const im;    // Number of cells in east-west direction
-    int const jm;    // Number of cells in north-south direction
+    int im;    // Number of cells in east-west direction
+    int jm;    // Number of cells in north-south direction
 
     // number (fraction) of cells in east-west direction from
     // International Date Line (180) to western edge of cell IA=1
-    double const offi;
+    double offi;
 
     // minutes of latitude for non-polar cells on grid A
-    double const dlat;
+    double dlat;
 
 //protected:
     blitz::Array<double,1> _dxyp;
+
+protected:
+    void init();    // Use after constructor or ncio()
 
 public:
     int size() const { return im * jm; }
@@ -28,6 +31,7 @@ public:
 
     double dxyp(int j) const { return _dxyp(j); }
 
+    HntrGrid() {}
     HntrGrid(int _im, int _jm, double _offi, double _dlat);
 
     template<class TypeT>

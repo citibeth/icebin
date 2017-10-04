@@ -4,13 +4,22 @@
 
 using namespace blitz;
 using namespace spsparse;
+using namespace ibmisc;
 
 namespace icebin {
 namespace modele {
 
 HntrGrid::HntrGrid(int _im, int _jm, double _offi, double _dlat) :
-    im(_im), jm(_jm), offi(_offi), dlat(_dlat), _dxyp(blitz::Range(1,jm))
+    im(_im), jm(_jm), offi(_offi), dlat(_dlat)
+
 {
+    init();
+}
+
+void HntrGrid::init()
+{
+    _dxyp.reference(blitz::Array<double,1>(blitz::Range(1,jm)));
+
     // Check for common error of degrees instead of minutes
     // (this is heuristic)
     if (dlat < .1 * (180.*60./jm)) (*icebin_error)(-1,
@@ -26,6 +35,21 @@ HntrGrid::HntrGrid(int _im, int _jm, double _offi, double _dlat) :
     }
 }
 
+void HntrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+{
+    auto hntr_v = get_or_add_var(ncio, vname, "int64", {});
+    if (ncio.rw == 'w') hntr_v.putAtt("comment",
+        "Parameters to instantiate a icebin::modele::HntrGrid description of this grid");
+
+    get_or_put_att(hntr_v, ncio.rw, "im", "int", &im, 1);
+    get_or_put_att(hntr_v, ncio.rw, "jm", "int", &jm, 1);
+    get_or_put_att(hntr_v, ncio.rw, "offi", "double", &offi, 1);
+    get_or_put_att(hntr_v, ncio.rw, "dlat", "double", &dlat, 1);
+
+    init();
+}
+
+// =============================================================
 
 Hntr::Hntr(HntrGrid const &_Agrid, HntrGrid const &_Bgrid, double _DATMIS)
     : Agrid(_Agrid), Bgrid(_Bgrid),

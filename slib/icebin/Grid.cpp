@@ -24,6 +24,9 @@
 //#include <giss/constant.hpp>
 #include <icebin/error.hpp>
 
+#ifdef BUILD_MODELE
+using namespace icebin::modele;
+#endif
 using namespace ibmisc;
 using namespace netCDF;
 
@@ -560,6 +563,23 @@ void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
 // ---------------------------------------------------------
 void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
 {
+#ifdef BUILD_MODELE
+    // Read the HntrGrid, if that's how we were made
+    if (ncio.rw == 'r') {
+        std::string const hntr_vname = vname + ".hntr";
+        auto hntr_v = ncio.nc->getVar(hntr_vname);
+        if (!hntr_v.isNull()) {
+            HntrGrid _hntr;
+            _hntr.ncio(ncio, hntr_vname);
+            hntr.reset(new HntrGrid(std::move(_hntr)));
+        }
+    } else {
+        if (hntr.get()) {
+            HntrGrid _hntr(*hntr);
+            _hntr.ncio(ncio, vname + ".hntr");
+        }
+    }
+#endif
 
     auto lonb_d = get_or_add_dim(ncio,
         vname + ".lon_boundaries.length", this->lonb.size());

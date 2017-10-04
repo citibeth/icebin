@@ -373,7 +373,7 @@ public:
 
 #ifdef BUILD_MODELE
     /** The grid description, as needed for Hntr regridding algorithm. */
-    std::unique_ptr<modele::HntrGrid> hntr;
+    std::unique_ptr<modele::HntrGrid const> hntr;
 #endif
 
 

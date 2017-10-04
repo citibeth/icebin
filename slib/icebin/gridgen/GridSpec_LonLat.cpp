@@ -116,6 +116,7 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
     grid.name = this->name;
     grid.points_in_side = points_in_side;
 
+printf("BB1\n");
     // Error-check the input parameters
     if (this->south_pole && this->latb[0] == -90.0) {
         (*icebin_error)(-1,
@@ -127,6 +128,7 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
     }
 
 
+printf("BB2\n");
     // Set up to project lines on sphere (and eliminate duplicate vertices) 
     VertexCache vcache(&grid);
 
@@ -187,6 +189,7 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
         }
     }
 
+printf("BB3\n");
     // Make the polar caps (if this grid specifies them)
 
     // North Pole cap
@@ -236,6 +239,7 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
         grid.cells.add(std::move(pole));
     }
 
+printf("BB4\n");
     grid.lonb = std::move(lonb);
     grid.latb = std::move(latb);
     grid.south_pole = south_pole;

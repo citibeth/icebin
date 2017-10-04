@@ -250,6 +250,8 @@ static HntrGrid const make_hntrA(Grid_LonLat const *gridO)
 /** Creates Atmosphere grid from an existing Hntr-type Ocean grid. */
 static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
 {
+printf("BEGIN make_gridA(%p)\n", gridO);
+
     HntrGrid const &hntrO(*gridO->hntr);
     HntrGrid const hntrA(make_hntrA(gridO));
 
@@ -264,7 +266,7 @@ static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
     SparseSetT dimA;
     Hntr hntrOvA({&hntrO, &hntrA}, 0);
 
-    blitz::Array<double,1> wtO(dim_clip(dimO));
+    // blitz::Array<double,1> wtO(dim_clip(dimO));
 
     accum::SparseSetAccum<SparseSetT,double,2> acc({nullptr, &dimA});
     hntrOvA.overlap(acc, 1.0, DimClip(&dimO));
@@ -281,6 +283,11 @@ static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
 
     std::unique_ptr<Grid_LonLat> gridA(new Grid_LonLat);
     spec.make_grid(*gridA);
+
+    std::unique_ptr<Grid> ret(gridA.release());
+
+printf("END make_gridA(%p -> %p)\n", gridO, ret.get());
+    return ret;
 }
 
 // ========================================================================
@@ -441,16 +448,23 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
         std::unique_ptr<icebin::GCMRegridder> &&_gcmO)
     : gcmO(std::move(_gcmO))
 {
+printf("BEGIN GCMRegridder_Modele::GCMRegridder_ModelE(): %p\n", &*gcmO);
+printf("AA0 %p\n", &*gcmO->gridA);
     // Initialize baseclass members
     gridA = make_gridA(cast_gridO(&*gcmO->gridA));
+printf("AA1\n");
     correctA = gcmO->correctA;
+printf("AA2\n");
     hcdefs = gcmO->hcdefs;
+printf("AA3\n");
     indexingHC = Indexing(
         {"O", "HC"},
         {0L, 0L},
         {gridA->ndata(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
+printf("AA4\n");
     indexingE = derive_indexingE(gridA->indexing, indexingHC);
+printf("END GCMRegridder_Modele::GCMRegridder_ModelE()\n");
 }
 
 void GCMRegridder_ModelE::set_focean(

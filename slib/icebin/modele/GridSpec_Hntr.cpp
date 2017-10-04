@@ -13,6 +13,8 @@ GridSpec_Hntr::GridSpec_Hntr(HntrGrid const &_hntr) : hntr(_hntr) {}
 
 void GridSpec_Hntr::make_grid(Grid_LonLat &grid)
 {
+    grid.hntr.reset(new HntrGrid(hntr));
+
     if (hntr.im % 2 != 0) (*icebin_error)(-1,
         "IM must be even");
 
