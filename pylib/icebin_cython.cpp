@@ -66,10 +66,12 @@ GCMRegridder *new_GCMRegridder_ModelE(
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py)
 {
-printf("BEGIN new_GCMRegridder_ModelE\n");
+#ifdef BUILD_MODELE
+    std::unique_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(
+        std::unique_ptr<icebin::GCMRegridder>(gcmO)));
+
     // Check types and convert Numpy Arrays
     size_t nO = gcmO->nA();
-#if 0
     auto _foceanAOp(np_to_blitz<double,1>(foceanAOp_py, "foceanAOp", {nO}));
     auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
 
@@ -79,16 +81,13 @@ printf("BEGIN new_GCMRegridder_ModelE\n");
     foceanAOp = _foceanAOp;
     blitz::Array<double,1> foceanAOm(_foceanAOm.shape());
     foceanAOm = _foceanAOm;
-#endif
 
-#ifdef BUILD_MODELE
-printf("BEGIN CALLING GCMRegridder_Modele::GCMRegridder_ModelE()\n");
-    return new GCMRegridder_ModelE(
-        std::unique_ptr<icebin::GCMRegridder>(gcmO));
+    gcmA->set_focean(foceanAOp, foceanAOm);
+    return gcmA.release();
+
 #else
     return nullptr;
 #endif
-printf("END new_GCMRegridder_ModelE\n");
 }
 
 

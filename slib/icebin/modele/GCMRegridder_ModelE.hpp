@@ -88,7 +88,7 @@ public:
     // ------------------------------------------------------------
     // Override virtual functions
     IceRegridder *ice_regridder(std::string const &name) const;
-    RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const;
+    RegridMatrices regrid_matrices(std::string const &ice_sheet_name) const;
 };
 
 }}    // namespace

@@ -262,7 +262,7 @@ public:
     virtual IceRegridder *ice_regridder(std::string const &name) const = 0;
 
     /** Produce regridding matrices for this setup. */
-    virtual RegridMatrices const regrid_matrices(std::string const &ice_sheet_name) const = 0;
+    virtual RegridMatrices regrid_matrices(std::string const &ice_sheet_name) const = 0;
 
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we
@@ -330,7 +330,7 @@ public:
     IceRegridder *ice_regridder(std::string const &name) const;
 
     /** Produce regridding matrices for this setup. */
-    RegridMatrices const regrid_matrices(std::string const &name) const;
+    RegridMatrices regrid_matrices(std::string const &name) const;
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):

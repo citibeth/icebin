@@ -78,5 +78,9 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 PyObject *Hntr_regrid(modele::Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool mean_polar);
 
 
+inline RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name)
+    { return new RegridMatrices(gcm->regrid_matrices(sheet_name)); }
+
+
 }}
 

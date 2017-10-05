@@ -471,20 +471,20 @@ void GCMRegridder_ModelE::set_focean(
         blitz::Array<double,1> &_foceanAOp,
         blitz::Array<double,1> &_foceanAOm)
 {
-    foceanAOm.reference(reshape1(_foceanAOm));    // set lbound=0
     foceanAOp.reference(reshape1(_foceanAOp));
+    foceanAOm.reference(reshape1(_foceanAOm));    // set lbound=0
 }
 
 IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
     { return gcmO->ice_regridder(name); }
 
 
-RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name) const
+RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name) const
 {
     Grid_LonLat const *gridO(cast_gridO(&*gcmO->gridA));
 
     RegridMatrices rm;
-    RegridMatrices const &rmO(rm.tmp.make<RegridMatrices>(
+    RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(
         gcmO->regrid_matrices(ice_sheet_name)));
 
     rm.add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
@@ -492,7 +492,7 @@ RegridMatrices const GCMRegridder_ModelE::regrid_matrices(std::string const &ice
     rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
         this, 'A', gridO->eq_rad, &rmO));
 
-    return rm;
+    return std::move(rm);
 }
 
 }}    // namespace

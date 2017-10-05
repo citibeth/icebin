@@ -280,7 +280,7 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder
 }
 
 
-RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &sheet_name) const
+RegridMatrices GCMRegridder_Standard::regrid_matrices(std::string const &sheet_name) const
 {
     IceRegridder const *regridder = ice_regridder(sheet_name);
 
@@ -330,7 +330,7 @@ RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &s
     printf("\n");
 #endif
 
-    return rm;
+    return std::move(rm);
 }
 // -----------------------------------------------------------------------
 // ----------------------------------------------------------------

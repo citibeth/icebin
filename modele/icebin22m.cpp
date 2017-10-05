@@ -93,7 +93,7 @@ blitz::Array<TypeT,1> load_pism(netCDF::NcGroup *nc, std::string const &vname)
 void greenland_2m(
     std::string const &pism_fname,
     GCMRegridder &gcm_regridder,
-    ArrayBundle<double,2> obundle)
+    ArrayBundle<double,2> const &obundle)
 {
 
 

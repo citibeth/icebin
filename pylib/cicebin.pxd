@@ -64,7 +64,6 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
         GCMRegridder() except +
         void ncio(cibmisc.NcIO &, string vname) except +
         IceRegridder *ice_regridder(string name) except +
-        RegridMatrices regrid_matrices(string name) except +
 
     cdef cppclass GCMRegridder_Standard(GCMRegridder):
         GCMRegridder_Standard() except +
@@ -111,6 +110,9 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         int M_nrow, int M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py) except +
 
     cdef Hntr_regrid(Hntr *hntr, object WTA_py, object A_py, bool mean_polar) except +
+
+    cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name) except +
+
 
 cdef extern from "icebin/modele/hntr.hpp" namespace "icebin::modele":
     pass

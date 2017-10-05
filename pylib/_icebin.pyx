@@ -176,8 +176,8 @@ cdef class GCMRegridder:
             sheet_name.encode(), <PyObject *>elevI)    # Borrowed references
 
     def regrid_matrices(self, str sheet_name):
-        cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
-            self.cself.regrid_matrices(sheet_name.encode()))
+        cdef cicebin.RegridMatrices *crm = \
+            cicebin.new_regrid_matrices(self.cself, sheet_name.encode())
 
 #        cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
 #            self.cself.regrid_matrices(sheet_name.encode()))
