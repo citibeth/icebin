@@ -142,6 +142,18 @@ cdef class GCMRegridder:
         else:
             raise ValueError('Invalid arguments: {}'.format(args))
 
+    def wA(self, sheet_name, snative, fill=0.):
+        """Returns weights (as a vector) of overall grid."""
+        if snative == 'native':
+            native = True
+        elif snative == 'proj':
+            native = False
+        else:
+            raise ValueError("Invalid argument: snative must be 'native' or 'proj'")
+
+        return cicebin.GCMRegridder_wA(self.cself, sheet_name.encode(), native, fill)
+
+
     def to_modele(self, foceanAOp, foceanAOm):
         foceanAOp = foceanAOp.reshape(-1)
         foceanAOm = foceanAOm.reshape(-1)

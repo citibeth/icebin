@@ -37,6 +37,12 @@ extern GCMRegridder *new_GCMRegridder_ModelE(
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py);
 
+extern PyObject *GCMRegridder_wA(
+    GCMRegridder *gcm_regridder,
+    std::string const &sheet_name,
+    bool native,    // native vs. projected grid
+    double fill);
+
 extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &name,
     std::string const &gridI_fname, std::string const &gridI_vname,

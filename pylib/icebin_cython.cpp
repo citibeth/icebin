@@ -90,6 +90,23 @@ GCMRegridder *new_GCMRegridder_ModelE(
 #endif
 }
 
+PyObject *GCMRegridder_wA(
+    GCMRegridder *gcm_regridder,
+    std::string const &sheet_name,
+    bool native,    // native vs. projected grid
+    double fill)
+{
+    PyObject *wA_py = ibmisc::cython::new_pyarray<double,1>(
+        std::array<int,1>{gcm_regridder->gridA->ndata()});
+    auto wA(np_to_blitz<double,1>(wA_py, "wA", {-1}));
+    wA = fill;
+
+    gcm_regridder->wA(
+        accum::blitz_existing(wA, DuplicatePolicy::REPLACE), sheet_name, native);
+
+    return wA_py;
+}
+
 
 void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &name,

@@ -257,6 +257,9 @@ public:
     unsigned long nA() const { return gridA->ndata(); }
     unsigned long nE() const { return nA() * nhc(-1); }
 
+    template<class AccumT>
+    void wA(AccumT &&accum, std::string const &ice_sheet_name, bool native);
+
     /** Produce an IceRegridder for a particular ice sheet.
     NOTE: ice_regridder(x)->gcm is not necessarily equal to this. */
     virtual IceRegridder *ice_regridder(std::string const &name) const = 0;
@@ -272,6 +275,18 @@ public:
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 
 };
+
+template<class AccumT>
+void GCMRegridder::wA(AccumT &&accum, std::string const &ice_sheet_name, bool native)
+{
+    IceRegridder *ice = ice_regridder(ice_sheet_name);
+    ibmisc::Proj_LL2XY proj(ice->gridI->sproj);
+
+    for (auto cell=gridA->cells.begin(); cell != gridA->cells.end(); ++cell) {
+        typename AccumT::val_type const index = cell->index;
+        accum.add({index}, native ? cell->native_area : cell->proj_area(&proj));
+    }
+}
 
 // ----------------------------------------------------------------------
 /** Generates the matrices required in the GCM */

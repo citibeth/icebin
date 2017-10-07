@@ -62,6 +62,11 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
 
     cdef cppclass GCMRegridder:
         GCMRegridder() except +
+
+        unsigned int nhc() except +
+        unsigned long nA() except +
+        unsigned long nE() except +
+
         void ncio(cibmisc.NcIO &, string vname) except +
         IceRegridder *ice_regridder(string name) except +
 
@@ -82,6 +87,12 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         GCMRegridder *gcmO,
         PyObject *foceanAOp_py,
         PyObject *foceanAOm_py) except +
+
+    cdef object GCMRegridder_wA(
+        GCMRegridder *gcm_regridder,
+        string &sheet_name,
+        bool native,
+        double fill) except +
 
     cdef void GCMRegridder_add_sheet(
         GCMRegridder *cself,
