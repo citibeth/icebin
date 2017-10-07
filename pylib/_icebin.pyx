@@ -29,6 +29,7 @@ from cython.operator cimport dereference as deref, preincrement as inc
 from libcpp cimport bool
 import functools
 import operator
+import warnings
 
 cdef class IceRegridder:
     pass
@@ -53,6 +54,10 @@ cdef class WeightedSparse:
 
     def __dealloc__(self):
         del self.cself
+
+    @property
+    def shape(self):
+        return self.cself.shape()
 
     def __call__(self):
         """Obtain the matrix and weight vectors as Python structures.
@@ -200,6 +205,11 @@ cdef class GCMRegridder:
 def coo_multiply(M, xx, double fill=np.nan, ignore_nan=False):
     """M:
         SciPy sparse matrix"""
+
+    warnings.warn(
+        "coo_multiply is deprecated; use WeightedSparse.apply() instead.",
+        DeprecationWarning)
+
     xx = xx.reshape(-1)
     yy = np.zeros(M._shape[0])
     yy[:] = fill

@@ -60,6 +60,9 @@ extern void GCMRegridder_set_elevI(GCMRegridder *cself,
 struct CythonWeightedSparse {
     std::array<SparseSetT,2> dims;
     std::unique_ptr<WeightedSparse> RM;
+
+    /** @return 2-D shape of the stored matrix */
+    PyObject *shape();
 };
 
 

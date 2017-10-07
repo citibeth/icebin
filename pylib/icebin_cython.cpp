@@ -182,6 +182,18 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 
 }
 
+
+PyObject *CythonWeightedSparse::shape()
+{
+    return py_build_tuple<pytype_long, long, 2>(
+        std::array<long,2>{
+            RM->dims[0]->sparse_extent(),
+            RM->dims[1]->sparse_extent()
+        }
+    );
+}
+
+
 extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::string const &spec_name, bool scale, bool correctA, double sigma_x, double sigma_y, double sigma_z, bool conserve)
 {
     std::unique_ptr<CythonWeightedSparse> CRM(new CythonWeightedSparse());

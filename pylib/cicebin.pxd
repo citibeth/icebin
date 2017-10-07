@@ -75,7 +75,7 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
 
 cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
     cdef cppclass CythonWeightedSparse:
-        pass
+        object shape() except +
 
     cdef GCMRegridder *new_GCMRegridder_Standard(
         string &gridA_fname,
