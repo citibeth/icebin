@@ -47,7 +47,7 @@ class Indexing(object):
         if (self.indices[0] == 0):
             self.shape = self.extent
         else:
-            self.shape = (self.extent[1], self.extent[0])
+            self.shape = self.extent[::-1]    # Reverse
 
         self.make_strides()
 
