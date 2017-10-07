@@ -51,10 +51,12 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridde
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     MakeDenseEigenT GvI_m(
+        // Only includes ice model grid cells with ice in them.
         std::bind(&IceRegridder::GvI, regridder, _1),
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimI}, '.');
     MakeDenseEigenT ApvG_m(        // _m ==> type MakeDenseEigenT
+        // Only includes ice model grid cells with ice in them.
         AE.GvAp,
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimA}, 'T');
@@ -82,15 +84,16 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridde
         ret->wM.reference(sum(wAvI, 0, '+'));    // Area of A cells
 
         // Compute the main matrix
+        auto sAvAp(sum_to_diagonal(wAvAp, 0, '-'));
         if (params.scale) {
             // Get two diagonal Eigen scale matrices
-            auto sAvAp(sum_to_diagonal(wAvAp, 0, '-'));
             auto sApvI(sum_to_diagonal(wApvI, 0, '-'));
 
             ret->M.reset(new EigenSparseMatrixT(
                 sAvAp * sApvI * *ApvI));    // AvI_scaled
         } else {
-            ret->M = std::move(ApvI);
+            ret->M.reset(new EigenSparseMatrixT(
+                sAvAp * *ApvI));
         }
 
     } else {

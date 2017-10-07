@@ -160,11 +160,14 @@ void IceRegridder_L0::GvI(
 void IceRegridder_L0::GvAp(MakeDenseEigenT::AccumT &ret) const
 {
     for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
-        int iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
-        int iA = cell->i;
+        long const iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
+        long const iA = cell->i;
+        long const iI = cell->j;
+
+        if (!std::isnan(elevI(iI))) {
         if (cell->native_area > 0) {
             ret.add({iG, iA}, cell->native_area);
-        }
+        }}
     }
 }
 // --------------------------------------------------------
