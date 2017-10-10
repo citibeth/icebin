@@ -75,16 +75,8 @@ GCMRegridder *new_GCMRegridder_ModelE(
     auto _foceanAOp(np_to_blitz<double,1>(foceanAOp_py, "foceanAOp", {nO}));
     auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
 
-    // Those Numpy arrays came from Python, and could be de-allocated.
-    // So let's copy them now.
-    blitz::Array<double,1> foceanAOp(_foceanAOp.shape());
-    foceanAOp = _foceanAOp;
-    blitz::Array<double,1> foceanAOm(_foceanAOm.shape());
-    foceanAOm = _foceanAOm;
-
-    gcmA->set_focean(foceanAOp, foceanAOm);
+    gcmA->set_focean(_foceanAOp, _foceanAOm);
     return gcmA.release();
-
 #else
     return nullptr;
 #endif
@@ -273,6 +265,8 @@ PyObject *CythonWeightedSparse_sparse_extent(CythonWeightedSparse const *cself)
 PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself)
 {
     // ----- Convert a dense vector w/ dense indices to a dense vector with sparse indices
+    if (cself->dims[0].sparse_extent() <= 0) (*icebin_error)(-1,
+        "dims[0].sparse_extent() must be > 0");
 
     // ---------- wM
     // Allocate the output Python vector

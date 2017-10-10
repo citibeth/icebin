@@ -49,8 +49,8 @@ NOTES:
 */
 static void scaled_AOmvAOp(
     MakeDenseEigenT::AccumT &ret,        // {dimAOm, dimAOp}
-    blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
     blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
+    blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
     char invert = '+')
 {
     SparseSetT &dimAOp(*ret.dim(1).sparse_set);
@@ -74,7 +74,8 @@ static void scaled_AOmvAOp(
         // In Om space, cell only accounts for the fraction covered by continent.
         // When divided by wM (scaling), this will have the effect of magnifying
         // cells only partially covered by ocean (in PISM)
-        ret.add({iAO_s, iAO_s}, invert == '-' ? fcont_p : 1./fcont_p);
+        double const val = (invert == '-' ? fcont_p : 1./fcont_p);
+        ret.add({iAO_s, iAO_s}, val);
     }
 }
 // ----------------------------------------------------------------
@@ -212,7 +213,7 @@ public:
 };
 
 
-static Grid_LonLat const *cast_gridO(Grid const *_gridO)
+static Grid_LonLat const *cast_Grid_LonLat(Grid const *_gridO)
 {
     // -------- Check types on gridO
     Grid_LonLat const *gridO(dynamic_cast<Grid_LonLat const *>(_gridO));
@@ -307,7 +308,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     RegridMatrices::Params const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     char X,    // Either 'A' or 'E', determines the destination matrix.
-    double const R,    // Radius of the earth
+    double const eq_rad,    // Radius of the earth
     RegridMatrices const *rmO)
 {
     TmpAlloc tmp;
@@ -315,6 +316,9 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     SparseSetT &dimXAm(*dims[0]);
     SparseSetT &dimIp(*dims[1]);
     SparseSetT dimEOm, dimEOp, dimOm;
+
+    dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
+    dimIp.set_sparse_extent(rmO->ice_regridder->nI());
 
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
 
@@ -344,7 +348,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     // OmvOp
     EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
-        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOm, gcmA->foceanAOp, '-'),
+        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '-'),
         {SparsifyTransform::TO_DENSE},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
@@ -354,11 +358,8 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
 
     // Obtain hntrA and hntrO for process below.
-    GCMRegridder const *gcmO(&*gcmA->gcmO);
-    Grid_LonLat const *gridO(cast_gridO(&*gcmO->gridA));
-    HntrGrid const &hntrO(*gridO->hntr);
-    HntrGrid const hntrA(make_hntrA(gridO));
-
+    HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
+    HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
 
     EigenColVectorT *wXOm_e;
     WeightedSparse *XOpvIp;
@@ -402,7 +403,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
 
-    } else {
+    } else {    // X == 'A'
         XOpvIp = &*AOpvIp;
         wXOm_e = &wAOm_e;
 
@@ -415,7 +416,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         Hntr hntr_XOmvXAm(std::array<HntrGrid const *,2>{&hntrO, &hntrA});
         reset_ptr(XAmvXOm, MakeDenseEigenT(
             std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
-                &hntr_XOmvXAm, _1, R, DimClip(&dimAOm)),
+                &hntr_XOmvXAm, _1, eq_rad, DimClip(&dimAOm)),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimAOm, &dimAAm}, 'T').to_eigen());
     }
@@ -429,7 +430,8 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     // ----------- Put it all together (XAmvIp)
     ret->wM.reference(to_blitz(wXAm_e));
     if (paramsA.scale) {
-        blitz::Array<double,1> sXAm(1. / to_blitz(wXAm_e));
+        auto wXAm(to_blitz(wXAm_e));
+        blitz::Array<double,1> sXAm(1. / wXAm);
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sXAm) * *XAmvXOm * *XOpvIp->M));
     } else {
@@ -449,20 +451,15 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     : gcmO(std::move(_gcmO))
 {
 printf("BEGIN GCMRegridder_Modele::GCMRegridder_ModelE(): %p\n", &*gcmO);
-printf("AA0 %p\n", &*gcmO->gridA);
     // Initialize baseclass members
-    gridA = make_gridA(cast_gridO(&*gcmO->gridA));
-printf("AA1\n");
+    gridA = make_gridA(cast_Grid_LonLat(&*gcmO->gridA));
     correctA = gcmO->correctA;
-printf("AA2\n");
     hcdefs = gcmO->hcdefs;
-printf("AA3\n");
     indexingHC = Indexing(
         {"O", "HC"},
         {0L, 0L},
         {gridA->ndata(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
-printf("AA4\n");
     indexingE = derive_indexingE(gridA->indexing, indexingHC);
 printf("END GCMRegridder_Modele::GCMRegridder_ModelE()\n");
 }
@@ -471,8 +468,13 @@ void GCMRegridder_ModelE::set_focean(
         blitz::Array<double,1> &_foceanAOp,
         blitz::Array<double,1> &_foceanAOm)
 {
-    foceanAOp.reference(reshape1(_foceanAOp));
-    foceanAOm.reference(reshape1(_foceanAOm));    // set lbound=0
+    // Take shared referenes, to prevent de-allocation
+    this->_foceanAOp.reference(_foceanAOp);
+    this->_foceanAOm.reference(_foceanAOm);
+
+    // Use reshaped versions, which don't share a reference
+    foceanAOp.reference(reshape1(this->_foceanAOp));
+    foceanAOm.reference(reshape1(this->_foceanAOm));    // set lbound=0
 }
 
 IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
@@ -481,11 +483,11 @@ IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
 
 RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name) const
 {
-    Grid_LonLat const *gridO(cast_gridO(&*gcmO->gridA));
+    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
 
-    RegridMatrices rm;
-    RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(
-        gcmO->regrid_matrices(ice_sheet_name)));
+    RegridMatrices _rmO(gcmO->regrid_matrices(ice_sheet_name));
+    RegridMatrices rm(_rmO.ice_regridder);
+    RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(std::move(_rmO)));
 
     rm.add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
         this, 'E', gridO->eq_rad, &rmO));

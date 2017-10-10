@@ -592,6 +592,13 @@ void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_ful
         vname + ".lat_boundaries", "double", {latb_d});
 
     NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
+
+    get_or_put_att(info_v, ncio.rw, "eq_rad", "double", &eq_rad, 1);
+    if (ncio.rw == 'w') info_v.putAtt("eq_rad.comment",
+        "Radius of Earth (m), or whatever planet you're looking at.  "
+        "Used to compute theoretical exact areas of graticules. That's different "
+        "from the radius (or elliptical shape) used in the projection.");
+
     get_or_put_att(info_v, ncio.rw, "north_pole_cap", north_pole);
     get_or_put_att(info_v, ncio.rw, "south_pole_cap", south_pole);
     get_or_put_att(info_v, ncio.rw, "points_in_side", "int", &points_in_side, 1);

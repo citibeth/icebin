@@ -114,6 +114,7 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
     grid.coordinates = Grid::Coordinates::LONLAT;
     grid.parameterization = Grid::Parameterization::L0;
     grid.name = this->name;
+    grid.eq_rad = this->eq_rad;
     grid.points_in_side = points_in_side;
 
 printf("BB1\n");

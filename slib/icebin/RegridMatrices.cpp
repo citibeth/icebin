@@ -92,8 +92,9 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridde
             ret->M.reset(new EigenSparseMatrixT(
                 sAvAp * sApvI * *ApvI));    // AvI_scaled
         } else {
-            ret->M.reset(new EigenSparseMatrixT(
-                sAvAp * *ApvI));
+            // Should be like this for test_conserv.py
+            // Note that sAvAp * sApvI = [size (weight) of grid cells in A]
+            ret->M = std::move(ApvI);
         }
 
     } else {
@@ -296,7 +297,7 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(std::string const &sheet_n
     printf("    nG = %d\n", regridder->nG());
 #endif
 
-    RegridMatrices rm;
+    RegridMatrices rm(regridder);
 
     UrAE urA("UrA", this->nA(),
         std::bind(&IceRegridder::GvAp, regridder, _1),

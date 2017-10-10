@@ -34,6 +34,8 @@ public:
     HntrGrid() {}
     HntrGrid(int _im, int _jm, double _offi, double _dlat);
 
+    HntrGrid(HntrGrid const &other);
+
     template<class TypeT>
     blitz::Array<TypeT, 2> Array() const
         { return blitz::Array<TypeT,2>(im,jm, blitz::fortranArray); }
@@ -147,7 +149,7 @@ public:
     template<class AccumT, class IncludeT = IncludeConst<int,true>>
     void overlap(
         AccumT &accum,        // The output (sparse) matrix; 0-based indexing
-        double const R,        // Radius of the Earth
+        double const eq_rad,        // Radius of the Earth
         IncludeT includeB = IncludeT());
 
 };    // class Hntr
@@ -156,13 +158,13 @@ public:
 template<class AccumT, class IncludeT>
 void Hntr::overlap(
     AccumT &accum,        // The output (sparse) matrix; 0-based indexing
-    double const R,        // Radius of the Earth
+    double const eq_rad,        // Radius of the Earth
     IncludeT includeB)
 {
 
     // ------------------
     // Interpolate the A grid onto the B grid
-    double const R2 = R*R;
+    double const R2 = eq_rad*eq_rad;
     for (int JB=1; JB <= Bgrid.jm; ++JB) {
         int JAMIN = JMIN(JB);
         int JAMAX = JMAX(JB);

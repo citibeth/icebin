@@ -9,6 +9,8 @@
 
 namespace icebin {
 
+class IceRegridder;
+
 
 /** Return value of a sparse matrix */
 struct WeightedSparse {
@@ -90,6 +92,9 @@ struct WeightedSparse {
     IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices {
 public:
+    /** ice_regridder from which this was constructed */
+    IceRegridder const * const ice_regridder;
+
     ibmisc::TmpAlloc tmp;
 
     /** Parameters controlling the generation of regridding matrices */
@@ -117,6 +122,8 @@ public:
         std::array<SparseSetT *,2> dims, RegridMatrices::Params const &params)> MatrixFunction;
 
     std::map<std::string, MatrixFunction> regrids;
+
+    RegridMatrices(IceRegridder const * const _ice_regridder) : ice_regridder(_ice_regridder) {}
 
     void add_regrid(std::string const &spec,
         MatrixFunction const &regrid);

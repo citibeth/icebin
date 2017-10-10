@@ -66,6 +66,8 @@ Putting it all together, we deal with the following grids:
 
 */
 class GCMRegridder_ModelE : public GCMRegridder {
+    blitz::Array<double,1> _foceanAOm, _foceanAOp;    // Hold allocated memory here
+
 public:
 
     std::unique_ptr<icebin::GCMRegridder> const gcmO;
@@ -77,6 +79,7 @@ public:
     GCMRegridder_ModelE(std::unique_ptr<icebin::GCMRegridder> &&_gcmO);
 
     /**
+    References to these variables must be kept alive externally.
     @param _foceanAOm Ocean surface fraction array (FOCEAN), as seen by
        ModelE; sparse indexing.  On Ocean grid.
     @param _foceanAOp Ocean surface fraction array (FOCEAN), as seen by

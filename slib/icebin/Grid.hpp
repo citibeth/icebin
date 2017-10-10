@@ -384,7 +384,7 @@ public:
     int nlat() const;
 
     void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
-};  // class
+};  // class Grid_LonLat
 
 }   // namespace
 

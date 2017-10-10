@@ -9,6 +9,13 @@ using namespace ibmisc;
 namespace icebin {
 namespace modele {
 
+HntrGrid::HntrGrid(HntrGrid const &other)
+    : im(other.im), jm(other.jm), offi(other.offi), dlat(other.dlat),
+    _dxyp(blitz::Range(other._dxyp.lbound(0), other._dxyp.ubound(0)))
+{
+    _dxyp = other._dxyp;
+}
+
 HntrGrid::HntrGrid(int _im, int _jm, double _offi, double _dlat) :
     im(_im), jm(_jm), offi(_offi), dlat(_dlat)
 
