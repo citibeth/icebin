@@ -108,7 +108,6 @@ double polar_graticule_area_exact(double eq_rad,
 */
 void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
 {
-printf("BEGIN GridSpec_LonLat::make_grid()\n");
     grid.clear();
     grid.type = Grid::Type::LONLAT;
     grid.coordinates = Grid::Coordinates::LONLAT;
@@ -117,7 +116,6 @@ printf("BEGIN GridSpec_LonLat::make_grid()\n");
     grid.eq_rad = this->eq_rad;
     grid.points_in_side = points_in_side;
 
-printf("BB1\n");
     // Error-check the input parameters
     if (this->south_pole && this->latb[0] == -90.0) {
         (*icebin_error)(-1,
@@ -129,7 +127,6 @@ printf("BB1\n");
     }
 
 
-printf("BB2\n");
     // Set up to project lines on sphere (and eliminate duplicate vertices) 
     VertexCache vcache(&grid);
 
@@ -185,12 +182,10 @@ printf("BB2\n");
             for (int i=n; i>0; --i)
                 vcache.add_vertex(cell, lon0, lats[i]);
 
-//printf("Adding lon/lat cell %d (%d, %d) area=%f\n", cell.index, cell.i, cell.j, cell.area);
             grid.cells.add(std::move(cell));
         }
     }
 
-printf("BB3\n");
     // Make the polar caps (if this grid specifies them)
 
     // North Pole cap
@@ -240,13 +235,11 @@ printf("BB3\n");
         grid.cells.add(std::move(pole));
     }
 
-printf("BB4\n");
     grid.lonb = std::move(lonb);
     grid.latb = std::move(latb);
     grid.south_pole = south_pole;
     grid.north_pole = north_pole;
     grid.indexing = indexing;
-printf("END GridSpec_LonLat::make_grid()\n");
 }
 
 // ---------------------------------------------------------
