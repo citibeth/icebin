@@ -325,6 +325,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     // ------------ Params for generating sub-matrices
     RegridMatrices::Params paramsO(paramsA);
     paramsO.scale = false;
+    paramsO.correctA = true;
 
     // ---------------- Take along the non-conservative weights
 
@@ -348,7 +349,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     // OmvOp
     EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
-        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '-'),
+        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '+'),
         {SparsifyTransform::TO_DENSE},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
@@ -423,9 +424,14 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
 
     // ---------- wEAm = [scale] * XAmvXOm * wEOm
-    blitz::Array<double,1> sXAmvXOm(sum(*XAmvXOm, 0, '-'));
+    // NOTE: We are scaling for the source grid, not destination grid.
+    // This will produce a matrix where A = O1+O2+O3+O4, which is what
+    // we want for summing up weights of ocean grid.
+    blitz::Array<double,1> XAmvXOms(sum(*XAmvXOm, 1, '-'));    // Not unusual way we weight/scale here
+
+    // The matrix *XAmvXOm * map_eigen_diagonal(XAmvXOms) should consist only of 1's and 0's
     auto &wXAm_e(ret->tmp.make<EigenColVectorT>(
-        map_eigen_diagonal(sXAmvXOm) * *XAmvXOm * *wXOm_e));
+        *XAmvXOm * map_eigen_diagonal(XAmvXOms) * *wXOm_e));
 
     // ----------- Put it all together (XAmvIp)
     ret->wM.reference(to_blitz(wXAm_e));
@@ -450,7 +456,6 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
         std::unique_ptr<icebin::GCMRegridder> &&_gcmO)
     : gcmO(std::move(_gcmO))
 {
-printf("BEGIN GCMRegridder_Modele::GCMRegridder_ModelE(): %p\n", &*gcmO);
     // Initialize baseclass members
     gridA = make_gridA(cast_Grid_LonLat(&*gcmO->gridA));
     correctA = gcmO->correctA;
@@ -461,7 +466,6 @@ printf("BEGIN GCMRegridder_Modele::GCMRegridder_ModelE(): %p\n", &*gcmO);
         {gridA->ndata(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
     indexingE = derive_indexingE(gridA->indexing, indexingHC);
-printf("END GCMRegridder_Modele::GCMRegridder_ModelE()\n");
 }
 
 void GCMRegridder_ModelE::set_focean(
