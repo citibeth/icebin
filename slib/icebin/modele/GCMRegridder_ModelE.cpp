@@ -292,6 +292,40 @@ printf("END make_gridA(%p -> %p)\n", gridO, ret.get());
 }
 
 // ========================================================================
+// --------------------------------------------------------
+/** This exists mostly so we can test it from Python */
+static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
+    std::array<SparseSetT *,2> dims,
+    RegridMatrices::Params const &paramsA,
+    GCMRegridder_ModelE const *gcmA,
+    char transpose)
+{
+    auto &dimAOm(*dims[0]);
+    auto &dimAAm(*dims[1]);
+
+
+    // Obtain hntrA and hntrO for process below.
+    Grid_LonLat const *_gcmO = cast_Grid_LonLat(&*gcmA->gcmO->gridA);
+    Grid_LonLat const *_gcmA = cast_Grid_LonLat(&*gcmA->gridA);
+
+    Hntr hntr_XOmvXAm(std::array<HntrGrid const *,2>{&*_gcmO->hntr, &*_gcmA->hntr});
+
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));    // conservative
+    reset_ptr(ret->M, MakeDenseEigenT(
+        std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
+            &hntr_XOmvXAm, _1, _gcmA->eq_rad, DimClip(&dimAOm)),
+        {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
+        {&dimAOm, &dimAAm}, transpose).to_eigen());
+
+    // Ignore the scale parameter
+
+    ret->wM.reference(sum(*ret->M, 0, '+'));
+    ret->Mw.reference(sum(*ret->M, 1, '+'));
+
+    return ret;
+}
+
+// ========================================================================
 
 /** Top-level subroutine produces the matrix EAmvIp or AAmvIp.
 
@@ -497,6 +531,12 @@ RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet
         this, 'E', gridO->eq_rad, &rmO));
     rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
         this, 'A', gridO->eq_rad, &rmO));
+
+    // For testing
+    rm.add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,
+        this, '.'));
+    rm.add_regrid("AAmvAOm", std::bind(&compute_AOmvAAm, _1, _2,
+        this, 'T'));
 
     return std::move(rm);
 }
