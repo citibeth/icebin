@@ -492,7 +492,7 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 {
     // Initialize baseclass members
     gridA = make_gridA(cast_Grid_LonLat(&*gcmO->gridA));
-    correctA = gcmO->correctA;
+    correctA = gcmO->correctA;    // Not used
     hcdefs = gcmO->hcdefs;
     indexingHC = Indexing(
         {"O", "HC"},
