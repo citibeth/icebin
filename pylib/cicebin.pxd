@@ -77,14 +77,14 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
     cdef cppclass CythonWeightedSparse:
         object shape() except +
 
-    cdef GCMRegridder *new_GCMRegridder_Standard(
+    cdef cibmisc.shared_ptr[GCMRegridder] new_GCMRegridder_Standard(
         string &gridA_fname,
         string &gridA_vname,
         vector[double] &hcdefs,
         bool correctA) except +
 
-    cdef GCMRegridder *new_GCMRegridder_ModelE(
-        GCMRegridder *gcmO,
+    cdef cibmisc.shared_ptr[GCMRegridder] new_GCMRegridder_ModelE(
+        cibmisc.shared_ptr[GCMRegridder] &gcmO,
         PyObject *foceanAOp_py,
         PyObject *foceanAOm_py) except +
 

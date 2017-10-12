@@ -487,8 +487,8 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 // Methods for GCMRegridder_ModelE
 
 GCMRegridder_ModelE::GCMRegridder_ModelE(
-        std::unique_ptr<icebin::GCMRegridder> &&_gcmO)
-    : gcmO(std::move(_gcmO))
+        std::shared_ptr<icebin::GCMRegridder> const &_gcmO)
+    : gcmO(_gcmO)
 {
     // Initialize baseclass members
     gridA = make_gridA(cast_Grid_LonLat(&*gcmO->gridA));

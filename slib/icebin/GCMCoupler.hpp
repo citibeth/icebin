@@ -163,7 +163,7 @@ public:
     bool use_smb;
 
     /** Main access to the core regridding of Icebin */
-    std::unique_ptr<GCMRegridder> gcm_regridder;
+    std::shared_ptr<GCMRegridder> gcm_regridder;
 
     /** Parameters (not physical constants) passed from the GCM
     through to the ice model.  These parameters cannot be specific to

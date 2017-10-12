@@ -26,14 +26,14 @@
 namespace icebin {
 namespace cython {
 
-extern GCMRegridder_Standard *new_GCMRegridder_Standard(
+extern std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
     std::string const &gridA_fname,
     std::string const &gridA_vname,
     std::vector<double> &hcdefs,
     bool _correctA);
 
-extern GCMRegridder *new_GCMRegridder_ModelE(
-    GCMRegridder *gcmO,
+extern std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
+    std::shared_ptr<GCMRegridder> const &gcmO,
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py);
 

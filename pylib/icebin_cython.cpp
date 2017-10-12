@@ -36,13 +36,13 @@ namespace cython {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-GCMRegridder_Standard *new_GCMRegridder_Standard(
+std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
     std::string const &gridA_fname,
     std::string const &gridA_vname,
     std::vector<double> &hcdefs,
     bool _correctA)
 {
-    std::unique_ptr<GCMRegridder_Standard> cself(new GCMRegridder_Standard());
+    std::shared_ptr<GCMRegridder_Standard> cself(new GCMRegridder_Standard());
 
     // Read gridA
     NcIO ncio(gridA_fname, netCDF::NcFile::read);
@@ -58,17 +58,16 @@ GCMRegridder_Standard *new_GCMRegridder_Standard(
         Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhc}, {1,0}),
         _correctA);
 
-    return cself.release();
+    return cself;
 }
 
-GCMRegridder *new_GCMRegridder_ModelE(
-    GCMRegridder *gcmO,
+std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
+    std::shared_ptr<GCMRegridder> const &gcmO,
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py)
 {
 #ifdef BUILD_MODELE
-    std::unique_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(
-        std::unique_ptr<icebin::GCMRegridder>(gcmO)));
+    std::shared_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(gcmO));
 
     // Check types and convert Numpy Arrays
     size_t nO = gcmO->nA();
@@ -76,9 +75,9 @@ GCMRegridder *new_GCMRegridder_ModelE(
     auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
 
     gcmA->set_focean(_foceanAOp, _foceanAOm);
-    return gcmA.release();
+    return gcmA;
 #else
-    return nullptr;
+    return std::shared_ptr<GCMRegridder_ModelE>();
 #endif
 }
 

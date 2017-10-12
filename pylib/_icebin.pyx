@@ -123,10 +123,7 @@ cdef class RegridMatrices:
         return ret
 
 cdef class GCMRegridder:
-    cdef cicebin.GCMRegridder *cself
-
-    def __dealloc__(self):
-        del self.cself
+    cdef cibmisc.shared_ptr[cicebin.GCMRegridder] cself
 
     def __init__(self, *args):
         cdef ibmisc.NcIO ncio
@@ -137,13 +134,17 @@ cdef class GCMRegridder:
             self.cself = cicebin.new_GCMRegridder_Standard(
                 gridA_fname.encode(), gridA_vname.encode(), hcdefs, correctA)
         elif len(args) == 1:
-            self.cself = new cicebin.GCMRegridder_Standard()
+            self.cself.reset(new cicebin.GCMRegridder_Standard())
             (regridder_fname,) = args
 
             # Load an existing GCMRegridder from disk
             ncio = ibmisc.NcIO(regridder_fname, 'read')
             self.ncio(ncio, str('m'))
             ncio.close()
+        elif len(args) == 0:
+            pass
+            # Initialize blank
+            # self.cself.reset(NULL)
         else:
             raise ValueError('Invalid arguments: {}'.format(args))
 
@@ -156,20 +157,24 @@ cdef class GCMRegridder:
         else:
             raise ValueError("Invalid argument: snative must be 'native' or 'proj'")
 
-        return cicebin.GCMRegridder_wA(self.cself, sheet_name.encode(), native, fill)
+        return cicebin.GCMRegridder_wA(self.cself.get(), sheet_name.encode(), native, fill)
 
 
     def to_modele(self, foceanAOp, foceanAOm):
+        """Returns a new GCMRegridder object, suitable for use with ModelE"""
         foceanAOp = foceanAOp.reshape(-1)
         foceanAOm = foceanAOm.reshape(-1)
-        cdef cicebin.GCMRegridder *gcm
+        cdef cibmisc.shared_ptr[cicebin.GCMRegridder] gcm
         gcm = cicebin.new_GCMRegridder_ModelE(self.cself, <PyObject *>foceanAOp, <PyObject *>foceanAOm)
-        if not gcm:
+        if not gcm.get():
             raise RuntimeError('IceBin must be built with USE_MODELE in order to use ModelE features')
-        self.cself = gcm
+
+        ret = GCMRegridder()
+        ret.cself = gcm
+        return ret
 
     def ncio(self, ibmisc.NcIO ncio, vname):
-        self.cself.ncio(deref(ncio.cself), vname.encode())
+        self.cself.get().ncio(deref(ncio.cself), vname.encode())
 
     def add_sheet(self, name,
         gridI_fname, gridI_vname,
@@ -180,7 +185,7 @@ cdef class GCMRegridder:
         elevI = elevI.reshape(-1)
         maskI = maskI.reshape(-1)
         elevI[maskI != 0] = np.nan  # For IceBin, isnan(elevI) means it's masked out.
-        cicebin.GCMRegridder_add_sheet(self.cself,
+        cicebin.GCMRegridder_add_sheet(self.cself.get(),
             name.encode(),
             gridI_fname.encode(), gridI_vname.encode(),
             exgrid_fname.encode(), exgrid_vname.encode(),
@@ -189,12 +194,12 @@ cdef class GCMRegridder:
 
     def set_elevI(self, sheet_name, elevI):
         elevI = elevI.reshape(-1)
-        cicebin.GCMRegridder_set_elevI(self.cself,
+        cicebin.GCMRegridder_set_elevI(self.cself.get(),
             sheet_name.encode(), <PyObject *>elevI)    # Borrowed references
 
     def regrid_matrices(self, str sheet_name):
         cdef cicebin.RegridMatrices *crm = \
-            cicebin.new_regrid_matrices(self.cself, sheet_name.encode())
+            cicebin.new_regrid_matrices(self.cself.get(), sheet_name.encode())
 
 #        cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
 #            self.cself.regrid_matrices(sheet_name.encode()))

@@ -70,13 +70,13 @@ class GCMRegridder_ModelE : public GCMRegridder {
 
 public:
 
-    std::unique_ptr<icebin::GCMRegridder> const gcmO;
+    std::shared_ptr<icebin::GCMRegridder> const gcmO;
     blitz::Array<double,1> foceanAOm;
     blitz::Array<double,1> foceanAOp;
 
     /**
     @param _gcmO Underlying regridder for the Ocean Grid Regime. */
-    GCMRegridder_ModelE(std::unique_ptr<icebin::GCMRegridder> &&_gcmO);
+    GCMRegridder_ModelE(std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
 
     /**
     References to these variables must be kept alive externally.

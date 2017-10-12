@@ -109,6 +109,14 @@ std::string GCMCoupler::sdate(double time_s) const
 }
 
 
+/** Static-cast a unique_ptr while moving it to another unique_ptr */
+template<typename D, typename B>
+void static_move(std::shared_ptr<D> &dest, std::unique_ptr<B>& base)
+{
+    dest.reset(static_cast<D*>(base.release()));
+}
+
+
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
     std::string const &config_fname,        // comes from this->gcm_params
