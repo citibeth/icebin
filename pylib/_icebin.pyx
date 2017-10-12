@@ -73,7 +73,7 @@ cdef class WeightedSparse:
         wM, (data,shape), Mw = cicebin.CythonWeightedSparse_to_tuple(self.cself)
         return wM, scipy.sparse.coo_matrix(data, shape), Mw
 
-    def apply(self, A_s, double fill=np.nan):
+    def apply(self, A_s, double fill=np.nan, force_conservation=True):
         """Applies the regrid matrix to A_s.  Smoothes and conserves, if those
         options were specified in RegridMatrices.matrix().
         A_s: Either:
@@ -87,7 +87,7 @@ cdef class WeightedSparse:
 
         leading_shape, new_shape = split_shape(A_s.shape, alen)
         A_s = A_s.reshape(new_shape)
-        B_s = cicebin.CythonWeightedSparse_apply(self.cself, <PyObject *>A_s, fill)
+        B_s = cicebin.CythonWeightedSparse_apply(self.cself, <PyObject *>A_s, fill, force_conservation)
 
         B_s = B_s.reshape( leading_shape + (B_s.shape[1],) )
 

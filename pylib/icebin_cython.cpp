@@ -200,7 +200,7 @@ extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::s
 extern PyObject *CythonWeightedSparse_apply(
     CythonWeightedSparse *BvA,
     PyObject *A_s_py,            // A_b{nj_s} One row per variable
-    double fill)
+    double fill, bool force_conservation)
 {
     // |j_s| = size of sparse input vector space (A_s)
     // |j_d] = size of dense input vector space (A_d)
@@ -222,7 +222,7 @@ extern PyObject *CythonWeightedSparse_apply(
     }
 
     // Apply...
-    auto B_d_eigen(BvA->RM->apply_e(A_d));    // Column major indexing
+    auto B_d_eigen(BvA->RM->apply_e(A_d, fill, force_conservation));    // Column major indexing
 
     // Allocate output vector and get a Blitz view
     // We will copy from the Eigen data structure to the Python

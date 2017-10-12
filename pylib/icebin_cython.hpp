@@ -73,7 +73,7 @@ extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself,
 extern PyObject *CythonWeightedSparse_apply(
     CythonWeightedSparse *BvA,
     PyObject *A_s_py,
-    double fill);            // A_b{nj_s} One row per variable
+    double fill, bool force_conservation);            // A_b{nj_s} One row per variable
 
 
 PyObject *CythonWeightedSparse_dense_extent(CythonWeightedSparse const *cself);
