@@ -102,18 +102,18 @@ static blitz::Array<double,1> dim_clip(SparseSetT const &dim)
 @see raw_EOvEA */
 class RawEOvEA {
 public:
-    MakeDenseEigenT::AccumT ret;    // Final place for EOvEA
+    MakeDenseEigenT::AccumT &ret;    // Final place for EOvEA
     GCMRegridder_ModelE const *gcmA;
     blitz::Array<double,1> const &wEO_d;
 
     RawEOvEA(
-        MakeDenseEigenT::AccumT &&_ret,
+        MakeDenseEigenT::AccumT &_ret,
         GCMRegridder_ModelE const *_gcmA,
         blitz::Array<double,1> const &_wEO_d)
-    : ret(std::move(_ret)), gcmA(_gcmA), wEO_d(_wEO_d) {}
+    : ret(_ret), gcmA(_gcmA), wEO_d(_wEO_d) {}
 
     /** Called by Hntr::matrix() (AvO) */
-    void add(std::array<long,2> index, double value)
+    void add(std::array<int,2> index, double value)
     {
         // Ignore stray overlaps
         if (std::abs(value) < 1e-8) (*icebin_error)(-1,
@@ -164,15 +164,16 @@ NOTES:
 static void raw_EOvEA(
     MakeDenseEigenT::AccumT &ret,        // {dimEA, dimEO}; dimEO should not change here.
     std::array<HntrGrid const *, 2> hntrs,    // {hntrO, hntrA}
+    double const eq_rad,
     SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> &wEO_d)            // == EOvI.wM.  Dense indexing.
 {
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
     Hntr hntr_AOvAA(hntrs, 0);    // dimB=A,  dimA=O
-    RawEOvEA raw(std::move(ret), gcmA, wEO_d);
+    RawEOvEA raw(ret, gcmA, wEO_d);
 
-    hntr_AOvAA.overlap(raw, 1.0, DimClip(dimAO));
+    hntr_AOvAA.overlap<RawEOvEA, DimClip>(raw, eq_rad, DimClip(dimAO));
 }
 
 
@@ -434,7 +435,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
                 std::array<HntrGrid const *,2>{&hntrO, &hntrA},
-                &dimEOm, gcmA, wXOm),
+                eq_rad, &dimAOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
 
@@ -475,7 +476,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
-    ret->wM.reference(to_blitz(wXAm_e));
+    ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
     if (paramsA.scale) {
         auto sXAm(sum(*XAmvXOm, 0, '-'));
         ret->M.reset(new EigenSparseMatrixT(

@@ -204,8 +204,8 @@ void Hntr::overlap(
             double const byWEIGHT = 1. / WEIGHT;
             for (auto ii=bvals.begin(); ii != bvals.end(); ++ii) {
             	    double const area = R2*Bgrid.dxyp(JB);
-                accum.add({IJB-1, ii->first},
-                    ii->second * byWEIGHT * area );
+                double const val = ii->second * byWEIGHT * area;
+                accum.add({IJB-1, ii->first}, val);
             }
         }
     }
