@@ -140,7 +140,10 @@ void IceRegridder_L0::GvI(
         for (auto cell=gridI->cells.begin(); cell != gridI->cells.end(); ++cell) {
             long iI = cell->index;
 
-            if (!std::isnan(elevI(iI)))
+            // Only include I cells that are NOT masked out
+            // Depending on elevI, this could be either just ice
+            // or ice and dry land
+             if (!std::isnan(elevI(iI)))
                 ret.add({iI, iI}, cell->native_area);
         }
     } else {
@@ -150,9 +153,11 @@ void IceRegridder_L0::GvI(
             long const iI = cell->j;        // index in ice grid
             long const iX = cell->index;    // index in exchange grid
 
-            if (!std::isnan(elevI(iI))) {
+            // Only include I cells that are NOT masked out
+            // Depending on elevI, this could be either just ice
+            // or ice and dry land
+            if (!std::isnan(elevI(iI)))
                 ret.add({iX,iI}, cell->native_area);
-            }
         }
     }
 }
@@ -164,10 +169,13 @@ void IceRegridder_L0::GvAp(MakeDenseEigenT::AccumT &ret) const
         long const iA = cell->i;
         long const iI = cell->j;
 
-        if (!std::isnan(elevI(iI))) {
-        if (cell->native_area > 0) {
-            ret.add({iG, iA}, cell->native_area);
-        }}
+        // Only include I cells that are NOT masked out
+        // Depending on elevI, this could be either just ice
+        // or ice and dry land
+        if (!std::isnan(elevI(iI)))
+            if (cell->native_area > 0) {
+                ret.add({iG, iA}, cell->native_area);
+            }
     }
 }
 // --------------------------------------------------------
