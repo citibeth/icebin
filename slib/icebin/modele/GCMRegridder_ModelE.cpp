@@ -368,8 +368,8 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     // We need AOpvIp for wAOP; used below.
     SparseSetT dimAOp;
-    std::unique_ptr<WeightedSparse> AOpvIp(rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO));
-    blitz::Array<double,1> const &wAOp(AOpvIp->wM);
+    std::unique_ptr<WeightedSparse> AOpvIp_corrected(rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO));
+    blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
     // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
     SparseSetT &dimAOm(dimAOp);
@@ -397,7 +397,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
 
     EigenColVectorT *wXOm_e;
-    WeightedSparse *XOpvIp;
+    WeightedSparse *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
     if (X == 'E') {
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
@@ -431,7 +431,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         blitz::Array<double,1> wEOm(to_blitz(*wXOm_e));
 
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
-        reset_ptr(XAmvXOm, MakeDenseEigenT(
+        reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
                 std::array<HntrGrid const *,2>{&hntrO, &hntrA},
                 &dimEOm, gcmA, wXOm),
@@ -439,6 +439,12 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
             {&dimEOm, &dimEAm}, 'T').to_eigen());
 
     } else {    // X == 'A'
+        RegridMatrices::Params paramsO(paramsA);
+        paramsO.scale = false;
+
+        auto &AOpvIp(tmp.take<std::unique_ptr<WeightedSparse>>(
+            rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO)));
+
         XOpvIp = &*AOpvIp;
         wXOm_e = &wAOm_e;
 
@@ -468,15 +474,18 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         *XAmvXOm * map_eigen_diagonal(XAmvXOms) * *wXOm_e));
 
     // ----------- Put it all together (XAmvIp)
+    blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
     ret->wM.reference(to_blitz(wXAm_e));
     if (paramsA.scale) {
-        auto wXAm(to_blitz(wXAm_e));
-        blitz::Array<double,1> sXAm(1. / wXAm);
+        auto sXAm(sum(*XAmvXOm, 0, '-'));
         ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sXAm) * *XAmvXOm * *XOpvIp->M));
+            map_eigen_diagonal(sXAm) * 
+            *XAmvXOm *
+            map_eigen_diagonal(sXOpvIp) *
+            *XOpvIp->M));
     } else {
         ret->M.reset(new EigenSparseMatrixT(
-            *XAmvXOm * *XOpvIp->M));
+            *XAmvXOm * map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
     }
     ret->Mw.reference(XOpvIp->Mw);
     return ret;
