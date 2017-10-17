@@ -371,6 +371,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
 {
     SparseSetT &dimAAm(*dims[0]);
     SparseSetT &dimEAm(*dims[1]);
+    SparseSetT dimIp;
 
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
 
@@ -393,15 +394,21 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
         {&dimAOm, &dimAAm}, 'T').to_eigen());
 
-    blitz::Array<double,1> AAmvAOms(sum(*AAmvAOm, 1, '-'));    // Not unusual way we weight/scale here
+    blitz::Array<double,1> AAmvAOms(sum(AAmvAOm, 1, '-'));    // Not unusual way we weight/scale here
     auto &wAAm_e(ret->tmp.make<EigenColVectorT>(
-        *AAmvAOm * map_eigen_diagonal(AAmvAOms) * *wAOm_e));
+        AAmvAOm * map_eigen_diagonal(AAmvAOms) * wAOm_e));
 
 
     // ------------ Compute AOmvEOm
     SparseSetT dimEOm;
     std::unique_ptr<WeightedSparse> AOmvEOm(
         rmO->matrix("AvE", {&dimAOm, &dimEOm}, paramsO));
+
+    auto EOmvAOm(AOmvEOm->M->transpose());
+    auto EOmvAOms(sum(*AOmvEOm->M, 0, '-'));
+    auto &sAOmvEOm(EOmvAOms);
+    EigenColVectorT wEOm_e(EOmvAOm * map_eigen_diagonal(EOmvAOms) * wAOm_e);
+    auto wEOm(to_blitz(wEOm_e));
 
 
     // ------------ Compute EOmvEAm
@@ -412,20 +419,29 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
         {&dimEOm, &dimEAm}, '.').to_eigen());
 
-    auto &EAmvEOm(EOmvEAm.transpose());
+    auto EAmvEOm(EOmvEAm.transpose());
 
     // ------------ Compute wEAm
-TODO: Allocate this with tmp
+    auto EAmvEOms(sum(EOmvEAm, 0, '-'));
+    auto &sEOmvEAm(EAmvEOms);
     auto &wEAm_e(ret->tmp.make<EigenColVectorT>(
-        *EAmvEOm * map_eigen_diagonal(EAmvEOms) * *wEOm_e));
+        EAmvEOm * map_eigen_diagonal(EAmvEOms) * wEOm_e));
 
 
     // ------------- Put it all together
     ret->wM.reference(to_blitz(wAAm_e));
-    ret->M.reset(new EigenSparseMatrixT(
-        AAmvAOm *
-        map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
-        map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
+    if (paramsA.scale) {
+        blitz::Array<double,1> sAAm(1. / ret->wM);
+        ret->M.reset(new EigenSparseMatrixT(
+            map_eigen_diagonal(sAAm) * AAmvAOm *
+            map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
+            map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
+    } else {
+        ret->M.reset(new EigenSparseMatrixT(
+            AAmvAOm *
+            map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
+            map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
+    }
     ret->Mw.reference(to_blitz(wEAm_e));
 
     return ret;
@@ -610,6 +626,7 @@ RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet
 {
     Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
 
+    // Delicate construction of rmO
     RegridMatrices _rmO(gcmO->regrid_matrices(ice_sheet_name));
     RegridMatrices rm(_rmO.ice_regridder);
     RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(std::move(_rmO)));
@@ -618,6 +635,11 @@ RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet
         this, 'E', gridO->eq_rad, &rmO));
     rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
         this, 'A', gridO->eq_rad, &rmO));
+
+
+    rm.add_regrid("AAmvEAm", std::bind(*compute_AAmvEAm, _1, _2,
+        this, gridO->eq_rad, &rmO));
+
 
     // For testing
     rm.add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,
