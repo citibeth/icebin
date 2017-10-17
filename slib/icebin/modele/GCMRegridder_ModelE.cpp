@@ -361,9 +361,76 @@ Compute_wAOm(
     wAOm_e = sc_AOmvAOp * map_eigen_colvector(wAOp);
 }};
 // ------------------------------------------------------
+static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
+    std::array<SparseSetT *,2> dims,
+    RegridMatrices::Params const &paramsA,
+    GCMRegridder_ModelE const *gcmA,
+//    char X,    // Either 'A' or 'E', determines the destination matrix.
+    double const eq_rad,    // Radius of the earth
+    RegridMatrices const *rmO)
+{
+    SparseSetT &dimAAm(*dims[0]);
+    SparseSetT &dimEAm(*dims[1]);
+
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
+
+    // ------------- Compute wAOm and related quantities
+    Compute_wAOm c1(dimIp, paramsA, gcmA, rmO);
+    auto &paramsO(c1.paramsO);
+    auto &dimAOp(c1.dimAOp);
+    auto &dimAOm(c1.dimAOm);
+    auto &wAOm_e(c1.wAOm_e);
+
+    // ------------- Compute wAAm and AAmvAOm
+    // Obtain hntrA and hntrO for process below.
+    HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
+    HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
+
+    Hntr hntr_AOmvAAm(std::array<HntrGrid const *,2>{&hntrO, &hntrA});
+    EigenSparseMatrixT AAmvAOm(MakeDenseEigenT(
+        std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
+            &hntr_AOmvAAm, _1, eq_rad, DimClip(&dimAOm)),
+        {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
+        {&dimAOm, &dimAAm}, 'T').to_eigen());
+
+    blitz::Array<double,1> AAmvAOms(sum(*AAmvAOm, 1, '-'));    // Not unusual way we weight/scale here
+    auto &wAAm_e(ret->tmp.make<EigenColVectorT>(
+        *AAmvAOm * map_eigen_diagonal(AAmvAOms) * *wAOm_e));
 
 
+    // ------------ Compute AOmvEOm
+    SparseSetT dimEOm;
+    std::unique_ptr<WeightedSparse> AOmvEOm(
+        rmO->matrix("AvE", {&dimAOm, &dimEOm}, paramsO));
 
+
+    // ------------ Compute EOmvEAm
+    EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
+        std::bind(&raw_EOvEA, _1,
+            std::array<HntrGrid const *,2>{&hntrO, &hntrA},
+            eq_rad, &dimAOm, gcmA, wEOm),
+        {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
+        {&dimEOm, &dimEAm}, '.').to_eigen());
+
+    auto &EAmvEOm(EOmvEAm.transpose());
+
+    // ------------ Compute wEAm
+TODO: Allocate this with tmp
+    auto &wEAm_e(ret->tmp.make<EigenColVectorT>(
+        *EAmvEOm * map_eigen_diagonal(EAmvEOms) * *wEOm_e));
+
+
+    // ------------- Put it all together
+    ret->wM.reference(to_blitz(wAAm_e));
+    ret->M.reset(new EigenSparseMatrixT(
+        AAmvAOm *
+        map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
+        map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
+    ret->Mw.reference(to_blitz(wEAm_e));
+
+    return ret;
+}
+// ------------------------------------------------------
 /** Top-level subroutine produces the matrix EAmvIp or AAmvIp.
 
 @param X
