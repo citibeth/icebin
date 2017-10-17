@@ -129,7 +129,7 @@ public:
                 std::array<long,2>{lAO_s,ihc});
 
             // Obtain wEO, size of the elevation grid cell
-            if (!dimEO.in_dense(lEO_s)) continue;    // wEO==0 here
+            if (!dimEO.in_sparse(lEO_s)) continue;    // wEO==0 here
             int const lEO_d = dimEO.to_dense(lEO_s);
             double const weightEO = wEO_d(lEO_d);
 
@@ -418,18 +418,17 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         std::unique_ptr<WeightedSparse> EOmvAOm(
             rmO->matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
         const_universe.reset();        // Check that dims didn't change
-        blitz::Array<double,1> sEOmvAOm(1. / EOmvAOm->wM);
+        blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
 
 
         // wEOm_e
         tmp.take<EigenColVectorT>(wXOm_e,
-            EigenColVectorT(map_eigen_diagonal(sEOmvAOm) * *EOmvAOm->M * wAOm_e));
+            EigenColVectorT(*EOmvAOm->M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
 
         // ---------------- Compute the main matrix
         // ---------------- XAmvIp = XAmvXOm * XOpvIp
         // Rename variables
         SparseSetT &dimEAm(dimXAm);
-        blitz::Array<double,1> wEOm(to_blitz(*wXOm_e));
 
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
