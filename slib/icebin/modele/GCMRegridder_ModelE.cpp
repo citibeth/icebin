@@ -328,6 +328,42 @@ static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
 
 // ========================================================================
 
+// ------------------------------------------------------
+class Compute_wAOm {
+public:
+    RegridMatrices::Params paramsO;
+    SparseSetT dimAOp;
+    SparseSetT &dimAOm;
+    EigenColVectorT wAOm_e;
+
+Compute_wAOm(
+    SparseSetT &dimIp,
+    RegridMatrices::Params const &paramsA,
+    GCMRegridder_ModelE const *gcmA,
+    RegridMatrices const *rmO)
+: paramsO(paramsA),
+    dimAOm(dimAOp)        // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
+{
+    // ------------ Params for generating sub-matrices
+    paramsO.scale = false;
+    paramsO.correctA = true;
+
+    // We need AOpvIp for wAOP; used below.
+    std::unique_ptr<WeightedSparse> AOpvIp_corrected(rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO));
+    blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
+
+    // OmvOp
+    EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
+        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '+'),
+        {SparsifyTransform::TO_DENSE},
+        {&dimAOm, &dimAOp}, '.').to_eigen());
+
+    wAOm_e = sc_AOmvAOp * map_eigen_colvector(wAOp);
+}};
+// ------------------------------------------------------
+
+
+
 /** Top-level subroutine produces the matrix EAmvIp or AAmvIp.
 
 @param X
@@ -357,38 +393,12 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
 
-    // ------------ Params for generating sub-matrices
-    RegridMatrices::Params paramsO(paramsA);
-    paramsO.scale = false;
-    paramsO.correctA = true;
-
-    // ---------------- Take along the non-conservative weights
-
-    // ----------- Determine universe for AOp / EOp
-    // (and we will use the main matrix later)
-
-    // We need AOpvIp for wAOP; used below.
-    SparseSetT dimAOp;
-    std::unique_ptr<WeightedSparse> AOpvIp_corrected(rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO));
-    blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
-
-    // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
-    SparseSetT &dimAOm(dimAOp);
-
-    std::unique_ptr<ConstUniverse> const_universe;
-
-    // ----------- Compute weights for GCM ice sheet (wXOm)
-    // wEOm = sEOmvOm * EOmvAOm * wc_AOmvAOp * wAOp
-    //    or   wAOm = AOmvAOp * wAOp
-    // wAOp
-
-    // OmvOp
-    EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
-        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '+'),
-        {SparsifyTransform::TO_DENSE},
-        {&dimAOm, &dimAOp}, '.').to_eigen());
-
-    EigenColVectorT wAOm_e(sc_AOmvAOp * map_eigen_colvector(wAOp));
+    // Compute wAOm and related quantities
+    Compute_wAOm c1(dimIp, paramsA, gcmA, rmO);
+    auto &paramsO(c1.paramsO);
+    auto &dimAOp(c1.dimAOp);
+    auto &dimAOm(c1.dimAOm);
+    auto &wAOm_e(c1.wAOm_e);
 
 
     std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
@@ -399,6 +409,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     EigenColVectorT *wXOm_e;
     WeightedSparse *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
+    std::unique_ptr<ConstUniverse> const_universe;
     if (X == 'E') {
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
