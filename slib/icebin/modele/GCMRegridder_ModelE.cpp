@@ -16,6 +16,8 @@ namespace modele {
 
 
 // ----------------------------------------------------------------
+double const *focean_watch;
+
 // ----------------------------------------------------------------
 /** Diagonal matrix converts wOm <- wOp, weight of the elevation
 classes in the two different systems (ModelE (m) vs. IceBin (p)).
@@ -53,6 +55,8 @@ static void scaled_AOmvAOp(
     blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
     char invert = '+')
 {
+focean_watch = &foceanAOm(48193);
+printf("BEGIN scaled_AOmvAOp(%p %p) %g\n", foceanAOp.data(), foceanAOm.data(), foceanAOm(48193));
     SparseSetT &dimAOp(*ret.dim(1).sparse_set);
 
     // By looping over only things in IceBin ice sheet, we implicitly only
@@ -67,7 +71,7 @@ static void scaled_AOmvAOp(
 
         if (fcont_m == 0.0) continue;
         if (fcont_m != 1.0) (*icebin_error)(-1,
-            "fcont_m must be 0 or 1");
+            "fcont_m[%d] = %g (%p; %p), must be 0 or 1", iAO_s, fcont_m, foceanAOm.data(), &foceanAOm(iAO_s));
 
         if (fcont_p == 0.0) continue;    // Can't extend ice that's not there
 
@@ -77,6 +81,7 @@ static void scaled_AOmvAOp(
         double const val = (invert == '-' ? fcont_p : 1./fcont_p);
         ret.add({iAO_s, iAO_s}, val);
     }
+printf("END scaled_AOmvAOp()\n");
 }
 // ----------------------------------------------------------------
 /** Helper function: clip a cell according to its index */
@@ -369,9 +374,13 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     double const eq_rad,    // Radius of the earth
     RegridMatrices const *rmO)
 {
+printf("BEGIN compute_AAmvEAm %p %g\n", focean_watch, *focean_watch);
     SparseSetT &dimAAm(*dims[0]);
     SparseSetT &dimEAm(*dims[1]);
     SparseSetT dimIp;
+
+    dimAAm.set_sparse_extent(gcmA->nA());
+    dimEAm.set_sparse_extent(gcmA->nE());
 
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
 
@@ -382,6 +391,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     auto &dimAOm(c1.dimAOm);
     auto &wAOm_e(c1.wAOm_e);
 
+printf("AA2\n");
     // ------------- Compute wAAm and AAmvAOm
     // Obtain hntrA and hntrO for process below.
     HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
@@ -399,6 +409,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
         AAmvAOm * map_eigen_diagonal(AAmvAOms) * wAOm_e));
 
 
+printf("AA3\n");
     // ------------ Compute AOmvEOm
     SparseSetT dimEOm;
     std::unique_ptr<WeightedSparse> AOmvEOm(
@@ -411,6 +422,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     auto wEOm(to_blitz(wEOm_e));
 
 
+printf("AA4\n");
     // ------------ Compute EOmvEAm
     EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
         std::bind(&raw_EOvEA, _1,
@@ -421,6 +433,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
 
     auto EAmvEOm(EOmvEAm.transpose());
 
+printf("AA5\n");
     // ------------ Compute wEAm
     auto EAmvEOms(sum(EOmvEAm, 0, '-'));
     auto &sEOmvEAm(EAmvEOms);
@@ -428,6 +441,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
         EAmvEOm * map_eigen_diagonal(EAmvEOms) * wEOm_e));
 
 
+printf("AA6\n");
     // ------------- Put it all together
     ret->wM.reference(to_blitz(wAAm_e));
     if (paramsA.scale) {
@@ -444,6 +458,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     }
     ret->Mw.reference(to_blitz(wEAm_e));
 
+printf("END compute_AAmvEAm\n");
     return ret;
 }
 // ------------------------------------------------------
@@ -465,6 +480,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     double const eq_rad,    // Radius of the earth
     RegridMatrices const *rmO)
 {
+printf("END compute_XAmvIp(%c)\n", X);
     TmpAlloc tmp;
 
     SparseSetT &dimXAm(*dims[0]);
@@ -482,6 +498,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     auto &dimAOp(c1.dimAOp);
     auto &dimAOm(c1.dimAOm);
     auto &wAOm_e(c1.wAOm_e);
+printf("FOCEAN1 %g\n", *focean_watch);
 
 
     std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
@@ -493,7 +510,9 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     EigenColVectorT *wXOm_e;
     WeightedSparse *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
     std::unique_ptr<ConstUniverse> const_universe;
+printf("FOCEAN2 %g\n", *focean_watch);
     if (X == 'E') {
+printf("FOCEAN3 %g\n", *focean_watch);
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
@@ -507,14 +526,20 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         // dimEOm is a subset of dimEOp
         SparseSetT &dimEOm(dimEOp);
 
+printf("FOCEAN4 %g\n", *focean_watch);
         // EOmvAOm: Repeat A values in E
         const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
+printf("FOCEAN4.1 %g\n", *focean_watch);
         std::unique_ptr<WeightedSparse> EOmvAOm(
             rmO->matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
+printf("FOCEAN4.2 %g\n", *focean_watch);
         const_universe.reset();        // Check that dims didn't change
+printf("FOCEAN4.3 %g\n", *focean_watch);
         blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
+printf("FOCEAN4.4 %g\n", *focean_watch);
 
 
+printf("FOCEAN5 %g\n", *focean_watch);
         // wEOm_e
         tmp.take<EigenColVectorT>(wXOm_e,
             EigenColVectorT(*EOmvAOm->M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
@@ -524,6 +549,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
         // Rename variables
         SparseSetT &dimEAm(dimXAm);
 
+printf("FOCEAN6 %g\n", *focean_watch);
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
@@ -531,6 +557,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
                 eq_rad, &dimAOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
+printf("FOCEAN7 %g\n", *focean_watch);
 
     } else {    // X == 'A'
         RegridMatrices::Params paramsO(paramsA);
@@ -567,6 +594,7 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     auto &wXAm_e(ret->tmp.make<EigenColVectorT>(
         *XAmvXOm * map_eigen_diagonal(XAmvXOms) * *wXOm_e));
 
+printf("FOCEAN8 %g\n", *focean_watch);
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
     ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
@@ -582,6 +610,9 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
             *XAmvXOm * map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
     }
     ret->Mw.reference(XOpvIp->Mw);
+
+printf("FOCEAN9 %g\n", *focean_watch);
+printf("END compute_XAmvIp(%c)\n", X);
     return ret;
 }
 // ========================================================================
