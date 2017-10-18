@@ -494,12 +494,9 @@ printf("END compute_XAmvIp(%c)\n", X);
 
     // Compute wAOm and related quantities
     Compute_wAOm c1(dimIp, paramsA, gcmA, rmO);
-    auto &paramsO(c1.paramsO);
     auto &dimAOp(c1.dimAOp);
     auto &dimAOm(c1.dimAOm);
     auto &wAOm_e(c1.wAOm_e);
-printf("FOCEAN1 %g\n", *focean_watch);
-
 
     std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
 
@@ -510,9 +507,11 @@ printf("FOCEAN1 %g\n", *focean_watch);
     EigenColVectorT *wXOm_e;
     WeightedSparse *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
     std::unique_ptr<ConstUniverse> const_universe;
-printf("FOCEAN2 %g\n", *focean_watch);
     if (X == 'E') {
-printf("FOCEAN3 %g\n", *focean_watch);
+        RegridMatrices::Params paramsO(paramsA);
+        paramsO.scale = false;
+        paramsO.correctA = false;
+
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
@@ -526,20 +525,14 @@ printf("FOCEAN3 %g\n", *focean_watch);
         // dimEOm is a subset of dimEOp
         SparseSetT &dimEOm(dimEOp);
 
-printf("FOCEAN4 %g\n", *focean_watch);
         // EOmvAOm: Repeat A values in E
         const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
-printf("FOCEAN4.1 %g\n", *focean_watch);
         std::unique_ptr<WeightedSparse> EOmvAOm(
             rmO->matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
-printf("FOCEAN4.2 %g\n", *focean_watch);
         const_universe.reset();        // Check that dims didn't change
-printf("FOCEAN4.3 %g\n", *focean_watch);
         blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
-printf("FOCEAN4.4 %g\n", *focean_watch);
 
 
-printf("FOCEAN5 %g\n", *focean_watch);
         // wEOm_e
         tmp.take<EigenColVectorT>(wXOm_e,
             EigenColVectorT(*EOmvAOm->M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
@@ -549,7 +542,6 @@ printf("FOCEAN5 %g\n", *focean_watch);
         // Rename variables
         SparseSetT &dimEAm(dimXAm);
 
-printf("FOCEAN6 %g\n", *focean_watch);
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
@@ -557,11 +549,10 @@ printf("FOCEAN6 %g\n", *focean_watch);
                 eq_rad, &dimAOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
-printf("FOCEAN7 %g\n", *focean_watch);
-
     } else {    // X == 'A'
         RegridMatrices::Params paramsO(paramsA);
         paramsO.scale = false;
+        paramsO.correctA = false;
 
         auto &AOpvIp(tmp.take<std::unique_ptr<WeightedSparse>>(
             rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO)));
