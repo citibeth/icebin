@@ -414,15 +414,15 @@ printf("AA3\n");
     SparseSetT dimEOm;
     std::unique_ptr<WeightedSparse> AOmvEOm(
         rmO->matrix("AvE", {&dimAOm, &dimEOm}, paramsO));
+    auto sAOmvEOm(sum(*AOmvEOm->M, 0, '-'));
+
 
     auto EOmvAOm(AOmvEOm->M->transpose());
-    auto EOmvAOms(sum(*AOmvEOm->M, 0, '-'));
-    auto &sAOmvEOm(EOmvAOms);
+    auto &EOmvAOms(sAOmvEOm);
     EigenColVectorT wEOm_e(EOmvAOm * map_eigen_diagonal(EOmvAOms) * wAOm_e);
     auto wEOm(to_blitz(wEOm_e));
 
 
-printf("AA4\n");
     // ------------ Compute EOmvEAm
     EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
         std::bind(&raw_EOvEA, _1,
@@ -433,7 +433,6 @@ printf("AA4\n");
 
     auto EAmvEOm(EOmvEAm.transpose());
 
-printf("AA5\n");
     // ------------ Compute wEAm
     auto EAmvEOms(sum(EOmvEAm, 0, '-'));
     auto &sEOmvEAm(EAmvEOms);
@@ -441,24 +440,26 @@ printf("AA5\n");
         EAmvEOm * map_eigen_diagonal(EAmvEOms) * wEOm_e));
 
 
-printf("AA6\n");
     // ------------- Put it all together
     ret->wM.reference(to_blitz(wAAm_e));
+    blitz::Array<double,1> sAAmvAOm(sum(AAmvAOm, 0, '-'));
     if (paramsA.scale) {
-        blitz::Array<double,1> sAAm(1. / ret->wM);
         ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sAAm) * AAmvAOm *
+            map_eigen_diagonal(sAAmvAOm) * AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
             map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
     } else {
+        blitz::Array<double,1> scale(ret->wM * sAAmvAOm);
         ret->M.reset(new EigenSparseMatrixT(
-            AAmvAOm *
+            map_eigen_diagonal(scale) *
+//            map_eigen_diagonal(ret->wM) *
+//            map_eigen_diagonal(sAAmvAOm) *
+            AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
             map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
     }
     ret->Mw.reference(to_blitz(wEAm_e));
 
-printf("END compute_AAmvEAm\n");
     return ret;
 }
 // ------------------------------------------------------
