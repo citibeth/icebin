@@ -161,7 +161,7 @@ void Hntr::overlap(
     double const eq_rad,        // Radius of the Earth
     IncludeT includeB)
 {
-
+printf("BEGIN Hntr::overlap() %p\n", &accum);
     // ------------------
     // Interpolate the A grid onto the B grid
     double const R2 = eq_rad*eq_rad;
@@ -209,6 +209,7 @@ void Hntr::overlap(
             }
         }
     }
+printf("END Hntr::overlap()\n");
 }
 
 
