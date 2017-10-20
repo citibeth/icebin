@@ -462,156 +462,9 @@ printf("AA3\n");
 
     return ret;
 }
-// ------------------------------------------------------
-/** Top-level subroutine produces the matrix EAmvIp or AAmvIp.
-
-@param X
-    Controls which matrix is produced:
-      'E' -> EAmvIp
-      'A' -> AAmvIp
-@parm rmO
-    Regrids between (AOp, EOp, Ip)
-    (NOTE: rmO expects to see these matrices named "A", "E" and "I")
-*/
-static std::unique_ptr<WeightedSparse> compute_XAmvIp_orig(
-    std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &paramsA,
-    GCMRegridder_ModelE const *gcmA,
-    char X,    // Either 'A' or 'E', determines the destination matrix.
-    double const eq_rad,    // Radius of the earth
-    RegridMatrices const *rmO)
-{
-printf("END compute_XAmvIp(%c)\n", X);
-    TmpAlloc tmp;
-
-    SparseSetT &dimXAm(*dims[0]);
-    SparseSetT &dimIp(*dims[1]);
-    SparseSetT dimEOm, dimEOp, dimOm;
-
-    dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
-    dimIp.set_sparse_extent(rmO->ice_regridder->nI());
-
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
-
-    // Compute wAOm and related quantities
-    Compute_wAOm c1(dimIp, paramsA, gcmA, rmO);
-    auto &dimAOp(c1.dimAOp);
-    auto &dimAOm(c1.dimAOm);
-    auto &wAOm_e(c1.wAOm_e);
-
-    std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
-
-    // Obtain hntrA and hntrO for process below.
-    HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
-    HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
-
-    EigenColVectorT *wXOm_e;
-    WeightedSparse *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
-    std::unique_ptr<ConstUniverse> const_universe;
-    if (X == 'E') {
-        RegridMatrices::Params paramsO(paramsA);
-        paramsO.scale = false;
-        paramsO.correctA = false;
-
-        // Get the universe for EOp / EOm
-        SparseSetT dimEOp;
-        const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
-        WeightedSparse &EOpvIp(tmp.take(rmO->matrix("EvI", {&dimEOp, &dimIp}, paramsO)));
-
-//        std::unique_ptr<WeightedSparse> EOpvIp();
-        XOpvIp = &EOpvIp;
-
-        const_universe.reset();        // Check that dimIp hasn't changed
-
-        // dimEOm is a subset of dimEOp
-        SparseSetT &dimEOm(dimEOp);
-
-        // EOmvAOm: Repeat A values in E
-        const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
-        std::unique_ptr<WeightedSparse> EOmvAOm(
-            rmO->matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
-        const_universe.reset();        // Check that dims didn't change
-        blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
-
-
-        // wEOm_e
-        tmp.take<EigenColVectorT>(wXOm_e,
-            EigenColVectorT(*EOmvAOm->M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
-
-        // ---------------- Compute the main matrix
-        // ---------------- XAmvIp = XAmvXOm * XOpvIp
-        // Rename variables
-        SparseSetT &dimEAm(dimXAm);
-
-        blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
-        reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
-            std::bind(&raw_EOvEA, _1,
-                std::array<HntrGrid const *,2>{&hntrO, &hntrA},
-                eq_rad, &dimAOm, gcmA, wXOm),
-            {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
-            {&dimEOm, &dimEAm}, 'T').to_eigen());
-    } else {    // X == 'A'
-        RegridMatrices::Params paramsO(paramsA);
-        paramsO.scale = false;
-        paramsO.correctA = false;
-
-        auto &AOpvIp(tmp.take<std::unique_ptr<WeightedSparse>>(
-            rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO)));
-
-        XOpvIp = &*AOpvIp;
-        wXOm_e = &wAOm_e;
-
-        // ---------------- Compute the main matrix
-        // ---------------- XAmvIp = XAmvXOm * XOpvIp
-
-        SparseSetT &dimAAm(dimXAm);
-
-        // Actually AOmvAAm
-        Hntr hntr_XOmvXAm(std::array<HntrGrid const *,2>{&hntrO, &hntrA});
-        reset_ptr(XAmvXOm, MakeDenseEigenT(
-            std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
-                &hntr_XOmvXAm, _1, eq_rad, DimClip(&dimAOm)),
-            {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
-            {&dimAOm, &dimAAm}, 'T').to_eigen());
-    }
-
-
-    // ---------- wEAm = [scale] * XAmvXOm * wEOm
-    // NOTE: We are scaling for the source grid, not destination grid.
-    // This will produce a matrix where A = O1+O2+O3+O4, which is what
-    // we want for summing up weights of ocean grid.
-    blitz::Array<double,1> XAmvXOms(sum(*XAmvXOm, 1, '-'));    // Not unusual way we weight/scale here
-
-    // The matrix *XAmvXOm * map_eigen_diagonal(XAmvXOms) should consist only of 1's and 0's
-    auto &wXAm_e(ret->tmp.make<EigenColVectorT>(
-        *XAmvXOm * map_eigen_diagonal(XAmvXOms) * *wXOm_e));
-
-printf("FOCEAN8 %g\n", *focean_watch);
-    // ----------- Put it all together (XAmvIp)
-    blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
-    ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
-    if (paramsA.scale) {
-        auto sXAm(sum(*XAmvXOm, 0, '-'));
-        ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sXAm) * 
-            *XAmvXOm *
-            map_eigen_diagonal(sXOpvIp) *
-            *XOpvIp->M));
-    } else {
-        ret->M.reset(new EigenSparseMatrixT(
-            *XAmvXOm * map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
-    }
-    ret->Mw.reference(XOpvIp->Mw);
-
-printf("FOCEAN9 %g\n", *focean_watch);
-printf("END compute_XAmvIp(%c)\n", X);
-    return ret;
-}
 // ========================================================================
 struct ComputeXAmvIp_Helper {
     TmpAlloc tmp;
-
-    std::unique_ptr<WeightedSparse> ret;
 
     SparseSetT dimEOm, dimEOp, dimOm;
 
@@ -624,6 +477,8 @@ struct ComputeXAmvIp_Helper {
     WeightedSparse *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
     EigenColVectorT *wXAm_e;
 
+    blitz::Array<double,1> XAmvXOms;
+
 ComputeXAmvIp_Helper(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
@@ -633,7 +488,7 @@ ComputeXAmvIp_Helper(
     RegridMatrices const *rmO)
 {
 
-    ret.reset(new WeightedSparse(dims, false));    // Not conservative
+//    ret.reset(new WeightedSparse(dims, false));    // Not conservative
     SparseSetT &dimXAm(*dims[0]);
     SparseSetT &dimIp(*dims[1]);
 
@@ -744,12 +599,12 @@ printf("HH8\n");
     // NOTE: We are scaling for the source grid, not destination grid.
     // This will produce a matrix where A = O1+O2+O3+O4, which is what
     // we want for summing up weights of ocean grid.
-    blitz::Array<double,1> XAmvXOms(sum(*XAmvXOm, 1, '-'));    // Not unusual way we weight/scale here
+    XAmvXOms.reference(sum(*XAmvXOm, 1, '-'));    // Not unusual way we weight/scale here
 printf("HH9\n");
 
     // The matrix *XAmvXOm * map_eigen_diagonal(XAmvXOms) should consist only of 1's and 0's
 
-    ret->tmp.take(wXAm_e,
+    tmp.take(wXAm_e,
         EigenColVectorT(*XAmvXOm * map_eigen_diagonal(XAmvXOms) * *wXOm_e));
 
 }
@@ -770,6 +625,7 @@ printf("BEGIN compute_XAmvIp() %p %p\n", &dims[0]->_d2s[0], &dims[1]->_d2s[0]);
 
     // Do the legwork, and fish out things from the results that we need
     ComputeXAmvIp_Helper hh(dims, paramsA, gcmA, X, eq_rad, rmO);
+    ret->tmp = std::move(hh.tmp);
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
@@ -778,28 +634,77 @@ printf("BEGIN compute_XAmvIp() %p %p\n", &dims[0]->_d2s[0], &dims[1]->_d2s[0]);
 printf("FOCEAN8 %g\n", *focean_watch);
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
-    hh.ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
+    ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
     if (paramsA.scale) {
         auto sXAm(sum(*XAmvXOm, 0, '-'));
-        hh.ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sXAm) * 
-            *XAmvXOm *
-            map_eigen_diagonal(sXOpvIp) *
-            *XOpvIp->M));
+        ret->M.reset(new EigenSparseMatrixT(
+            map_eigen_diagonal(sXAm) *  *XAmvXOm *
+            map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
     } else {
-        hh.ret->M.reset(new EigenSparseMatrixT(
+        ret->M.reset(new EigenSparseMatrixT(
             *XAmvXOm * map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
     }
-    hh.ret->Mw.reference(XOpvIp->Mw);
+    ret->Mw.reference(XOpvIp->Mw);
 
 printf("FOCEAN9 %g\n", *focean_watch);
 printf("END compute_XAmvIp(%c)\n", X);
-    return std::move(hh.ret);
+    return ret;
+}
+
+
+static std::unique_ptr<WeightedSparse> compute_IpvXAm(
+    std::array<SparseSetT *,2> dims,
+    RegridMatrices::Params const &paramsA,
+    GCMRegridder_ModelE const *gcmA,
+    char X,    // Either 'A' or 'E', determines the destination matrix.
+    double const eq_rad,    // Radius of the earth
+    RegridMatrices const *rmO)
+{
+
+    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
+
+printf("BEGIN compute_XAmvIp() %p %p\n", &dims[0]->_d2s[0], &dims[1]->_d2s[0]);
+
+    // Do the legwork, and fish out things from the results that we need
+    ComputeXAmvIp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, X, eq_rad, rmO);
+    ret->tmp = std::move(hh.tmp);
+    auto &XOpvIp(hh.XOpvIp);
+    auto &wXAm_e(*hh.wXAm_e);
+    auto &XAmvXOm(hh.XAmvXOm);
+
+
+printf("FOCEAN8 %g\n", *focean_watch);
+    // ----------- Put it all together (XAmvIp)
+    blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
+
+    auto XOmvXAm(XAmvXOm->transpose());
+    auto &sXOmvXAm(hh.XAmvXOms);
+    auto IpvXOp(XOpvIp->M->transpose());
+//    auto sIpvXOp(sum(*XOpvIp->M, 1, '-'));
+//    ret->wM.reference(sIpvXOp);
+    blitz::Array<double,1> sIpvXOp(1. / XOpvIp->Mw);
+    ret->wM.reference(XOpvIp->Mw);
+    if (paramsA.scale) {
+        ret->M.reset(new EigenSparseMatrixT(
+            map_eigen_diagonal(sIpvXOp) * IpvXOp *
+            map_eigen_diagonal(sXOmvXAm) * XOmvXAm
+        ));
+    } else {
+        ret->M.reset(new EigenSparseMatrixT(
+            IpvXOp *
+            map_eigen_diagonal(sXOmvXAm) * XOmvXAm
+        ));
+    }
+    ret->Mw.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
+
+printf("FOCEAN9 %g\n", *focean_watch);
+printf("END compute_XAmvIp(%c)\n", X);
+    return ret;
 }
 
 
 
-static std::unique_ptr<WeightedSparse> compute_IpvXAm(
+static std::unique_ptr<WeightedSparse> compute_IpvXAm_bad(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
     GCMRegridder_ModelE const *gcmA,
