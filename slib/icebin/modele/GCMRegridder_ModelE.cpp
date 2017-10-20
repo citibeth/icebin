@@ -673,25 +673,36 @@ printf("BEGIN compute_XAmvIp() %p %p\n", &dims[0]->_d2s[0], &dims[1]->_d2s[0]);
     auto &XAmvXOm(hh.XAmvXOm);
 
 
+    std::string const &matname(X=='A' ? "IvA" : "IvE");
+printf("matname %s\n", matname.c_str());
+    SparseSetT *dimIp(dims[0]);
+    RegridMatrices::Params paramsO(paramsA);
+        paramsO.scale = false;
+        paramsO.correctA = false;
+    auto IpvXOp(
+        rmO->matrix(matname,
+            {dimIp, X == 'A' ? &hh.c1->dimAOp : &hh.dimEOp}, paramsO));
+
+
 printf("FOCEAN8 %g\n", *focean_watch);
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
 
     auto XOmvXAm(XAmvXOm->transpose());
     auto &sXOmvXAm(hh.XAmvXOms);
-    auto IpvXOp(XOpvIp->M->transpose());
+//    auto IpvXOp(XOpvIp->M->transpose());
 //    auto sIpvXOp(sum(*XOpvIp->M, 1, '-'));
 //    ret->wM.reference(sIpvXOp);
-    blitz::Array<double,1> sIpvXOp(1. / XOpvIp->Mw);
+    blitz::Array<double,1> sIpvXOp(1. / IpvXOp->wM);
     ret->wM.reference(XOpvIp->Mw);
     if (paramsA.scale) {
         ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sIpvXOp) * IpvXOp *
+            map_eigen_diagonal(sIpvXOp) * *IpvXOp->M *
             map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     } else {
         ret->M.reset(new EigenSparseMatrixT(
-            IpvXOp *
+            *IpvXOp->M *
             map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     }
