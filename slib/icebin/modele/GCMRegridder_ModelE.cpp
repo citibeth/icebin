@@ -249,10 +249,16 @@ static HntrGrid const make_hntrA(Grid_LonLat const *gridO)
 }
 
 
-/** Creates Atmosphere grid from an existing Hntr-type Ocean grid. */
+/** Creates Atmosphere grid from an existing Hntr-defined Ocean grid.
+It does this creating a Hntr spec for gridA, and then running grid-generation
+code on it.
+
+@gridO the Hntr-defined Ocean grid.  gridO->hntr must be set; this
+    will happen if it was defined using GridSpec_Hntr (or loaded from
+    a NetCDF file generated that way).
+*/
 static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
 {
-printf("BEGIN make_gridA(%p)\n", gridO);
 
     HntrGrid const &hntrO(*gridO->hntr);
     HntrGrid const hntrA(make_hntrA(gridO));
@@ -288,13 +294,15 @@ printf("BEGIN make_gridA(%p)\n", gridO);
 
     std::unique_ptr<Grid> ret(gridA.release());
 
-printf("END make_gridA(%p -> %p)\n", gridO, ret.get());
     return ret;
 }
 
 // ========================================================================
 // --------------------------------------------------------
-/** This exists mostly so we can test it from Python */
+/** Top-level regrid generator computes AOmvAAm.
+This is not a regridding matrix ModelE needs directly (it is a component of such).
+It exists here as a top-level subroutine so we can test it easily from Python.
+@param transpose 'T' if this matrix should be transposed, '.' if not. */
 static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
@@ -329,14 +337,24 @@ static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
 // ========================================================================
 
 // ------------------------------------------------------
+/** Computes the intermediate value wAOm, which is needed by more than one
+    top-level regrid generator.  Computes some other values along with wAOm as well. */
 class Compute_wAOm {
 public:
-    RegridMatrices::Params paramsO;
-    SparseSetT dimAOp;
+    RegridMatrices::Params paramsO;   // Parameters used with rmO
+    SparseSetT dimAOp; // Includes only AO grid cells that interact with an ice sheet.
     SparseSetT &dimAOm;
     EigenColVectorT wAOm_e;
 
-Compute_wAOm(
+    /** Parameters come from top-level regridding subroutine */
+    Compute_wAOm(
+        SparseSetT &dimIp,
+        RegridMatrices::Params const &paramsA,
+        GCMRegridder_ModelE const *gcmA,
+        RegridMatrices const *rmO);
+};
+
+Compute_wAOm::Compute_wAOm(
     SparseSetT &dimIp,
     RegridMatrices::Params const &paramsA,
     GCMRegridder_ModelE const *gcmA,
@@ -359,8 +377,16 @@ Compute_wAOm(
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
     wAOm_e = sc_AOmvAOp * map_eigen_colvector(wAOp);
-}};
+}
 // ------------------------------------------------------
+/** Computes AAmvEAM (with scaling)
+@param dims {dimAAm, dimEAm} User-supplied dimension maps, which will be added to.
+@param paramsA Regridding parameters.  NOTE: correctA is ignored.
+@param gcmA Used to obtain access to foceanAOp, foceanAOm, gridA, gridO
+@param eq_rad Radius of the earth.  Must be the same as eq_rad in ModelE.
+@param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
+       NOTE: rmO knows these grids as (A, E, I).
+*/
 static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
@@ -372,6 +398,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     SparseSetT &dimEAm(*dims[1]);
     SparseSetT dimIp;
 
+    // Must set sparse_extent
     dimAAm.set_sparse_extent(gcmA->nA());
     dimEAm.set_sparse_extent(gcmA->nE());
 
@@ -452,12 +479,21 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     return ret;
 }
 // ========================================================================
+
+// -----------------------------------------------------------
+/** Computes some intermediate values used by more than one top-level
+    regrid generator */
 struct ComputeXAmvIp_Helper {
+
+    /** Allocated stuff that must remain allocated for the duration of
+    the temporary values.  This should be transferred to a
+    RegridMatrices object being returned by the top-level regrid generator. */
     TmpAlloc tmp;
 
+    // Intermediate regridded values
     SparseSetT dimEOm, dimEOp, dimOm;
 
-
+    // Intermediate values
     std::unique_ptr<Compute_wAOm> c1;
 
     std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
@@ -468,7 +504,17 @@ struct ComputeXAmvIp_Helper {
 
     blitz::Array<double,1> XAmvXOms;
 
-ComputeXAmvIp_Helper(
+    /** Parameters come from top-level regridding subroutine */
+    ComputeXAmvIp_Helper(
+        std::array<SparseSetT *,2> dims,
+        RegridMatrices::Params const &paramsA,
+        GCMRegridder_ModelE const *gcmA,
+        char X,    // Either 'A' or 'E', determines the destination matrix.
+        double const eq_rad,    // Radius of the earth
+        RegridMatrices const *rmO);
+};    // class ComputeXAmvIp_Helper
+
+ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
     GCMRegridder_ModelE const *gcmA,
@@ -490,6 +536,7 @@ ComputeXAmvIp_Helper(
     dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
     dimIp.set_sparse_extent(rmO->ice_regridder->nI());
 
+    // Ensure that operations don't change universes.  Sanity check.
     std::unique_ptr<ConstUniverse> const_universe;
 
     if (X == 'E') {
@@ -570,8 +617,16 @@ ComputeXAmvIp_Helper(
         EigenColVectorT(*XAmvXOm * map_eigen_diagonal(XAmvXOms) * *wXOm_e));
 
 }
-};    // class ComputeXAmvIp_Helper
-
+// -----------------------------------------------------------
+/** Computes XAmvIp (with scaling)
+@param dims {dimXAm, dimIp} User-supplied dimension maps, which will be added to.
+@param paramsA Regridding parameters.  NOTE: correctA is ignored.
+@param gcmA Used to obtain access to foceanAOp, foceanAOm, gridA, gridO
+@param X Either 'A' or 'E', determines the destination matrix.
+@param eq_rad Radius of the earth.  Must be the same as eq_rad in ModelE.
+@param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
+       NOTE: rmO knows these grids as (A, E, I).
+*/
 static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
@@ -607,8 +662,16 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
 
     return ret;
 }
-
-
+// -----------------------------------------------------------
+/** Computes IpvXAm (with scaling)
+@param dims {dimIp, dimXAm} User-supplied dimension maps, which will be added to.
+@param paramsA Regridding parameters.  NOTE: correctA is ignored.
+@param gcmA Used to obtain access to foceanAOp, foceanAOm, gridA, gridO
+@param X Either 'A' or 'E', determines the destination matrix.
+@param eq_rad Radius of the earth.  Must be the same as eq_rad in ModelE.
+@param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
+       NOTE: rmO knows these grids as (A, E, I).
+*/
 static std::unique_ptr<WeightedSparse> compute_IpvXAm(
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &paramsA,
@@ -659,42 +722,11 @@ static std::unique_ptr<WeightedSparse> compute_IpvXAm(
 
     return ret;
 }
-
-
-
-static std::unique_ptr<WeightedSparse> compute_IpvXAm_bad(
-    std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &paramsA,
-    GCMRegridder_ModelE const *gcmA,
-    char X,    // Either 'A' or 'E', determines the destination matrix.
-    double const eq_rad,    // Radius of the earth
-    RegridMatrices const *rmO)
-{
-    RegridMatrices::Params _paramsA(paramsA);
-    _paramsA.scale = false;
-
-    auto XAmvIp(compute_XAmvIp(
-        {dims[1], dims[0]},
-        _paramsA, gcmA, X, eq_rad, rmO));
-
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
-    ret->tmp = std::move(XAmvIp->tmp);
-    ret->Mw.reference(XAmvIp->wM);
-    ret->wM.reference(XAmvIp->Mw);
-    if (paramsA.scale) {
-        ret->M.reset(new EigenSparseMatrixT(XAmvIp->M->transpose()));
-    } else {
-        blitz::Array<double,1> scale(1. / XAmvIp->Mw);
-        ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(scale) * XAmvIp->M->transpose()));
-    }
-
-    return ret;
-}
-
 // ============================================================
 // Methods for GCMRegridder_ModelE
 
+/** @param gcmO A GCMRegridder_Standard that regrids between AOp,EOp,Ip.
+        This is typically loaded directly from a NetCDF file. */
 GCMRegridder_ModelE::GCMRegridder_ModelE(
         std::shared_ptr<icebin::GCMRegridder> const &_gcmO)
     : gcmO(_gcmO)
