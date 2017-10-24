@@ -62,6 +62,7 @@ public:
     /** Elevation of grid cells in ice grid (I).
     This also implies a mask: cells with std::isnan() are masked out. */
     DenseArrayT<1> elevI;
+    blitz::Array<int,1> maskI;
 protected:
 
     Type type;          /// Grid::Parameterization
@@ -98,7 +99,11 @@ public:
         DenseArrayT<1> const &elevI);
 
 
-    void set_elevI(DenseArrayT<1> const &_elevI);
+    /** @param elevI Elevation at points of ice sheet and land.
+    @param maskI Land surface type of each grid cell (ocean, land, ice) */
+    void set_elevI(
+        DenseArrayT<1> const &_elevI,
+        blitz::Array<char,1> const &maskI);
 
     // ------------------------------------------------
     /** Number of dimensions of ice vector space */

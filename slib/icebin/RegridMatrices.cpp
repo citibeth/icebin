@@ -119,7 +119,8 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridde
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
+std::unique_ptr<WeightedSparse> compute_IvAE(
+    IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &AE)
 {

@@ -148,22 +148,15 @@ public:
 
     /** (4) Run the ice model for one coupling timestep.
     @param time_s Seconds since GCMParams::time_base.  Helps with debugging.
-    @param index Index of each input grid value in ivalsI.
-    @param ivalsI The values themselves (sparse representation).
-           Their meaning (SMB, T, etc) is determined
-           by the place in the array, as specified by the appropriate
-           INPUT contract for this ice model.
-    @param am_i_root
-        Call with true if calling from MPI root; false otherwise.
-        The core coupling/regridding computation only runs on root.
-        But other MPI ranks need to go along for the ride, assuming that
-        the ice model uses MPI. */
+    @param out Outputs are stored here
+    @param run_ice Set to false to get initial conditions of ice sheet (in out)
+    */
     void couple(
         double time_s,
         // Values from GCM, passed GCM -> Ice
         VectorMultivec const &gcm_ovalsE,
         GCMInput &out,    // Accumulate matrices here...
-        bool do_run);
+        bool run_ice);
 
     /** (4.1) @param index Index of each grid value.
     @param time_s Time since start of simulation, in seconds

@@ -121,6 +121,7 @@ public:
 
     /**
     References to these variables must be kept alive externally.
+    NOTE: Used only by the Python interface.
     @param _foceanAOm Ocean surface fraction array (FOCEAN), as seen by
        ModelE; sparse indexing.  On Ocean grid.
     @param _foceanAOp Ocean surface fraction array (FOCEAN), as seen by
