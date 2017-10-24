@@ -109,7 +109,12 @@ void GCMCoupler_ModelE::ncread(
 
     // Replace the GCMRegridder with a wrapped version that understands
     // the ocean-vs-atmosphere grid complexity of ModelE
-    gcm_regridder.reset(new GCMRegridder_ModelE(std::move(gcm_regridder)));
+    gcm_regridder.reset(new GCMRegridder_ModelE(gcm_regridder));
+
+    if (am_i_root()) {
+        topoO
+Read Gary's TOPO file into UsedTopoOutputs<1> topoO;;;
+    }
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()

@@ -93,7 +93,11 @@ public:
         std::unique_ptr<Grid> &&_exgrid,
         InterpStyle _interp_style);
 
-    void set_elevI(DenseArrayT<1> const &_elevI);
+    /** @param elevI Elevation at points of ice sheet and land.
+    @param maskI Land surface type of each grid cell (ocean, land, ice) */
+    void set_elevI(
+        DenseArrayT<1> const &_elevI,
+        blitz::Array<char,1> const &maskI);
 
     // ------------------------------------------------
     /** Number of dimensions of ice vector space */
