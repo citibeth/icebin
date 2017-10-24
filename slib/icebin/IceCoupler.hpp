@@ -39,10 +39,9 @@ public:
     to be passed IceBin->IceCoupler and IceCoupler->IceBin */
     enum IO {INPUT, OUTPUT, count};
 
-
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
-    IceRegridder *ice_regridder;   // Set from gcm_coupler.  This is not const; see IceCoupler.IceRegridder::set_elevI()
+    IceRegridder const *ice_regridder;   // Set from gcm_coupler.
     std::string _name;              // Name of the ice sheet (in case ice_regridder is NULL)
 
     /** Place where we can write stuff related to this ice sheet */
@@ -79,6 +78,8 @@ public:
     // Writers called to record the input and output seen by this IceCoupler
     std::array<std::unique_ptr<IceWriter>, 2> writer;
 
+    // Current ice sheet elevation
+    blitz::Array<double,1> elevI;
 public:
     std::string const &name() const { return _name; }
     Grid const *gridI() { return ice_regridder->gridI.get(); }

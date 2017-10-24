@@ -87,8 +87,11 @@ extern void linterp_1d_b(
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
 @param ret Put the regrid matrix here.
 @param elevIh Must be the result of this->elevI_hash() */
-void IceRegridder_L0::GvEp(MakeDenseEigenT::AccumT &ret) const
+void IceRegridder_L0::GvEp(
+    MakeDenseEigenT::AccumT &ret,
+    blitz::Array<double,1> const *_elevI) const
 {
+    blitz::Array<double,1> const &elevI(*_elevI);
     IceExch dest = interp_grid;
 
     if (gcm->hcdefs.size() == 0) (*icebin_error)(-1,
@@ -131,8 +134,10 @@ void IceRegridder_L0::GvEp(MakeDenseEigenT::AccumT &ret) const
 }
 // --------------------------------------------------------
 void IceRegridder_L0::GvI(
-    MakeDenseEigenT::AccumT &ret) const
+    MakeDenseEigenT::AccumT &ret,
+    blitz::Array<double,1> const *_elevI) const
 {
+    blitz::Array<double,1> const &elevI(*_elevI);
     if (interp_grid == IceExch::ICE) {
         // Ice <- Ice = Indentity Matrix (scaled)
         // But we need this unscaled... so we use the weight of
@@ -162,8 +167,11 @@ void IceRegridder_L0::GvI(
     }
 }
 // --------------------------------------------------------
-void IceRegridder_L0::GvAp(MakeDenseEigenT::AccumT &ret) const
+void IceRegridder_L0::GvAp(
+    MakeDenseEigenT::AccumT &ret,
+    blitz::Array<double,1> const *_elevI) const
 {
+    blitz::Array<double,1> const &elevI(*_elevI);
     for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
         long const iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
         long const iA = cell->i;

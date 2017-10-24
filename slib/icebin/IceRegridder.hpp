@@ -59,9 +59,6 @@ public:
     /** Parent pointer; holds the IceRegridder for ALL ice sheets */
     GCMRegridder const *gcm;
 
-    /** Elevation of grid cells in ice grid (I).
-    This also implies a mask: cells with std::isnan() are masked out. */
-    DenseArrayT<1> elevI;
 protected:
 
     Type type;          /// Grid::Parameterization
@@ -94,9 +91,7 @@ public:
         std::string const &_name,
         std::unique_ptr<Grid> &&_gridI,
         std::unique_ptr<Grid> &&_exgrid,
-        InterpStyle _interp_style,
-        DenseArrayT<1> const &elevI);
-
+        InterpStyle _interp_style);
 
     void set_elevI(DenseArrayT<1> const &_elevI);
 
@@ -124,13 +119,16 @@ public:
     void sEpvE(MakeDenseEigenT::AccumT &w) const;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
-    virtual void GvEp(MakeDenseEigenT::AccumT &ret) const = 0;
+    virtual void GvEp(MakeDenseEigenT::AccumT &ret,
+        blitz::Array<double,1> const *elevI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Ice] */
-    virtual void GvI(MakeDenseEigenT::AccumT &ret) const = 0;
+    virtual void GvI(MakeDenseEigenT::AccumT &ret,
+        blitz::Array<double,1> const *elevI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
-    virtual void GvAp(MakeDenseEigenT::AccumT &ret) const = 0;
+    virtual void GvAp(MakeDenseEigenT::AccumT &ret,
+        blitz::Array<double,1> const *elevI) const = 0;
 
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */

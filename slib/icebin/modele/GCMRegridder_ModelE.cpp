@@ -760,12 +760,12 @@ IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
     { return gcmO->ice_regridder(name); }
 
 
-RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name) const
+RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name, blitz::Array<double,1> const *elevI) const
 {
     Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
 
     // Delicate construction of rmO
-    RegridMatrices _rmO(gcmO->regrid_matrices(ice_sheet_name));
+    RegridMatrices _rmO(gcmO->regrid_matrices(ice_sheet_name, elevI));
     RegridMatrices rm(_rmO.ice_regridder);
     RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(std::move(_rmO)));
 

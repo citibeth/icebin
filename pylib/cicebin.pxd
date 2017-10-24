@@ -99,13 +99,7 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         string &name,
         string &gridI_fname, string &gridI_vname,
         string &exgrid_fname, string &exgrid_vname,
-        string &sinterp_style,
-        PyObject *elevI_py) except +        # PyObject=Borrowed reference, object = owned reference
-
-    cdef void GCMRegridder_set_elevI(
-        GCMRegridder *cself,
-        string &name,
-        PyObject *elevI_py) except +        # PyObject=Borrowed reference, object = owned reference
+        string &sinterp_style) except +
 
     cdef CythonWeightedSparse *RegridMatrices_matrix(
         RegridMatrices *self, string spec_name, bool scale, bool correctA,
@@ -122,7 +116,7 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 
     cdef Hntr_regrid(Hntr *hntr, object WTA_py, object A_py, bool mean_polar) except +
 
-    cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name) except +
+    cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name, PyObject *elevI_py) except +
 
 
 cdef extern from "icebin/modele/hntr.hpp" namespace "icebin::modele":
