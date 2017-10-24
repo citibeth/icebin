@@ -139,7 +139,9 @@ public:
        1. Grid names here are ModelE_specific, not the simple A,E,I generated
           by GCMRegridder_Standard.
        2. It can also generate AOmvAAm and AAmvAOm, for testing purposes. */
-    RegridMatrices regrid_matrices(std::string const &ice_sheet_name) const;
+    RegridMatrices regrid_matrices(
+        std::string const &ice_sheet_name,
+        blitz::Array<double,1> const *elevI) const;
 };
 
 }}    // namespace

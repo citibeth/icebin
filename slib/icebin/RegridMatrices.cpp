@@ -35,9 +35,12 @@ struct UrAE {
 
 
 // ------------------------------------------------------------
-static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridder,
+static std::unique_ptr<WeightedSparse> compute_AEvI(
+    IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &params, UrAE const &AE)
+    RegridMatrices::Params const &params,
+    blitz::Array<double,1> const *elevI,
+    UrAE const &AE)
 {
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
     SparseSetT * const dimA(ret->dims[0]);
@@ -52,7 +55,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridde
     // ----- Get the Ur matrices (which determines our dense dimensions)
     MakeDenseEigenT GvI_m(
         // Only includes ice model grid cells with ice in them.
-        std::bind(&IceRegridder::GvI, regridder, _1),
+        std::bind(&IceRegridder::GvI, regridder, _1, elevI),
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimI}, '.');
     MakeDenseEigenT ApvG_m(        // _m ==> type MakeDenseEigenT
@@ -119,9 +122,12 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(IceRegridder const *regridde
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
+std::unique_ptr<WeightedSparse> compute_IvAE(
+    IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &params, UrAE const &AE)
+    RegridMatrices::Params const &params,
+    blitz::Array<double,1> const *elevI,
+    UrAE const &AE)
 {
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
@@ -138,7 +144,7 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimA}, '.');
     MakeDenseEigenT IvG_m(
-        std::bind(&IceRegridder::GvI, regridder, _1),
+        std::bind(&IceRegridder::GvI, regridder, _1, elevI),
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimI}, 'T');
 
@@ -193,7 +199,7 @@ std::unique_ptr<WeightedSparse> compute_IvAE(IceRegridder const *regridder,
         // Obtain the smoothing matrix (smoother.hpp)
         TupleListT<2> smoothI_t({dimI->dense_extent(), dimI->dense_extent()});
         smoothing_matrix(smoothI_t, &*regridder->gridI,
-            *dimI, &regridder->elevI, ret->wM, params.sigma);
+            *dimI, elevI, ret->wM, params.sigma);
         auto smoothI(to_eigen_sparsematrix(smoothI_t));
 
         // Smooth the underlying unsmoothed regridding transformation
@@ -284,7 +290,9 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder
 }
 
 
-RegridMatrices GCMRegridder_Standard::regrid_matrices(std::string const &sheet_name) const
+RegridMatrices GCMRegridder_Standard::regrid_matrices(
+    std::string const &sheet_name,
+    blitz::Array<double,1> const *elevI) const
 {
     IceRegridder const *regridder = ice_regridder(sheet_name);
 
@@ -300,24 +308,24 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(std::string const &sheet_n
     RegridMatrices rm(regridder);
 
     UrAE urA("UrA", this->nA(),
-        std::bind(&IceRegridder::GvAp, regridder, _1),
+        std::bind(&IceRegridder::GvAp, regridder, _1, elevI),
         std::bind(&IceRegridder::sApvA, regridder, _1));
 
     UrAE urE("UrE", this->nE(),
-        std::bind(&IceRegridder::GvEp, regridder, _1),
+        std::bind(&IceRegridder::GvEp, regridder, _1, elevI),
         std::bind(&IceRegridder::sEpvE, regridder, _1));
 
     // ------- AvI, IvA
     rm.add_regrid("AvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, urA));
+        std::bind(&compute_AEvI, regridder, _1, _2, elevI, urA));
     rm.add_regrid("IvA",
-        std::bind(&compute_IvAE, regridder, _1, _2, urA));
+        std::bind(&compute_IvAE, regridder, _1, _2, elevI, urA));
 
     // ------- EvI, IvE
     rm.add_regrid("EvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, urE));
+        std::bind(&compute_AEvI, regridder, _1, _2, elevI, urE));
     rm.add_regrid("IvE",
-        std::bind(&compute_IvAE, regridder, _1, _2, urE));
+        std::bind(&compute_IvAE, regridder, _1, _2, elevI, urE));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, regridder, _1, _2, urE, urA) ));
     rm.add_regrid("EvA",

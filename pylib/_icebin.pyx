@@ -179,27 +179,18 @@ cdef class GCMRegridder:
     def add_sheet(self, name,
         gridI_fname, gridI_vname,
         exgrid_fname, exgrid_vname,
-        interp_style,
-        elevI, maskI):
+        interp_style):
 
-        elevI = elevI.reshape(-1)
-        maskI = maskI.reshape(-1)
-        elevI[maskI != 0] = np.nan  # For IceBin, isnan(elevI) means it's masked out.
         cicebin.GCMRegridder_add_sheet(self.cself.get(),
             name.encode(),
             gridI_fname.encode(), gridI_vname.encode(),
             exgrid_fname.encode(), exgrid_vname.encode(),
-            interp_style.encode(),
-            <PyObject *>elevI)   # Borrowed references
+            interp_style.encode())
 
-    def set_elevI(self, sheet_name, elevI):
+    def regrid_matrices(self, str sheet_name, elevI):
         elevI = elevI.reshape(-1)
-        cicebin.GCMRegridder_set_elevI(self.cself.get(),
-            sheet_name.encode(), <PyObject *>elevI)    # Borrowed references
-
-    def regrid_matrices(self, str sheet_name):
         cdef cicebin.RegridMatrices *crm = \
-            cicebin.new_regrid_matrices(self.cself.get(), sheet_name.encode())
+            cicebin.new_regrid_matrices(self.cself.get(), sheet_name.encode(), <PyObject *>elevI)        # PyObject=Borrowed reference, object = owned reference
 
 #        cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
 #            self.cself.regrid_matrices(sheet_name.encode()))

@@ -47,12 +47,7 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &name,
     std::string const &gridI_fname, std::string const &gridI_vname,
     std::string const &exgrid_fname, std::string const &exgrid_vname,
-    std::string const &sinterp_style,
-    PyObject *elevI_py);
-
-extern void GCMRegridder_set_elevI(GCMRegridder *cself,
-    std::string const &name,
-    PyObject *elevI_py);
+    std::string const &sinterp_style);
 
 
 /** Wraps WeightedSparse to keep around the dense/sparse dimension
@@ -87,8 +82,7 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 PyObject *Hntr_regrid(modele::Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool mean_polar);
 
 
-inline RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name)
-    { return new RegridMatrices(gcm->regrid_matrices(sheet_name)); }
+RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py);
 
 
 }}

@@ -65,11 +65,9 @@ std::unique_ptr<GCMRegridder_Standard> load_AI_regridder(
 
         ncio.close();
 
-        blitz::Array<double,1> elevI(ibmisc::const_array<double,1>(blitz::shape(gridI->ndata()), 0));
-
         auto sheet(new_ice_regridder(gridI->parameterization));
         sheet->init(sheet_name, std::move(gridI), std::move(exgrid),
-            InterpStyle::Z_INTERP, elevI);
+            InterpStyle::Z_INTERP);
         gcm_regridder->add_sheet(std::move(sheet));
 
     }
@@ -232,8 +230,9 @@ void pism_replace_greenland(
     //    params.correctA = false;
     //    params.sigma = {0,0,0};
     std::string const sheet = "greenland";
-    RegridMatrices rm(gcm_regridder.regrid_matrices(sheet));
     IceRegridder *ice_regridder = gcm_regridder.ice_regridder(sheet);
+    blitz::Array<double,1> elevI(ibmisc::const_array<double,1>(blitz::shape(ice_regridder->gridI->ndata()), 0));
+    RegridMatrices rm(gcm_regridder.regrid_matrices(sheet, &elevI));
     auto AvI(rm.matrix("AvI", {&dimA, &dimI}, params));
 
 printf("dimA: ndense=%d nsparse%ld\n", dimA.dense_extent(), dimA.sparse_extent());

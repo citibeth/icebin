@@ -23,11 +23,6 @@ IceRegridder::~IceRegridder() {}
 
 
 // -------------------------------------------------------------
-void IceRegridder::set_elevI(DenseArrayT<1> const &_elevI)
-{
-    elevI = _elevI;        // Copies
-}
-// -------------------------------------------------------------
 // ==============================================================
 // Different vector spaces:
 //      Description                    Domain
@@ -70,7 +65,6 @@ void IceRegridder::clear()
 {
     gridI.reset();
     exgrid.reset();
-    elevI = nan;
 }
 // -------------------------------------------------------------
 void IceRegridder::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
@@ -88,8 +82,6 @@ printf("BEGIN IceRegridder::ncio(%s, %d)\n", vname.c_str(), rw_full);
 
     gridI->ncio(ncio, vname + ".gridI", rw_full);
     exgrid->ncio(ncio, vname + ".exgrid", rw_full);
-    if (rw_full) ncio_blitz(ncio, elevI, true, vname + ".elevI", "double",
-        get_dims(ncio ,{vname + ".gridI.cells.nfull"}));
 
 printf("END IceRegridder::ncio(%s, %d)\n", vname.c_str(), rw_full);
 }
@@ -98,14 +90,12 @@ void IceRegridder::init(
     std::string const &name,
     std::unique_ptr<Grid> &&_gridI,
     std::unique_ptr<Grid> &&_exgrid,
-    InterpStyle _interp_style,
-    blitz::Array<double,1> const &_elevI)
+    InterpStyle _interp_style)
 {
     _name = (name != "" ? name : gridI->name);
     gridI = std::move(_gridI);
     exgrid = std::move(_exgrid);
     interp_style = _interp_style;
-    elevI.reference(_elevI);
 }
 
 std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
