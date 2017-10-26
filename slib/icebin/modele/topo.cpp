@@ -24,10 +24,14 @@ class ComputeFOCEAN {
     elevation, where there is.
 */
 void update_foceanOp(
+GCMCoupler *gcmc,
 GCMRegridder *gcmO,
 blitz::Array<double,1> &foceanOp,    // 0-based array
 std::map<std::string, blitz::Array<double,1>> const &cont_elevIs)
 {
+//    GCMRegridder *gcmA = &*gcmc->gcm_regridder;
+
+
     auto nO(gcmO.nA());
     Grid const &gridO = *gcmO.gridA;
 
@@ -43,12 +47,26 @@ std::map<std::string, blitz::Array<double,1>> const &cont_elevIs)
     blitz::Array<double,1> fcontOp;
 
     for (auto sheet_name=sheets_index.begin(); sheet_name != sheets_index.end(); ++sheet_name) {
+        // Construct an elevmaskI for CONTINENTAL land (not just ice sheet)
+        // (==elevI on continent, nan on ocean)
+        IceCoupler *icec(gcmc->ice_coupler(*sheet_name));
+        blitz::Array elevmaskI(icec->nI());
+        for (int iI=0; iI<icec->nI(); ++iI) {
+            auto const m(icec->maskI(iI));
+            if (m==MASK_ICE_FREE_OCEAN) {
+                elevmaskI(i) = nan;
+            } else {
+                elevmaskI(i) = icec->elevI(iI);
+            }
+        }
+
         // configure regridder for full continent (not just ice sheet)
-        IceRegridder *iceO(gcmO.ice_regridder(*sheet_name));
-        iceO->set_elevI(cont_elevIs.at(*sheet_name));
+        IceRegridder *iceO(gcmO.ice_regridder(*sheet_name, elevmaskI));
+//        iceO->set_elevI(cont_elevIs.at(*sheet_name));
+
 
         // Get OvI for continental cells
-        RegridMatrices rm(gcmO.regrid_matrices(*sheet_name));
+        RegridMatrices rm(gcmO.regrid_matrices(*sheet_name, elevmaskI));
         SparseSetT dimO, dimI;
         RegridMatrices::Params paramsO;
             paramsO.scale = false;
@@ -74,6 +92,238 @@ std::map<std::string, blitz::Array<double,1>> const &cont_elevIs)
         }
     }
 }
+
+// ======================================================================
+
+/** This needs to be run at least once before matrices can be generated. */
+void GCMCoupler_ModelE::update_topo(double time_s, bool run_ice)
+{
+    if (run_ice) (*icebin_error)(-1,
+        "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
+
+
+    GCMRegridder_ModelE const *gcmA = dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder);
+    Topos &topoA(modele_inputs);
+
+
+    auto nA = gcmA->nA();
+    auto nO = gcmA->gcmO->nA();
+
+    // Convert to 1-D zero-based indexing
+    auto fhcAA(regrid1(topoA.fhc));
+    auto undericeAA(regrid1(topoA.underice));
+    auto elevEA(regrid1(topoA.elevE));
+    auto foceanAA(regrid1(topoA.focean));
+    auto flakeAA(regrid1(topoA.flake));
+    auto fgrndAA(regrid1(topoA.fgrnd));
+    auto fgiceAA(regrid1(topoA.fgice));
+    auto zatmoAA(regrid1(topoA.zatmo));
+
+    // Read the original topo file [Ocean grid]
+    NcIO ncio(topoO_fname, 'r');
+    blitz::Array<double,2> foceanO2(nc_read_blitz(ncio.nc, "FOCEAN"));
+    blitz::Array<double,2> flakeO2(nc_read_blitz(ncio.nc, "FLAKE"));
+    blitz::Array<double,2> fgrndO2(nc_read_blitz(ncio.nc, "FGRND"));
+    blitz::Array<double,2> fgiceO2(nc_read_blitz(ncio.nc, "FGICE"));
+    blitz::Array<double,2> zatmoO2(nc_read_blitz(ncio.nc, "ZATMO"));
+
+    blitz::Array<double,1> &foceanO(regrid1(foceanO2));
+    blitz::Array<double,1> &flakeO(regrid1(flakeO2));
+    blitz::Array<double,1> &fgrndO(regrid1(fgrndO2));
+    blitz::Array<double,1> &fgiceO(regrid1(fgiceO2));
+    blitz::Array<double,1> &zatmoO(regrid1(zatmoO2));
+    ncio.close();
+
+    // Keep track of which gridcells have been changed
+    blitz::Array<char,1> changedO(nO);
+    changedO = 0;
+
+    // --------------------------------------
+    // Add ice sheet to foceanO (and call it foceanOp)
+    blitz::Array<double,1> &foceanOp(gcmA->foceanAOp);
+    blitz::Array<double,1> &foceanOm(gcmA->foceanAOm);
+    foceanOp = foceanO;
+    update_foceanOp(gcmc, gcmO, foceanOp, changedO);
+
+    // --------------------------------------
+    // Add ice to the surface type
+    update_fgiceO(gcmc, gcmO, fgiceO, changedO);
+
+    // --------------------------------------
+    // Adjust fgrnd to maek it all sum to 1.
+    for (int i=0; i<nO; ++i) {
+        if (changedO(i)) {
+            flakeO(i) = 0.;
+            if (foceanOp(i) >= 0.5)
+                foceanOm(i) = 1.;
+                fgrndO(i) = 0.;
+                fgiceO(i) = 0.;
+            } else {
+                foceanOm(i) = 0.;
+                fgrnd(i) = 1. - fgiceO(i);
+            }
+        }
+    }
+
+    // Store the initial FOCEAN for ModelE, since it cannot change later.
+    if (!run_ice) {
+        foceanOm0.reset(blitz::Array<double,1>(nO));
+        foceanOm0 = foceanOm;
+    }
+
+    // ----------------------------------------------------------
+    // ----------------------------------------------------------
+    // Now we are ready to use regrid matrices
+
+    // =====================================================
+    // Regrid TOPO to Atmosphere grid
+    HntrGrid const &hntrA(*cast_Grid_LonLat(&*this->gridA)->hntr);
+    HntrGrid const &hntrO(*cast_Grid_LonLat(&*this->gcmO->gridA)->hntr);
+    Hntr hntrAvO({&hntrA, &hntrO});
+    TupleListT<double,2> AvO_tuples;
+    hntrAvO.scaled_regrid(AvO_tuples);
+    auto AvO_e(AvO_tuples.to_eigen());
+
+    to_eigen(foceanA) = AvO_e * foceanOm;
+    to_eigen(flakeA) = AvO_e * flakeO;
+    to_eigen(fgrndA) = AvO_e * fgrnd;
+    to_eigen(fgiceA) = AvO_e * fgice;
+    to_eigen(zatmoA) = AvO_e * zatmo;
+
+    // =====================================================
+    // ---------- Compute elevE and AvE (aka fhc)
+
+    // Whole-earth arrays, spanning all ice sheets
+    TupleListT<double,2> AvE_global;
+    TupleListT<double,1> elevE_global;
+
+    // Compute elevE and AvE (aka fhc)
+    for (auto sheet=sheets_index.begin(); sheet != sheets_index.end(); ++sheet) {
+        // Construct an elevmaskI for ice sheet, =nan off ice sheet
+        IceCoupler *icec(gcmc->ice_coupler(*sheet));
+        blitz::Array elevmaskI(icec->nI());
+        for (int iI=0; iI<icec->nI(); ++iI) {
+            auto const m(icec->maskI(iI));
+            if (m==MASK_GROUNDED_IE || m==MASK_FLOATING_ICE) {
+                elevmaskI(i) = icec->elevI(iI);
+            } else {
+                elevmaskI(i) = nan;
+            }
+        }
+
+        // Get regrid matrice needed to compute global stuff
+        RegridMatrices rm(regrid_matrices(*sheet, elevmaskI));
+        SparseSetT dimA, dimE, dimI;
+        RegridMatrices::Params params;
+            params.scale = true;
+            params.correctA = false;
+            params.sigma = ...;    // TODO: Set smoothing!
+        auto AvI(rmA.matrix('AvI', {&dimA, &dimI}, params);
+        auto EvI(rmA.matrix('EvI', {&dimE, &dimI}, params);
+        auto AvE(rmA.matrix('AvE', {&dimE, &dimA}, params);
+
+        append(AvE_global, AvE, {dimA, dimE});
+        auto elevE(EvI.apply(elevmaskI, nan, true));
+        append(elevE_global, elevE, dimE);
+    }
+
+    // Create matrix that works directly on sparse-indexed vectors
+    AvE_global_e = AvE_global.to_eigen();
+    EigenColVectorT elevA_global_e(AvE_global_e * eigen_col_vector(elevE_global));
+    auto elevA_global(to_blitz(elevA_global_e));    // Sparse indexing
+
+    // =======================================================
+    // ----------- Set TOPO variables
+zatmoA, etc.
+
+    // =======================================================
+    // ----------- Set up elevation class structure
+
+
+    // Set up elevation class segments: fhc, underice, elevI
+    fhc = 0;
+    underice = 0;
+    elevE = 0;
+
+    // ------- Segment 0: Legacy Segment
+    for (int ihc=legacy_base; ihc<legacy_end; ++ihc) {
+        for (int iA_s=0; iA_s<dimA.sparse_extent(); ++iA_s) {
+            fhc(ihc,iA_s) = 1.;    // Legacy ice for Greenland and Antarctica.
+            underice(ihc,iA_s) = UI_NOTHING;
+        }
+
+        for (int iA_s=0; iA_s<dimA.sparse_extent(); ++iA_s) {
+            elevE(ihc,iA_s) = zatmoA(iA_s);
+        }
+
+        // overaly...
+        for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
+            int iA_s = dimA.to_sparse(iA_d);
+            elevE(ihc,iA_s) = elevA(iA_s);
+        }
+    }}
+
+
+
+    // ------- Segment 1: SeaLand Segment
+    // ihc=0: Non-ice portion of grid cell at sea level
+
+    // FHC is fraction of ICE-COVERED area in this elevation class
+    // Therefore, FHC=0 for the sea portion of the SeaLand Segment
+    // NOT: fhc[sealand_base,_maskA] = 1.-fgice[_maskA]
+    // We could do away with this EC altogether because it's not used.
+    for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
+        int iA_s = dimA.to_sparse(iA_d);
+
+        fhc(sealand_base, iA_s) = 0.
+        underice(sealand_base, iA_s) = 0
+        elevE(sealand_base, iA_s) = 0.
+    };
+
+    // ihc=1: Ice portion of grid cell at mean for the ice portion
+    // FHC is fraction of ICE-COVERED area in this elevation class
+    // Therefore, FHC=1 for the land portion of the SeaLand Segment
+    // NOT: fhc[sealand_base+1,_maskA] = fgice[_maskA]
+    for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
+        int iA_s = dimA.to_sparse(iA_d);
+
+        fhc(sealand_base+1, iA_s) = 1.
+        underice(sealand_base+1, iA_s) = UI_NOTHING
+        elevE(sealand_base+1, iA_s) = elevA[_maskA]
+    }
+
+    // ---------- Segment 2: Full Elevation Classes
+    for (auto ii=AvE_global.begin(); ii != AvE_global.end(); ++ii) {
+        auto const iA = ii->index(0);
+        auto const iE = ii->index(1);
+
+        auto const iE_tuple(indexingHC.index_to_tuple(iE));
+        auto const iA2 = iE_tuple[0];
+        auto const ihc = iE_tuple[1];
+
+        if (iA2 != iA) (*icebin_error)(-1,
+            "Matrix is non-local: iA=%d, iE=%d, iA2=%d", (int)iA, (int)iE, (int)iA2);
+
+        fhc2(ec_base+ihc, iA) = ii->value();
+        underice2(ec_base+ihc, iA) = UI_ICEBIN;
+    }
+
+    for (int ihc=0; ihc<elevE2.extent(0); ++ihc) {
+    for (int iA=0; iA<elevE2.extent(1); ++iA) {
+        elevE2(ec_base+ihc, iA) = hcdefs_ice(ihc);
+    }}
+
+
+    // ==================================================
+    // 4) Fix bottom of atmosphere
+
+    // Atmosphere sees mean of elevations over entire grid cell
+    for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
+        int iA_s = dimA.to_sparse(iA_d);
+
+        zatmo_m(iA_s) = elevE2(legacy_base, iA_s);
+    }
+
 
 
 

@@ -315,6 +315,10 @@ bool run_ice)
     }
 
     // ========== Update regridding matrices
+    int maskI_ix = standard_names[OUTPUT].at("maskI");
+    blitz::Array<double,1> out_maskI(ice_ovalsI(maskI_ix, blitz::Range::all()));
+    for (int i=0; i<nO; ++i) maskI(i) = (char)out_maskI(i);
+
     int elevI_ix = standard_names[OUTPUT].at("elevI");
     blitz::Array<double,1> out_elevI(ice_ovalsI(elevI_ix, blitz::Range::all()));
     // Check that elevI is an alias for variable #elevI_ix in ice_ovalsI

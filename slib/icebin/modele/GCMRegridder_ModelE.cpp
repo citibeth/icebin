@@ -741,20 +741,12 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
         {gridA->ndata(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
     indexingE = derive_indexingE(gridA->indexing, indexingHC);
+
+    auto const nO = gcmO->nA();
+    foceanAOp.reference(blitz::Array<double,1>(nO));
+    foceanAOm.reference(blitz::Array<double,1>(nO));
 }
 
-void GCMRegridder_ModelE::set_focean(
-        blitz::Array<double,1> &_foceanAOp,
-        blitz::Array<double,1> &_foceanAOm)
-{
-    // Take shared referenes, to prevent de-allocation
-    this->_foceanAOp.reference(_foceanAOp);
-    this->_foceanAOm.reference(_foceanAOm);
-
-    // Use reshaped versions, which don't share a reference
-    foceanAOp.reference(reshape1(this->_foceanAOp));
-    foceanAOm.reference(reshape1(this->_foceanAOm));    // set lbound=0
-}
 
 IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
     { return gcmO->ice_regridder(name); }

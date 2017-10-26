@@ -128,6 +128,7 @@ void GCMCoupler::ncread(
     get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
     get_or_put_att(config_info, ncio_config.rw, "output_dir", output_dir);
     get_or_put_att(config_info, ncio_config.rw, "use_smb", &use_smb, 1);
+    get_or_put_att(config_info, ncio_config.rw, "topo_ocean", topoO_fname);
 
     printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 
@@ -236,6 +237,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
     }
 
+    update_topo(time_s, run_ice);
 
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-in-" + sdate + ".nc";

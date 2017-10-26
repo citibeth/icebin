@@ -75,12 +75,8 @@ std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
     auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
 
     // Copy values from Python memory to C++ memory
-    blitz::Array<double,1> foceanAOp(_foceanAOp.shape());
-    foceanAOp = _foceanAOp;
-    blitz::Array<double,1> foceanAOm(_foceanAOm.shape());
-    foceanAOm = _foceanAOm;
-
-    gcmA->set_focean(foceanAOp, foceanAOm);
+    gcmA->foceanAOp = _foceanAOp;
+    gcmA->foceanAOm = _foceanAOm;
     return gcmA;
 #else
     return std::shared_ptr<GCMRegridder_ModelE>();
