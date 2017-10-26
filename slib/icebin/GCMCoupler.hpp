@@ -123,12 +123,13 @@ struct GCMParams {
     // Should IceBin update topography?
     bool dynamic_topo = false;
 
+#if 0
     std::vector<HCSegmentData> hc_segments {    // 0-based
         HCSegmentData("legacy", 0, 1),
         HCSegmentData("sealand", 1, 2),
         HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
     int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
-
+#endif
 
     GCMParams(MPI_Comm _gcm_comm, int _gcm_root);
     HCSegmentData &segment(std::string const &name);
@@ -157,6 +158,10 @@ public:
 
     /** Parameters read from IceBin config file */
     std::string output_dir;
+
+    /** Name of the Ocean-level TOPO file (output of modified Gary's
+    program, sans ice sheets) */
+    std::string topoO_fname;
 
     /** Set to false and IceBin will pass a zero SMB and appropriately
     zero B.C. to the ice sheet.  This is for testing. */
@@ -226,6 +231,9 @@ public:
     void cold_start(
         ibmisc::Datetime _time_base,
         double time_start_s);
+
+    /** @param run_ice =false for int timestep, =true for normal timestep */
+    virtual void update_topo(double time_s, bool run_ice);
 
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.

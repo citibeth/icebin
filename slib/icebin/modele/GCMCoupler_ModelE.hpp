@@ -133,9 +133,8 @@ public:
     // Low and high indices for global domain (Fortran order, 0-based)
     ibmisc::Domain domainA_global;
 
-
-    // Items from Gary's TOPO file (Ocean grid) that we use
-    std::unique_ptr<UsedTopoOutputs<1>> topoO;
+    // Initial ModelE state of foceanO; this cannot change.
+    blitz::Array<double,1> foceanOm0;
 
 public:
     virtual ~GCMCoupler_ModelE() {}
@@ -151,6 +150,8 @@ public:
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 
+    void update_topo(double time_s, bool run_ice);
+
     int _read_nhc_gcm();
 
     // The gcmce_xxx() functions do not need to be declared here
@@ -159,11 +160,6 @@ public:
 
     // 1. Copies values back into modele_inputs.gcm_ivals
     void update_gcm_ivals(GCMInput const &out);
-
-    /** Called from gcmce_Xxx() functions to update fhc, eleveE, focean, etc.
-    when the ice model changes.  For now, a NOP. */
-    virtual void update_topo() {}
-
 
 };    // class GCMCouler_ModelE
 

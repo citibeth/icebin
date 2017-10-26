@@ -119,17 +119,6 @@ public:
     /** @param _gcmO Underlying regridder for the Ocean Grid Regime. */
     GCMRegridder_ModelE(std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
 
-    /**
-    References to these variables must be kept alive externally.
-    NOTE: Used only by the Python interface.
-    @param _foceanAOm Ocean surface fraction array (FOCEAN), as seen by
-       ModelE; sparse indexing.  On Ocean grid.
-    @param _foceanAOp Ocean surface fraction array (FOCEAN), as seen by
-       ice model; sparse indexing.  On Ocean grid. */
-    void set_focean(
-        blitz::Array<double,1> &_foceanAOp,
-        blitz::Array<double,1> &_foceanAOm);
-
     // ------------------------------------------------------------
     // Override virtual functions
     IceRegridder *ice_regridder(std::string const &name) const;

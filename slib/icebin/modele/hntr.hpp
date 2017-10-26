@@ -161,7 +161,7 @@ void Hntr::overlap(
     double const eq_rad,        // Radius of the Earth
     IncludeT includeB)
 {
-
+printf("BEGIN Hntr::overlap() %p\n", &accum);
     // ------------------
     // Interpolate the A grid onto the B grid
     double const R2 = eq_rad*eq_rad;
@@ -203,12 +203,13 @@ void Hntr::overlap(
             // Scale the values we just constructed
             double const byWEIGHT = 1. / WEIGHT;
             for (auto ii=bvals.begin(); ii != bvals.end(); ++ii) {
-            	    double const area = R2*Bgrid.dxyp(JB);
+          	    double const area = R2*Bgrid.dxyp(JB);
                 double const val = ii->second * byWEIGHT * area;
                 accum.add({IJB-1, ii->first}, val);
             }
         }
     }
+printf("END Hntr::overlap()\n");
 }
 
 
