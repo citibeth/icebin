@@ -101,6 +101,8 @@ struct HCSegmentData {
         : name(_name), base(_base), size(_size) {}
 };
 
+extern HCSegmentData const &get_segment(std::vector<HCSegmentData> &hc_segments, std::string const &name);
+
 /** Parameters passed from the GCM through to the ice model.
 These parameters cannot be specific to either the ice model or the GCM.
 TODO: Make procedure to read rundeck params and set this stuff up. */
@@ -123,16 +125,13 @@ struct GCMParams {
     // Should IceBin update topography?
     bool dynamic_topo = false;
 
-#if 0
     std::vector<HCSegmentData> hc_segments {    // 0-based
         HCSegmentData("legacy", 0, 1),
         HCSegmentData("sealand", 1, 2),
         HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
     int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
-#endif
 
     GCMParams(MPI_Comm _gcm_comm, int _gcm_root);
-    HCSegmentData &segment(std::string const &name);
 };
 // =============================================================================
 class GCMCoupler {
@@ -158,10 +157,6 @@ public:
 
     /** Parameters read from IceBin config file */
     std::string output_dir;
-
-    /** Name of the Ocean-level TOPO file (output of modified Gary's
-    program, sans ice sheets) */
-    std::string topoO_fname;
 
     /** Set to false and IceBin will pass a zero SMB and appropriately
     zero B.C. to the ice sheet.  This is for testing. */
@@ -217,9 +212,19 @@ public:
 
     bool am_i_root() const { return gcm_params.am_i_root(); }
 
+protected:
     virtual void ncread(
-        std::string const &config_fname,
+        ibmisc::NcIO &ncio_config,
         std::string const &vname);
+
+public:
+    void ncread(
+        std::string const &config_fname,
+        std::string const &vname)
+    {
+        NcIO ncio(config_fname, NcFile::read);
+        read(ncio, vname);
+    }
 
     /** Locates an ice model input file, according to resolution rules
         of the GCM. */
