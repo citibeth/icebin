@@ -43,6 +43,14 @@ namespace icebin {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 // ==========================================================
+HCSegmentData const &get_segment(std::vector<HCSegmentData> &hc_segments, std::string const &name)
+{
+    for (size_t i=0; i<hc_segments.size(); ++i)
+        if (hc_segments[i].name == name) return hc_segments[i];
+    (*icebin_error)(-1, "Cannot find segment named %s", name.c_str());
+}
+
+
 static std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
 {
     std::vector<HCSegmentData> ret;
@@ -70,13 +78,6 @@ GCMParams::GCMParams(MPI_Comm _gcm_comm, int _gcm_root) :
     world(gcm_comm, boost::mpi::comm_attach)
 {
     MPI_Comm_rank(gcm_comm, &gcm_rank);
-}
-
-HCSegmentData &GCMParams::segment(std::string const &name)
-{
-    for (size_t i=0; i<hc_segments.size(); ++i)
-        if (hc_segments[i].name == name) return hc_segments[i];
-    (*icebin_error)(-1, "Cannot find segment named %s", name.c_str());
 }
 
 // ==========================================================
@@ -119,16 +120,14 @@ void static_move(std::shared_ptr<D> &dest, std::unique_ptr<B>& base)
 
 /** @param nc The IceBin configuration file */
 void GCMCoupler::ncread(
-    std::string const &config_fname,        // comes from this->gcm_params
+    ibmisc::NcIO &ncio_config,
     std::string const &vname)        // comes from this->gcm_params
 {
-    NcIO ncio_config(config_fname, NcFile::read);
     auto config_info(get_or_add_var(ncio_config, vname + ".info", "int64", {}));
     std::string grid_fname;
     get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
     get_or_put_att(config_info, ncio_config.rw, "output_dir", output_dir);
     get_or_put_att(config_info, ncio_config.rw, "use_smb", &use_smb, 1);
-    get_or_put_att(config_info, ncio_config.rw, "topo_ocean", topoO_fname);
 
     printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 
@@ -155,7 +154,7 @@ void GCMCoupler::ncread(
     std::string segments;
     get_or_put_att(config_info, ncio_config.rw, "segments", segments);
     gcm_params.hc_segments = parse_hc_segments(segments);
-    gcm_params.icebin_base_hc = gcm_params.segment("ec").base;
+    gcm_params.icebin_base_hc = get_segment(gcm_params.hc_segments, "ec").base;
 
     ice_couplers.clear();
     for (size_t i=0; i < gcmr->ice_regridders.size(); ++i) {

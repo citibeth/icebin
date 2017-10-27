@@ -102,10 +102,13 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
 }
 // -----------------------------------------------------
 void GCMCoupler_ModelE::ncread(
-    std::string const &config_fname,        // comes from this->gcm_params
+    ibmisc::NcIO &ncio_config,
     std::string const &vname)        // comes from this->gcm_params
 {
-    GCMCoupler::ncread(config_fname, vname);
+    GCMCoupler::ncread(ncio_config, vname);
+
+    auto config_info(get_or_add_var(ncio_config, vname + ".info", "int64", {}));
+    get_or_put_att(config_info, ncio_config.rw, "topo_ocean", topoO_fname);
 
     // Replace the GCMRegridder with a wrapped version that understands
     // the ocean-vs-atmosphere grid complexity of ModelE

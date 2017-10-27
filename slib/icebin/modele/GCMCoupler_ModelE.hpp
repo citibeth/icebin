@@ -133,6 +133,10 @@ public:
     // Low and high indices for global domain (Fortran order, 0-based)
     ibmisc::Domain domainA_global;
 
+    /** Name of the Ocean-level TOPO file (output of modified Gary's
+    program, sans ice sheets) */
+    std::string topoO_fname;
+
     // Initial ModelE state of foceanO; this cannot change.
     blitz::Array<double,1> foceanOm0;
 
