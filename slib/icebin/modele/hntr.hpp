@@ -152,6 +152,13 @@ public:
         double const eq_rad,        // Radius of the Earth
         IncludeT includeB = IncludeT());
 
+    template<class MatAccumT, class IncludeT>
+    void matrix(
+        MatAccumT &mataccum,        // The output (sparse) matrix; 0-based indexing
+        double const eq_rad,        // Radius of the Earth
+        IncludeT includeB);
+
+
 };    // class Hntr
 
 
@@ -216,6 +223,7 @@ printf("END Hntr::overlap()\n");
 
 template<class AccumT>
 class OverlapMatAccum {
+    AccumT &accum;
     HntrGrid const &Bgrid;
     double const R2;
 
@@ -237,7 +245,7 @@ class OverlapMatAccum {
         bvals.push_back(std::make_pair(IJA-1, FG));
     }
 
-    void finishB(int const IJB)
+    void finishB(int const IJB, int const JB)
     {
         // Scale the values we just constructed
         double const byWEIGHT = 1. / WEIGHT;
@@ -253,6 +261,7 @@ class OverlapMatAccum {
 template<class AccumT>
 class ScaledRegridMatAccum
 {
+    AccumT &accum;
     HntrGrid const &Agrid;
 
     // Buffer for unscaled matrix elements for a single B gridcell
@@ -273,7 +282,7 @@ class ScaledRegridMatAccum
         bvals.push_back(std::make_pair(IJA-1, FG));
     }
 
-    void finishB(int const IJB)
+    void finishB(int const IJB, int const JB)
     {
         // Scale the values we just constructed
         double const byWEIGHT = 1. / WEIGHT;
@@ -300,13 +309,12 @@ printf("BEGIN Hntr::matrix() %p\n", &mataccum);
         int JAMIN = JMIN(JB);
         int JAMAX = JMAX(JB);
 
-        mataccum.clear();
 
         for (int IB=1; IB <= Bgrid.im; ++IB) {
             int const IJB = IB + Bgrid.im * (JB-1);
             if (!includeB(IJB-1)) continue;
 
-            bvals.clear();
+            mataccum.clear();
             double WEIGHT = 0;
 
             int const IAMIN = IMIN(IB);
@@ -328,7 +336,7 @@ printf("BEGIN Hntr::matrix() %p\n", &mataccum);
                 }
             }
 
-            mataccum.finishB(IJB);
+            mataccum.finishB(IJB, JB);
         }
     }
 printf("END Hntr::matrix()\n");
