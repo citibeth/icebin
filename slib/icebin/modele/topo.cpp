@@ -46,7 +46,6 @@ blitz::Array<char,1> &changedO)    // OUT
 {
 //    GCMRegridder *gcmA = &*gcmc->gcm_regridder;
 
-
     auto nO(gcmO.nA());
 
     // --------------------- Compute fcontOp_d (and foceanOp)
@@ -68,7 +67,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices::Params paramsO;
             paramsO.scale = false;
             paramsO.correctA = false;
-        auto OvI(rmO.matrix('AvI', {&dimO, &dimI}, paramsO);
+        auto OvI(rmO.matrix('AvI', {&dimO, &dimI}, paramsO));
 
         // Don't need to set up the mask on I ourselves; this is already
         // built into the OvI matrix.  The mask, taken from PISM, includes
@@ -120,7 +119,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices::Params paramsO;
             paramsO.scale = false;
             paramsO.correctA = false;
-        auto OvI(rmO.matrix('AvI', {&dimO, &dimI}, paramsO);
+        auto OvI(rmO.matrix('AvI', {&dimO, &dimI}, paramsO));
 
         // Don't need to set up the mask on I ourselves; this is already
         // built into the OvI matrix.  The mask, taken from PISM, includes
@@ -139,6 +138,7 @@ blitz::Array<char,1> &changedO)    // OUT
             fgiceO(iO_s) += fgiceO_d(iO_d);
             changedO(iO_s) = 1;    // true
         }
+
     }
 }
 
@@ -164,15 +164,16 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool first)
 
 
 void update_topo(
+    // ====== INPUT parameters
     GCMRegridder_ModelE *gcmA,    // Gets updated with new fcoeanOp, foceanOm
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
     std::map<std::string, ElevMask<1>> const &elevmasks,
     bool first,    // true if this is the first (initialization) timestep
-    HCSegmentData con
-    // OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
+    HCSegmentData hc_segments,
+    // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
     biltz::Array<double,1> foceanOm0)
-{
+{    // BEGIN update_topo
     if (!first) (*icebin_error)(-1,
         "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
 
@@ -228,7 +229,7 @@ void update_topo(
     for (int i=0; i<nO; ++i) {
         if (changedO(i)) {
             flakeO(i) = 0.;
-            if (foceanOp(i) >= 0.5)
+            if (foceanOp(i) >= 0.5) {
                 foceanOm(i) = 1.;
                 fgrndO(i) = 0.;
                 fgiceO(i) = 0.;
@@ -238,6 +239,7 @@ void update_topo(
             }
         }
     }
+
 
     // Store the initial FOCEAN for ModelE, since it cannot change later.
     if (first) foceanOm0 = foceanOm;
@@ -255,11 +257,11 @@ void update_topo(
     hntrAvO.scaled_regrid(AvO_tuples);
     auto AvO_e(AvO_tuples.to_eigen());
 
-    to_eigen(foceanA) = AvO_e * foceanOm;
-    to_eigen(flakeA) = AvO_e * flakeO;
-    to_eigen(fgrndA) = AvO_e * fgrnd;
-    to_eigen(fgiceA) = AvO_e * fgice;
-    to_eigen(zatmoA) = AvO_e * zatmo;
+    to_eigen(foceanA) = AvO_e * to_eigen(foceanOm);
+    to_eigen(flakeA) = AvO_e * to_eigen(flakeO);
+    to_eigen(fgrndA) = AvO_e * to_eigen(fgrnd);
+    to_eigen(fgiceA) = AvO_e * to_eigen(fgice);
+    to_eigen(zatmoA) = AvO_e * to_eigen(zatmo);
 
     // =====================================================
     // ---------- Compute elevE and AvE (aka fhc)
@@ -289,9 +291,9 @@ void update_topo(
             params.scale = true;
             params.correctA = false;
             params.sigma = ...;    // TODO: Set smoothing!
-        auto AvI(rmA.matrix('AvI', {&dimA, &dimI}, params);
-        auto EvI(rmA.matrix('EvI', {&dimE, &dimI}, params);
-        auto AvE(rmA.matrix('AvE', {&dimE, &dimA}, params);
+        auto AvI(rmA.matrix('AvI', {&dimA, &dimI}, params));
+        auto EvI(rmA.matrix('EvI', {&dimE, &dimI}, params));
+        auto AvE(rmA.matrix('AvE', {&dimE, &dimA}, params));
 
         // Merge local and global AvE
         spsparse::spcopy(
@@ -329,21 +331,19 @@ void update_topo(
 
     // ------- Segment 0: Legacy Segment
     for (int ihc=legacy.base; ihc<legacy.end; ++ihc) {
+        // Full domain
         for (int iA_s=0; iA_s<dimA.sparse_extent(); ++iA_s) {
-            fhc(ihc,iA_s) = 1.;    // Legacy ice for Greenland and Antarctica.
-            underice(ihc,iA_s) = UI_NOTHING;
+            fhcE2(ihc,iA_s) = 1.;    // Legacy ice for Greenland and Antarctica.
+            undericeE2(ihc,iA_s) = UI_NOTHING;
+            elevE2(ihc,iA_s) = zatmoA(iA_s);
         }
 
-        for (int iA_s=0; iA_s<dimA.sparse_extent(); ++iA_s) {
-            elevE(ihc,iA_s) = zatmoA(iA_s);
-        }
-
-        // overaly...
+        // overlay...
         for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
             int iA_s = dimA.to_sparse(iA_d);
-            elevE(ihc,iA_s) = elevA(iA_s);
+            elevE2(ihc,iA_s) = elevA(iA_s);
         }
-    }}
+    }
 
 
 
@@ -403,14 +403,17 @@ void update_topo(
     for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
         int iA_s = dimA.to_sparse(iA_d);
 
-        zatmo_m(iA_s) = elevE2(legacy.base, iA_s);
+        zatmoA(iA_s) = elevE2(legacy.base, iA_s);
     }
 
+}
 
 
 
 
 
+
+/*
 
 Input Files:
    1. TOPO output (O)             [Does not change]
@@ -433,3 +436,4 @@ Subsequent Coupling Steps
 -------------------------
 Inputs:
     Updated Continent mask (cont_elevI)
+*/

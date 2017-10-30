@@ -589,7 +589,8 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     }
     printf("END GCMCoupler_ModelE::update_gcm_ivals\n");
 }
-
+// ============================================================================
+// Update TOPO file during a coupled run
 
 
 

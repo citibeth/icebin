@@ -213,6 +213,128 @@ printf("END Hntr::overlap()\n");
 }
 
 
+
+template<class AccumT>
+class OverlapMatAccum {
+    HntrGrid const &Bgrid;
+    double const R2;
+
+    // Buffer for unscaled matrix elements for a single B gridcell
+    std::vector<std::pair<int,double>> bvals;
+    double WEIGHT;
+
+    OverlapMatAccum(AccumT &_accum, HntrGrid &_Bgrid, double _R2) : accum(_accum), Bgrid(_Bgrid), R2(_R2) {}
+
+    void clear()
+    {
+        bvals.clear();
+        WEIGHT = 0.;
+    }
+
+    void addA(int const IJA, double const FG)
+    {
+        WEIGHT += FG;
+        bvals.push_back(std::make_pair(IJA-1, FG));
+    }
+
+    void finishB(int const IJB)
+    {
+        // Scale the values we just constructed
+        double const byWEIGHT = 1. / WEIGHT;
+        for (auto ii=bvals.begin(); ii != bvals.end(); ++ii) {
+            double const area = R2*Bgrid.dxyp(JB);
+            double const val = ii->second * byWEIGHT * area;
+            accum.add({IJB-1, ii->first}, val);
+        }
+    }
+
+};
+// ----------------------------------------------------------
+template<class AccumT>
+class ScaledRegridMatAccum
+{
+    HntrGrid const &Agrid;
+
+    // Buffer for unscaled matrix elements for a single B gridcell
+    std::vector<std::pair<int,double>> bvals;
+    double WEIGHT;
+
+    ScaledRegridMatAccum(AccumT &_accum, HntrGrid &_Agrid) : accum(_accum), Agrid(_Agrid) {}
+
+    void clear()
+    {
+        bvals.clear();
+        WEIGHT = 0.;
+    }
+
+    void addA(int const IJA, double const FG)
+    {
+        WEIGHT += FG;
+        bvals.push_back(std::make_pair(IJA-1, FG));
+    }
+
+    void finishB(int const IJB)
+    {
+        // Scale the values we just constructed
+        double const byWEIGHT = 1. / WEIGHT;
+        for (auto ii=bvals.begin(); ii != bvals.end(); ++ii) {
+            double const val = ii->second * byWEIGHT;
+            accum.add({IJB-1, ii->first}, val);
+        }
+    }
+
+};
+// ---------------------------------------------------
+
+template<class MatAccumT, class IncludeT>
+void Hntr::matrix(
+    MatAccumT &mataccum,        // The output (sparse) matrix; 0-based indexing
+    double const eq_rad,        // Radius of the Earth
+    IncludeT includeB)
+{
+printf("BEGIN Hntr::matrix() %p\n", &mataccum);
+    // ------------------
+    // Interpolate the A grid onto the B grid
+    double const R2 = eq_rad*eq_rad;
+    for (int JB=1; JB <= Bgrid.jm; ++JB) {
+        int JAMIN = JMIN(JB);
+        int JAMAX = JMAX(JB);
+
+        mataccum.clear();
+
+        for (int IB=1; IB <= Bgrid.im; ++IB) {
+            int const IJB = IB + Bgrid.im * (JB-1);
+            if (!includeB(IJB-1)) continue;
+
+            bvals.clear();
+            double WEIGHT = 0;
+
+            int const IAMIN = IMIN(IB);
+            int const IAMAX = IMAX(IB);
+            for (int JA=JAMIN; JA <= JAMAX; ++JA) {
+                double G = SINA(JA) - SINA(JA-1);
+                if (JA==JAMIN) G -= GMIN(JB);
+                if (JA==JAMAX) G -= GMAX(JB);
+
+                for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
+                    int const IA  = 1 + ((IAREV-1) % Agrid.im);
+                    int const IJA = IA + Agrid.im * (JA-1);
+
+                    double F = 1;
+                    if (IAREV==IAMIN) F -= FMIN(IB);
+                    if (IAREV==IAMAX) F -= FMAX(IB);
+
+                    mataccum.addA(IJA, F*G);
+                }
+            }
+
+            mataccum.finishB(IJB);
+        }
+    }
+printf("END Hntr::matrix()\n");
+}
+
+
 /** Works with 0-based or 1-based N-dimensional arrays */
 template<int RANK>
 void Hntr::regrid(
