@@ -194,6 +194,16 @@ void hntr_overlap(
     hntr_BvA.overlap(ret, R, DimClip(&dimB));
 }
 // ----------------------------------------------------------------
+void hntr_scaled_regrid_matrix(
+    MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
+    std::array<HntrGrid const *, 2> hntrs)    // {hntrB, hntrA}
+{
+    auto &dimB(*ret.dim(0).sparse_set);
+    Hntr hntr_BvA(hntrs, 0);    // BvA
+
+    hntr_BvA.scaled_regrid_matrix(ret, DimClip(&dimB));
+}
+// ----------------------------------------------------------------
 extern "C" void call_hntr4(
     float const *WTA, int const &lwta,
     float const *A, int const &la,
@@ -260,6 +270,7 @@ void cmp_regrid(
     for (int i=0; i<gridA.ndata(); ++i) dimA.add_dense(i);
     EXPECT_EQ(gridA.jm*gridA.im, dimA.dense_extent());
 
+    // ---------------------------------------------------------
     // Regrid with scaled overlap matrix using matrix assembly machinery
     // Do it entirely in "sparse" indexing
     MakeDenseEigenT BvA_m(
@@ -281,6 +292,21 @@ void cmp_regrid(
 
     cmp_array(reshape1(Bd1,1), reshape1(Bf,1), "MATRIX");
 
+    // ---------------------------------------------------------
+    // Regrid with scaled overlap matrix using matrix assembly machinery
+    // Do it entirely in "sparse" indexing
+    MakeDenseEigenT BvA2_m(
+        std::bind(&hntr_scaled_regrid_matrix, std::placeholders::_1,
+            std::array<HntrGrid const *,2>{&gridB, &gridA}),
+        {SparsifyTransform::TO_DENSE},
+        {&dimB, &dimA}, '.');
+    EigenSparseMatrixT BvA2(BvA2_m.to_eigen());
+//    EigenSparseMatrixT BvA2(map_eigen_diagonal(sBvA) * BvA);
+
+    EigenColVectorT Bd21_e(BvA2 * map_eigen_colvector(Ac1));
+    blitz::Array<double,1> Bd21(to_blitz(Bd21_e));
+
+    cmp_array(reshape1(Bd21,1), reshape1(Bf,1), "MATRIX2");
 
     // ---------------------------------------------------------
 
