@@ -124,9 +124,9 @@ void greenland_2m(
     //    params.correctA = true;
     //    params.sigma = {0,0,0};
     //    params.conserve = true;
-    IceRegridder *ice_regridder = gcm_regridder.ice_regridder("greenland");
+    IceRegridder *ice_regridder = &*gcm_regridder.ice_regridders().at("greenland");
     blitz::Array<double,1> elevI(ibmisc::const_array<double,1>(blitz::shape(ice_regridder->gridI->ndata()), 0));
-    RegridMatrices rm(gcm_regridder.regrid_matrices(ice_regridder->name(), &elevI));
+    RegridMatrices rm(gcm_regridder.regrid_matrices(ice_regridder->name(), elevI));
     auto AvI(rm.matrix("AvI", {&dimA, &dimI}, params));
 
 printf("dimA: ndense=%d nsparse%ld\n", dimA.dense_extent(), dimA.sparse_extent());

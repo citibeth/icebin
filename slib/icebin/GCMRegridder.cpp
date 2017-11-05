@@ -69,8 +69,6 @@ void GCMRegridder_Standard::init(
     indexingE = derive_indexingE(gridA->indexing, indexingHC);
 }
 // -------------------------------------------------------------
-IceRegridder *GCMRegridder_Standard::ice_regridder(std::string const &name) const
-    { return ice_regridders[sheets_index.at(name)].get(); }
 
 // -------------------------------------------------------------
 // ==============================================================
@@ -83,8 +81,8 @@ void GCMRegridder_Standard::clear()
 {
     gridA.reset();
     hcdefs.clear();
-    sheets_index.clear();
-    ice_regridders.clear();
+    ice_regridders().index.clear();
+    ice_regridders().clear();
 }
 // -------------------------------------------------------------
 void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
@@ -108,7 +106,7 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname, bool rw_f
     std::vector<std::string> sheet_names;
     if (ncio.rw == 'w') {
         // Copy sheet names to a std::vector
-        for (auto ii=sheets_index.begin(); ii != sheets_index.end(); ++ii)
+        for (auto ii=ice_regridders().index.begin(); ii != ice_regridders().index.end(); ++ii)
             sheet_names.push_back(*ii);
     }
     get_or_put_att(info_v, ncio.rw, "sheets", "string", sheet_names);
@@ -120,7 +118,7 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname, bool rw_f
             add_sheet(*sheet_name, new_ice_regridder(ncio, vn));
         }
     }
-    for (auto ice_regridder=ice_regridders.begin(); ice_regridder != ice_regridders.end(); ++ice_regridder) {
+    for (auto ice_regridder=ice_regridders().begin(); ice_regridder != ice_regridders().end(); ++ice_regridder) {
         (*ice_regridder)->ncio(ncio, vname + "." + (*ice_regridder)->name(), rw_full);
     }
 
@@ -136,7 +134,7 @@ void GCMRegridder_Standard::filter_cellsA(std::function<bool(long)> const &keepA
 
     // Now remove cells from the exgrids and gridIs that
     // do not interact with the cells we've kept in grid1.
-    for (auto ice_regridder=ice_regridders.begin(); ice_regridder != ice_regridders.end(); ++ice_regridder) {
+    for (auto ice_regridder=ice_regridders().begin(); ice_regridder != ice_regridders().end(); ++ice_regridder) {
         (*ice_regridder)->filter_cellsA(keepA);
     }
 

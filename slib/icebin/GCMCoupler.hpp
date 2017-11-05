@@ -38,6 +38,26 @@ namespace icebin {
 template<int RANK>
     using TupleListLT = spsparse::TupleList<long,double,RANK>;
 
+// From pism/src/base/util/Mask.hh
+struct IceMask {
+    static const char UNKNOWN          = -1;
+    static const char ICE_FREE_BEDROCK = 0;
+    static const char GROUNDED_ICE     = 2;
+    static const char FLOATING_ICE     = 3;
+    static const char ICE_FREE_OCEAN   = 4;
+};
+
+template<int RANK>
+struct ElevMask {
+    blitz::Array<double,RANK> elev;
+    blitz::Array<char,RANK> mask;
+
+    ElevMask(
+        blitz::Array<double,RANK> const &_elev,
+        blitz::Array<char,RANK> const &_mask)
+    : elev(_elev), mask(_mask) {}
+};
+
 struct GCMInput {
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
@@ -100,6 +120,11 @@ struct HCSegmentData {
         : name(_name), base(_base), size(_size) {}
 };
 
+extern HCSegmentData &get_segment(std::vector<HCSegmentData> &hc_segments, std::string const &name);
+
+inline HCSegmentData const &get_segment(std::vector<HCSegmentData> const &hc_segments, std::string const &name)
+    { return get_segment(const_cast<std::vector<HCSegmentData> &>(hc_segments), name); }
+
 /** Parameters passed from the GCM through to the ice model.
 These parameters cannot be specific to either the ice model or the GCM.
 TODO: Make procedure to read rundeck params and set this stuff up. */
@@ -128,9 +153,12 @@ struct GCMParams {
         HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
     int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
 
+    HCSegmentData &segment(std::string const &name)
+        { return get_segment(hc_segments, name); }
+    HCSegmentData const &segment(std::string const &name) const
+        { return get_segment(hc_segments, name); }
 
     GCMParams(MPI_Comm _gcm_comm, int _gcm_root);
-    HCSegmentData &segment(std::string const &name);
 };
 // =============================================================================
 class GCMCoupler {
@@ -184,7 +212,7 @@ protected:
 
 public:
 
-    /** See regridder.sheets_index */
+    /** See regridder.ice_regridders().index */
     std::vector<std::unique_ptr<IceCoupler>> ice_couplers;
 
     ibmisc::UTSystem ut_system;     //!< Unit system for ConstantSets and CouplingContracts
@@ -211,9 +239,19 @@ public:
 
     bool am_i_root() const { return gcm_params.am_i_root(); }
 
-    virtual void ncread(
-        std::string const &config_fname,
+protected:
+    virtual void _ncread(
+        ibmisc::NcIO &ncio_config,
         std::string const &vname);
+
+public:
+    void ncread(
+        std::string const &config_fname,
+        std::string const &vname)
+    {
+        ibmisc::NcIO ncio(config_fname, netCDF::NcFile::read);
+        _ncread(ncio, vname);
+    }
 
     /** Locates an ice model input file, according to resolution rules
         of the GCM. */
@@ -225,6 +263,10 @@ public:
     void cold_start(
         ibmisc::Datetime _time_base,
         double time_start_s);
+
+    /** Top level method to compute (or re-compute) the TOPO parameters.
+    @param run_ice =false for int timestep, =true for normal timestep */
+    virtual void update_topo(double time_s, bool run_ice) = 0;
 
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.

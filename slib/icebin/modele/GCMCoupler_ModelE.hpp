@@ -20,6 +20,7 @@
 
 #include <boost/mpi.hpp>
 #include <icebin/GCMCoupler.hpp>
+#include <icebin/modele/GCMRegridder_ModelE.hpp>
 
 namespace icebin {
 namespace modele {
@@ -110,6 +111,17 @@ public:
     }
 };
 
+extern void update_topo(
+    // ====== INPUT parameters
+    GCMRegridder_ModelE *gcmA,    // Gets updated with new fcoeanOp, foceanOm
+    std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
+    std::vector<ElevMask<1>> const &elevmasks,
+    bool initial_timestep,    // true if this is the first (initialization) timestep
+    HCSegmentData hc_segments,
+    // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
+    Topos &topoA,
+    blitz::Array<double,1> foceanOm0);
+
 
 class GCMCoupler_ModelE : public GCMCoupler
 {
@@ -133,6 +145,12 @@ public:
     // Low and high indices for global domain (Fortran order, 0-based)
     ibmisc::Domain domainA_global;
 
+    /** Name of the Ocean-level TOPO file (output of modified Gary's
+    program, sans ice sheets) */
+    std::string topoO_fname;
+
+    // Initial ModelE state of foceanO; this cannot change.
+    blitz::Array<double,1> foceanOm0;
 
 public:
     virtual ~GCMCoupler_ModelE() {}
@@ -140,18 +158,15 @@ public:
     // Called from LISnow::allocate()
     GCMCoupler_ModelE(GCMParams &&_params);
 
-    void ncread(   // virtual
-        std::string const &config_fname,
+    void _ncread(    // virtual
+        ibmisc::NcIO &ncio_config,
         std::string const &vname);        // comes from this->gcm_params
-
-
-    void set_focean(
-        blitz::Array<double,1> const &foceanOm,
-        blitz::Array<double,1> const &foceanOp);
 
     std::string locate_input_file(   // virtual
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
+
+    void update_topo(double time_s, bool run_ice);
 
     int _read_nhc_gcm();
 
@@ -161,11 +176,6 @@ public:
 
     // 1. Copies values back into modele_inputs.gcm_ivals
     void update_gcm_ivals(GCMInput const &out);
-
-    /** Called from gcmce_Xxx() functions to update fhc, eleveE, focean, etc.
-    when the ice model changes.  For now, a NOP. */
-    virtual void update_topo() {}
-
 
 };    // class GCMCouler_ModelE
 
