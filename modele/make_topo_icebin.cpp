@@ -3,6 +3,7 @@
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/blitz.hpp>
 #include <icebin/GCMRegridder.hpp>
+#include <icebin/GCMCoupler.hpp>
 #include <icebin/modele/z1qx1n_bs1.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/grids.hpp>
@@ -16,13 +17,6 @@ using namespace blitz;
 
 namespace icebin {
 namespace modele {
-
-// Different values for the mask
-const int MASK_UNKNOWN          = -1;
-const int MASK_ICE_FREE_BEDROCK = 0;
-const int MASK_GROUNDED         = 2;
-const int MASK_FLOATING         = 3;
-const int MASK_ICE_FREE_OCEAN   = 4;
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
@@ -230,9 +224,10 @@ void pism_replace_greenland(
     //    params.correctA = false;
     //    params.sigma = {0,0,0};
     std::string const sheet = "greenland";
-    IceRegridder *ice_regridder = gcm_regridder.ice_regridder(sheet);
-    blitz::Array<double,1> elevI(ibmisc::const_array<double,1>(blitz::shape(ice_regridder->gridI->ndata()), 0));
-    RegridMatrices rm(gcm_regridder.regrid_matrices(sheet, &elevI));
+    auto sheet_ix = gcm_regridder.ice_regridders().index.at(sheet);
+    IceRegridder *ice_regridder = &*gcm_regridder.ice_regridders()[sheet_ix];
+    blitz::Array<double,1> elevmaskI(ibmisc::const_array<double,1>(blitz::shape(ice_regridder->gridI->ndata()), 0));
+    RegridMatrices rm(gcm_regridder.regrid_matrices(sheet_ix, elevmaskI));
     auto AvI(rm.matrix("AvI", {&dimA, &dimI}, params));
 
 printf("dimA: ndense=%d nsparse%ld\n", dimA.dense_extent(), dimA.sparse_extent());
@@ -254,14 +249,14 @@ printf("dimI: ndense=%d nsparse%ld\n", dimI.dense_extent(), dimI.sparse_extent()
         auto mask(pout.mask(i_s));
 
         switch(mask) {
-            case MASK_GROUNDED:
-            case MASK_FLOATING:
+            case IceMask::GROUNDED_ICE:
+            case IceMask::FLOATING_ICE:
                 II_d(ICE,i_d) = 1.0;
             break;
-            case MASK_ICE_FREE_BEDROCK:
+            case IceMask::ICE_FREE_BEDROCK:
                 II_d(GRND,i_d) = 1.0;
             break;
-            case MASK_ICE_FREE_OCEAN:
+            case IceMask::ICE_FREE_OCEAN:
             break;
             default:
                 (*icebin_error)(-1,

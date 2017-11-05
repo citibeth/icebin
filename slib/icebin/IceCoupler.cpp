@@ -18,6 +18,7 @@
 
 #include <mpi.h>        // Intel MPI wants to be first
 #include <type_traits>
+#include <boost/filesystem.hpp>
 
 #include <spsparse/blitz.hpp>
 #include <ibmisc/datetime.hpp>
@@ -74,7 +75,7 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     // Do basic initialization...
     self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
-    self->ice_regridder = _gcm_coupler->gcm_regridder->ice_regridder(sheet_name);
+    self->ice_regridder = &*_gcm_coupler->gcm_regridder->ice_regridders().at(sheet_name);
     self->elevI.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
     self->elevI = nan;
 
@@ -98,6 +99,13 @@ IceCoupler::IceCoupler(IceCoupler::Type _type) :
     reconstruct_ice_ivalsI(std::bind(
         &_reconstruct_ice_ivalsI, std::placeholders::_1, std::placeholders::_2))
     {}
+
+void IceCoupler::ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet)
+{
+    // General args passed to the ice sheet, regardless of which ice model is being used
+    NcVar info_var(ncio_config.nc->getVar(vname_sheet + ".info"));
+    get_or_put_att<NcVar,double>(info_var, 'r', "sigma", "double", &sigma[0], 3);
+}
 
 
 IceCoupler::~IceCoupler() {}
@@ -317,7 +325,7 @@ bool run_ice)
     // ========== Update regridding matrices
     int maskI_ix = standard_names[OUTPUT].at("maskI");
     blitz::Array<double,1> out_maskI(ice_ovalsI(maskI_ix, blitz::Range::all()));
-    for (int i=0; i<nO; ++i) maskI(i) = (char)out_maskI(i);
+    for (int i=0; i<nI(); ++i) maskI(i) = (char)out_maskI(i);
 
     int elevI_ix = standard_names[OUTPUT].at("elevI");
     blitz::Array<double,1> out_elevI(ice_ovalsI(elevI_ix, blitz::Range::all()));
@@ -326,7 +334,9 @@ bool run_ice)
         "ice_ovalsI <%p> != elevI <%p>\n", &ice_ovalsI(elevI_ix,0), &out_elevI(0));
 
     elevI = out_elevI;    // Copy
-    RegridMatrices rm(gcm_coupler->gcm_regridder->regrid_matrices(name(), &elevI));
+    GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
+    int sheet_index = gcmr->ice_regridders().index.at(name());
+    RegridMatrices rm(gcmr->regrid_matrices(sheet_index, elevI));
     RegridMatrices::Params regrid_params(true, true, {0,0,0});
     RegridMatrices::Params regrid_params_nc(true, false, {0,0,0});    // correctA=False
 

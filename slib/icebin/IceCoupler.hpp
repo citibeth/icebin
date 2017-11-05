@@ -8,7 +8,6 @@
 #include <ibmisc/udunits2.hpp>
 #include <ibmisc/ConstantSet.hpp>
 
-#include <icebin/GCMParams.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/VarSet.hpp>
 #include <icebin/multivec.hpp>
@@ -39,6 +38,8 @@ public:
     to be passed IceBin->IceCoupler and IceCoupler->IceBin */
     enum IO {INPUT, OUTPUT, count};
 
+    /** Smoothing to use when regridding.  See RegridMatrices::Params. */
+    std::array<double,3> sigma;
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
     IceRegridder const *ice_regridder;   // Set from gcm_coupler.
@@ -105,7 +106,7 @@ public:
     /** (1) Initialize any grid information, etc. from the IceSheet struct.
     @param vname_base Construct variable name from this, out of which to pull parameters from netCDF
     @param Opened handle on the IceBin config file (not IceBin grid file). */
-    virtual void ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet) {}
+    virtual void ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet);
 
 
     // ========= Called by

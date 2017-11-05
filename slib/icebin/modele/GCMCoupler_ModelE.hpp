@@ -20,6 +20,7 @@
 
 #include <boost/mpi.hpp>
 #include <icebin/GCMCoupler.hpp>
+#include <icebin/modele/GCMRegridder_ModelE.hpp>
 
 namespace icebin {
 namespace modele {
@@ -114,12 +115,12 @@ extern void update_topo(
     // ====== INPUT parameters
     GCMRegridder_ModelE *gcmA,    // Gets updated with new fcoeanOp, foceanOm
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
-    std::map<std::string, ElevMask<1>> const &elevmasks,
-    bool first,    // true if this is the first (initialization) timestep
+    std::vector<ElevMask<1>> const &elevmasks,
+    bool initial_timestep,    // true if this is the first (initialization) timestep
     HCSegmentData hc_segments,
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
-    biltz::Array<double,1> foceanOm0);
+    blitz::Array<double,1> foceanOm0);
 
 
 class GCMCoupler_ModelE : public GCMCoupler
@@ -157,8 +158,8 @@ public:
     // Called from LISnow::allocate()
     GCMCoupler_ModelE(GCMParams &&_params);
 
-    void ncread(   // virtual
-        std::string const &config_fname,
+    void _ncread(    // virtual
+        ibmisc::NcIO &ncio_config,
         std::string const &vname);        // comes from this->gcm_params
 
     std::string locate_input_file(   // virtual

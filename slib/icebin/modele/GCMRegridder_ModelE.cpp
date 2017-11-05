@@ -214,7 +214,7 @@ public:
 };
 
 
-static Grid_LonLat const *cast_Grid_LonLat(Grid const *_gridO)
+Grid_LonLat const *cast_Grid_LonLat(Grid const *_gridO)
 {
     // -------- Check types on gridO
     Grid_LonLat const *gridO(dynamic_cast<Grid_LonLat const *>(_gridO));
@@ -728,9 +728,11 @@ static std::unique_ptr<WeightedSparse> compute_IpvXAm(
 /** @param gcmO A GCMRegridder_Standard that regrids between AOp,EOp,Ip.
         This is typically loaded directly from a NetCDF file. */
 GCMRegridder_ModelE::GCMRegridder_ModelE(
-        std::shared_ptr<icebin::GCMRegridder> const &_gcmO)
-    : gcmO(_gcmO)
+    std::shared_ptr<icebin::GCMRegridder> const &_gcmO)
+    :  gcmO(_gcmO)
 {
+    _ice_regridders = &gcmO->ice_regridders();
+
     // Initialize baseclass members
     gridA = make_gridA(cast_Grid_LonLat(&*gcmO->gridA));
     correctA = gcmO->correctA;    // Not used
@@ -748,16 +750,13 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 }
 
 
-IceRegridder *GCMRegridder_ModelE::ice_regridder(std::string const &name) const
-    { return gcmO->ice_regridder(name); }
-
-
-RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet_name, blitz::Array<double,1> const *elevI) const
+RegridMatrices GCMRegridder_ModelE::regrid_matrices(
+    int sheet_index, blitz::Array<double,1> const &elevI) const
 {
     Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
 
     // Delicate construction of rmO
-    RegridMatrices _rmO(gcmO->regrid_matrices(ice_sheet_name, elevI));
+    RegridMatrices _rmO(gcmO->regrid_matrices(sheet_index, elevI));
     RegridMatrices rm(_rmO.ice_regridder);
     RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(std::move(_rmO)));
 
@@ -775,6 +774,24 @@ RegridMatrices GCMRegridder_ModelE::regrid_matrices(std::string const &ice_sheet
         this, 'E', gridO->eq_rad, &rmO));
     rm.add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
         this, 'A', gridO->eq_rad, &rmO));
+
+
+    // --------------- Simply-named aliases
+    rm.add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
+        this, 'E', gridO->eq_rad, &rmO));
+    rm.add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
+        this, 'A', gridO->eq_rad, &rmO));
+
+
+    rm.add_regrid("AvE", std::bind(*compute_AAmvEAm, _1, _2,
+        this, gridO->eq_rad, &rmO));
+
+
+    rm.add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
+        this, 'E', gridO->eq_rad, &rmO));
+    rm.add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
+        this, 'A', gridO->eq_rad, &rmO));
+
 
 
     // For testing

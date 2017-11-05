@@ -308,9 +308,10 @@ PyObject *Hntr_regrid(Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool m
 
 RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py)
 {
-    IceRegridder *ice_regridder = gcm->ice_regridder(sheet_name);
+    auto sheet_index = gcm->ice_regridders().index.at(sheet_name);
+    IceRegridder *ice_regridder = &*gcm->ice_regridders()[sheet_index];
     auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {ice_regridder->nI()}));
-    return new RegridMatrices(gcm->regrid_matrices(sheet_name, &elevI));
+    return new RegridMatrices(gcm->regrid_matrices(sheet_index, elevI));
 }
 
 

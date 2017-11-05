@@ -130,9 +130,12 @@ public:
           by GCMRegridder_Standard.
        2. It can also generate AOmvAAm and AAmvAOm, for testing purposes. */
     RegridMatrices regrid_matrices(
-        std::string const &ice_sheet_name,
-        blitz::Array<double,1> const *elevI) const;
+        int sheet_index,
+        blitz::Array<double,1> const &elevI) const;
 };
+
+/** Casts to a Grid_Lonlat, which is what we know is used by ModelE */
+Grid_LonLat const *cast_Grid_LonLat(Grid const *_gridO);
 
 }}    // namespace
 #endif

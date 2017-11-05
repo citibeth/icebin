@@ -244,7 +244,16 @@ public:
     grid cells) */
     std::vector<double> hcdefs; // [nhc]
 
+protected:
+    /** Ice sheets stored by index defined in sheets_index */
+    ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> *_ice_regridders;
+
 public:
+
+    ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> &ice_regridders()
+        { return *_ice_regridders; }
+    ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> const &ice_regridders() const
+        { return *_ice_regridders; }
 
     virtual ~GCMRegridder() {}
 
@@ -260,14 +269,20 @@ public:
     template<class AccumT>
     void wA(AccumT &&accum, std::string const &ice_sheet_name, bool native);
 
-    /** Produce an IceRegridder for a particular ice sheet.
-    NOTE: ice_regridder(x)->gcm is not necessarily equal to this. */
-    virtual IceRegridder *ice_regridder(std::string const &name) const = 0;
-
     /** Produce regridding matrices for this setup. */
     virtual RegridMatrices regrid_matrices(
-        std::string const &ice_sheet_name,
-        blitz::Array<double,1> const *elevI) const = 0;
+        int sheet_index,
+        blitz::Array<double,1> const &elevmaskI) const = 0;
+
+    inline RegridMatrices regrid_matrices(
+        std::string const &sheet,
+        blitz::Array<double,1> const &elevmaskI) const
+    {
+        auto sheet_ix = ice_regridders().index.at(sheet);
+        return regrid_matrices(sheet_ix, elevmaskI);
+    }
+
+
 
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we
@@ -281,7 +296,7 @@ public:
 template<class AccumT>
 void GCMRegridder::wA(AccumT &&accum, std::string const &ice_sheet_name, bool native)
 {
-    IceRegridder *ice = ice_regridder(ice_sheet_name);
+    IceRegridder *ice = &*ice_regridders().at(ice_sheet_name);
     ibmisc::Proj_LL2XY proj(ice->gridI->sproj);
 
     for (auto cell=gridA->cells.begin(); cell != gridA->cells.end(); ++cell) {
@@ -295,18 +310,21 @@ void GCMRegridder::wA(AccumT &&accum, std::string const &ice_sheet_name, bool na
 class GCMRegridder_Standard : public GCMRegridder
 {
 
-public:
     /** Creates an (index, name) correspondence for ice sheets. */
-    ibmisc::IndexSet<std::string> sheets_index;
+    ibmisc::IndexSet<std::string> mem_sheets_index;
 
     /** Ice sheets stored by index defined in sheets_index */
-    std::vector<std::unique_ptr<IceRegridder>> ice_regridders;
+    ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> mem_ice_regridders;
 
 public:
 
     /** Constructs a blank GCMRegridder.  Typically one will use
         ncio() afterwards to read from a file. */
-    GCMRegridder_Standard() {}
+    GCMRegridder_Standard() :
+        mem_ice_regridders(mem_sheets_index)
+    {
+        _ice_regridders = &mem_ice_regridders;
+    }
 
     void clear();
 
@@ -334,8 +352,8 @@ public:
     void add_sheet(std::unique_ptr<IceRegridder> &&regridder)
     {
         regridder->gcm = this;
-        size_t ix = sheets_index.insert(regridder->name());
-        ice_regridders.push_back(std::move(regridder));
+        size_t ix = ice_regridders().index.insert(regridder->name());
+        ice_regridders().push_back(std::move(regridder));
     }
 
     void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&regridder)
@@ -344,12 +362,10 @@ public:
         add_sheet(std::move(regridder));
     }
 
-    IceRegridder *ice_regridder(std::string const &name) const;
-
     /** Produce regridding matrices for this setup. */
     RegridMatrices regrid_matrices(
-        std::string const &name,
-        blitz::Array<double,1> const *elevI) const;
+        int sheet_index,
+        blitz::Array<double,1> const &elevI) const;
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):
@@ -367,9 +383,9 @@ public:
     > const_iterator;
 
     const_iterator begin() const
-        { return const_iterator(ice_regridders.cbegin()); }
+        { return const_iterator(ice_regridders().cbegin()); }
     const_iterator end() const
-        { return const_iterator(ice_regridders.cend()); }
+        { return const_iterator(ice_regridders().cend()); }
 
     // -----------------------------------------
     void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);

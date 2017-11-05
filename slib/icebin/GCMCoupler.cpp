@@ -43,7 +43,7 @@ namespace icebin {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 // ==========================================================
-HCSegmentData const &get_segment(std::vector<HCSegmentData> &hc_segments, std::string const &name)
+HCSegmentData &get_segment(std::vector<HCSegmentData> &hc_segments, std::string const &name)
 {
     for (size_t i=0; i<hc_segments.size(); ++i)
         if (hc_segments[i].name == name) return hc_segments[i];
@@ -119,7 +119,7 @@ void static_move(std::shared_ptr<D> &dest, std::unique_ptr<B>& base)
 
 
 /** @param nc The IceBin configuration file */
-void GCMCoupler::ncread(
+void GCMCoupler::_ncread(
     ibmisc::NcIO &ncio_config,
     std::string const &vname)        // comes from this->gcm_params
 {
@@ -157,8 +157,8 @@ void GCMCoupler::ncread(
     gcm_params.icebin_base_hc = get_segment(gcm_params.hc_segments, "ec").base;
 
     ice_couplers.clear();
-    for (size_t i=0; i < gcmr->ice_regridders.size(); ++i) {
-        std::string const &sheet_name(gcmr->ice_regridders[i]->name());
+    for (size_t i=0; i < gcmr->ice_regridders().size(); ++i) {
+        std::string const &sheet_name(gcmr->ice_regridders()[i]->name());
 
         // Create an IceCoupler corresponding to this IceSheet.
         std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname, sheet_name, this));
