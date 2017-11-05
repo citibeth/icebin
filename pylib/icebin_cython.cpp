@@ -75,12 +75,8 @@ std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
     auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
 
     // Copy values from Python memory to C++ memory
-    blitz::Array<double,1> foceanAOp(_foceanAOp.shape());
-    foceanAOp = _foceanAOp;
-    blitz::Array<double,1> foceanAOm(_foceanAOm.shape());
-    foceanAOm = _foceanAOm;
-
-    gcmA->set_focean(foceanAOp, foceanAOm);
+    gcmA->foceanAOp = _foceanAOp;
+    gcmA->foceanAOm = _foceanAOm;
     return gcmA;
 #else
     return std::shared_ptr<GCMRegridder_ModelE>();
@@ -312,9 +308,10 @@ PyObject *Hntr_regrid(Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool m
 
 RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py)
 {
-    IceRegridder *ice_regridder = gcm->ice_regridder(sheet_name);
+    auto sheet_index = gcm->ice_regridders().index.at(sheet_name);
+    IceRegridder *ice_regridder = &*gcm->ice_regridders()[sheet_index];
     auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {ice_regridder->nI()}));
-    return new RegridMatrices(gcm->regrid_matrices(sheet_name, &elevI));
+    return new RegridMatrices(gcm->regrid_matrices(sheet_index, elevI));
 }
 
 

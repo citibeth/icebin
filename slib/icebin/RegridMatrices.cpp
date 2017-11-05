@@ -291,10 +291,10 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder
 
 
 RegridMatrices GCMRegridder_Standard::regrid_matrices(
-    std::string const &sheet_name,
-    blitz::Array<double,1> const *elevI) const
+    int sheet_index,
+    blitz::Array<double,1> const &elevI) const
 {
-    IceRegridder const *regridder = ice_regridder(sheet_name);
+    IceRegridder const *regridder = &*ice_regridders()[sheet_index];
 
 #if 0
     printf("===== RegridMatrices Grid geometries:\n");
@@ -308,24 +308,24 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(
     RegridMatrices rm(regridder);
 
     UrAE urA("UrA", this->nA(),
-        std::bind(&IceRegridder::GvAp, regridder, _1, elevI),
+        std::bind(&IceRegridder::GvAp, regridder, _1, &elevI),
         std::bind(&IceRegridder::sApvA, regridder, _1));
 
     UrAE urE("UrE", this->nE(),
-        std::bind(&IceRegridder::GvEp, regridder, _1, elevI),
+        std::bind(&IceRegridder::GvEp, regridder, _1, &elevI),
         std::bind(&IceRegridder::sEpvE, regridder, _1));
 
     // ------- AvI, IvA
     rm.add_regrid("AvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, elevI, urA));
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevI, urA));
     rm.add_regrid("IvA",
-        std::bind(&compute_IvAE, regridder, _1, _2, elevI, urA));
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevI, urA));
 
     // ------- EvI, IvE
     rm.add_regrid("EvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, elevI, urE));
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevI, urE));
     rm.add_regrid("IvE",
-        std::bind(&compute_IvAE, regridder, _1, _2, elevI, urE));
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevI, urE));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, regridder, _1, _2, urE, urA) ));
     rm.add_regrid("EvA",

@@ -119,16 +119,6 @@ public:
     /** @param _gcmO Underlying regridder for the Ocean Grid Regime. */
     GCMRegridder_ModelE(std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
 
-    /**
-    References to these variables must be kept alive externally.
-    @param _foceanAOm Ocean surface fraction array (FOCEAN), as seen by
-       ModelE; sparse indexing.  On Ocean grid.
-    @param _foceanAOp Ocean surface fraction array (FOCEAN), as seen by
-       ice model; sparse indexing.  On Ocean grid. */
-    void set_focean(
-        blitz::Array<double,1> &_foceanAOp,
-        blitz::Array<double,1> &_foceanAOm);
-
     // ------------------------------------------------------------
     // Override virtual functions
     IceRegridder *ice_regridder(std::string const &name) const;
@@ -140,9 +130,12 @@ public:
           by GCMRegridder_Standard.
        2. It can also generate AOmvAAm and AAmvAOm, for testing purposes. */
     RegridMatrices regrid_matrices(
-        std::string const &ice_sheet_name,
-        blitz::Array<double,1> const *elevI) const;
+        int sheet_index,
+        blitz::Array<double,1> const &elevI) const;
 };
+
+/** Casts to a Grid_Lonlat, which is what we know is used by ModelE */
+Grid_LonLat const *cast_Grid_LonLat(Grid const *_gridO);
 
 }}    // namespace
 #endif

@@ -44,7 +44,6 @@
 #include <icebin/GCMCoupler.hpp>
 #include <memory>
 #include <icebin/Grid.hpp>
-#include <icebin/GCMParams.hpp>
 
 
 namespace icebin {

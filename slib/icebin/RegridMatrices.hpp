@@ -114,6 +114,8 @@ public:
         /** Tells if these parameters are asking us to smooth */
         bool smooth() const { return sigma[0] != 0; }
 
+        Params() : scale(true), correctA(false), sigma({0.,0.,0.}) {}
+
         Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
             scale(_scale), correctA(_correctA), sigma(_sigma) {}
     };
