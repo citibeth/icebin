@@ -265,8 +265,8 @@ public:
         double time_start_s);
 
     /** Top level method to compute (or re-compute) the TOPO parameters.
-    @param run_ice =false for int timestep, =true for normal timestep */
-    virtual void update_topo(double time_s, bool run_ice) = 0;
+    @param initial_timestep True if this is the initialization timestep. */
+    virtual void update_topo(double time_s, bool initial_timestep) = 0;
 
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.

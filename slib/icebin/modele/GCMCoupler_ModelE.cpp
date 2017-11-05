@@ -383,10 +383,10 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
 
     // b) Compute fhc, elevE
     // c) Compute ZATMO, FGICE, etc.
-    self->update_topo(time_s, false);
+    self->update_topo(time_s, true);    // initial_timestep=true
 
     // d) Sync with dynamic ice model
-    gcmce_couple_native(self, itimei, false);
+    gcmce_couple_native(self, itimei, false);    // run_ice=false
 
     printf("END gcmce_cold_start()\n");
 }
@@ -533,7 +533,7 @@ printf("END gcmce_couple_native() every_outs\n");
     self->update_gcm_ivals(out);
     // 2. Sets icebin_nhc, 
     // 3. Updates FHC, ZATMO, etc.
-    self->update_topo(time_s, true);
+    self->update_topo(time_s, false);    // initial_timestep=false
 }
 // =======================================================
 /** Called from MPI rank */

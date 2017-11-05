@@ -166,7 +166,7 @@ public:
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 
-    void update_topo(double time_s, bool run_ice);
+    void update_topo(double time_s, bool initial_timestep);
 
     int _read_nhc_gcm();
 

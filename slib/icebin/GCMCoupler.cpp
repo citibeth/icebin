@@ -236,7 +236,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
     }
 
-    update_topo(time_s, run_ice);
+    update_topo(time_s, !run_ice);
 
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-in-" + sdate + ".nc";
