@@ -8,7 +8,6 @@
 #include <ibmisc/udunits2.hpp>
 #include <ibmisc/ConstantSet.hpp>
 
-#include <icebin/GCMParams.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/VarSet.hpp>
 #include <icebin/multivec.hpp>

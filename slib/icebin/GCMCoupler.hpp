@@ -28,7 +28,6 @@
 #include <ibmisc/ConstantSet.hpp>
 
 #include <icebin/IceCoupler.hpp>
-#include <icebin/GCMParams.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/VarSet.hpp>
 #include <icebin/multivec.hpp>
