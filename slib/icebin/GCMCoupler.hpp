@@ -125,6 +125,9 @@ extern HCSegmentData &get_segment(std::vector<HCSegmentData> &hc_segments, std::
 inline HCSegmentData const &get_segment(std::vector<HCSegmentData> const &hc_segments, std::string const &name)
     { return get_segment(const_cast<std::vector<HCSegmentData> &>(hc_segments), name); }
 
+/** Parses a spec. string (eg: "legacy,sealand,ec") to a usable set of HCSegments. */
+extern std::vector<HCSegmentData> parse_hc_segments(std::string const &str);
+
 /** Parameters passed from the GCM through to the ice model.
 These parameters cannot be specific to either the ice model or the GCM.
 TODO: Make procedure to read rundeck params and set this stuff up. */

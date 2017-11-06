@@ -117,7 +117,12 @@ void GCMCoupler_ModelE::_ncread(
 
     // Replace the GCMRegridder with a wrapped version that understands
     // the ocean-vs-atmosphere grid complexity of ModelE
-    gcm_regridder.reset(new GCMRegridder_ModelE(gcm_regridder));
+    GCMRegridder_ModelE *gcmA = new GCMRegridder_ModelE(gcm_regridder);
+    gcm_regridder.reset(gcmA);
+
+    // Allocate goceanOm0
+    Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmA->gcmO->gridA);
+    foceanOm0.reference(blitz::Array<double,2>(gridO->nlat(), gridO->nlon()));
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()
@@ -715,7 +720,7 @@ blitz::Array<char,1> &changedO)    // OUT
 
 // ======================================================================
 
-void update_topo_x(
+void update_topo(
     // ====== INPUT parameters
     GCMRegridder_ModelE *gcmA,    // Gets updated with new fcoeanOp, foceanOm
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
@@ -725,7 +730,7 @@ void update_topo_x(
     std::vector<HCSegmentData> const &hc_segments,
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
-    blitz::Array<double,1> foceanOm0)
+    blitz::Array<double,2> foceanOm0)
 {    // BEGIN update_topo
     if (!initial_timestep) (*icebin_error)(-1,
         "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
@@ -797,7 +802,10 @@ void update_topo_x(
 
 
     // Store the initial FOCEAN for ModelE, since it cannot change later.
-    if (initial_timestep) foceanOm0 = foceanOm;
+    if (initial_timestep) {
+        auto foceanOm0_1(reshape1(foceanOm0));
+        foceanOm0_1 = foceanOm;
+    }
 
     // ----------------------------------------------------------
     // ----------------------------------------------------------
@@ -976,7 +984,7 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
     }
 
     Topos &topoA(modele_inputs);
-    update_topo_x(
+    icebin::modele::update_topo(
         gcmA, topoO_fname, elevmasks, sigmas,
         initial_timestep, gcm_params.hc_segments,
         topoA, foceanOm0);

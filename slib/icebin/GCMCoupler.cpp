@@ -51,7 +51,7 @@ HCSegmentData &get_segment(std::vector<HCSegmentData> &hc_segments, std::string 
 }
 
 
-static std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
+std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
 {
     std::vector<HCSegmentData> ret;
 

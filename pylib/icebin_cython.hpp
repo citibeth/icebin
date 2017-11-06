@@ -84,6 +84,25 @@ PyObject *Hntr_regrid(modele::Hntr const *hntr, PyObject *WTA_py, PyObject *A_py
 
 RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py);
 
+void update_topo(
+    // ====== INPUT parameters
+    GCMRegridder *_gcmA,
+    std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
+    PyObject *elevmask_sigmas_py,    // {'greenland' : (elevI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
+    bool initial_timestep,    // true if this is the first (initialization) timestep
+    PyObject *segments_py,    // [('name', base), ...]
+    // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
+    PyObject *fhc_py,         // blitz::Array<double,3> fhc;
+    PyObject *underice_py,    // blitz::Array<int,3> underice;
+    PyObject *elevE_py,       // blitz::Array<double,3> elevE;
+    // i,j arrays on Atmosphere grid
+    PyObject *focean_py,      // blitz::Array<double,2> focean;
+    PyObject *flake_py,       // blitz::Array<double,2> flake;
+    PyObject *fgrnd_py,       // blitz::Array<double,2> fgrnd;    // Alt: fearth0
+    PyObject *fgice_py,       // blitz::Array<double,2> fgice;    // Alt: flice
+    PyObject *zatmo_py,       // blitz::Array<double,2> zatmo;      // i,j
+
+    PyObject *foceanOm0_py);   // blitz::Array<double,1> foceanOm0,
 
 }}
 
