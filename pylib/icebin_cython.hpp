@@ -90,7 +90,7 @@ void update_topo(
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
     PyObject *elevmask_sigmas_py,    // {'greenland' : (elevI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
     bool initial_timestep,    // true if this is the first (initialization) timestep
-    PyObject *segments_py,    // [('name', base), ...]
+    std::string const &segments,    // [('name', base), ...]
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     PyObject *fhc_py,         // blitz::Array<double,3> fhc;
     PyObject *underice_py,    // blitz::Array<int,3> underice;

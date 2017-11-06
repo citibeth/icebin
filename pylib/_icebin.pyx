@@ -263,3 +263,15 @@ cdef class Hntr:
 
     def regrid(self, WTA, A, bool mean_polar):
         cicebin.Hntr_regrid(self.cself, WTA, A, mean_polar)
+
+def update_topo(GCMRegridder gcmA, topoO_fname, elevmask_sigmas, bool initial_timestamp, segments,
+    fhc, underice, elevE,
+    focean, flake, fgrnd, fgice, zatmo,
+    foceanOm0):
+
+    cicebin.update_topo(
+        gcmA.cself.get(), topoO_fname.encode(),
+        <PyObject *>elevmask_sigmas, initial_timestamp, segments.encode(),
+        <PyObject *>fhc, <PyObject *>underice, <PyObject *>elevE,
+        <PyObject *>focean, <PyObject *>flake, <PyObject *>fgrnd, <PyObject *>fgice, <PyObject *>zatmo,
+        <PyObject *>foceanOm0)
