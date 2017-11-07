@@ -355,6 +355,7 @@ void update_topo(
     PyObject *foceanOm0_py)   // blitz::Array<double,1> foceanOm0,
 {
 #ifdef BUILD_MODELE
+printf("BEGIN icebin_cython.cpp - update_topo()\n");
     auto gcmA(dynamic_cast<GCMRegridder_ModelE *>(_gcmA));
 
     // --------------------------------------------------------
@@ -431,6 +432,7 @@ void update_topo(
     // Call C++ Function
     icebin::modele::update_topo(gcmA, topoO_fname, elevmasks, sigmas,
         initial_timestep, hc_segments, toposA, foceanOm0);
+printf("END icebin_cython.cpp - update_topo()\n");
 #endif
 }
 
