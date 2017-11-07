@@ -33,7 +33,10 @@ extern std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
     bool _correctA);
 
 extern std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
-    std::shared_ptr<GCMRegridder> const &gcmO,
+    std::shared_ptr<GCMRegridder> const &gcmO);
+
+extern void GCMRegridder_ModelE_set_focean(
+    GCMRegridder *_gcmA,
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py);
 

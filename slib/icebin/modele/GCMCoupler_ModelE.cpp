@@ -732,6 +732,7 @@ void update_topo(
     Topos &topoA,
     blitz::Array<double,2> foceanOm0)
 {    // BEGIN update_topo
+printf("BEGIN update_topo(...)\n");
     if (!initial_timestep) (*icebin_error)(-1,
         "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
 
@@ -968,6 +969,7 @@ void update_topo(
         zatmoA(iA_s) = elevE2(legacy.base, iA_s);
     }
 
+printf("END update_topo(...)\n");
 }
 
 /** This needs to be run at least once before matrices can be generated. */
