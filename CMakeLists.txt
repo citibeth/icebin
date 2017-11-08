@@ -10,14 +10,6 @@ include_directories($ENV{SPACK_TRANSITIVE_INCLUDE_PATH})
 
 # ------- Process Configure Options
 
-if (NOT DEFINED USE_EVERYTRACE)
-    set(USE_EVERYTRACE NO)
-endif()
-if (USE_EVERYTRACE)
-    find_package(Everytrace)
-endif()
-
-
 if (NOT DEFINED BUILD_PYTHON)
     set(BUILD_PYTHON NO)
 endif()
@@ -85,6 +77,12 @@ include_directories(${Boost_INCLUDE_DIRS})
 list(APPEND EXTERNAL_LIBS ${Boost_LIBRARIES})
 
 # -------- Find Dependencies
+
+# --- Everytrace
+find_package(Everytrace REQUIRED)
+add_definitions(-DUSE_EVERYTRACE)
+include_directories(${EVERYTRACE_INCLUDE_DIR})
+list(APPEND EXTERNAL_LIBS ${EVERYTRACE_LIBRARY})
 
 # --- Blitz
 find_package(Blitz REQUIRED)

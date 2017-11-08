@@ -69,6 +69,7 @@ std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
 {
 #ifdef BUILD_MODELE
     std::shared_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(gcmO));
+    return gcmA;
 #else
     return std::shared_ptr<GCMRegridder_ModelE>();
 #endif
@@ -355,7 +356,6 @@ void update_topo(
     PyObject *foceanOm0_py)   // blitz::Array<double,1> foceanOm0,
 {
 #ifdef BUILD_MODELE
-printf("BEGIN icebin_cython.cpp - update_topo()\n");
     auto gcmA(dynamic_cast<GCMRegridder_ModelE *>(_gcmA));
 
     // --------------------------------------------------------
@@ -399,10 +399,12 @@ printf("BEGIN icebin_cython.cpp - update_topo()\n");
     // --------------------------------------------------------
     // Convert segments to C++ Data Structure
     std::vector<HCSegmentData> hc_segments(parse_hc_segments(segments));
+    auto const &ec(get_segment(hc_segments, "ec"));
+    auto nhc_ice(gcmA->nhc());
+    int nhc_gcm = ec.base + nhc_ice;
 
     // --------------------------------------------------------
     // Convert arrays to C++ Data Structures
-    auto nhc(gcmA->nhc());
     Grid_LonLat *gridA = dynamic_cast<Grid_LonLat *>(&*gcmA->gridA);
     int nj = gridA->nlat();
     int ni = gridA->nlon();
@@ -410,9 +412,9 @@ printf("BEGIN icebin_cython.cpp - update_topo()\n");
     icebin::modele::Topos toposA;
 
     // Convert 3D on the Elevation Grid
-    toposA.fhc.reference(np_to_blitz<double,3>(fhc_py, "fhc", {nhc, nj, ni}));
-    toposA.underice.reference(np_to_blitz<int,3>(underice_py, "underice", {nhc, nj, ni}));
-    toposA.elevE.reference(np_to_blitz<double,3>(elevE_py, "elevE", {nhc, nj, ni}));
+    toposA.fhc.reference(np_to_blitz<double,3>(fhc_py, "fhc", {nhc_gcm, nj, ni}));
+    toposA.underice.reference(np_to_blitz<int,3>(underice_py, "underice", {nhc_gcm, nj, ni}));
+    toposA.elevE.reference(np_to_blitz<double,3>(elevE_py, "elevE", {nhc_gcm, nj, ni}));
 
     // Convert 2D on the Atmosphere Grid
     toposA.focean.reference(np_to_blitz<double,2>(focean_py, "focean", {nj, ni}));
@@ -432,7 +434,6 @@ printf("BEGIN icebin_cython.cpp - update_topo()\n");
     // Call C++ Function
     icebin::modele::update_topo(gcmA, topoO_fname, elevmasks, sigmas,
         initial_timestep, hc_segments, toposA, foceanOm0);
-printf("END icebin_cython.cpp - update_topo()\n");
 #endif
 }
 

@@ -652,7 +652,11 @@ blitz::Array<char,1> &changedO)    // OUT
 
         // Compute fcontOp (for this ice sheet only)
         TmpAlloc tmp;
+
+printf("OvI: %d %d\n", OvI->dims[0]->dense_extent(), OvI->dims[1]->dense_extent());
+printf("fcontI_d: %d\n", fcontI_d.extent(0));
         blitz::Array<double,1> fcontOp_d(OvI->apply(fcontI_d, 0., true, tmp));    // force_conservation set to true by default, and it probably doesn't matter; but I think it should be false here.
+printf("DONE APPLY\n");
 
         // Interpolate into foceanOp_s
         for (int iO_d=0; iO_d<fcontOp_d.extent(0); ++iO_d) {
@@ -736,15 +740,21 @@ printf("BEGIN update_topo(...)\n");
     if (!initial_timestep) (*icebin_error)(-1,
         "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
 
+    HCSegmentData const &legacy(get_segment(hc_segments, "legacy"));
+    HCSegmentData const &sealand(get_segment(hc_segments, "sealand"));
+    HCSegmentData const &ec(get_segment(hc_segments, "ec"));
+
     GCMRegridder *gcmO = &*gcmA->gcmO;
     auto nA = gcmA->nA();
     auto nE = gcmA->nE();
     auto nO = gcmO->nA();
     auto nhc_ice = gcmA->nhc();
+    int nhc_gcm = ec.base + nhc_ice;
 
+printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
     // Convert TOPO arrays to 1-D zero-based indexing
     // ...on elevation grid
-    blitz::TinyVector<int,2> const shape_E2(nhc_ice, nA);
+    blitz::TinyVector<int,2> const shape_E2(nhc_gcm, nA);
     blitz::Array<double,2> fhcE2(reshape(topoA.fhc, shape_E2));
     blitz::Array<int,2> undericeE2(reshape(topoA.underice, shape_E2));
     blitz::Array<double,2>  elevE2(reshape(topoA.elevE, shape_E2));
@@ -883,9 +893,6 @@ printf("BEGIN update_topo(...)\n");
 
     // =======================================================
     // ----------- Set up elevation class structure
-    HCSegmentData const &legacy(get_segment(hc_segments, "legacy"));
-    HCSegmentData const &sealand(get_segment(hc_segments, "sealand"));
-    HCSegmentData const &ec(get_segment(hc_segments, "ec"));
 
     // Set up elevation class segments: fhc, underice, elevI
     fhcE2 = 0;

@@ -93,20 +93,13 @@ if (BUILD_GRIDGEN)
 endif()
 
 
-if (USE_EVERYTRACE)
-    if (BUILD_COUPLER)
-      add_library (icebin SHARED ${EVERYTRACE_cf_mpi_REFADDR} ${icebin_SOURCES})
-    else()
-      add_library (icebin SHARED ${EVERYTRACE_cf_REFADDR} ${icebin_SOURCES})
-    endif()
+if (BUILD_COUPLER)
+  add_library (icebin SHARED ${EVERYTRACE_cf_mpi_REFADDR} ${icebin_SOURCES})
 else()
-    add_library (icebin SHARED ${icebin_SOURCES})
+  add_library (icebin SHARED ${EVERYTRACE_cf_REFADDR} ${icebin_SOURCES})
 endif()
 
 target_link_libraries(icebin ${EXTERNAL_LIBS})
-if (USE_EVERYTRACE)
-    target_link_libraries(icebin ${EVERYTRACE_LIBRARY})
-endif()
 
 install(TARGETS icebin DESTINATION lib)
 
