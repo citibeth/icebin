@@ -736,7 +736,6 @@ void update_topo(
     Topos &topoA,
     blitz::Array<double,2> foceanOm0)
 {    // BEGIN update_topo
-printf("BEGIN update_topo(...)\n");
     if (!initial_timestep) (*icebin_error)(-1,
         "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
 
@@ -751,7 +750,6 @@ printf("BEGIN update_topo(...)\n");
     auto nhc_ice = gcmA->nhc();
     int nhc_gcm = ec.base + nhc_ice;
 
-printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
     // Convert TOPO arrays to 1-D zero-based indexing
     // ...on elevation grid
     blitz::TinyVector<int,2> const shape_E2(nhc_gcm, nA);
@@ -828,7 +826,7 @@ printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
     HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
     Hntr hntrAvO({&hntrA, &hntrO});
     TupleListT<2> AvE_global_tp;
-    blitz::Array<double,1> elevE_global;
+    blitz::Array<double,1> elevE_global(nE);
 
     // Compute elevE and AvE (aka fhc)
     SparseSetT dimA_global;
@@ -867,16 +865,33 @@ printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
             *AvE->M, true);
 
 
+        // Densify elevmaskI
+        blitz::Array<double,1> elevmaskI_d(dimI.dense_extent());
+        for (int i_d=0; i_d<dimI.dense_extent(); ++i_d) {
+            elevmaskI_d(i_d) = elevmaskI(dimI.to_sparse(i_d));
+        }
+        auto elevE_d(EvI->apply(elevmaskI_d, nan, true, tmp));
+#if 0
         // Merge local and global elevE
-        auto elevE(EvI->apply(elevmaskI, nan, true, tmp));
+        for (int iE_d=0; iE_d<elevE_d.extent(0); ++iE_d) {
+            int const iE_s = dimE.to_sparse(iE_d);
+            auto &val(elevE_global(iE_s));
+            if (std::isnan(val)) {
+                val = elevE_d(iE_d);
+            } else {
+                val += elevE_d(iE_d);
+            }
+        }
+#else
         spsparse::spcopy(
             spsparse::accum::to_sparse(std::array<SparseSetT *,1>{&dimE},
             spsparse::accum::blitz_existing(elevE_global)),
-            elevE, true);
+            elevE_d, true);
+#endif
 
         // Add to dimA_global
         for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
-            auto iA_s = dimA.to_sparse(iA_d);
+            int iA_s = dimA.to_sparse(iA_d);
             dimA_global.add_dense(iA_s);
         }
     }
@@ -884,10 +899,8 @@ printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
     // Create matrix that works directly on sparse-indexed vectors
     EigenSparseMatrixT AvE_global_e(nA, nE);
     AvE_global_e.setFromTriplets(AvE_global_tp.begin(), AvE_global_tp.end());
-
     EigenColVectorT elevA_global_e(AvE_global_e * map_eigen_colvector(elevE_global));
     auto elevA_global(to_blitz(elevA_global_e));    // Sparse indexing
-
     // =======================================================
     // ----------- Set TOPO variables
 
@@ -960,11 +973,15 @@ printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
         undericeE2(ec.base+ihc, iA) = UI_ICEBIN;
     }
 
-    for (int ihc=0; ihc<elevE2.extent(0); ++ihc) {
-    for (int iA=0; iA<elevE2.extent(1); ++iA) {
-        elevE2(ec.base+ihc, iA) = gcmA->hcdefs[ihc];
-    }}
+    for (int ihc=0; ihc<nhc_ice; ++ihc) {
+    for (int iA=0; iA<nA; ++iA) {
+        int const ihcx = ec.base + ihc;
 
+        //if (ihcx < 0 || ihcx >= elevE2.extent(0)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(0));
+        //if (iA < 0 || iA >= elevE2.extent(1)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(1));
+
+        elevE2(ihcx, iA) = gcmA->hcdefs[ihc];
+    }}
 
     // ==================================================
     // 4) Fix bottom of atmosphere
