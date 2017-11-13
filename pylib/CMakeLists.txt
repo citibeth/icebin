@@ -42,6 +42,14 @@ foreach (CYTHON_MODULE _icebin)
             ${PROJECT_SOURCE_DIR}/pylib/${CYTHON_MODULE}.pyx
             -o ${CYTHON_MODULE}.cpp)
 
+    if (BUILD_COUPLER)
+      set(EVERYTRACE_REFADDR ${EVERYTRACE_cf_mpi_REFADDR})
+    else()
+      set(EVERYTRACE_REFADDR ${EVERYTRACE_cf_REFADDR})
+    endif()
+
+
+
     ADD_LIBRARY(${CYTHON_MODULE}_so MODULE ${CYTHON_MODULE}.cpp ${PYLIB_SOURCES} ${EVERYTRACE_REFADDR})
 
     target_link_libraries(${CYTHON_MODULE}_so icebin ${PYTHON_LIBRARY})

@@ -84,7 +84,10 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         bool correctA) except +
 
     cdef cibmisc.shared_ptr[GCMRegridder] new_GCMRegridder_ModelE(
-        cibmisc.shared_ptr[GCMRegridder] &gcmO,
+        cibmisc.shared_ptr[GCMRegridder] &gcmO) except +
+
+    cdef void GCMRegridder_ModelE_set_focean(
+        GCMRegridder *_gcmA,
         PyObject *foceanAOp_py,
         PyObject *foceanAOm_py) except +
 
@@ -118,6 +121,11 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 
     cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name, PyObject *elevI_py) except +
 
+    cdef void update_topo(GCMRegridder *_gcmA, string &topoO_fname,
+        PyObject *elev_sigmas_py, bool initial_timestep, string &segments_py, string &primary_segment_py,
+        PyObject *fhc_py, PyObject *underice_py, PyObject *elevE_py,
+        PyObject *focean_py, PyObject *flake_py, PyObject *fgrnd_py,
+        PyObject *fgice_py, PyObject *zatmo_py, PyObject *foceanOm0_py) except +
 
 cdef extern from "icebin/modele/hntr.hpp" namespace "icebin::modele":
     pass

@@ -22,13 +22,16 @@
 #include <ibmisc/cython.hpp>
 #include <spsparse/SparseSet.hpp>
 #ifdef BUILD_MODELE
-#include <icebin/modele/GCMRegridder_ModelE.hpp>
+#include <icebin/GCMCoupler.hpp>
+#include <icebin/modele/GCMCoupler_ModelE.hpp>
+#include <icebin/IceRegridder.hpp>
 #endif
 #include "icebin_cython.hpp"
 
 using namespace ibmisc;
 using namespace ibmisc::cython;
 using namespace spsparse;
+using namespace icebin;
 using namespace icebin::modele;
 
 namespace icebin {
@@ -62,28 +65,32 @@ std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
 }
 
 std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
-    std::shared_ptr<GCMRegridder> const &gcmO,
+    std::shared_ptr<GCMRegridder> const &gcmO)
+{
+#ifdef BUILD_MODELE
+    std::shared_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(gcmO));
+    return gcmA;
+#else
+    return std::shared_ptr<GCMRegridder_ModelE>();
+#endif
+}
+
+void GCMRegridder_ModelE_set_focean(
+    GCMRegridder *_gcmA,
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py)
 {
 #ifdef BUILD_MODELE
-    std::shared_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(gcmO));
+    auto gcmA(dynamic_cast<GCMRegridder_ModelE *>(_gcmA));
 
     // Check types and convert Numpy Arrays
-    size_t nO = gcmO->nA();
+    size_t nO = gcmA->gcmO->nA();
     auto _foceanAOp(np_to_blitz<double,1>(foceanAOp_py, "foceanAOp", {nO}));
     auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
 
     // Copy values from Python memory to C++ memory
-    blitz::Array<double,1> foceanAOp(_foceanAOp.shape());
-    foceanAOp = _foceanAOp;
-    blitz::Array<double,1> foceanAOm(_foceanAOm.shape());
-    foceanAOm = _foceanAOm;
-
-    gcmA->set_focean(foceanAOp, foceanAOm);
-    return gcmA;
-#else
-    return std::shared_ptr<GCMRegridder_ModelE>();
+    gcmA->foceanAOp = _foceanAOp;
+    gcmA->foceanAOm = _foceanAOm;
 #endif
 }
 
@@ -312,9 +319,123 @@ PyObject *Hntr_regrid(Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool m
 
 RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py)
 {
-    IceRegridder *ice_regridder = gcm->ice_regridder(sheet_name);
+    auto sheet_index = gcm->ice_regridders().index.at(sheet_name);
+    IceRegridder *ice_regridder = &*gcm->ice_regridders()[sheet_index];
     auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {ice_regridder->nI()}));
-    return new RegridMatrices(gcm->regrid_matrices(sheet_name, &elevI));
+    return new RegridMatrices(gcm->regrid_matrices(sheet_index, elevI));
+}
+
+std::string to_string(PyObject *str, std::string const &vname)
+{
+    if (!PyUnicode_Check(str)) (*icebin_error)(-1,
+        "Variable %s must be str", vname.c_str());
+
+    Py_ssize_t size;
+    char *buf = PyUnicode_AsUTF8AndSize(str, &size);
+    return std::string(buf, size);
+}
+
+void update_topo(
+    // ====== INPUT parameters
+    GCMRegridder *_gcmA,
+    std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
+    PyObject *elevmask_sigmas_py,    // {'greenland' : (elevI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
+    bool initial_timestep,    // true if this is the first (initialization) timestep
+    std::string const &segments,    // string, eg: "legacy,sealand,ec"
+    std::string const &primary_segment,    // [('name', base), ...]
+    // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
+    PyObject *fhc_py,         // blitz::Array<double,3> fhc;
+    PyObject *underice_py,    // blitz::Array<int,3> underice;
+    PyObject *elevE_py,       // blitz::Array<double,3> elevE;
+    // i,j arrays on Atmosphere grid
+    PyObject *focean_py,      // blitz::Array<double,2> focean;
+    PyObject *flake_py,       // blitz::Array<double,2> flake;
+    PyObject *fgrnd_py,       // blitz::Array<double,2> fgrnd;    // Alt: fearth0
+    PyObject *fgice_py,       // blitz::Array<double,2> fgice;    // Alt: flice
+    PyObject *zatmo_py,       // blitz::Array<double,2> zatmo;      // i,j
+
+    PyObject *foceanOm0_py)   // blitz::Array<double,1> foceanOm0,
+{
+#ifdef BUILD_MODELE
+    auto gcmA(dynamic_cast<GCMRegridder_ModelE *>(_gcmA));
+
+    // --------------------------------------------------------
+    // Convert elevmask and sigmas to C++ Data Structures
+    std::map<std::string, std::pair<ElevMask<1>, std::array<double,3>>> tdata;
+    if (!PyDict_Check(elevmask_sigmas_py)) (*icebin_error)(-1,
+        "elevmask_sigmas must be a Python dict.");
+    PyObject *sheet_py, *value;
+    Py_ssize_t ppos = 0;
+    while (PyDict_Next(elevmask_sigmas_py, &ppos, &sheet_py, &value)) {
+        // Get nI
+        std::string sheet(to_string(sheet_py, "sheet_py"));
+        IceRegridder *icer = &*gcmA->ice_regridders().at(sheet);
+        int nI = icer->nI();
+
+        // Parse the main tuple
+        PyObject *elevI_py, *maskI_py, *sigma_py;
+        PyArg_ParseTuple(value, "OOO", &elevI_py, &maskI_py, &sigma_py);
+        auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {nI}));
+        auto maskI(np_to_blitz<char,1>(maskI_py, "maskI", {nI}));
+
+        // Further parse sigma_py
+        std::array<double,3> sigma;
+        PyArg_ParseTuple(sigma_py, "ddd", &sigma[0], &sigma[1], &sigma[2]);
+
+        // Add to temporary C++ Data Structures
+        tdata.insert(std::make_pair(sheet,
+            std::make_pair(ElevMask<1>(elevI, maskI), sigma)));
+    }
+
+    // Convert temporary to permanent C++ data structure
+    std::vector<ElevMask<1>> elevmasks;
+    std::vector<std::array<double,3>> sigmas;
+    auto &index(gcmA->ice_regridders().index);
+    for (size_t i=0; i<index.size(); ++i) {
+        auto const &rec(tdata.find(index[i]));
+        elevmasks.push_back(rec->second.first);
+        sigmas.push_back(rec->second.second);
+    }
+
+    // --------------------------------------------------------
+    // Convert segments to C++ Data Structure
+    std::vector<HCSegmentData> hc_segments(parse_hc_segments(segments));
+    auto const &ec(get_segment(hc_segments, "ec"));
+    auto nhc_ice(gcmA->nhc());
+    int nhc_gcm = ec.base + nhc_ice;
+
+    // --------------------------------------------------------
+    // Convert arrays to C++ Data Structures
+    Grid_LonLat *gridA = dynamic_cast<Grid_LonLat *>(&*gcmA->gridA);
+    int nj = gridA->nlat();
+    int ni = gridA->nlon();
+
+    icebin::modele::Topos toposA;
+
+    // Convert 3D on the Elevation Grid
+    toposA.fhc.reference(np_to_blitz<double,3>(fhc_py, "fhc", {nhc_gcm, nj, ni}));
+    toposA.underice.reference(np_to_blitz<int,3>(underice_py, "underice", {nhc_gcm, nj, ni}));
+    toposA.elevE.reference(np_to_blitz<double,3>(elevE_py, "elevE", {nhc_gcm, nj, ni}));
+
+    // Convert 2D on the Atmosphere Grid
+    toposA.focean.reference(np_to_blitz<double,2>(focean_py, "focean", {nj, ni}));
+    toposA.flake.reference(np_to_blitz<double,2>(flake_py, "flake", {nj, ni}));
+    toposA.fgrnd.reference(np_to_blitz<double,2>(fgrnd_py, "fgrnd", {nj, ni}));
+    toposA.fgice.reference(np_to_blitz<double,2>(fgice_py, "fgice", {nj, ni}));
+    toposA.zatmo.reference(np_to_blitz<double,2>(zatmo_py, "zatmo", {nj, ni}));
+
+    // Convert 2D on the Ocean Grid
+    GCMRegridder *gcmO = &*gcmA->gcmO;
+    Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmO->gridA);
+    int njO = gridO->nlat();
+    int niO = gridO->nlon();
+    auto foceanOm0(np_to_blitz<double,2>(foceanOm0_py, "foceanOm0", {njO, niO}));
+
+    // --------------------------------------------------------
+    // Call C++ Function
+    icebin::modele::update_topo(gcmA, topoO_fname, elevmasks, sigmas,
+        initial_timestep, hc_segments, primary_segment, toposA, foceanOm0);
+#endif
 }
 
 

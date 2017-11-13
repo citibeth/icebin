@@ -61,10 +61,7 @@ struct WeightedSparse {
         blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
         double fill,    // Fill value for cells not in BvA matrix
         bool force_conservation,
-        ibmisc::TmpAlloc &tmp) const
-    {
-        return spsparse::to_blitz<double>(apply_e(A_b, fill), tmp);
-    }
+        ibmisc::TmpAlloc &tmp) const;
 
 
     /** Apply to a single variable */
@@ -73,13 +70,7 @@ struct WeightedSparse {
         blitz::Array<double,1> const &A_b,       // A_b{j} One variable
         double fill,    // Fill value for cells not in BvA matrix
         bool force_conservation,
-        ibmisc::TmpAlloc &tmp) const
-    {
-        auto A_b2(ibmisc::reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
-        auto ret2(spsparse::to_blitz(apply_e(A_b2, fill), tmp));
-        return ibmisc::reshape<double,2,1>(ret2, {ret2.shape()[1]});
-    }
-
+        ibmisc::TmpAlloc &tmp) const;
 
     /** Read/write to NetCDF */
     void ncio(ibmisc::NcIO &ncio,
@@ -113,6 +104,8 @@ public:
 
         /** Tells if these parameters are asking us to smooth */
         bool smooth() const { return sigma[0] != 0; }
+
+        Params() : scale(true), correctA(false), sigma({0.,0.,0.}) {}
 
         Params(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
             scale(_scale), correctA(_correctA), sigma(_sigma) {}

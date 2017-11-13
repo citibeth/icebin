@@ -38,6 +38,8 @@ public:
     to be passed IceBin->IceCoupler and IceCoupler->IceBin */
     enum IO {INPUT, OUTPUT, count};
 
+    /** Smoothing to use when regridding.  See RegridMatrices::Params. */
+    std::array<double,3> sigma;
 public:
     GCMCoupler const *gcm_coupler;      // parent back-pointer
     IceRegridder const *ice_regridder;   // Set from gcm_coupler.
@@ -78,7 +80,8 @@ public:
     std::array<std::unique_ptr<IceWriter>, 2> writer;
 
     // Current ice sheet elevation
-    blitz::Array<double,1> elevI;
+    blitz::Array<double,1> elevI;    // Elevation at least on land and ice sheet
+    blitz::Array<char,1> maskI;      // 'O'=ocean, 'L'=land, 'I'=ice sheet
 public:
     std::string const &name() const { return _name; }
     Grid const *gridI() { return ice_regridder->gridI.get(); }
@@ -103,7 +106,7 @@ public:
     /** (1) Initialize any grid information, etc. from the IceSheet struct.
     @param vname_base Construct variable name from this, out of which to pull parameters from netCDF
     @param Opened handle on the IceBin config file (not IceBin grid file). */
-    virtual void ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet) {}
+    virtual void ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet);
 
 
     // ========= Called by
@@ -148,22 +151,15 @@ public:
 
     /** (4) Run the ice model for one coupling timestep.
     @param time_s Seconds since GCMParams::time_base.  Helps with debugging.
-    @param index Index of each input grid value in ivalsI.
-    @param ivalsI The values themselves (sparse representation).
-           Their meaning (SMB, T, etc) is determined
-           by the place in the array, as specified by the appropriate
-           INPUT contract for this ice model.
-    @param am_i_root
-        Call with true if calling from MPI root; false otherwise.
-        The core coupling/regridding computation only runs on root.
-        But other MPI ranks need to go along for the ride, assuming that
-        the ice model uses MPI. */
+    @param out Outputs are stored here
+    @param run_ice Set to false to get initial conditions of ice sheet (in out)
+    */
     void couple(
         double time_s,
         // Values from GCM, passed GCM -> Ice
         VectorMultivec const &gcm_ovalsE,
         GCMInput &out,    // Accumulate matrices here...
-        bool do_run);
+        bool run_ice);
 
     /** (4.1) @param index Index of each grid value.
     @param time_s Time since start of simulation, in seconds

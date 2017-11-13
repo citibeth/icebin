@@ -291,10 +291,10 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder
 
 
 RegridMatrices GCMRegridder_Standard::regrid_matrices(
-    std::string const &sheet_name,
-    blitz::Array<double,1> const *elevI) const
+    int sheet_index,
+    blitz::Array<double,1> const &elevI) const
 {
-    IceRegridder const *regridder = ice_regridder(sheet_name);
+    IceRegridder const *regridder = &*ice_regridders()[sheet_index];
 
 #if 0
     printf("===== RegridMatrices Grid geometries:\n");
@@ -308,24 +308,24 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(
     RegridMatrices rm(regridder);
 
     UrAE urA("UrA", this->nA(),
-        std::bind(&IceRegridder::GvAp, regridder, _1, elevI),
+        std::bind(&IceRegridder::GvAp, regridder, _1, &elevI),
         std::bind(&IceRegridder::sApvA, regridder, _1));
 
     UrAE urE("UrE", this->nE(),
-        std::bind(&IceRegridder::GvEp, regridder, _1, elevI),
+        std::bind(&IceRegridder::GvEp, regridder, _1, &elevI),
         std::bind(&IceRegridder::sEpvE, regridder, _1));
 
     // ------- AvI, IvA
     rm.add_regrid("AvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, elevI, urA));
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevI, urA));
     rm.add_regrid("IvA",
-        std::bind(&compute_IvAE, regridder, _1, _2, elevI, urA));
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevI, urA));
 
     // ------- EvI, IvE
     rm.add_regrid("EvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, elevI, urE));
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevI, urE));
     rm.add_regrid("IvE",
-        std::bind(&compute_IvAE, regridder, _1, _2, elevI, urE));
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevI, urE));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, regridder, _1, _2, urE, urA) ));
     rm.add_regrid("EvA",
@@ -388,12 +388,17 @@ EigenDenseMatrixT WeightedSparse::apply_e(
     // A{jn}   One col per variable
     int nvar = A_b.extent(0);
     int nA = A_b.extent(1);
+
     Eigen::Map<EigenDenseMatrixT> const A(
         const_cast<double *>(A_b.data()), nA, nvar);
 
     // |i| = size of output vector space (B)
     // |j| = size of input vector space (A)
     // |n| = number of variables being processed together
+
+
+    if (BvA.M->cols() != A.rows()) (*icebin_error)(-1,
+        "BvA.cols=%d does not match A.rows=%d", BvA.M->cols(), A.rows());
 
     // Apply initial regridding.
     EigenDenseMatrixT B0(*BvA.M * A);        // B0{in}
@@ -434,6 +439,33 @@ EigenDenseMatrixT WeightedSparse::apply_e(
     mask_result(B0, BvA.wM, fill);
 
     return ret;
+}
+
+blitz::Array<double,2> WeightedSparse::apply(
+    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
+    double fill,    // Fill value for cells not in BvA matrix
+    bool force_conservation,
+    ibmisc::TmpAlloc &tmp) const
+{
+    return spsparse::to_blitz<double>(apply_e(A_b, fill), tmp);
+}
+
+
+/** Apply to a single variable */
+blitz::Array<double,1> WeightedSparse::apply(
+    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    blitz::Array<double,1> const &A_b,       // A_b{j} One variable
+    double fill,    // Fill value for cells not in BvA matrix
+    bool force_conservation,
+    ibmisc::TmpAlloc &tmp) const
+{
+printf("XX1 %d %d\n", A_b.extent(0), A_b.shape()[0]);
+    auto A_b2(ibmisc::reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
+printf("XX2 %d %d\n", A_b2.extent(0), A_b2.extent(1));
+    auto ret2(spsparse::to_blitz(apply_e(A_b2, fill), tmp));
+printf("XX3 %d %d\n", ret2.extent(0), ret2.extent(1));
+    return ibmisc::reshape<double,2,1>(ret2, {ret2.shape()[1]});
 }
 // -----------------------------------------------------------------------
 void WeightedSparse::ncio(ibmisc::NcIO &ncio,
