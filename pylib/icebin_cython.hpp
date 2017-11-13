@@ -32,8 +32,17 @@ extern std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
     std::vector<double> &hcdefs,
     bool _correctA);
 
+/** Instantiates a new C++ object of type GCMRegridder_ModelE.
+NOTE: This function is only enabled if BUILD_MODELE is enabled in CMake. */
 extern std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
-    std::shared_ptr<GCMRegridder> const &gcmO,
+    std::shared_ptr<GCMRegridder> const &gcmO);
+
+/** Sets the ocean to use for mismatched regridding (icbin::modele::GCMRegridder_ModelE)
+@param _gcmA Must be of type GCMRegridder_ModelE *.  Ocean is set for this regridder.
+@param foceanAOp_py The ocean (on Ocean grid) as seen by the dynamic ice model.
+@param foceanAOm_py The ocean (on Ocean grid) as seen by ModelE. */
+extern void GCMRegridder_ModelE_set_focean(
+    GCMRegridder *_gcmA,
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py);
 
@@ -84,6 +93,29 @@ PyObject *Hntr_regrid(modele::Hntr const *hntr, PyObject *WTA_py, PyObject *A_py
 
 RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py);
 
+/** Allows Python users access to GCMCoupler_Modele::update_topo().
+Starting from output of Gary's program (on the Ocean grid), this subroutine
+produces a ModelE TOPO file (as internal arrays) on the Atmosphere grid. */
+void update_topo(
+    // ====== INPUT parameters
+    GCMRegridder *_gcmA,
+    std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
+    PyObject *elevmask_sigmas_py,    // {'greenland' : (elevI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
+    bool initial_timestep,    // true if this is the first (initialization) timestep
+    std::string const &segments,    // [('name', base), ...]
+    std::string const &primary_segment,    // [('name', base), ...]
+    // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
+    PyObject *fhc_py,         // blitz::Array<double,3> fhc;
+    PyObject *underice_py,    // blitz::Array<int,3> underice;
+    PyObject *elevE_py,       // blitz::Array<double,3> elevE;
+    // i,j arrays on Atmosphere grid
+    PyObject *focean_py,      // blitz::Array<double,2> focean;
+    PyObject *flake_py,       // blitz::Array<double,2> flake;
+    PyObject *fgrnd_py,       // blitz::Array<double,2> fgrnd;    // Alt: fearth0
+    PyObject *fgice_py,       // blitz::Array<double,2> fgice;    // Alt: flice
+    PyObject *zatmo_py,       // blitz::Array<double,2> zatmo;      // i,j
+
+    PyObject *foceanOm0_py);   // blitz::Array<double,1> foceanOm0,
 
 }}
 

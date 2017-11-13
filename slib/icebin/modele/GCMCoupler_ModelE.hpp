@@ -116,11 +116,13 @@ extern void update_topo(
     GCMRegridder_ModelE *gcmA,    // Gets updated with new fcoeanOp, foceanOm
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
     std::vector<ElevMask<1>> const &elevmasks,
+    std::vector<std::array<double,3>> const &sigmas,
     bool initial_timestep,    // true if this is the first (initialization) timestep
-    HCSegmentData hc_segments,
+    std::vector<HCSegmentData> const &hc_segments,
+    std::string const &primary_segment,
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
-    blitz::Array<double,1> foceanOm0);
+    blitz::Array<double,2> foceanOm0);
 
 
 class GCMCoupler_ModelE : public GCMCoupler
@@ -150,7 +152,7 @@ public:
     std::string topoO_fname;
 
     // Initial ModelE state of foceanO; this cannot change.
-    blitz::Array<double,1> foceanOm0;
+    blitz::Array<double,2> foceanOm0;
 
 public:
     virtual ~GCMCoupler_ModelE() {}
@@ -166,7 +168,7 @@ public:
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 
-    void update_topo(double time_s, bool run_ice);
+    void update_topo(double time_s, bool initial_timestep);
 
     int _read_nhc_gcm();
 
@@ -178,7 +180,6 @@ public:
     void update_gcm_ivals(GCMInput const &out);
 
 };    // class GCMCouler_ModelE
-
 
 }}
 

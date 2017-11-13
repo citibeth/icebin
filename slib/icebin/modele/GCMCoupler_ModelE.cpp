@@ -23,6 +23,7 @@
 #include <ibmisc/ncfile.hpp>
 #include <ibmisc/string.hpp>
 #include <ibmisc/f90blitz.hpp>
+#include <ibmisc/math.hpp>
 #include <spsparse/eigen.hpp>
 #include <spsparse/SparseSet.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
@@ -117,7 +118,12 @@ void GCMCoupler_ModelE::_ncread(
 
     // Replace the GCMRegridder with a wrapped version that understands
     // the ocean-vs-atmosphere grid complexity of ModelE
-    gcm_regridder.reset(new GCMRegridder_ModelE(gcm_regridder));
+    GCMRegridder_ModelE *gcmA = new GCMRegridder_ModelE(gcm_regridder);
+    gcm_regridder.reset(gcmA);
+
+    // Allocate foceanOm0
+    Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmA->gcmO->gridA);
+    foceanOm0.reference(blitz::Array<double,2>(gridO->nlat(), gridO->nlon()));
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()
@@ -383,10 +389,10 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
 
     // b) Compute fhc, elevE
     // c) Compute ZATMO, FGICE, etc.
-    self->update_topo(time_s, false);
+    self->update_topo(time_s, true);    // initial_timestep=true
 
     // d) Sync with dynamic ice model
-    gcmce_couple_native(self, itimei, false);
+    gcmce_couple_native(self, itimei, false);    // run_ice=false
 
     printf("END gcmce_cold_start()\n");
 }
@@ -533,7 +539,7 @@ printf("END gcmce_couple_native() every_outs\n");
     self->update_gcm_ivals(out);
     // 2. Sets icebin_nhc, 
     // 3. Updates FHC, ZATMO, etc.
-    self->update_topo(time_s, true);
+    self->update_topo(time_s, false);    // initial_timestep=false
 }
 // =======================================================
 /** Called from MPI rank */
@@ -647,15 +653,56 @@ blitz::Array<char,1> &changedO)    // OUT
 
         // Compute fcontOp (for this ice sheet only)
         TmpAlloc tmp;
+
         blitz::Array<double,1> fcontOp_d(OvI->apply(fcontI_d, 0., true, tmp));    // force_conservation set to true by default, and it probably doesn't matter; but I think it should be false here.
 
         // Interpolate into foceanOp_s
+        IceRegridder *iceO = &*gcmO->ice_regridders()[sheet_index];
+        ibmisc::Proj_LL2XY proj(iceO->gridI->sproj);
+
+        Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmO->gridA);
         for (int iO_d=0; iO_d<fcontOp_d.extent(0); ++iO_d) {
+
+            // fcont will be 0 or 1; must multiply by fraction of gridcell covered by continent.
             auto const iO_s = dimO.to_sparse(iO_d);
-            foceanOp(iO_s) -= fcontOp_d(iO_d);
+            auto ijO(gcmO->gridA->indexing.index_to_tuple<int,2>(iO_s));
+            int const jO(ijO[1]);
+            double const area = gridO->cells.at(iO_s)->proj_area(&proj);
+
+            foceanOp(iO_s) = foceanOp(iO_s) - round_mantissa(fcontOp_d(iO_d) / area, 12);
             changedO(iO_s) = 1;    // true
         }
+
+#if 0
+// Write debugging NetCDF file
+{NcIO ncio("x.nc", 'w');
+
+    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
+    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+
+
+    // fcontOp
+    blitz::Array<double,1> fcontOp(nO);
+    fcontOp = nan;
+    for (int i=0; i<dimO.dense_extent(); ++i) {
+        fcontOp(dimO.to_sparse(i)) = fcontOp_d(i);
     }
+
+    // (IM, IM)
+    auto dimsO(get_or_add_dims(ncio, {"jm", "im"}, {gridO->nlat(), gridO->nlon()}));
+    auto fcontOp2(reshape<double,1,2>(fcontOp, shapeO));
+    auto foceanOp2(reshape<double,1,2>(foceanOp, shapeO));
+
+    ncio_blitz(ncio, fcontOp2, false, "fcontOpx", dimsO);
+    ncio_blitz(ncio, foceanOp2, false, "foceanOp", dimsO);
+
+    ncio.close();
+}
+#endif
+
+    }
+
+
 }
 
 /** Adds ice sheets to Gary's TOPO file */
@@ -687,7 +734,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
         SparseSetT dimO, dimI;
         RegridMatrices::Params paramsO;
-            paramsO.scale = false;
+            paramsO.scale = true;
             paramsO.correctA = false;
         auto OvI(rmO.matrix("AvI", {&dimO, &dimI}, paramsO));
 
@@ -705,7 +752,7 @@ blitz::Array<char,1> &changedO)    // OUT
         // Interpolate into foceanOp_s
         for (int iO_d=0; iO_d<fgiceO_d.extent(0); ++iO_d) {
             auto const iO_s = dimO.to_sparse(iO_d);
-            fgiceO(iO_s) += fgiceO_d(iO_d);
+            fgiceO(iO_s) += fgiceO_d(iO_d);        // Will have some rounding error on #s that should ==1.0
             changedO(iO_s) = 1;    // true
         }
 
@@ -715,7 +762,7 @@ blitz::Array<char,1> &changedO)    // OUT
 
 // ======================================================================
 
-void update_topo_x(
+void update_topo(
     // ====== INPUT parameters
     GCMRegridder_ModelE *gcmA,    // Gets updated with new fcoeanOp, foceanOm
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
@@ -723,22 +770,29 @@ void update_topo_x(
     std::vector<std::array<double,3>> const &sigmas,
     bool initial_timestep,    // true if this is the first (initialization) timestep
     std::vector<HCSegmentData> const &hc_segments,
+    std::string const &primary_segment,
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
-    blitz::Array<double,1> foceanOm0)
+    blitz::Array<double,2> foceanOm0)
 {    // BEGIN update_topo
+
     if (!initial_timestep) (*icebin_error)(-1,
         "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
+
+    HCSegmentData const &legacy(get_segment(hc_segments, "legacy"));
+    HCSegmentData const &sealand(get_segment(hc_segments, "sealand"));
+    HCSegmentData const &ec(get_segment(hc_segments, "ec"));
 
     GCMRegridder *gcmO = &*gcmA->gcmO;
     auto nA = gcmA->nA();
     auto nE = gcmA->nE();
     auto nO = gcmO->nA();
     auto nhc_ice = gcmA->nhc();
+    int nhc_gcm = ec.base + nhc_ice;
 
     // Convert TOPO arrays to 1-D zero-based indexing
     // ...on elevation grid
-    blitz::TinyVector<int,2> const shape_E2(nhc_ice, nA);
+    blitz::TinyVector<int,2> const shape_E2(nhc_gcm, nA);
     blitz::Array<double,2> fhcE2(reshape(topoA.fhc, shape_E2));
     blitz::Array<int,2> undericeE2(reshape(topoA.underice, shape_E2));
     blitz::Array<double,2>  elevE2(reshape(topoA.elevE, shape_E2));
@@ -786,18 +840,75 @@ void update_topo_x(
             flakeO(i) = 0.;
             if (foceanOp(i) >= 0.5) {
                 foceanOm(i) = 1.;
-                fgrndO(i) = 0.;
                 fgiceO(i) = 0.;
+                fgrndO(i) = 0.;
             } else {
                 foceanOm(i) = 0.;
-                fgrndO(i) = 1. - fgiceO(i);
+                fgiceO(i) = round_mantissa(fgiceO(i), 3);    // will be ==1.0 when needed
+                fgrndO(i) = 1. - fgiceO(i);    // Should have pure zeros, not +-1e-17 stuff
             }
+        } else {
+            foceanOm(i) = foceanOp(i);
         }
     }
 
+    // ----------------------------------------------
+    // Eliminate single-cell oceans
+    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
+    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+    auto foceanOm2(reshape<double,1,2>(foceanOm, shapeO));
+
+    auto const im(gridO->nlon());
+    auto const jm(gridO->nlat());
+    // Avoid edges, where indexing is more complex (and we don't need to correct anyway)
+    std::array<int,2> ijO{1,1};
+    for (ijO[1]=1; ijO[1]<jm-1; ++ijO[1]) {
+    for (ijO[0]=1; ijO[0]<im-1; ++ijO[0]) {
+        int iO(gcmO->gridA->indexing.tuple_to_index(ijO));
+        auto const i(ijO[0]);
+        auto const j(ijO[1]);
+
+        if (changedO(iO)) {
+            if (foceanOm2(j,i) == 1. && foceanOm2(j-1,i)==0. && foceanOm2(j,i-1) == 0. && foceanOm2(j+1,i) == 0. & foceanOm2(j,i+1) == 0) {
+                // Repeat of if-body above
+                foceanOm(iO) = 0.;
+                fgiceO(iO) = round_mantissa(fgiceO(iO), 3);
+                fgrndO(iO) = 1. - fgiceO(iO);
+            }
+        }
+    }}
+
 
     // Store the initial FOCEAN for ModelE, since it cannot change later.
-    if (initial_timestep) foceanOm0 = foceanOm;
+    if (initial_timestep) {
+        auto foceanOm0_1(reshape1(foceanOm0));
+        foceanOm0_1 = foceanOm;
+    }
+
+
+
+# if 0
+// Debugging NetCDF file
+{NcIO ncio("y.nc", 'w');
+
+    Grid_LonLat const *gridA(cast_Grid_LonLat(&*gcmA->gridA));
+    auto shapeA(blitz::shape(gridA->nlat(), gridA->nlon()));
+    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
+    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+
+    // (IM, IM)
+    auto dimsO(get_or_add_dims(ncio, {"jmO", "imO"}, {gridO->nlat(), gridO->nlon()}));
+    auto dimsA(get_or_add_dims(ncio, {"jmA", "imA"}, {gridA->nlat(), gridA->nlon()}));
+
+    auto foceanOp2(reshape<double,1,2>(foceanOp, shapeO));
+    ncio_blitz(ncio, foceanOp2, false, "foceanOp", dimsO);
+
+    auto foceanOm2(reshape<double,1,2>(foceanOm, shapeO));
+    ncio_blitz(ncio, foceanOm2, false, "foceanOm", dimsO);
+
+    ncio.close();
+}
+#endif
 
     // ----------------------------------------------------------
     // ----------------------------------------------------------
@@ -808,8 +919,22 @@ void update_topo_x(
     HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
     HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
     Hntr hntrAvO({&hntrA, &hntrO});
+
+    TupleListT<2> AvO_tp;
+    hntrAvO.scaled_regrid_matrix(AvO_tp);
+    EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
+    AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
+
+    fgiceA = 0;
+
+    map_eigen_colvector(foceanA) = AvO_e * map_eigen_colvector(foceanOm);
+    map_eigen_colvector(flakeA) = AvO_e * map_eigen_colvector(flakeO);
+    map_eigen_colvector(fgrndA) = AvO_e * map_eigen_colvector(fgrndO);
+    map_eigen_colvector(fgiceA) = AvO_e * map_eigen_colvector(fgiceO);
+    map_eigen_colvector(zatmoA) = AvO_e * map_eigen_colvector(zatmoO);
+
     TupleListT<2> AvE_global_tp;
-    blitz::Array<double,1> elevE_global;
+    blitz::Array<double,1> elevE_global(nE);
 
     // Compute elevE and AvE (aka fhc)
     SparseSetT dimA_global;
@@ -848,24 +973,28 @@ void update_topo_x(
             *AvE->M, true);
 
 
+        // Densify elevmaskI
+        blitz::Array<double,1> elevmaskI_d(dimI.dense_extent());
+        for (int i_d=0; i_d<dimI.dense_extent(); ++i_d) {
+            elevmaskI_d(i_d) = elevmaskI(dimI.to_sparse(i_d));
+        }
+        auto elevE_d(EvI->apply(elevmaskI_d, nan, true, tmp));
+
         // Merge local and global elevE
-        auto elevE(EvI->apply(elevmaskI, nan, true, tmp));
         spsparse::spcopy(
             spsparse::accum::to_sparse(std::array<SparseSetT *,1>{&dimE},
             spsparse::accum::blitz_existing(elevE_global)),
-            elevE, true);
+            elevE_d, true);
 
         // Add to dimA_global
         for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
-            auto iA_s = dimA.to_sparse(iA_d);
+            int iA_s = dimA.to_sparse(iA_d);
             dimA_global.add_dense(iA_s);
         }
     }
-
     // Create matrix that works directly on sparse-indexed vectors
     EigenSparseMatrixT AvE_global_e(nA, nE);
     AvE_global_e.setFromTriplets(AvE_global_tp.begin(), AvE_global_tp.end());
-
     EigenColVectorT elevA_global_e(AvE_global_e * map_eigen_colvector(elevE_global));
     auto elevA_global(to_blitz(elevA_global_e));    // Sparse indexing
 
@@ -874,32 +1003,38 @@ void update_topo_x(
 
     // =======================================================
     // ----------- Set up elevation class structure
-    HCSegmentData const &legacy(get_segment(hc_segments, "legacy"));
-    HCSegmentData const &sealand(get_segment(hc_segments, "sealand"));
-    HCSegmentData const &ec(get_segment(hc_segments, "ec"));
 
     // Set up elevation class segments: fhc, underice, elevI
     fhcE2 = 0;
     undericeE2 = 0;
     elevE2 = 0;
 
+    double const zero = 1.e-30;    // Non-zero, yet adds nothing
+    double const legacy_mult = (primary_segment == "legacy" ? 1.0 : zero);
+    double const sealand_mult = (primary_segment == "sealand" ? 1.0 : zero);
+    double const ec_mult = (primary_segment == "ec" ? 1.0 : zero);
+
     // ------- Segment 0: Legacy Segment
     for (int ihc=legacy.base; ihc<legacy.base+legacy.size; ++ihc) {
         // Full domain
         for (int iA_s=0; iA_s<nA; ++iA_s) {
-            fhcE2(ihc,iA_s) = 1.;    // Legacy ice for Greenland and Antarctica.
-            undericeE2(ihc,iA_s) = UI_NOTHING;
-            elevE2(ihc,iA_s) = zatmoA(iA_s);
+            if (fgiceA(iA_s) != 0) {
+                fhcE2(ihc,iA_s) = 1.0;
+                undericeE2(ihc,iA_s) = UI_NOTHING;
+                elevE2(ihc,iA_s) = zatmoA(iA_s);
+            }
         }
 
         // overlay...
         for (int iA_d=0; iA_d<dimA_global.dense_extent(); ++iA_d) {
             int iA_s = dimA_global.to_sparse(iA_d);
             elevE2(ihc,iA_s) = elevA_global(iA_s);
+            fhcE2(ihc,iA_s) = legacy_mult;    // Legacy ice for Greenland and Antarctica.
         }
+
+
+
     }
-
-
 
     // ------- Segment 1: SeaLand Segment
     // ihc=0: Non-ice portion of grid cell at sea level
@@ -915,7 +1050,7 @@ void update_topo_x(
         undericeE2(sealand.base, iA_s) = 0;
         elevE2(sealand.base, iA_s) = 0.;
     };
-
+// return;    // good
     // ihc=1: Ice portion of grid cell at mean for the ice portion
     // FHC is fraction of ICE-COVERED area in this elevation class
     // Therefore, FHC=1 for the land portion of the SeaLand Segment
@@ -923,7 +1058,7 @@ void update_topo_x(
     for (int iA_d=0; iA_d<dimA_global.dense_extent(); ++iA_d) {
         int iA_s = dimA_global.to_sparse(iA_d);
 
-        fhcE2(sealand.base+1, iA_s) = 1.;
+        fhcE2(sealand.base+1, iA_s) = sealand_mult * fgiceA(iA_s);
         undericeE2(sealand.base+1, iA_s) = UI_NOTHING;
         elevE2(sealand.base+1, iA_s) = elevA_global(iA_s);
     }
@@ -940,15 +1075,19 @@ void update_topo_x(
         if (iA2 != iA) (*icebin_error)(-1,
             "Matrix is non-local: iA=%d, iE=%d, iA2=%d", (int)iA, (int)iE, (int)iA2);
 
-        fhcE2(ec.base+ihc, iA) = ii->value();
+        fhcE2(ec.base+ihc, iA) = ii->value() * ec_mult;
         undericeE2(ec.base+ihc, iA) = UI_ICEBIN;
     }
 
-    for (int ihc=0; ihc<elevE2.extent(0); ++ihc) {
-    for (int iA=0; iA<elevE2.extent(1); ++iA) {
-        elevE2(ec.base+ihc, iA) = gcmA->hcdefs[ihc];
-    }}
+    for (int ihc=0; ihc<nhc_ice; ++ihc) {
+    for (int iA=0; iA<nA; ++iA) {
+        int ihcx = ec.base + ihc;
 
+        if (ihcx < 0 || ihcx >= elevE2.extent(0)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(0));
+        if (iA < 0 || iA >= elevE2.extent(1)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(1));
+
+        elevE2(ihcx, iA) = gcmA->hcdefs[ihc];
+    }}
 
     // ==================================================
     // 4) Fix bottom of atmosphere
@@ -976,9 +1115,9 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
     }
 
     Topos &topoA(modele_inputs);
-    update_topo_x(
+    icebin::modele::update_topo(
         gcmA, topoO_fname, elevmasks, sigmas,
-        initial_timestep, gcm_params.hc_segments,
+        initial_timestep, gcm_params.hc_segments, gcm_params.primary_segment,
         topoA, foceanOm0);
 }
 
