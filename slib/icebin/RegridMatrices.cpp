@@ -388,12 +388,17 @@ EigenDenseMatrixT WeightedSparse::apply_e(
     // A{jn}   One col per variable
     int nvar = A_b.extent(0);
     int nA = A_b.extent(1);
+
     Eigen::Map<EigenDenseMatrixT> const A(
         const_cast<double *>(A_b.data()), nA, nvar);
 
     // |i| = size of output vector space (B)
     // |j| = size of input vector space (A)
     // |n| = number of variables being processed together
+
+
+    if (BvA.M->cols() != A.rows()) (*icebin_error)(-1,
+        "BvA.cols=%d does not match A.rows=%d", BvA.M->cols(), A.rows());
 
     // Apply initial regridding.
     EigenDenseMatrixT B0(*BvA.M * A);        // B0{in}
@@ -434,6 +439,30 @@ EigenDenseMatrixT WeightedSparse::apply_e(
     mask_result(B0, BvA.wM, fill);
 
     return ret;
+}
+
+blitz::Array<double,2> WeightedSparse::apply(
+    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
+    double fill,    // Fill value for cells not in BvA matrix
+    bool force_conservation,
+    ibmisc::TmpAlloc &tmp) const
+{
+    return spsparse::to_blitz<double>(apply_e(A_b, fill), tmp);
+}
+
+
+/** Apply to a single variable */
+blitz::Array<double,1> WeightedSparse::apply(
+    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
+    blitz::Array<double,1> const &A_b,       // A_b{j} One variable
+    double fill,    // Fill value for cells not in BvA matrix
+    bool force_conservation,
+    ibmisc::TmpAlloc &tmp) const
+{
+    auto A_b2(ibmisc::reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
+    auto ret2(spsparse::to_blitz(apply_e(A_b2, fill), tmp));
+    return ibmisc::reshape<double,2,1>(ret2, {ret2.shape()[1]});
 }
 // -----------------------------------------------------------------------
 void WeightedSparse::ncio(ibmisc::NcIO &ncio,
