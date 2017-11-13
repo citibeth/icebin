@@ -121,6 +121,7 @@ extern void update_topo(
     std::vector<std::array<double,3>> const &sigmas,
     bool initial_timestep,    // true if this is the first (initialization) timestep
     std::vector<HCSegmentData> const &hc_segments,
+    std::string const &primary_segment,
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
     blitz::Array<double,2> foceanOm0);

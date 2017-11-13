@@ -638,7 +638,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
         SparseSetT dimO, dimI;
         RegridMatrices::Params paramsO;
-            paramsO.scale = false;
+            paramsO.scale = true;
             paramsO.correctA = false;
         auto OvI(rmO.matrix("AvI", {&dimO, &dimI}, paramsO));
 
@@ -664,7 +664,38 @@ printf("DONE APPLY\n");
             foceanOp(iO_s) -= fcontOp_d(iO_d);
             changedO(iO_s) = 1;    // true
         }
+
+
+{NcIO ncio("x.nc", 'w');
+
+    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
+    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+
+
+    // fcontOp
+printf("FFONT: nO = %ld\n", (long)nO);
+    blitz::Array<double,1> fcontOp(nO);
+    fcontOp = nan;
+    for (int i=0; i<dimO.dense_extent(); ++i) {
+        fcontOp(dimO.to_sparse(i)) = fcontOp_d(i);
+printf("fcontOp(%d) = %g\n", dimO.to_sparse(i), fcontOp(dimO.to_sparse(i)));
     }
+
+    // (IM, IM)
+    auto dimsO(get_or_add_dims(ncio, {"jm", "im"}, {gridO->nlat(), gridO->nlon()}));
+    auto fcontOp2(reshape<double,1,2>(fcontOp, shapeO));
+    auto foceanOp2(reshape<double,1,2>(foceanOp, shapeO));
+
+    ncio_blitz(ncio, fcontOp2, false, "fcontOpx", dimsO);
+    ncio_blitz(ncio, foceanOp2, false, "foceanOp", dimsO);
+
+    ncio.close();
+}
+
+
+    }
+
+
 }
 
 /** Adds ice sheets to Gary's TOPO file */
@@ -696,7 +727,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
         SparseSetT dimO, dimI;
         RegridMatrices::Params paramsO;
-            paramsO.scale = false;
+            paramsO.scale = true;
             paramsO.correctA = false;
         auto OvI(rmO.matrix("AvI", {&dimO, &dimI}, paramsO));
 
@@ -732,10 +763,15 @@ void update_topo(
     std::vector<std::array<double,3>> const &sigmas,
     bool initial_timestep,    // true if this is the first (initialization) timestep
     std::vector<HCSegmentData> const &hc_segments,
+    std::string const &primary_segment,
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
     blitz::Array<double,2> foceanOm0)
 {    // BEGIN update_topo
+
+printf("BEGIN update_topo(...)\n");
+printf("ENDING update_topo(...)\n");
+
     if (!initial_timestep) (*icebin_error)(-1,
         "GCMCoupler_ModelE::update_topo() currently only works for the initial call");
 
@@ -750,6 +786,7 @@ void update_topo(
     auto nhc_ice = gcmA->nhc();
     int nhc_gcm = ec.base + nhc_ice;
 
+printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
     // Convert TOPO arrays to 1-D zero-based indexing
     // ...on elevation grid
     blitz::TinyVector<int,2> const shape_E2(nhc_gcm, nA);
@@ -820,17 +857,36 @@ void update_topo(
     // ----------------------------------------------------------
     // Now we are ready to use regrid matrices
 
+//return;    // good
+
     // =====================================================
     // Regrid TOPO to Atmosphere grid
     HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
     HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
     Hntr hntrAvO({&hntrA, &hntrO});
+
+    TupleListT<2> AvO_tp;
+    hntrAvO.scaled_regrid_matrix(AvO_tp);
+    EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
+printf("TT1 %ld\n", AvO_tp.size());
+    AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
+printf("TT2 %ld\n", AvO_tp.size());
+
+    fgiceA = 0;
+
+    map_eigen_colvector(foceanA) = AvO_e * map_eigen_colvector(foceanOm);
+    map_eigen_colvector(flakeA) = AvO_e * map_eigen_colvector(flakeO);
+    map_eigen_colvector(fgrndA) = AvO_e * map_eigen_colvector(fgrndO);
+    map_eigen_colvector(fgiceA) = AvO_e * map_eigen_colvector(fgiceO);
+    map_eigen_colvector(zatmoA) = AvO_e * map_eigen_colvector(zatmoO);
+
     TupleListT<2> AvE_global_tp;
     blitz::Array<double,1> elevE_global(nE);
 
     // Compute elevE and AvE (aka fhc)
     SparseSetT dimA_global;
     for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
+printf("BEGIN sheet_index=%ld of %ld\n", sheet_index, gcmO->ice_regridders().index.size());
         TmpAlloc tmp;
 
         auto &emI(elevmasks[sheet_index]);
@@ -870,7 +926,9 @@ void update_topo(
         for (int i_d=0; i_d<dimI.dense_extent(); ++i_d) {
             elevmaskI_d(i_d) = elevmaskI(dimI.to_sparse(i_d));
         }
+// return; // good
         auto elevE_d(EvI->apply(elevmaskI_d, nan, true, tmp));
+// return;  // good
 #if 0
         // Merge local and global elevE
         for (int iE_d=0; iE_d<elevE_d.extent(0); ++iE_d) {
@@ -889,18 +947,24 @@ void update_topo(
             elevE_d, true);
 #endif
 
+// return; // good
         // Add to dimA_global
         for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
             int iA_s = dimA.to_sparse(iA_d);
             dimA_global.add_dense(iA_s);
         }
+// return;    // good
+printf("END sheet_index=%ld of %ld\n", sheet_index, gcmO->ice_regridders().index.size());
     }
-
+//return;    // good
     // Create matrix that works directly on sparse-indexed vectors
     EigenSparseMatrixT AvE_global_e(nA, nE);
     AvE_global_e.setFromTriplets(AvE_global_tp.begin(), AvE_global_tp.end());
+// return;    // good
     EigenColVectorT elevA_global_e(AvE_global_e * map_eigen_colvector(elevE_global));
+// return;    // good
     auto elevA_global(to_blitz(elevA_global_e));    // Sparse indexing
+// return;    // crash  (good now)
     // =======================================================
     // ----------- Set TOPO variables
 
@@ -912,23 +976,33 @@ void update_topo(
     undericeE2 = 0;
     elevE2 = 0;
 
+    double const zero = 1.e-30;    // Non-zero, yet adds nothing
+//    double const zero = 1.;
+    double const legacy_mult = (primary_segment == "legacy" ? 1.0 : zero);
+    double const sealand_mult = (primary_segment == "sealand" ? 1.0 : zero);
+    double const ec_mult = (primary_segment == "ec" ? 1.0 : zero);
+
     // ------- Segment 0: Legacy Segment
     for (int ihc=legacy.base; ihc<legacy.base+legacy.size; ++ihc) {
         // Full domain
         for (int iA_s=0; iA_s<nA; ++iA_s) {
-            fhcE2(ihc,iA_s) = 1.;    // Legacy ice for Greenland and Antarctica.
-            undericeE2(ihc,iA_s) = UI_NOTHING;
-            elevE2(ihc,iA_s) = zatmoA(iA_s);
+            if (fgiceA(iA_s) != 0) {
+                fhcE2(ihc,iA_s) = 1.0;
+                undericeE2(ihc,iA_s) = UI_NOTHING;
+                elevE2(ihc,iA_s) = zatmoA(iA_s);
+            }
         }
 
         // overlay...
         for (int iA_d=0; iA_d<dimA_global.dense_extent(); ++iA_d) {
             int iA_s = dimA_global.to_sparse(iA_d);
             elevE2(ihc,iA_s) = elevA_global(iA_s);
+            fhcE2(ihc,iA_s) = legacy_mult;    // Legacy ice for Greenland and Antarctica.
         }
+
+
+
     }
-
-
 
     // ------- Segment 1: SeaLand Segment
     // ihc=0: Non-ice portion of grid cell at sea level
@@ -944,7 +1018,7 @@ void update_topo(
         undericeE2(sealand.base, iA_s) = 0;
         elevE2(sealand.base, iA_s) = 0.;
     };
-
+// return;    // good
     // ihc=1: Ice portion of grid cell at mean for the ice portion
     // FHC is fraction of ICE-COVERED area in this elevation class
     // Therefore, FHC=1 for the land portion of the SeaLand Segment
@@ -952,7 +1026,7 @@ void update_topo(
     for (int iA_d=0; iA_d<dimA_global.dense_extent(); ++iA_d) {
         int iA_s = dimA_global.to_sparse(iA_d);
 
-        fhcE2(sealand.base+1, iA_s) = 1.;
+        fhcE2(sealand.base+1, iA_s) = sealand_mult * fgiceA(iA_s);
         undericeE2(sealand.base+1, iA_s) = UI_NOTHING;
         elevE2(sealand.base+1, iA_s) = elevA_global(iA_s);
     }
@@ -969,16 +1043,18 @@ void update_topo(
         if (iA2 != iA) (*icebin_error)(-1,
             "Matrix is non-local: iA=%d, iE=%d, iA2=%d", (int)iA, (int)iE, (int)iA2);
 
-        fhcE2(ec.base+ihc, iA) = ii->value();
+        fhcE2(ec.base+ihc, iA) = ii->value() * ec_mult;
         undericeE2(ec.base+ihc, iA) = UI_ICEBIN;
     }
 
+// return;    // good
+printf("elevE2 shape: (%d %d) ec.base=%d\n", elevE2.extent(0), elevE2.extent(1), ec.base);
     for (int ihc=0; ihc<nhc_ice; ++ihc) {
     for (int iA=0; iA<nA; ++iA) {
-        int const ihcx = ec.base + ihc;
+        int ihcx = ec.base + ihc;
 
-        //if (ihcx < 0 || ihcx >= elevE2.extent(0)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(0));
-        //if (iA < 0 || iA >= elevE2.extent(1)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(1));
+        if (ihcx < 0 || ihcx >= elevE2.extent(0)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(0));
+        if (iA < 0 || iA >= elevE2.extent(1)) (*icebin_error)(-1, "ihcx out of bounds: %d %d\n", ihcx, elevE2.extent(1));
 
         elevE2(ihcx, iA) = gcmA->hcdefs[ihc];
     }}
@@ -1012,7 +1088,7 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
     Topos &topoA(modele_inputs);
     icebin::modele::update_topo(
         gcmA, topoO_fname, elevmasks, sigmas,
-        initial_timestep, gcm_params.hc_segments,
+        initial_timestep, gcm_params.hc_segments, gcm_params.primary_segment,
         topoA, foceanOm0);
 }
 

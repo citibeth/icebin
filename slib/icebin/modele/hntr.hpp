@@ -161,10 +161,10 @@ public:
 
     /** Produces a scaled regrid matrix, without the extra baggage.
     Equivalent to running overlap() and then scaling. */
-    template<class AccumT, class IncludeT>
+    template<class AccumT, class IncludeT = IncludeConst<int,true>>
     void scaled_regrid_matrix(
         AccumT &accum,        // The output (sparse) matrix; 0-based indexing
-        IncludeT includeB);
+        IncludeT includeB = IncludeT());
 };    // class Hntr
 
 

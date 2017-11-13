@@ -155,6 +155,7 @@ struct GCMParams {
         HCSegmentData("sealand", 1, 2),
         HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
     int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
+    std::string primary_segment = "ec";
 
     HCSegmentData &segment(std::string const &name)
         { return get_segment(hc_segments, name); }
