@@ -23,6 +23,7 @@
 #include <ibmisc/ncfile.hpp>
 #include <ibmisc/string.hpp>
 #include <ibmisc/f90blitz.hpp>
+#include <ibmisc/math.hpp>
 #include <spsparse/eigen.hpp>
 #include <spsparse/SparseSet.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
@@ -624,6 +625,7 @@ blitz::Array<char,1> &changedO)    // OUT
     // --------------------- Compute fcontOp_d (and foceanOp)
     for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().size(); ++sheet_index) {
 
+
         // Construct an elevmaskI for CONTINENTAL land (not just ice sheet)
         // (==elevI on continent, nan on ocean)
         auto &emI(elevmasks[sheet_index]);
@@ -638,7 +640,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
         SparseSetT dimO, dimI;
         RegridMatrices::Params paramsO;
-            paramsO.scale = true;
+            paramsO.scale = false;
             paramsO.correctA = false;
         auto OvI(rmO.matrix("AvI", {&dimO, &dimI}, paramsO));
 
@@ -659,9 +661,20 @@ printf("fcontI_d: %d\n", fcontI_d.extent(0));
 printf("DONE APPLY\n");
 
         // Interpolate into foceanOp_s
+        IceRegridder *iceO = &*gcmO->ice_regridders()[sheet_index];
+        ibmisc::Proj_LL2XY proj(iceO->gridI->sproj);
+
+        Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmO->gridA);
         for (int iO_d=0; iO_d<fcontOp_d.extent(0); ++iO_d) {
+
+            // fcont will be 0 or 1; must multiply by fraction of gridcell covered by continent.
             auto const iO_s = dimO.to_sparse(iO_d);
-            foceanOp(iO_s) -= fcontOp_d(iO_d);
+            auto ijO(gcmO->gridA->indexing.index_to_tuple<int,2>(iO_s));
+            int const jO(ijO[1]);
+            double const area = gridO->cells.at(iO_s)->proj_area(&proj);
+
+            foceanOp(iO_s) = foceanOp(iO_s) - round_mantissa(fcontOp_d(iO_d) / area, 12);
+printf("foceanOp(%ld) = %g %a\n", (long)iO_s, foceanOp(iO_s), foceanOp(iO_s));
             changedO(iO_s) = 1;    // true
         }
 
@@ -678,7 +691,7 @@ printf("FFONT: nO = %ld\n", (long)nO);
     fcontOp = nan;
     for (int i=0; i<dimO.dense_extent(); ++i) {
         fcontOp(dimO.to_sparse(i)) = fcontOp_d(i);
-printf("fcontOp(%d) = %g\n", dimO.to_sparse(i), fcontOp(dimO.to_sparse(i)));
+//printf("fcontOp(%d) = %g\n", dimO.to_sparse(i), fcontOp(dimO.to_sparse(i)));
     }
 
     // (IM, IM)
@@ -745,7 +758,7 @@ blitz::Array<char,1> &changedO)    // OUT
         // Interpolate into foceanOp_s
         for (int iO_d=0; iO_d<fgiceO_d.extent(0); ++iO_d) {
             auto const iO_s = dimO.to_sparse(iO_d);
-            fgiceO(iO_s) += fgiceO_d(iO_d);
+            fgiceO(iO_s) += fgiceO_d(iO_d);        // Will have some rounding error on #s that should ==1.0
             changedO(iO_s) = 1;    // true
         }
 
@@ -836,15 +849,46 @@ printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
         if (changedO(i)) {
             flakeO(i) = 0.;
             if (foceanOp(i) >= 0.5) {
+printf("changed(%d) %g->1\n", i, foceanOp(i));
                 foceanOm(i) = 1.;
-                fgrndO(i) = 0.;
                 fgiceO(i) = 0.;
+                fgrndO(i) = 0.;
             } else {
+printf("changed(%d) %g->0\n", i, foceanOp(i));
                 foceanOm(i) = 0.;
-                fgrndO(i) = 1. - fgiceO(i);
+                fgiceO(i) = round_mantissa(fgiceO(i), 3);    // will be ==1.0 when needed
+                fgrndO(i) = 1. - fgiceO(i);    // Should have pure zeros, not +-1e-17 stuff
             }
+        } else {
+            foceanOm(i) = foceanOp(i);
         }
     }
+
+    // ----------------------------------------------
+    // Eliminate single-cell oceans
+    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
+    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+    auto foceanOm2(reshape<double,1,2>(foceanOm, shapeO));
+
+    auto const im(gridO->nlon());
+    auto const jm(gridO->nlat());
+    // Avoid edges, where indexing is more complex (and we don't need to correct anyway)
+    std::array<int,2> ijO{1,1};
+    for (ijO[1]=1; ijO[1]<jm-1; ++ijO[1]) {
+    for (ijO[0]=1; ijO[0]<im-1; ++ijO[0]) {
+        int iO(gcmO->gridA->indexing.tuple_to_index(ijO));
+        auto const i(ijO[0]);
+        auto const j(ijO[1]);
+
+        if (changedO(iO)) {
+            if (foceanOm2(j,i) == 1. && foceanOm2(j-1,i)==0. && foceanOm2(j,i-1) == 0. && foceanOm2(j+1,i) == 0. & foceanOm2(j,i+1) == 0) {
+                // Repeat of if-body above
+                foceanOm(iO) = 0.;
+                fgiceO(iO) = round_mantissa(fgiceO(iO), 3);
+                fgrndO(iO) = 1. - fgiceO(iO);
+            }
+        }
+    }}
 
 
     // Store the initial FOCEAN for ModelE, since it cannot change later.
@@ -852,6 +896,31 @@ printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
         auto foceanOm0_1(reshape1(foceanOm0));
         foceanOm0_1 = foceanOm;
     }
+
+
+
+
+{NcIO ncio("y.nc", 'w');
+
+    Grid_LonLat const *gridA(cast_Grid_LonLat(&*gcmA->gridA));
+    auto shapeA(blitz::shape(gridA->nlat(), gridA->nlon()));
+    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
+    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+
+    // (IM, IM)
+    auto dimsO(get_or_add_dims(ncio, {"jmO", "imO"}, {gridO->nlat(), gridO->nlon()}));
+    auto dimsA(get_or_add_dims(ncio, {"jmA", "imA"}, {gridA->nlat(), gridA->nlon()}));
+
+    auto foceanOp2(reshape<double,1,2>(foceanOp, shapeO));
+    ncio_blitz(ncio, foceanOp2, false, "foceanOp", dimsO);
+
+    auto foceanOm2(reshape<double,1,2>(foceanOm, shapeO));
+    ncio_blitz(ncio, foceanOm2, false, "foceanOm", dimsO);
+
+    ncio.close();
+}
+
+
 
     // ----------------------------------------------------------
     // ----------------------------------------------------------
@@ -868,9 +937,7 @@ printf("nhc = %d %d %d\n", nhc_ice, topoA.fhc.extent(0), nhc_gcm);
     TupleListT<2> AvO_tp;
     hntrAvO.scaled_regrid_matrix(AvO_tp);
     EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
-printf("TT1 %ld\n", AvO_tp.size());
     AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
-printf("TT2 %ld\n", AvO_tp.size());
 
     fgiceA = 0;
 
@@ -886,7 +953,6 @@ printf("TT2 %ld\n", AvO_tp.size());
     // Compute elevE and AvE (aka fhc)
     SparseSetT dimA_global;
     for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
-printf("BEGIN sheet_index=%ld of %ld\n", sheet_index, gcmO->ice_regridders().index.size());
         TmpAlloc tmp;
 
         auto &emI(elevmasks[sheet_index]);
@@ -926,9 +992,7 @@ printf("BEGIN sheet_index=%ld of %ld\n", sheet_index, gcmO->ice_regridders().ind
         for (int i_d=0; i_d<dimI.dense_extent(); ++i_d) {
             elevmaskI_d(i_d) = elevmaskI(dimI.to_sparse(i_d));
         }
-// return; // good
         auto elevE_d(EvI->apply(elevmaskI_d, nan, true, tmp));
-// return;  // good
 #if 0
         // Merge local and global elevE
         for (int iE_d=0; iE_d<elevE_d.extent(0); ++iE_d) {
@@ -947,24 +1011,19 @@ printf("BEGIN sheet_index=%ld of %ld\n", sheet_index, gcmO->ice_regridders().ind
             elevE_d, true);
 #endif
 
-// return; // good
         // Add to dimA_global
         for (int iA_d=0; iA_d<dimA.dense_extent(); ++iA_d) {
             int iA_s = dimA.to_sparse(iA_d);
             dimA_global.add_dense(iA_s);
         }
-// return;    // good
 printf("END sheet_index=%ld of %ld\n", sheet_index, gcmO->ice_regridders().index.size());
     }
-//return;    // good
     // Create matrix that works directly on sparse-indexed vectors
     EigenSparseMatrixT AvE_global_e(nA, nE);
     AvE_global_e.setFromTriplets(AvE_global_tp.begin(), AvE_global_tp.end());
-// return;    // good
     EigenColVectorT elevA_global_e(AvE_global_e * map_eigen_colvector(elevE_global));
-// return;    // good
     auto elevA_global(to_blitz(elevA_global_e));    // Sparse indexing
-// return;    // crash  (good now)
+
     // =======================================================
     // ----------- Set TOPO variables
 
@@ -977,7 +1036,6 @@ printf("END sheet_index=%ld of %ld\n", sheet_index, gcmO->ice_regridders().index
     elevE2 = 0;
 
     double const zero = 1.e-30;    // Non-zero, yet adds nothing
-//    double const zero = 1.;
     double const legacy_mult = (primary_segment == "legacy" ? 1.0 : zero);
     double const sealand_mult = (primary_segment == "sealand" ? 1.0 : zero);
     double const ec_mult = (primary_segment == "ec" ? 1.0 : zero);
