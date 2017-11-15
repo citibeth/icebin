@@ -370,11 +370,6 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
 // Called from LISheetIceBin::cold_start()
 
 extern "C"
-void gcmce_couple_native(GCMCoupler_ModelE *self,
-int itime,
-bool run_ice);    // if false, only initialize
-
-extern "C"
 void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dtsrc)
 {
     printf("BEGIN gcmce_cold_start() yeari=%d, itimei=%d, dtsrc=%g\n", yeari, itimei, dtsrc);

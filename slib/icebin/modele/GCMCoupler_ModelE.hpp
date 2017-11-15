@@ -181,5 +181,93 @@ public:
 
 };    // class GCMCouler_ModelE
 
+// ===============================================================
+// The "gcmce_*" interface used by Fortran ModelE
+
+extern "C"
+void *gcmce_new(
+    ModelEParams const &_rdparams,
+
+    // Info about the global grid
+    int im, int jm,
+
+    // Info about the local grid (1-based indexing, closed ranges)
+    int i0_f, int i1_f, int j0_f, int j1_f,
+
+    // MPI Stuff
+    MPI_Fint comm_f, int root);
+
+/* Tells ModelE how many elevation classes it needs **/
+extern "C"
+void gcmce_hc_params(GCMCoupler_ModelE *self, int &nhc_gcm, int &icebin_base_hc, int &nhc_ice);
+
+/** Set a single constant value in Icebin.  This is a callback, to be called
+from ModelE's (Fortran code) constant_set::set_all_constants() */
+/** Called from within LISheetIceBin::allocate() */
+extern "C"
+void gcmce_set_constant(
+    GCMCoupler_ModelE *self,
+    char const *name_f, int name_len,
+    double val,
+    char const *units_f, int units_len,
+    char const *description_f, int description_len);
+
+extern "C"
+void gcmce_add_gcm_outpute(
+GCMCoupler_ModelE *self,
+F90Array<double, 3> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+char const *long_name_f, int long_name_len);
+
+/** @para var_nhc Number of elevation points for this variable.
+ (equal to 1 for atmosphere variables, or nhc for elevation-grid variables)
+@param return: Start of this variable in the gcm_inputs_local array (Fortran 1-based index) */
+extern "C"
+void gcmce_add_gcm_inputa(
+GCMCoupler_ModelE *self,
+F90Array<double, 2> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+bool initial,    // bool
+char const *long_name_f, int long_name_len);
+
+extern "C"
+void gcmce_add_gcm_inpute(
+GCMCoupler_ModelE *self,
+F90Array<double, 3> &var_f,
+char const *field_name_f, int field_name_len,
+char const *units_f, int units_len,
+int initial,    // bool
+char const *long_name_f, int long_name_len);
+
+extern "C"
+void gcmce_reference_globals(
+    GCMCoupler_ModelE *self,
+    F90Array<double, 3> &fhc,
+    F90Array<int, 3> &underice,
+    F90Array<double, 3> &elevE,
+    F90Array<double, 2> &focean,
+    F90Array<double, 2> &flake,
+    F90Array<double, 2> &fgrnd,
+    F90Array<double, 2> &fgice,
+    F90Array<double, 2> &zatmo);
+
+extern "C"
+void gcmce_io_rsf(GCMCoupler_ModelE *self,
+    char *fname_c, int fname_n);
+
+extern "C"
+void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dtsrc);
+
+extern "C"
+void gcmce_couple_native(GCMCoupler_ModelE *self,
+int itime,
+bool run_ice);    // if false, only initialize
+
+
+
+
+
 }}
 
