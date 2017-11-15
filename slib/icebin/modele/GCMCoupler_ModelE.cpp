@@ -260,7 +260,7 @@ char const *long_name_f, int long_name_len)
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
     std::unique_ptr<blitz::Array<double,3>> var(
-        new blitz::Array<double,3>(var_f.to_blitz()));
+        new blitz::Array<double,3>(f_to_c(var_f.to_blitz())));
 
     unsigned int flags = 0;
 
@@ -287,7 +287,7 @@ char const *long_name_f, int long_name_len)
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
     std::unique_ptr<blitz::Array<double,2>> var(
-        new blitz::Array<double,2>(var_f.to_blitz()));
+        new blitz::Array<double,2>(f_to_c(var_f.to_blitz())));
 
     unsigned int flags = 0;
     if (initial) flags |= contracts::INITIAL;
@@ -312,7 +312,7 @@ char const *long_name_f, int long_name_len)
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
     std::unique_ptr<blitz::Array<double,3>> var(
-        new blitz::Array<double,3>(var_f.to_blitz()));
+        new blitz::Array<double,3>(f_to_c(var_f.to_blitz())));
 
     unsigned int flags = 0;
     if (initial) flags |= contracts::INITIAL;
@@ -340,14 +340,14 @@ void gcmce_reference_globals(
     F90Array<double, 2> &zatmo)
 {
     Topos *topos(&self->modele_inputs);
-    topos->fhc.reference(fhc.to_blitz());
-    topos->underice.reference(underice.to_blitz());
-    topos->elevE.reference(elevE.to_blitz());
-    topos->focean.reference(focean.to_blitz());
-    topos->flake.reference(flake.to_blitz());
-    topos->fgrnd.reference(fgrnd.to_blitz());
-    topos->fgice.reference(fgice.to_blitz());
-    topos->zatmo.reference(zatmo.to_blitz());
+    topos->fhc.reference(f_to_c(fhc.to_blitz()));
+    topos->underice.reference(f_to_c(underice.to_blitz()));
+    topos->elevE.reference(f_to_c(elevE.to_blitz()));
+    topos->focean.reference(f_to_c(focean.to_blitz()));
+    topos->flake.reference(f_to_c(flake.to_blitz()));
+    topos->fgrnd.reference(f_to_c(fgrnd.to_blitz()));
+    topos->fgice.reference(f_to_c(fgice.to_blitz()));
+    topos->zatmo.reference(f_to_c(zatmo.to_blitz()));
 }
 
 // ===========================================================
@@ -448,7 +448,6 @@ bool run_ice)    // if false, only initialize
 printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc, nhc_ice);
 
     for (int ihc=base_hc; ihc < base_hc + nhc_ice; ++ihc) {
-        const int ihc_f = ihc+1;
         const int ihc_ice = ihc - base_hc;   // Use only IceBin HC's, zero-based indexing
         if (ihc_ice < 0) (*icebin_error)(-1,
             "ihc_ice cannot be <0: %d = %d - %d - 1\n", ihc_ice, ihc, base_hc);
@@ -456,10 +455,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
         for (int j=domainA[1].begin; j < domainA[1].end; ++j) {
         for (int i=domainA[0].begin; i < domainA[0].end; ++i) {
             // i,j are 0-based indexes.
-            const int i_f = i+1;
-            const int j_f = j+1;
-
-            if (self->modele_inputs.underice(i_f,j_f,ihc_f) != UI_ICEBIN) continue;    // C2F indexing
+            if (self->modele_inputs.underice(ihc,j,i) != UI_ICEBIN) continue;
             long iE_s = self->gcm_regridder->indexingE.tuple_to_index(
                 make_array(i, j, ihc_ice));
 
@@ -467,7 +463,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
                 "iE_s=%ld (from %d %d %d), it should not be negative\n", iE_s, i, j, ihc_ice);
 
             for (unsigned int ivar=0; ivar<self->gcm_outputsE.size(); ++ivar) {
-                val[ivar] = (*self->modele_outputs.gcm_ovalsE[ivar])(i_f,j_f,ihc_f);    // Fortran-order,
+                val[ivar] = (*self->modele_outputs.gcm_ovalsE[ivar])(ihc,j,i);
             }
 
             gcm_ovalsE_s.add({iE_s}, &val[0]);
@@ -565,10 +561,10 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {    // Iterate through elements of parallel arrays
         long iA = gcm_ivalsA_s.index[i];
         auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
-        int const i_f = ij[0]+1;    // C2F
-        int const j_f = ij[1]+1;
+        int const i = ij[0];
+        int const j = ij[1];
         for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
-            (*gcm_ivalsA[ivar])(i_f, j_f) +=
+            (*gcm_ivalsA[ivar])(j,i) +=
                 gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar];
         }
     }
@@ -585,13 +581,13 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
         long iE = gcm_ivalsE_s.index[i];
         auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
-        int const i_f = ijk[0]+1;    // C2F
-        int const j_f = ijk[1]+1;
+        int const i = ijk[0];
+        int const j = ijk[1];
         int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
-        int const ihc_gcm_f = gcm_params.icebin_base_hc + ihc_ice + 1;    // 1-based, G
+        int const ihc_gcm = gcm_params.icebin_base_hc + ihc_ice;
 
         for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
-            (*gcm_ivalsE[ivar])(i_f, j_f, ihc_gcm_f) +=
+            (*gcm_ivalsE[ivar])(ihc_gcm,j,i) +=
                 gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar];
         }
     }
