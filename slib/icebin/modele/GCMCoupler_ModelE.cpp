@@ -138,8 +138,9 @@ std::string GCMCoupler_ModelE::locate_input_file(
 }
 // -----------------------------------------------------
 // ===========================================================
+/** Reads from file ./config/icebin.nc */
 extern "C"
-void *gcmce_new(
+GCMCoupler_ModelE *gcmce_new(
     ModelEParams const &_rdparams,
 
     // Info about the global grid

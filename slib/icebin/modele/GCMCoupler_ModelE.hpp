@@ -185,7 +185,7 @@ public:
 // The "gcmce_*" interface used by Fortran ModelE
 
 extern "C"
-void *gcmce_new(
+GCMCoupler_ModelE *gcmce_new(
     ModelEParams const &_rdparams,
 
     // Info about the global grid
