@@ -185,9 +185,10 @@ cdef class GCMRegridder:
         fhc, underice, elevE,
         focean, flake, fgrnd, fgice, zatmo,
         foceanOm0):
-    """Allows Python users access to GCMCoupler_Modele::update_topo().
-    Starting from output of Gary's program (on the Ocean grid), this subroutine
-    produces a ModelE TOPO file (as internal arrays) on the Atmosphere grid."""
+        """Allows Python users access to GCMCoupler_Modele::update_topo().
+        Starting from output of Gary's program (on the Ocean grid), this subroutine
+        produces a ModelE TOPO file (as internal arrays) on the Atmosphere grid."""
+
         cicebin.update_topo(
             self.cself.get(), topoO_fname.encode(),
             <PyObject *>elevmask_sigmas, initial_timestamp, segments.encode(), primary_segment.encode(),

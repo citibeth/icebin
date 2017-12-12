@@ -331,14 +331,14 @@ char const *long_name_f, int long_name_len)
 extern "C"
 void gcmce_reference_globals(
     GCMCoupler_ModelE *self,
-    F90Array<double, 3> &fhc,
-    F90Array<int, 3> &underice,
-    F90Array<double, 3> &elevE,
-    F90Array<double, 2> &focean,
-    F90Array<double, 2> &flake,
-    F90Array<double, 2> &fgrnd,
-    F90Array<double, 2> &fgice,
-    F90Array<double, 2> &zatmo)
+    F90Array<double, 3> fhc,
+    F90Array<int, 3> underice,
+    F90Array<double, 3> elevE,
+    F90Array<double, 2> focean,
+    F90Array<double, 2> flake,
+    F90Array<double, 2> fgrnd,
+    F90Array<double, 2> fgice,
+    F90Array<double, 2> zatmo)
 {
     Topos *topos(&self->modele_inputs);
     topos->fhc.reference(f_to_c(fhc.to_blitz()));

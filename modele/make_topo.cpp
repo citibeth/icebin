@@ -69,7 +69,7 @@ printf("greenland = %d\n", args.greenland);
     printf("============ Writing Output\n");
     {NcIO ncio(args.ofname, 'w');
 
-        topo_outputs.bundle.ncio(ncio, {}, false, "", "double");
+        topo_outputs.bundle.ncio(ncio, {}, "", "double");
 
         ncio.close();
     }

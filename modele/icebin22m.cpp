@@ -202,7 +202,7 @@ ArrayBundle<double,2> make_bundle()
 void do_main()
 {
     auto bundle2(make_bundle());
-    bundle2.allocate(blitz::shape(IM2, JM2), {"im2", "jm2"});
+    bundle2.allocate({IM2, JM2}, {"im2", "jm2"});
 
     for (size_t i=0; i<bundle2.data.size(); ++i) {
         bundle2.data[i].arr = NaN;
@@ -223,7 +223,7 @@ void do_main()
 
     // Regrid to 1/2-degree --- because the 2-minute file is too slow for ncview
     auto bundleH(make_bundle());
-    bundleH.allocate(blitz::shape(IMH, JMH), {"im", "jm"});
+    bundleH.allocate({IMH, JMH}, {"im", "jm"});
     Hntr hntr(g2mx2m, g1qx1, NaN);
     for (size_t i=0; i<bundleH.data.size(); ++i) {
         bundleH.data[i].arr.reference(hntr.regrid(bundle2.at("WT").arr, bundle2.data[i].arr));
@@ -231,7 +231,7 @@ void do_main()
 
     printf("BEGIN writing output\n");
     {NcIO ncio("greenland2m.nc", 'w');
-        bundleH.ncio(ncio, {}, false, "", "double");
+        bundleH.ncio(ncio, {}, "", "double");
     }
     printf("END writing output\n");
 

@@ -71,8 +71,8 @@ TEST_F(Z1qx1n_Bs1Test, read_inputs)
     EnvSearchPath locator("MODELE_FILE_PATH");
     read_raw(topo_inputs, true, &greenland_inputs, locator);
 
-    topo_inputs.bundle.ncio(ncio, {}, true, "", "double");
-    greenland_inputs.bundle.ncio(ncio, {}, true, "gr:", "double");
+    topo_inputs.bundle.ncio_alloc(ncio, {}, "", "double");
+    greenland_inputs.bundle.ncio_alloc(ncio, {}, "gr:", "double");
     ncio.close();
 }
 

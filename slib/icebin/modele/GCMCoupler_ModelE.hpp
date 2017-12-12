@@ -245,14 +245,14 @@ char const *long_name_f, int long_name_len);
 extern "C"
 void gcmce_reference_globals(
     GCMCoupler_ModelE *self,
-    ibmisc::F90Array<double, 3> &fhc,
-    ibmisc::F90Array<int, 3> &underice,
-    ibmisc::F90Array<double, 3> &elevE,
-    ibmisc::F90Array<double, 2> &focean,
-    ibmisc::F90Array<double, 2> &flake,
-    ibmisc::F90Array<double, 2> &fgrnd,
-    ibmisc::F90Array<double, 2> &fgice,
-    ibmisc::F90Array<double, 2> &zatmo);
+    ibmisc::F90Array<double, 3> fhc,
+    ibmisc::F90Array<int, 3> underice,
+    ibmisc::F90Array<double, 3> elevE,
+    ibmisc::F90Array<double, 2> focean,
+    ibmisc::F90Array<double, 2> flake,
+    ibmisc::F90Array<double, 2> fgrnd,
+    ibmisc::F90Array<double, 2> fgice,
+    ibmisc::F90Array<double, 2> zatmo);
 
 extern "C"
 void gcmce_io_rsf(GCMCoupler_ModelE *self,

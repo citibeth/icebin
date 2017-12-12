@@ -1,14 +1,14 @@
 /** One-way coupler driver */
 
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
+#include <ibmisc/bundle.hpp>
 
 using namespace icebin;
+using namespace icebin::modele;
 using namespace ibmisc;
 
-
-# Name of constants file written by ModelE
-std::string const constants_fname = 'log/constants.nc'
-std::string const constants_fname = 'log/constants.nc'
+// Name of constants file written by ModelE
+std::string const constants_fname = "log/constants.nc";
 std::string const TOPO_fname = "TOPO";
 std::string const forcing_fname = "gcm-out-19500305.nc";
 
@@ -17,7 +17,7 @@ struct GCMOutputBundles {
     ibmisc::ArrayBundle<double,3> E;
 };
 
-ibmisc::ArrayBundle<double,3> gcm_outputs_bundles()
+GCMOutputBundles gcm_outputs_bundles()
 {
     GCMOutputBundles bundles;
 
@@ -135,7 +135,7 @@ GCMInputBundles gcm_inputs_bundles()
         "description", "Changes not otherwise accounted for"
     });
 
-    return ret;
+    return bundles;
 }
 
 // =============================================================================
@@ -198,53 +198,10 @@ struct Oneway {
     int const jm = 90;
     int nhc_gcm;
 
-    Oneway::Oneway(int argc, char **argv)
-
-    blitz::Array<double,3> add_gcm_inputE(
-        std::string const &field, std::string const &units, std::string const &description, bool intitial);
-
-    blitz::Array<double,2> add_gcm_inputA(
-        std::string const &field, std::string const &units, std::string const &description, bool initial=false);
-
-    blitz::Array<double,3> add_gcm_outputE(
-        std::string const &field, std::string const &units, std::string const &description);
-
+    Oneway(int argc, char **argv);
 
 };
 
-blitz::Array<double,3> Oneway::add_gcm_inputsE(ibmisc::ArrayBundle<double,3> &bundleE)
-{
-    blitz::Array<double,3> var_f(im,jm,nhc_gcm, blitz::fortranArray);
-    gcmce_add_gcm_inpute(gcmce, var_f,
-        field.c_str(), field.size(),
-        units.c_str(), units.size(),
-        description.c_str(), description.size());
-    return var_f;
-}
-
-blitz::Array<double,2> Oneway::add_gcm_inputA(
-    std::string const &field, std::string const &units, std::string const &description, bool initial)
-{
-    blitz::Array<double,2> var_f(im,jm, blitz::fortranArray);
-    gcmce_add_gcm_inputa(gcmce, var_f,
-        field.c_str(), field.size(),
-        units.c_str(), units.size(),
-        description.c_str(), description.size());
-    return var_f;
-}
-
-
-
-blitz::Array<double,3> Oneway::add_gcm_outputE(
-    std::string const &field, std::string const &units, std::string const &description)
-{
-    blitz::Array<double,3> var_f(im,jm,nhc_gcm, blitz::fortranArray);
-    gcmce_add_gcm_outpute(gcmce, var_f,
-        field.c_str(), field.size(),
-        units.c_str(), units.size(),
-        description.c_str(), description.size());
-    return var_f;
-}
 
 
 Oneway::Oneway(int argc, char **argv)
@@ -283,25 +240,25 @@ Oneway::Oneway(int argc, char **argv)
             im, jm,
             1, im, 1, jm,        // The entire domain is in root
             MPI_Comm_c2f(comm),
-            0);
+            0)
         :
         gcmce_new(
             ModelEParams(),    // Dummy for now
             im, jm,
             1, 0, 1, 0,        // No part of the domain is in non-root
             MPI_Comm_c2f(comm),
-            0);
+            0)
     );
 
     // Figure out how many elevation classes we need.
     int nhc_gcm;
     int icebin_base_hc;
     int nhc_ice;
-    gcmce_hc_params(gcmce, nhc_gcm, icebin_base_hc, nhc_ice);
+    gcmce_hc_params(&*gcmce, nhc_gcm, icebin_base_hc, nhc_ice);
 
     // Read constants from NetCDF file written during ModelE run
     // (in lieu of calling gcmce_set_constant())
-    {NcIO ncio(consants_fname, 'r');
+    {NcIO ncio(constants_fname, 'r');
         gcmce->gcm_constants.read_nc(ncio.nc, "");
     }
 
@@ -312,38 +269,45 @@ Oneway::Oneway(int argc, char **argv)
     // And register them with IceBin Coupler
     GCMOutputBundles outputs(gcm_outputs_bundles());
     outputs.E.allocate(
-        blitz::shape(im,jm,nhc_gcm),
+        {im,jm,nhc_gcm},
         {"im","jm","nhc_gcm"},
-        blitz::fortranArray);
+        true, blitz::fortranArray);
     for (size_t i=0; i<outputs.E.index.size(); ++i) {
-        auto ArrayBundle<double,3>::Meta const &meta(outputs.E.data[i]);
-        std::map<std::string, std::string> attr(meta.make_attr_map());
+        ArrayBundle<double,3>::Data &meta(outputs.E.data[i]);
+//        std::map<std::string, std::string> attr(meta.meta.attr.begin(), meta.meta.attr.end());
+        std::map<std::string, std::string> attr(meta.meta.make_attr_map());
 
-        std::string const &name(meta.name);
-        std::string const &units(attr.at("units"));
-        std::string const &description(attr.at("description"));
-        gcmce_add_inpute(gcmce, meta.arr,
-            name.c_str(), name.size(),
-            units.c_str(), units.size(),
-            description.c_str(), description.size());
-    }
-
-    GCMInputBundles inputs(gcm_inputs_bundles());
-    inputs.A.allocate(
-        blitz::shape(im,jm),
-        {"im","jm"},
-        blitz::fortranArray);
-    for (size_t i=0; i<inputs.A.index.size(); ++i) {
-        auto ArrayBundle<double,2>::Meta const &meta(inputs.A.data[i]);
-        std::map<std::string, std::string> attr(meta.make_attr_map());
-
-        std::string const &name(meta.name);
+        std::string const &name(meta.meta.name);
         std::string const &units(attr.at("units"));
         std::string const &description(attr.at("description"));
         auto initial_ii(attr.find("initial"));
         bool initial = (initial_ii == attr.end() ? true : atoi(initial_ii->second.c_str()));
 
-        gcmce_add_inputa(gcmce, meta.arr,
+        auto arr_f(f90array(meta.arr));
+        gcmce_add_gcm_inpute(&*gcmce, arr_f,
+            name.c_str(), name.size(),
+            units.c_str(), units.size(),
+            initial,
+            description.c_str(), description.size());
+    }
+
+    GCMInputBundles inputs(gcm_inputs_bundles());
+    inputs.A.allocate(
+        {im, jm},
+        {"im","jm"},
+        true, blitz::fortranArray);
+    for (size_t i=0; i<inputs.A.index.size(); ++i) {
+        ArrayBundle<double,2>::Data &meta(inputs.A.data[i]);
+        std::map<std::string, std::string> attr(meta.meta.make_attr_map());
+
+        std::string const &name(meta.meta.name);
+        std::string const &units(attr.at("units"));
+        std::string const &description(attr.at("description"));
+        auto initial_ii(attr.find("initial"));
+        bool initial = (initial_ii == attr.end() ? true : atoi(initial_ii->second.c_str()));
+
+        auto arr_f(f90array(meta.arr));
+        gcmce_add_gcm_inputa(&*gcmce, arr_f,
             name.c_str(), name.size(),
             units.c_str(), units.size(),
             initial,
@@ -351,20 +315,21 @@ Oneway::Oneway(int argc, char **argv)
     }
 
     inputs.E.allocate(
-        blitz::shape(im,jm, nhc_gcm),
+        {im,jm, nhc_gcm},
         {"im","jm","nhc_gcm"},
-        blitz::fortranArray);
+        true, blitz::fortranArray);
     for (size_t i=0; i<inputs.E.index.size(); ++i) {
-        auto ArrayBundle<double,3>::Meta const &meta(inputs.E.data[i]);
-        std::map<std::string, std::string> attr(meta.make_attr_map());
+        ArrayBundle<double,3>::Data &meta(inputs.E.data[i]);
+        std::map<std::string, std::string> attr(meta.meta.make_attr_map());
 
-        std::string const &name(meta.name);
+        std::string const &name(meta.meta.name);
         std::string const &units(attr.at("units"));
         std::string const &description(attr.at("description"));
         auto initial_ii(attr.find("initial"));
         bool initial = (initial_ii == attr.end() ? true : atoi(initial_ii->second.c_str()));
 
-        gcmce_add_inpute(gcmce, meta.arr,
+        auto arr_f(f90array(meta.arr));
+        gcmce_add_gcm_inpute(&*gcmce, arr_f,
             name.c_str(), name.size(),
             units.c_str(), units.size(),
             initial,
@@ -376,19 +341,22 @@ Oneway::Oneway(int argc, char **argv)
 
     GlobalBundles globals;
     globals.Ed.allocate(
-        blitz::shape(im,jm, nhc_gcm),
+        {im,jm, nhc_gcm},
         {"im","jm","nhc_gcm"},
+        true,
         blitz::fortranArray);
     globals.Ei.allocate(
-        blitz::shape(im,jm, nhc_gcm),
+        {im,jm, nhc_gcm},
         {"im","jm","nhc_gcm"},
+        true,
         blitz::fortranArray);
     globals.Ad.allocate(
-        blitz::shape(im,jm),
+        {im,jm},
         {"im","jm"},
+        true,
         blitz::fortranArray);
 
-    gcmce_reference_globals(gcmce,
+    gcmce_reference_globals(&*gcmce,
         f90array(globals.Ed.array("fhc")),
         f90array(globals.Ei.array("underice")),
         f90array(globals.Ed.array("elevE")),
@@ -401,44 +369,32 @@ Oneway::Oneway(int argc, char **argv)
 
     // -----------------------------------------------------------------
     // Read TOPO file into GlobalBundles
-    {NcIO ncio(TOPO_fname);
-        globals.Ed.ncio(ncio, {}, false, "", "double");
-        globals.Ei.ncio(ncio, {}, false, "", "int");
-        globals.Ad.ncio(ncio, {}, false, "", "double");
+    {NcIO ncio(TOPO_fname, 'r');
+        globals.Ed.ncio(ncio, {}, "", "double");
+        globals.Ei.ncio(ncio, {}, "", "int");
+        globals.Ad.ncio(ncio, {}, "", "double");
     }
-#if 0
-        for (int i=0; i<globals.Ed.size(); ++i) {
-            auto ArrayBundle<double,3>::Meta const &meta(globals.Ed.data[i]);
-            ncio_blitz(ncio, meta.var, false, meta.name, {});
-        }
-        for (int i=0; i<globals.Ei.size(); ++i) {
-            auto ArrayBundle<double,3>::Meta const &meta(globals.Ei.data[i]);
-            ncio_blitz(ncio, meta.var, false, meta.name, {});
-        }
-        for (int i=0; i<globals.Ad.size(); ++i) {
-            auto ArrayBundle<double,2>::Meta const &meta(globals.Ad.data[i]);
-            ncio_blitz(ncio, meta.var, false, meta.name, {});
-        }
-#endif
 
 
     // -----------------------------------------------------------------
     // Read a single forcing to use over and over again...
 
     int itime=0;
-    {NcIO ncio(foring_fname);
-        outputs.E.ncio(ncio, {}, false, "", "double");
+    {NcIO ncio(forcing_fname, 'r');
+        outputs.E.ncio_partial(
+            ncio, {}, "", "double",
+            {}, {itime, 0, 0, 0}, {3,2,1});
     }
 
 
-
-
-    
-
-
-
-
     // Set up a single domain
-    GCMCoupler_ModelE *gcmc
+    GCMCoupler_ModelE *gcmc;
 
 }
+
+
+int main(int argc, char **argv)
+{
+    Oneway ow(argc, argv);
+}
+
