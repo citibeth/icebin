@@ -19,21 +19,21 @@ static double const NaN = std::numeric_limits<double>::quiet_NaN();
 ArrayBundle<double,2> greenland_inputs_bundle(bool allocate)
 {
     ArrayBundle<double, 2> bundle;
-    bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {});
-    bundle.add("ZETOP2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {
+    bundle.add("FOCEN2", {IM2, JM2}, {"im2", "jm2"}, {});
+    bundle.add("ZETOP2", {IM2, JM2}, {"im2", "jm2"}, {
         "description", "Solid Topography except for ice shelves",
         "units", "m",
         "source", "Z2MX2M.NGDC"
     });
 
-    bundle.add("FOCENS", blitz::shape(IMS, JMS), {"ims", "jms"}, {});
+    bundle.add("FOCENS", {IMS, JMS}, {"ims", "jms"}, {});
 
-    bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"}, {});
+    bundle.add("FLAKES", {IMS, JMS}, {"ims", "jms"}, {});
 
-    bundle.add("FGICEH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {});
+    bundle.add("FGICEH", {IMH, JMH}, {"imh", "jmh"}, {});
 
-    bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {});
-    bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {});
+    bundle.add("FCONT1", {IM1, JM1}, {"im1", "jm1"}, {});
+    bundle.add("FGICE1", {IM1, JM1}, {"im1", "jm1"}, {});
 
     if (allocate) bundle.allocate(true, blitz::fortranArray);
 
@@ -58,44 +58,44 @@ ArrayBundle<double,2> topo_inputs_bundle(bool allocate)
 {
 
     ArrayBundle<double,2> bundle;
-    bundle.add("FOCEN2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {
+    bundle.add("FOCEN2", {IM2, JM2}, {"im2", "jm2"}, {
         "description", "Ocean Fraction",
         "units", "0 or 1",
     });
-    bundle.add("ZETOP2", blitz::shape(IM2, JM2), {"im2", "jm2"}, {
+    bundle.add("ZETOP2", {IM2, JM2}, {"im2", "jm2"}, {
         "description", "Solid Topography except for ice shelves",
         "units", "m",
         "source", "Z2MX2M.NGDC"
     });
 
-    bundle.add("FLAKES", blitz::shape(IMS, JMS), {"ims", "jms"}, {
+    bundle.add("FLAKES", {IMS, JMS}, {"ims", "jms"}, {
         "description", "Lake Fraction",
         "units", "0:1",
         "source", "Z2MX2M.NGDC"
     });
 
-    bundle.add("dZGICH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {
+    bundle.add("dZGICH", {IMH, JMH}, {"imh", "jmh"}, {
         "description", "Glacial Ice Thickness",
         "units", "m",
         "source", "ZICEHXH"
     });
-    bundle.add("FGICEH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {
+    bundle.add("FGICEH", {IMH, JMH}, {"imh", "jmh"}, {
         "description", "Glacial Ice Fraction (Antarctica & Greenland only)",
         "units", "0:1",
         "source", "ZICEHXH"
     });
-    bundle.add("ZSOLDH", blitz::shape(IMH, JMH), {"imh", "jmh"}, {
+    bundle.add("ZSOLDH", {IMH, JMH}, {"imh", "jmh"}, {
         "description", "Ice Topography (Antarctica & Greenland only)",
         "units", "m",
         "source", "ZICEHXH"
     });
 
-    bundle.add("FCONT1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {
+    bundle.add("FCONT1", {IM1, JM1}, {"im1", "jm1"}, {
         "description", "Continental Fraction",
         "units", "0:1",
         "SOURCE", "ZNGDC1"
     });
-    bundle.add("FGICE1", blitz::shape(IM1, JM1), {"im1", "jm1"}, {
+    bundle.add("FGICE1", {IM1, JM1}, {"im1", "jm1"}, {
         "description", "Glacial Ice Fraction (all ice)",
         "units", "0:1",
         "SOURCE", "ZNGDC1"
@@ -136,10 +136,10 @@ void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLoc
     blitz::Array<double,2> greenland_focen2(
         greenland ? greenland->FOCEN2 : blitz::Array<double,2>(IM2,JM2,fortranArray));
     {NcIO ncio(files.locate("Z2MX2M.NGDC-SeparateGreenland.nc"), 'r');
-        ncio_blitz(ncio, in.FOCEN2, false, "FOCEN2", "double",
+        ncio_blitz(ncio, in.FOCEN2, "FOCEN2", "double",
             get_dims(ncio, {"im2", "jm2"}));
 
-        ncio_blitz(ncio, in.ZETOP2, false, "ZETOP2", "double",
+        ncio_blitz(ncio, in.ZETOP2, "ZETOP2", "double",
             get_dims(ncio, {"im2", "jm2"}));
 
         // Separate Greenland from the rest
@@ -228,9 +228,9 @@ void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLoc
     // Read in ZNGDC1
     // Read hand-modified FCONT1 (formerly from "ZNGDC1")
     {NcIO ncio(files.locate("ZNGDC1-SeparateGreenland.nc"), 'r');
-        ncio_blitz(ncio, in.FCONT1, false, "FCONT1", "double",
+        ncio_blitz(ncio, in.FCONT1, "FCONT1", "double",
             get_dims(ncio, {"im1", "jm1"}));
-        ncio_blitz(ncio, in.FGICE1, false, "FGICE1", "double",
+        ncio_blitz(ncio, in.FGICE1, "FGICE1", "double",
             get_dims(ncio, {"im1", "jm1"}));
 
         // Separate Greenland from the rest
@@ -302,7 +302,7 @@ void callZ(
     bundle.add("ZGRND", ZGRND, {"im", "jm"}, {});
     bundle.add("ZSGHI", ZSGHI, {"im", "jm"}, {});
 
-    bundle.ncio(ncio, {}, false, "", "double");
+    bundle.ncio(ncio, {}, "", "double");
 }
 
 

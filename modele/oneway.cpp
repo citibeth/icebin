@@ -9,38 +9,15 @@ using namespace ibmisc;
 # Name of constants file written by ModelE
 std::string const constants_fname = 'log/constants.nc'
 std::string const constants_fname = 'log/constants.nc'
+std::string const TOPO_fname = "TOPO";
+std::string const forcing_fname = "gcm-out-19500305.nc";
 
 // =============================================================================
 struct GCMOutputBundles {
     ibmisc::ArrayBundle<double,3> E;
 };
 
-class GCMOutputs {
-public:
-    GCMOutputBundles bundles;
-    blitz::Array<double,3> &runo;
-    blitz::Array<double,3> &eruno;
-    blitz::Array<double,3> &deltah;
-    blitz::Array<double,3> &massxfer;
-    blitz::Array<double,3> &enthxfer;
-    blitz::Array<double,3> &volxfer;
-    blitz::Array<double,3> &gcm_bottom_senth;
-
-    GCMOutputs(GCMOutputBundles &&_bundleE);
-};
-
-GCMOutputs::GCMOutputs(GCMOutputBUndles &&_bundles) :
-    bundles(std::move(_bundles)),
-    runo(bundles.E.array("runo")),
-    eruno(bundles.E.array("eruno")),
-    deltah(bundles.E.array("deltah")),
-    massxfer(bundles.E.array("massxfer")),
-    enthxfer(bundles.E.array("enthxfer")),
-    volxfer(bundles.E.array("volxfer")),
-    gcm_bottom_senth(bundles.E.array("gcm_bottom_senth"))
-{}
-
-ibmisc::ArrayBundle<double,3> gcm_outputs_bundleE()
+ibmisc::ArrayBundle<double,3> gcm_outputs_bundles()
 {
     GCMOutputBundles bundles;
 
@@ -84,50 +61,7 @@ struct GCMInputBundles {
     ibmisc::ArrayBundle<double,3> E;
 };
 
-class GCMInputs {
-public:
-    ibmisc::ArrayBundle<double,3> bundleE;
-    ibmisc::ArrayBundle<double,2> bundleA;
-
-    blitz::Array<double,2> &elevA;
-    blitz::Array<double,3> &elevE;
-    blitz::Array<double,3> &ice_top_senth;
-    blitz::Array<double,2> & basal_frictional_heating;
-    blitz::Array<double,2> & strain_heating;
-    blitz::Array<double,2> & geothermal_flux;
-    blitz::Array<double,2> & upward_geothermal_flux;
-    blitz::Array<double,2> & calving_mass;
-    blitz::Array<double,2> & calving_enth;
-    blitz::Array<double,2> & basal_runoff_mass;
-    blitz::Array<double,2> & basal_runoff_enth;
-    blitz::Array<double,2> & internal_advection_mass;
-    blitz::Array<double,2> & internal_advection_enth;
-    blitz::Array<double,2> & epsilon_mass;
-    blitz::Array<double,2> & epsilon_enth;
-
-    GCMInputs(ibmisc::ArrayBundle<double,3> &&_bundleE);
-};
-
-GCMInputs::GCMInputs(GCMInputBundles &&_bundles) :
-    bundles(std::move(_bundles)),
-    elevA(bundles.A.array("elevA")),
-    elevE(bundles.E.array("elevE")),
-    ice_top_senth(bundles.E.array("ice_top_senth")),
-    basal_frictional_heating(bundles.A.array("basal_frictional_heating")),
-    strain_heating(bundles.A.array("strain_heating")),
-    geothermal_flux(bundles.A.array("geothermal_flux")),
-    upward_geothermal_flux(bundles.A.array("upward_geothermal_flux")),
-    calving.mass(bundles.A.array("calving.mass")),
-    calving.enth(bundles.A.array("calving.enth")),
-    basal_runoff.mass(bundles.A.array("basal_runoff.mass")),
-    basal_runoff.enth(bundles.A.array("basal_runoff.enth")),
-    internal_advection.mass(bundles.A.array("internal_advection.mass")),
-    internal_advection.enth(bundles.A.array("internal_advection.enth")),
-    epsilon.mass(bundles.A.array("epsilon.mass")),
-    epsilon.enth(bundles.A.array("epsilon.enth"))
-{}
-
-std::tuple<ibmisc::ArrayBundle<double,2>, ibmisc::ArrayBundle<double,3>> gcm_inputs_bundles()
+GCMInputBundles gcm_inputs_bundles()
 {
     GCMInputBundles bundles;
 
@@ -211,34 +145,6 @@ struct GlobalBundles {
     ibmisc::ArrayBundle<double,2> Ad;
 };
 
-class Globals {
-public:
-    GlobalBundles bundles;
-
-    blitz::Array<double, 3> &fhc;
-    blitz::Array<int, 3> &underice;
-    blitz::Array<double, 3> &elevE;
-    blitz::Array<double, 2> &focean;
-    blitz::Array<double, 2> &flake;
-    blitz::Array<double, 2> &fgrnd;
-    blitz::Array<double, 2> &fgice;
-    blitz::Array<double, 2> &zatmo;
-
-    Globals(GlobalBundles &&_bundles);
-};
-
-Globals::Globals() :
-    bundles(std::move(_bundles)),
-    fhc(bundles.Ed.array("fhc")),
-    underice(bundles.Ei.array("underice")),
-    elevE(bundles.Ed.array("elevE")),
-    focean(bundles.Ad.array("focean")),
-    flake(bundles.Ad.array("flake")),
-    fgrnd(bundles.Ad.array("fgrnd")),
-    fgice(bundles.Ad.array("fgice")),
-    zatmo(bundles.Ad.array("zatmo"))
-{}
-
 GlobalBundles global_bundles()
 {
     GlobalBundles bundles;
@@ -280,7 +186,7 @@ GlobalBundles global_bundles()
         "description", "Elevation of bottom of the atmosphere."
     });
 
-    return ret;
+    return bundles;
 }
 
 // =============================================================================
@@ -404,13 +310,13 @@ Oneway::Oneway(int argc, char **argv)
     //
     // Allocate arrays used to communicate with coupler
     // And register them with IceBin Coupler
-    GCMOutputs outputs(gcm_outputs_bundleE());
-    outputs.bundles.E.allocate(
+    GCMOutputBundles outputs(gcm_outputs_bundles());
+    outputs.E.allocate(
         blitz::shape(im,jm,nhc_gcm),
         {"im","jm","nhc_gcm"},
         blitz::fortranArray);
-    for (size_t i=0; i<outputs.bundleE.index.size(); ++i) {
-        auto ArrayBundle<double,3>::Meta const &meta(outputs.bundleE.data[i]);
+    for (size_t i=0; i<outputs.E.index.size(); ++i) {
+        auto ArrayBundle<double,3>::Meta const &meta(outputs.E.data[i]);
         std::map<std::string, std::string> attr(meta.make_attr_map());
 
         std::string const &name(meta.name);
@@ -422,13 +328,13 @@ Oneway::Oneway(int argc, char **argv)
             description.c_str(), description.size());
     }
 
-    GCMInputs inputs(gcm_inputs_bundles());
-    inputs.bundles.A.allocate(
+    GCMInputBundles inputs(gcm_inputs_bundles());
+    inputs.A.allocate(
         blitz::shape(im,jm),
         {"im","jm"},
         blitz::fortranArray);
-    for (size_t i=0; i<inputs.bundleA.index.size(); ++i) {
-        auto ArrayBundle<double,2>::Meta const &meta(inputs.bundleA.data[i]);
+    for (size_t i=0; i<inputs.A.index.size(); ++i) {
+        auto ArrayBundle<double,2>::Meta const &meta(inputs.A.data[i]);
         std::map<std::string, std::string> attr(meta.make_attr_map());
 
         std::string const &name(meta.name);
@@ -444,12 +350,12 @@ Oneway::Oneway(int argc, char **argv)
             description.c_str(), description.size());
     }
 
-    inputs.bundles.E.allocate(
+    inputs.E.allocate(
         blitz::shape(im,jm, nhc_gcm),
         {"im","jm","nhc_gcm"},
         blitz::fortranArray);
-    for (size_t i=0; i<inputs.bundleE.index.size(); ++i) {
-        auto ArrayBundle<double,3>::Meta const &meta(inputs.bundleE.data[i]);
+    for (size_t i=0; i<inputs.E.index.size(); ++i) {
+        auto ArrayBundle<double,3>::Meta const &meta(inputs.E.data[i]);
         std::map<std::string, std::string> attr(meta.make_attr_map());
 
         std::string const &name(meta.name);
@@ -468,7 +374,61 @@ Oneway::Oneway(int argc, char **argv)
     // ----------------------------------------------------------------
     // gcmce_reference_globals()
 
-    Globals 
+    GlobalBundles globals;
+    globals.Ed.allocate(
+        blitz::shape(im,jm, nhc_gcm),
+        {"im","jm","nhc_gcm"},
+        blitz::fortranArray);
+    globals.Ei.allocate(
+        blitz::shape(im,jm, nhc_gcm),
+        {"im","jm","nhc_gcm"},
+        blitz::fortranArray);
+    globals.Ad.allocate(
+        blitz::shape(im,jm),
+        {"im","jm"},
+        blitz::fortranArray);
+
+    gcmce_reference_globals(gcmce,
+        f90array(globals.Ed.array("fhc")),
+        f90array(globals.Ei.array("underice")),
+        f90array(globals.Ed.array("elevE")),
+        f90array(globals.Ad.array("focean")),
+        f90array(globals.Ad.array("flake")),
+        f90array(globals.Ad.array("fgrnd")),
+        f90array(globals.Ad.array("fgice")),
+        f90array(globals.Ad.array("zatmo"))
+    );
+
+    // -----------------------------------------------------------------
+    // Read TOPO file into GlobalBundles
+    {NcIO ncio(TOPO_fname);
+        globals.Ed.ncio(ncio, {}, false, "", "double");
+        globals.Ei.ncio(ncio, {}, false, "", "int");
+        globals.Ad.ncio(ncio, {}, false, "", "double");
+    }
+#if 0
+        for (int i=0; i<globals.Ed.size(); ++i) {
+            auto ArrayBundle<double,3>::Meta const &meta(globals.Ed.data[i]);
+            ncio_blitz(ncio, meta.var, false, meta.name, {});
+        }
+        for (int i=0; i<globals.Ei.size(); ++i) {
+            auto ArrayBundle<double,3>::Meta const &meta(globals.Ei.data[i]);
+            ncio_blitz(ncio, meta.var, false, meta.name, {});
+        }
+        for (int i=0; i<globals.Ad.size(); ++i) {
+            auto ArrayBundle<double,2>::Meta const &meta(globals.Ad.data[i]);
+            ncio_blitz(ncio, meta.var, false, meta.name, {});
+        }
+#endif
+
+
+    // -----------------------------------------------------------------
+    // Read a single forcing to use over and over again...
+
+    int itime=0;
+    {NcIO ncio(foring_fname);
+        outputs.E.ncio(ncio, {}, false, "", "double");
+    }
 
 
 

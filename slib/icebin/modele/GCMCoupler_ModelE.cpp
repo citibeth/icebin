@@ -554,8 +554,8 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     }
 
     for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) (*gcm_ivalsA[ivar]) = 0;
-    for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {    // Iterate through elements of parallel arrays
-        long iA = gcm_ivalsA_s.index[i];
+    for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
+        long iA = gcm_ivalsA_s.index[ix];
         auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
         int const i = ij[0];
         int const j = ij[1];
@@ -574,8 +574,8 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
 
     // Write to here...
     for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) (*gcm_ivalsE[ivar]) = 0;
-    for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
-        long iE = gcm_ivalsE_s.index[i];
+    for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
+        long iE = gcm_ivalsE_s.index[ix];
         auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
         int const i = ijk[0];
         int const j = ijk[1];

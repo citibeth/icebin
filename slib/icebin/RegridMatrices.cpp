@@ -476,8 +476,7 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
 
     // ----------- wM
     std::string matrix_name(dim_names[0] + "v" + dim_names[1]);
-    ncio_blitz<double,1>(ncio, wM, true,
-        vname + ".wM",
+    ncio_blitz_alloc<double,1>(ncio, wM, vname+".wM", get_nc_type<double>(),
         {ncdims[0]});
 
     // --------- M
@@ -489,8 +488,7 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
         "conservative", get_nc_type<bool>(), &conservative, 1);
 
     // ---- Mw
-    ncio_blitz<double,1>(ncio, Mw, true,
-        vname + ".Mw",
+    ncio_blitz_alloc<double,1>(ncio, Mw, vname + ".Mw", get_nc_type<double>(),
         {ncdims[1]});
 }
 

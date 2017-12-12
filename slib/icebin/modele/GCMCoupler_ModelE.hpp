@@ -19,6 +19,7 @@
 #pragma once
 
 #include <boost/mpi.hpp>
+#include <ibmisc/f90blitz.hpp>
 #include <icebin/GCMCoupler.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 
@@ -215,7 +216,7 @@ void gcmce_set_constant(
 extern "C"
 void gcmce_add_gcm_outpute(
 GCMCoupler_ModelE *self,
-F90Array<double, 3> &var_f,
+ibmisc::F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 char const *long_name_f, int long_name_len);
@@ -226,7 +227,7 @@ char const *long_name_f, int long_name_len);
 extern "C"
 void gcmce_add_gcm_inputa(
 GCMCoupler_ModelE *self,
-F90Array<double, 2> &var_f,
+ibmisc::F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 bool initial,    // bool
@@ -235,7 +236,7 @@ char const *long_name_f, int long_name_len);
 extern "C"
 void gcmce_add_gcm_inpute(
 GCMCoupler_ModelE *self,
-F90Array<double, 3> &var_f,
+ibmisc::F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 int initial,    // bool
@@ -244,14 +245,14 @@ char const *long_name_f, int long_name_len);
 extern "C"
 void gcmce_reference_globals(
     GCMCoupler_ModelE *self,
-    F90Array<double, 3> &fhc,
-    F90Array<int, 3> &underice,
-    F90Array<double, 3> &elevE,
-    F90Array<double, 2> &focean,
-    F90Array<double, 2> &flake,
-    F90Array<double, 2> &fgrnd,
-    F90Array<double, 2> &fgice,
-    F90Array<double, 2> &zatmo);
+    ibmisc::F90Array<double, 3> &fhc,
+    ibmisc::F90Array<int, 3> &underice,
+    ibmisc::F90Array<double, 3> &elevE,
+    ibmisc::F90Array<double, 2> &focean,
+    ibmisc::F90Array<double, 2> &flake,
+    ibmisc::F90Array<double, 2> &fgrnd,
+    ibmisc::F90Array<double, 2> &fgice,
+    ibmisc::F90Array<double, 2> &zatmo);
 
 extern "C"
 void gcmce_io_rsf(GCMCoupler_ModelE *self,

@@ -192,7 +192,7 @@ void write_regrid_nc(blitz::Array<double,2> &AA_d, SparseSetT &dimA)
     b2.add("cont", {});
     b2.add("ice", {});
     b2.add("topg", {});
-    b2.allocate(shape(IM,JM), {"im", "jm"}, true, fortranArray);
+    b2.allocate({IM,JM}, {"im", "jm"}, true, fortranArray);
 
     ArrayBundle<double,1> b1(reshape1(b2,0));
 
@@ -206,7 +206,7 @@ void write_regrid_nc(blitz::Array<double,2> &AA_d, SparseSetT &dimA)
     }
 
     NcIO ncio("AA_d.nc", 'w');
-    b2.ncio(ncio, {}, false, "", "double", fortranArray);
+    b2.ncio(ncio, {}, "", "double");
 }
 
 
@@ -372,13 +372,13 @@ void do_main()
 
 
     // Load outputs from Greenland-free TOPO generation
-    TopoOutputs<2> tout(topo_outputs_bundle2(true));
+    TopoOutputs<2> tout(topo_outputs_bundle2(true));    // allocate=true
     {NcIO ncio(TOPO_nogr_fname, 'r');
         tout.bundle.ncio(ncio,
             {"FOCEAN", "FLAKE", "FGRND", "FGICE",
             "ZATMO", "dZOCEN", "dZLAKE", "dZGICE", "ZSOLDG", "ZSGLO",
             "ZLAKE", "ZGRND", "ZSGHI", "FOCENF"},
-            false, "", "double", blitz::FortranArray<2>());
+            "", "double");
     }
 
     // LoadPISM Values
@@ -397,7 +397,7 @@ void do_main()
 
     printf("BEGIN writing output\n");
     {NcIO ncio("out-pism.nc", 'w');
-        tout.bundle.ncio(ncio, {}, false, "", "double");
+        tout.bundle.ncio(ncio, {}, "", "double");
     }
     printf("END writing output\n");
 

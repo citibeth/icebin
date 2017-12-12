@@ -21,7 +21,7 @@ extern ibmisc::ArrayBundle<double,RANK> topo_outputs_bundle();
 inline ibmisc::ArrayBundle<double,2> topo_outputs_bundle2(bool allocate)
 {
     auto ret(topo_outputs_bundle<2>());
-    if (allocate) ret.allocate(blitz::shape(IM,JM), {"im", "jm"},
+    if (allocate) ret.allocate({IM,JM}, {"im", "jm"},
             true, blitz::fortranArray);
     return ret;
 }
