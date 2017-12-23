@@ -452,6 +452,8 @@ struct ElevPoints {
         : elev(_elev), points(std::move(_points)) {}
 };
 
+#if 0
+// Corrected in ETOPO1
 static const std::vector<ElevPoints> resets
 {
     // Caspian Sea
@@ -470,6 +472,7 @@ static const std::vector<ElevPoints> resets
         {75,138}
     })
 };
+#endif
 
 
 
@@ -477,6 +480,32 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
 {
     double const TWOPI = 2. * M_PI;
     double const AREAG = 4. * M_PI;
+
+IN ETOPO1, difference between ice top and solid ground topography is zero in Himalayas, Andes.
+So we still need to:
+  1. Set contientnal cells nort of 78N to entirely glacial ice
+
+ZNGDC1 (FGICE1) has Andes and Himalayas
+Strategy is to get all ice onto 1-degree (or 1/2-degree) grid.
+I need ice on the 1m (or other fine) grid.
+
+
+
+ZNGDC1 contains: Ice for Greenland, Antarctica, southern Alaska and Artic islands (a bit in Iceland too).
+    Ice missing thickness
+
+ZICEHXH contains: Has stuff only only for Greenland, Antarctica
+    Contains ice thickness.
+
+Current strategy:
+  Start with ZNGDC1
+  Add in thickness from ZICEHXH
+  Invent thickness everywhere else
+
+ETOPO1:
+  1) Does have all ice-covered areas?
+     No.  Only Greenland and Antarctica
+
 
     //
     // Add small ice cap and glacier data to FGICEH and dZGICH
@@ -490,6 +519,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
     auto FCON1H(hntr1h.regrid(WT1, in.FCONT1));
     auto FGIC1H(hntr1h.regrid(WT1, in.FGICE1));
 
+Inventing ice thickness
     // RGIC1H = areal ratio of glacial ice to continent
     // For smaller ice caps and glaciers, dZGICH = CONSTK * RGIC1H^.3
     // Constant is chosen so that average value of dZGICH is 264.7 m
@@ -524,6 +554,8 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
     }
 
 
+#if 0
+Not needed in ETOPO1
     // ETOPO2 treats Antarctic ice shelves as ocean.
     // When this happens ETOPO2 data are replaced with interpolated data
     // from in.FGICEH and dZGICH.  Resulting files are:
@@ -579,11 +611,13 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
         }
     }}
 
+#endif
 
     //
     // FOCEAN: Ocean Surface Fraction (0:1)
     //
     // Fractional ocean cover FOCENF is interpolated from FOAAH2
+This stays same with ETOPO1
     blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
     Hntr hntr2mq1(g2mx2m, g1qx1, 0);
     hntr2mq1.regrid(WT2, in.FOCEN2, out.FOCENF, true);    // Fractional ocean cover
@@ -594,6 +628,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
         out.FOCEAN(i,j) = std::round(out.FOCENF(i,j));
     }}
 
+Leave these for now
     // Set following grid cells to be continent
     out.FOCEAN( 84, 18) = 0;
     out.FOCEAN( 85, 18) = 0;
@@ -650,6 +685,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
     out.FOCEAN( 75,165) = 1;
     out.FOCEAN(225,169) = 1;
 
+Only diagnostic, stays the same
     // Average non-fractional and fractional ocean covers over latitude
     printf(
         " Comparison between Fractional and Non-fractional Ocean Cover\n\n"
@@ -704,7 +740,9 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
     // Apportion out.FLAKE to the nonocean fraction and round to 1/256
     for (int j=1; j<=JM; ++j) {
     for (int i=1; i<=IM; ++i) {
+Take lake fraction only over continental fraction
         out.FLAKE(i,j) = out.FLAKE(i,j)*(1.-out.FOCEAN(i,j)) / (1.-out.FOCENF(i,j)+1e-20);
+Clean out insignificant bits, avoid roundoff error.  Not really necessary.
         out.FLAKE(i,j) = std::round(out.FLAKE(i,j)*256.) / 256.;
     }}
 
@@ -815,6 +853,8 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
         out.FOCEAN, out.FLAKE, out.FGRND, out.ZATMO,
         out.dZLAKE,out.ZSOLDG,out.ZSGLO,out.ZLAKE,out.ZGRND,out.ZSGHI);
 
+#if 0
+// This has been corrected in ETOPO1
     // Reset ZATMO, out.dZOCEN and ZLAKE by hand if FLAKE(I,J) == 1
     //
 
@@ -830,6 +870,7 @@ void z1qx1n_bs1(TopoInputs &in, TopoOutputs<2> &out)
             out.ZLAKE(i,j) = elev;
         }
     }
+#endif
 
     for (int J=1; J <= JM; ++J) {
     for (int I=1; I<=IM; ++I) {
