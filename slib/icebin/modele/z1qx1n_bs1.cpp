@@ -14,6 +14,106 @@ namespace modele {
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 
+
+
+// ==================================================================
+ibmisc::ArrayBundle<int2_t,2> etopo1_bundle()
+{
+    ibmisc::ArrayBundle<int2_t,2>;
+
+    bundle.add("focean", {
+        "units", "m",
+        "description", "Ice Top Topography (dense indexing)"
+    });
+    bundle.add("zictop", {
+        "units", "m",
+        "description", "Ice Top Topography (dense indexing)"
+    });
+    bundle.add("zsolid", {
+        "units", "m",
+        "description", "Solid Ground Topography (dense indexing)"
+    });
+
+    return bundle;
+}
+
+
+class ETopo1 {
+
+public:
+    ibmisc::ArrayBundle<double,RANK> bundle;
+
+    ibmisc::SparseSet<int,int> dimI;    // Ice grid
+    blitz::Array<int16_t,1> &zictop;
+    blitz::Array<int16_t,1> &zsolid;
+    blitz::Array<int16_t,1> &focean;
+
+    ETopo1(ibmisc::ArrayBundle<int16_t,1> &&bundle)
+        : bundle(_bundle),
+        zictop(bundle.array("zictop")),
+        zsolid(bundle.array("zsolid")),
+        focean(bundle.array("focean"))
+    {}
+
+    void allocate()
+        { bundle.allocate({dimI.dense_extent()}, {nId}); }
+};
+
+
+ETopo1 read_etopo1(std::string const &fname)
+{
+    ETopo1 retId(etopo_bundle());
+
+    {fortran::UnformattedInput fin(fname, Endian::BIG);
+        blitz::Array<int16_t,2> zictopIs, zsolidIs;
+
+        // Read from file
+        fortran::read(fin) >> fortran::endr;
+        fortran::read(fin) >> titlei >> zictopIs >> fortran::endr;
+        fortran::read(fin) >> titlei >> zsolidIs >> fortran::endr;
+
+        // Shift to 1D indexing
+        auto zictopIs1(reshape1(zictopIs));
+        auto zsolidIs1(reshape1(zsolidIs));
+
+
+        // Count number of used grid cells
+        for (int is=0; is<nIs; ++is)
+            if (zictopIs1(is) != zsolidIs1(is)) retId.dimI.add_dense(is);
+
+
+        // Allocate
+        retId.allocate();
+
+        // Densify into allocated space
+        for (int id=0; id<nId; ++id) {
+            int const is = retId.dimI.to_sparse(id);
+            retId.zictop(id) = zictopIs(is);
+            retId.zsolid(id) = zsolidIs(is);
+        }
+    }
+
+    // Read focean
+    {fortran::UnformattedInput fin(fname, Endian::BIG);
+        blitz::Array<int16_t,2> foceanIs;
+
+        // Read from file
+        fortran::read(fin) >> titlei >> foceanIs >> fortran::endr;
+
+        // Shift to 1D indexing
+        auto foceanIs1(reshape1(foceanIs));
+
+        // Densify into allocated space
+        for (int id=0; id<nId; ++id) {
+            int const is = retId.dimI.to_sparse(id);
+            retId.focean(id) = foceanIs(is);
+        }
+    }
+
+    return retId;
+}
+
+
 // ==================================================================
 // -------------------------------------------------------
 ArrayBundle<double,2> greenland_inputs_bundle(bool allocate)

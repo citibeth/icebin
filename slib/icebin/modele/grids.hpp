@@ -6,6 +6,8 @@
 namespace icebin {
 namespace modele {
 
+int const IM1m = 21600;
+int const JM1m = 10801;
 int const IM2 = 10800;
 int const JM2 = 5400;
 int const IMS = 2160;
@@ -17,6 +19,7 @@ int const JM1 = 180;
 int const IM = 288;
 int const JM = 180;
 
+extern HntrGrid const g1mx1m;
 extern HntrGrid const g2mx2m;
 extern HntrGrid const g10mx10m;
 extern HntrGrid const ghxh;
