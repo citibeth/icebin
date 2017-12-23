@@ -2,6 +2,7 @@
 
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <ibmisc/bundle.hpp>
+#include <everytrace.h>
 
 using namespace icebin;
 using namespace icebin::modele;
@@ -395,6 +396,7 @@ Oneway::Oneway(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+    everytrace_init();
     Oneway ow(argc, argv);
 }
 
