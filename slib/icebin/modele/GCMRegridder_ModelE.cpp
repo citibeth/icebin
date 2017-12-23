@@ -1,7 +1,7 @@
 #include <spsparse/eigen.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/hntr.hpp>
-#include <icebin/modele/GridSpec_Hntr.hpp>
+#include <icebin/modele/GridGen_Hntr.hpp>
 
 using namespace icebin;
 using namespace ibmisc;
@@ -254,7 +254,7 @@ It does this creating a Hntr spec for gridA, and then running grid-generation
 code on it.
 
 @gridO the Hntr-defined Ocean grid.  gridO->hntr must be set; this
-    will happen if it was defined using GridSpec_Hntr (or loaded from
+    will happen if it was defined using GridGen_Hntr (or loaded from
     a NetCDF file generated that way).
 */
 static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
@@ -280,7 +280,7 @@ static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
     hntrOvA.overlap(acc, 1.0, DimClip(&dimO));
 
     // ------- Produce a full gridA, based on hntrA and realized cells in dimA
-    GridSpec_Hntr spec(hntrA);
+    GridGen_Hntr spec(hntrA);
     spec.name = gridO->name + "_A";
     spec.pole_caps = gridO->north_pole;
 

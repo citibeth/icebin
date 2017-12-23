@@ -63,7 +63,7 @@ if (BUILD_COUPLER)
 
         if (BUILD_GRIDGEN)
             list(APPEND icebin_SOURCES
-                icebin/modele/GridSpec_Hntr.cpp
+                icebin/modele/GridGen_Hntr.cpp
                 icebin/modele/clippers.cpp
             )
         endif()
@@ -86,9 +86,9 @@ if (BUILD_GRIDGEN)
     list(APPEND icebin_SOURCES
         icebin/gridgen/gridutil.cpp
         icebin/gridgen/clippers.cpp
-        icebin/gridgen/GridSpec_LonLat.cpp
-        icebin/gridgen/GridSpec_XY.cpp
-        icebin/gridgen/GridSpec_Exchange.cpp
+        icebin/gridgen/GridGen_LonLat.cpp
+        icebin/gridgen/GridGen_XY.cpp
+        icebin/gridgen/GridGen_Exchange.cpp
     )
 endif()
 

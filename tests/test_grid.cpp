@@ -23,9 +23,9 @@
 #include <netcdf>
 #include <gtest/gtest.h>
 #include <icebin/Grid.hpp>
-#include <icebin/gridgen/GridSpec_LonLat.hpp>
+#include <icebin/gridgen/GridGen_LonLat.hpp>
 #ifdef BUILD_MODELE
-#include <icebin/modele/GridSpec_Hntr.hpp>
+#include <icebin/modele/GridGen_Hntr.hpp>
 #include <icebin/modele/clippers.hpp>
 #endif
 
@@ -265,7 +265,7 @@ TEST_F(GridTest, centroid)
 TEST_F(GridTest, hntr)
 {
     // Create a grid with Hntr-style parameterization
-    modele::GridSpec_Hntr hntr(modele::HntrGrid(4, 4, 0., 60.*45.));
+    modele::GridGen_Hntr hntr(modele::HntrGrid(4, 4, 0., 60.*45.));
     hntr.name = "hntr";
     hntr.spherical_clip = std::bind(&ice_sheet::clip,
         ice_sheet::GREENLAND|ice_sheet::ANTARCTICA, _1, _2, _3, _4, _5);
@@ -274,7 +274,7 @@ TEST_F(GridTest, hntr)
     hntr.eq_rad = 1.;
 
     // Create a grid with traditional lon/lat parameterization
-    GridSpec_LonLat ll;
+    GridGen_LonLat ll;
     ll.name = "ll";
     ll.spherical_clip = hntr.spherical_clip;
     ll.latb = std::vector<double>{-90., -45., 0., 45., 90.};

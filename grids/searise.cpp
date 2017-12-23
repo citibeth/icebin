@@ -30,7 +30,7 @@
 #include <icebin/error.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 #include <icebin/gridgen/clippers.hpp>
-#include <icebin/gridgen/GridSpec_XY.hpp>
+#include <icebin/gridgen/GridGen_XY.hpp>
 
 using namespace std::placeholders;  // for _1, _2, _3...
 using namespace ibmisc;
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 
     printf("------------- Set up the local ice grid\n");
 
-    GridSpec_XY spec;
+    GridGen_XY spec;
     char xname[100];
     snprintf(xname, sizeof(xname), "sr_g%d_%s", grid_size, icemodel.str());
     std::string name(xname);

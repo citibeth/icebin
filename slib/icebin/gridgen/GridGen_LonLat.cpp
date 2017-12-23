@@ -25,7 +25,7 @@
 #include <icebin/Grid.hpp>
 #include <icebin/error.hpp>
 
-#include <icebin/gridgen/GridSpec_LonLat.hpp>
+#include <icebin/gridgen/GridGen_LonLat.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 
 using namespace netCDF;
@@ -44,7 +44,7 @@ inline int sgn(T val) {
 }
 
 // ---------------------------------------------------------
-std::vector<double> GridSpec_LonLat::latc() const
+std::vector<double> GridGen_LonLat::latc() const
 {
     std::vector<double> ret;
     ret.reserve(nlat()+1);
@@ -57,7 +57,7 @@ std::vector<double> GridSpec_LonLat::latc() const
     return ret;
 }
 
-std::vector<double> GridSpec_LonLat::lonc() const
+std::vector<double> GridGen_LonLat::lonc() const
 {
     std::vector<double> ret;
     ret.reserve(nlon()-1);
@@ -102,11 +102,11 @@ double polar_graticule_area_exact(double eq_rad,
 }
 
 // ---------------------------------------------------------
-/** Set up a GridSpec_LonLat with a given specification.
+/** Set up a GridGen_LonLat with a given specification.
 @param spherical_clip Only realize grid cells that pass this test (before projection).
 @see EuclidianClip, SphericalClip
 */
-void GridSpec_LonLat::make_grid(Grid_LonLat &grid)
+void GridGen_LonLat::make_grid(Grid_LonLat &grid)
 {
     grid.clear();
     grid.type = Grid::Type::LONLAT;

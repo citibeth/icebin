@@ -24,7 +24,7 @@
 
 namespace icebin {
 
-class GridSpec_Exchange : public GridSpec {
+class GridGen_Exchange : public GridGen {
 public :
     Grid const *gridA;
     Grid const *gridI;
@@ -36,7 +36,7 @@ public :
     long gridA_cells_nfull;
     long gridI_cells_nfull;
 
-    GridSpec_Exchange() : gridA(0), gridI(0), gridA_cells_nfull(-1), gridI_cells_nfull(-1) {}
+    GridGen_Exchange() : gridA(0), gridI(0), gridA_cells_nfull(-1), gridI_cells_nfull(-1) {}
 
     void make_grid(Grid &grid);
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);

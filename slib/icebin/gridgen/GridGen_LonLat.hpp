@@ -28,7 +28,7 @@ namespace icebin {
 /** Represents a lat-lon grid on a sphere with non-equally-spaced grid
 cell boundaries.  Can optionally represent circular "cap" cells at the
 north and south pole, if needed. */
-struct GridSpec_LonLat {
+struct GridGen_LonLat {
 
     std::string name;
     std::function<bool(long, double, double, double, double)> spherical_clip;

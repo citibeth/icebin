@@ -263,7 +263,7 @@ GCMRegridder A_v_O(
 
 
     // ------- Produce a full gridA, based on hntrA and realized cells in dimA
-    GridSpec_Hntr spec(hntrA);
+    GridGen_Hntr spec(hntrA);
     spec.name = gridO->name + "_A";
     if (gridO->north_pole != gridO->south_pole) (*icebin_error)(-1,
         "north_pole=%d and south_pole=%d must match in gridO",

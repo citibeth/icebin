@@ -30,7 +30,7 @@
 #include <icebin/error.hpp>
 
 #include <icebin/gridgen/cgal.hpp>
-#include <icebin/gridgen/GridSpec_Exchange.hpp>
+#include <icebin/gridgen/GridGen_Exchange.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 
 using namespace ibmisc;
@@ -207,7 +207,7 @@ static bool overlap_callback(VertexCache *exvcache, long gridI_ndata,
 // --------------------------------------------------------------------
 
 /** @param gridI Put in an RTree */
-void GridSpec_Exchange::make_grid(Grid &exgrid)
+void GridGen_Exchange::make_grid(Grid &exgrid)
 {
     exgrid.coordinates = Grid::Coordinates::XY;
     exgrid.parameterization = Grid::Parameterization::L0;   // Why not?

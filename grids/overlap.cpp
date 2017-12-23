@@ -22,7 +22,7 @@
 #include <ibmisc/netcdf.hpp>
 
 #include <icebin/Grid.hpp>
-#include <icebin/gridgen/GridSpec_Exchange.hpp>
+#include <icebin/gridgen/GridGen_Exchange.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 
 static const double km = 1000.0;
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     printf("Done reading gridI\n");
 
     printf("--------------- Overlapping\n");
-    GridSpec_Exchange spec;
+    GridGen_Exchange spec;
     spec.gridA = &gridA;
     spec.gridI = &gridI;
     Grid exgrid;

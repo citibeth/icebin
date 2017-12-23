@@ -125,15 +125,15 @@ public:
 // ----------------------------------------------------
 class Grid;
 
-class GridSpec {};  // Tagging class
+class GridGen {};  // Tagging class
 
 /** Specialized dict-like structure used for cells and vertices in a grid. */
 template<class CellT>
 class GridMap {
     friend class Grid;
-    friend class GridSpec_XY;
-    friend class GridSpec_LonLat;
-    friend class GridSpec_Exchange;
+    friend class GridGen_XY;
+    friend class GridGen_LonLat;
+    friend class GridGen_Exchange;
 protected:
     typedef std::unordered_map<long, std::unique_ptr<CellT>> MapT;
     MapT _cells;

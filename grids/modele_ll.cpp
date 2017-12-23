@@ -29,8 +29,8 @@
 
 #include <icebin/error.hpp>
 #include <icebin/gridgen/gridutil.hpp>
-#include <icebin/gridgen/GridSpec_LonLat.hpp>
-#include <icebin/modele/GridSpec_Hntr.hpp>
+#include <icebin/gridgen/GridGen_LonLat.hpp>
+#include <icebin/modele/GridGen_Hntr.hpp>
 #include <icebin/modele/clippers.hpp>
 #include <icebin/modele/grids.hpp>
 
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
     HntrGrid const *hntr_grid = grids_by_name.at(sgrid);
 
     // -------------------------------------------------------------
-    GridSpec_Hntr spec(*hntr_grid);
+    GridGen_Hntr spec(*hntr_grid);
     spec.name = "modele_ll_" + szone + sgrid;
     spec.pole_caps = vm["pole-caps"].as<bool>();
 

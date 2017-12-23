@@ -8,7 +8,7 @@
 namespace icebin {
 namespace modele {
 
-struct GridSpec_Hntr {
+struct GridGen_Hntr {
     std::string name;
     HntrGrid hntr;
     std::function<bool(long, double, double, double, double)> spherical_clip;
@@ -29,7 +29,7 @@ struct GridSpec_Hntr {
     double eq_rad = 1.;
 
 
-    GridSpec_Hntr(HntrGrid const &_hntr);
+    GridGen_Hntr(HntrGrid const &_hntr);
 
     void make_grid(Grid_LonLat &grid);
 };

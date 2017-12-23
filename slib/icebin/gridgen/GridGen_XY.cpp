@@ -20,7 +20,7 @@
 #include <cmath>
 #include <ibmisc/netcdf.hpp>
 
-#include <icebin/gridgen/GridSpec_XY.hpp>
+#include <icebin/gridgen/GridGen_XY.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 
 using namespace netCDF;
@@ -28,7 +28,7 @@ using namespace ibmisc;
 
 namespace icebin {
 
-void set_xy_boundaries(GridSpec_XY &spec,
+void set_xy_boundaries(GridGen_XY &spec,
     double x0, double x1, double dx,
     double y0, double y1, double dy)
 {
@@ -53,7 +53,7 @@ void set_xy_boundaries(GridSpec_XY &spec,
 
 }
 
-void set_xy_centers(GridSpec_XY &spec,
+void set_xy_centers(GridGen_XY &spec,
     double x0, double x1, double dx,
     double y0, double y1, double dy)
 {
@@ -63,7 +63,7 @@ void set_xy_centers(GridSpec_XY &spec,
 }
 
 
-void GridSpec_XY::make_grid(Grid_XY &grid)
+void GridGen_XY::make_grid(Grid_XY &grid)
 {
     grid.type = Grid::Type::XY;
     grid.coordinates = Grid::Coordinates::XY;

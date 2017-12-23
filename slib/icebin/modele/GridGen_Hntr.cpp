@@ -1,7 +1,7 @@
-#include <icebin/modele/GridSpec_Hntr.hpp>
+#include <icebin/modele/GridGen_Hntr.hpp>
 #include <icebin/Grid.hpp>
 #include <ibmisc/indexing.hpp>
-#include <icebin/gridgen/GridSpec_LonLat.hpp>
+#include <icebin/gridgen/GridGen_LonLat.hpp>
 
 using namespace ibmisc;
 using namespace std::placeholders;  // for _1, _2, _3...
@@ -9,16 +9,16 @@ using namespace std::placeholders;  // for _1, _2, _3...
 namespace icebin {
 namespace modele {
 
-GridSpec_Hntr::GridSpec_Hntr(HntrGrid const &_hntr) : hntr(_hntr) {}
+GridGen_Hntr::GridGen_Hntr(HntrGrid const &_hntr) : hntr(_hntr) {}
 
-void GridSpec_Hntr::make_grid(Grid_LonLat &grid)
+void GridGen_Hntr::make_grid(Grid_LonLat &grid)
 {
     grid.hntr.reset(new HntrGrid(hntr));
 
     if (hntr.im % 2 != 0) (*icebin_error)(-1,
         "IM must be even");
 
-    GridSpec_LonLat spec;
+    GridGen_LonLat spec;
     spec.name = name;
     spec.spherical_clip = spherical_clip;
     spec.points_in_side = points_in_side;

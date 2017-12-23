@@ -27,7 +27,7 @@
 namespace icebin {
 
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
-struct GridSpec_XY : public GridSpec {
+struct GridGen_XY : public GridGen {
 
     std::string name;
     std::string sproj;
@@ -68,14 +68,14 @@ struct GridSpec_XY : public GridSpec {
 @param dy Size of grid cell in the y direction.
     Will be adjusted if (y1-y0) is not an even multiple of dy
 @param euclidian_clip Only realize grid cells that pass this test.
-@return The newly created GridSpec_XY.
+@return The newly created GridGen_XY.
 @see EuclidianClip
 */
-void set_xy_boundaries(GridSpec_XY &grid,
+void set_xy_boundaries(GridGen_XY &grid,
     double x0, double x1, double dx,
     double y0, double y1, double dy);
 
-void set_xy_centers(GridSpec_XY &grid,
+void set_xy_centers(GridGen_XY &grid,
     double x0, double x1, double dx,
     double y0, double y1, double dy);
 
