@@ -241,6 +241,12 @@ CellT *GridMap<CellT>::add_claim(CellT *cell)
 
 
 // ----------------------------------------------------
+class GridExtra
+{
+public:
+    virtual ~GridExtra() {}
+};
+
 class Grid {
 public:
     GridMap<Vertex> vertices;
@@ -255,6 +261,7 @@ public:
         (CUBESPHERE)    (4)     // Global Cubed Sphere grid
         (MESH)          (5)     // Arbitrary mesh (could be global or on plane)
     )
+    std::shared_ptr<GridExtra> extra;
 
     BOOST_ENUM_VALUES( Coordinates, int,
         (XY)            (0)     // Vertices in x/y coordinates on a plane
@@ -312,7 +319,8 @@ public:
     void filter_cells(std::function<bool (long)> const &keep_fn);
 };
 
-class Grid_XY : public Grid
+
+class Grid_XY : public GridExtra
 {
 public:
     ~Grid_XY() {}
@@ -338,7 +346,7 @@ extern std::unique_ptr<Grid> new_grid(Grid::Type type);
 extern std::unique_ptr<Grid> new_grid(ibmisc::NcIO &ncio, std::string const &vname);
 
 
-class Grid_LonLat : public Grid
+class Grid_LonLat : public GridExtra
 {
 public:
     ~Grid_LonLat() {}

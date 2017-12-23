@@ -22,7 +22,7 @@
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
 
-#include <icebin/Grid.hpp>
+#include <icebin/AbbrGrid.hpp>
 #include <icebin/eigen_types.hpp>
 #include <icebin/RegridMatrices.hpp>
 
@@ -65,8 +65,8 @@ protected:
     std::string _name;  /// "greenland", "antarctica", etc.
 
 public:
-    std::unique_ptr<Grid> gridI;            /// Ice grid outlines
-    std::unique_ptr<Grid> exgrid;       /// Exchange grid outlines (between GCM and Ice)
+    std::unique_ptr<AbbrGrid> gridI;            /// Ice grid outlines
+    std::unique_ptr<AbbrGrid> exgrid;       /// Exchange grid outlines (between GCM and Ice)
     InterpStyle interp_style;   /// How we interpolate I<-E.  Determines basis functions in E
 
     // ---------------------------------
@@ -89,8 +89,8 @@ public:
     */
     void init(
         std::string const &_name,
-        std::unique_ptr<Grid> &&_gridI,
-        std::unique_ptr<Grid> &&_exgrid,
+        std::unique_ptr<AbbrGrid> &&_gridI,
+        std::unique_ptr<AbbrGrid> &&_exgrid,
         InterpStyle _interp_style);
 
     /** @param elevI Elevation at points of ice sheet and land.

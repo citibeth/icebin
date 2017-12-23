@@ -101,10 +101,10 @@ void IceRegridder_L0::GvEp(
     // Handle Z_INTERP or ELEV_CLASS_INTERP
 
     // Interpolate in the vertical
-    for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
-        long const iA = cell->i;        // GCM Atmosphere grid
-        long const iI = cell->j;        // Ice Grid
-        long const iX = cell->index;    // X=Exchange Grid
+    for (int id=0; id<exgrid->ndata(); ++id) {
+        long const iA = exgrid->ijk[0](id);        // GCM Atmosphere grid
+        long const iI = exgrid->ijk[1](id);        // Ice Grid
+        long const iX = exgrid->index(id);    // X=Exchange Grid
         long const iG = (dest == IceExch::ICE ? iI : iX);   // G=Interpolation Grid
 
         if (!std::isnan(elevI(iI))) {
@@ -119,14 +119,14 @@ void IceRegridder_L0::GvEp(
                     double whps[2];
                     linterp_1d_b(gcm->hcdefs, elevation, ihps, whps);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[0]})},
-                        cell->native_area * whps[0]);
+                        exgrid->native_area(id) * whps[0]);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[1]})},
-                        cell->native_area * whps[1]);
+                        exgrid->native_area(id) * whps[1]);
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {
                     int ihps0 = nearest_1d(gcm->hcdefs, elevation);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps0})},
-                        cell->native_area);
+                        exgrid->native_area(id));
                 } break;
             }
         }
@@ -142,27 +142,27 @@ void IceRegridder_L0::GvI(
         // Ice <- Ice = Indentity Matrix (scaled)
         // But we need this unscaled... so we use the weight of
         // each grid cell.
-        for (auto cell=gridI->cells.begin(); cell != gridI->cells.end(); ++cell) {
-            long iI = cell->index;
+        for (int iId=0; iId<gridI->ndata(); ++iId) {
+            long iIs = gridI->dim.dense_to_sparse(iId);
 
             // Only include I cells that are NOT masked out
             // Depending on elevI, this could be either just ice
             // or ice and dry land
-             if (!std::isnan(elevI(iI)))
-                ret.add({iI, iI}, cell->native_area);
+             if (!std::isnan(elevI(iIs)))
+                ret.add({iI, iI}, gridI->native_area(iId));
         }
     } else {
         // Exchange <- Ice
-        for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
+        for (int id=0; id<exgrid->ndata(); ++id) {
             // cell->i = index in atmosphere grid
-            long const iI = cell->j;        // index in ice grid
-            long const iX = cell->index;    // index in exchange grid
+            long const iI = exgrid->ijk[1](id);        // index in ice grid
+            long const iX = exgrid->index(id);    // index in exchange grid
 
             // Only include I cells that are NOT masked out
             // Depending on elevI, this could be either just ice
             // or ice and dry land
             if (!std::isnan(elevI(iI)))
-                ret.add({iX,iI}, cell->native_area);
+                ret.add({iX,iI}, exgrid->native_area(id));
         }
     }
 }
@@ -172,17 +172,18 @@ void IceRegridder_L0::GvAp(
     blitz::Array<double,1> const *_elevI) const
 {
     blitz::Array<double,1> const &elevI(*_elevI);
-    for (auto cell = exgrid->cells.begin(); cell != exgrid->cells.end(); ++cell) {
-        long const iG = (interp_grid == IceExch::ICE ? cell->j : cell->index);
-        long const iA = cell->i;
-        long const iI = cell->j;
+    for (int id=0; id<exgrid->ndata(); ++id) {
+        long const iG = (interp_grid == IceExch::ICE ?
+            exgrid->ijk[1](id) : exgrid->index(id));
+        long const iA = exgrid->ijk[0](id);
+        long const iI = exgrid->ijk[1](id);
 
         // Only include I cells that are NOT masked out
         // Depending on elevI, this could be either just ice
         // or ice and dry land
         if (!std::isnan(elevI(iI)))
             if (cell->native_area > 0) {
-                ret.add({iG, iA}, cell->native_area);
+                ret.add({iG, iA}, exgrid->native_area(id));
             }
     }
 }
