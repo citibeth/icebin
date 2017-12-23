@@ -182,7 +182,7 @@ if (BUILD_MODELE)
 endif()
 add_subdirectory(tests)
 if (BUILD_GRIDGEN)
-    add_subdirectory(grids)
+    add_subdirectory(gridgen)
 endif()
 
 if(${BUILD_PYTHON})
