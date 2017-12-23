@@ -390,7 +390,7 @@ public:
     // -----------------------------------------
     void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
 
-};  // class GCMRegridder
+};  // class GCMRegridder_Standard
 // ===========================================================
 
 

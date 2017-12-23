@@ -762,7 +762,7 @@ void update_topo(
     std::vector<std::array<double,3>> const &sigmas,
     bool initial_timestep,    // true if this is the first (initialization) timestep
     std::vector<HCSegmentData> const &hc_segments,
-    std::string const &primary_segment,
+    std::string const &primary_segment,    // Normally "ec"
     // ===== OUTPUT parameters (variables come from GCMCoupler); must be pre-allocated
     Topos &topoA,
     blitz::Array<double,2> foceanOm0)
@@ -1098,6 +1098,7 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
 {
     GCMRegridder_ModelE *gcmA = dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder);
 
+    // Transfer elemask and sigma parameters from each ice coupler
     std::vector<ElevMask<1>> elevmasks;
     std::vector<std::array<double,3>> sigmas;
     for (size_t sheet_index=0; sheet_index < gcmA->ice_regridders().index.size(); ++sheet_index) {
