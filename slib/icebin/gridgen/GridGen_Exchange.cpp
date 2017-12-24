@@ -207,11 +207,10 @@ static bool overlap_callback(VertexCache *exvcache, long gridI_ndata,
 // --------------------------------------------------------------------
 
 /** @param gridI Put in an RTree */
-void GridGen_Exchange::make_grid(Grid &exgrid)
+void make_exchange_grid(
+    Grid const *gridA, grid const *gridI,
+    std::string sproj)
 {
-    exgrid.coordinates = Grid::Coordinates::XY;
-    exgrid.parameterization = Grid::Parameterization::L0;   // Why not?
-
     // Determine compatibility and projections between the two grids
     std::unique_ptr<Proj2> proj1, proj2;
     if (gridA->coordinates == Grid::Coordinates::XY) {
@@ -240,16 +239,13 @@ void GridGen_Exchange::make_grid(Grid &exgrid)
     }
 
     /** Initialize the new grid */
-    exgrid.name = gridA->name + '-' + gridI->name;
-    exgrid.sproj = sproj;
-    gridA_cells_nfull = gridA->cells.nfull();
-    gridI_cells_nfull = gridI->cells.nfull();
-    exgrid.cells._nfull = -1;       // Not specified
-    exgrid.vertices._nfull = -1;    // Not specified
-    VertexCache exvcache(&exgrid);
+    GridMap<Vertex> vertices(-1);    // Not specified
+    GridMap<Cell> cells(-1);         // Not specified
 
-    OGrid ogridA(gridA, &*proj1);   // proj1 used to transform LL->XY when overlapping
-    OGrid ogridI(gridI, &*proj2);   // proj2 used to transform LL->XY when overlapping
+    VertexCache exvcache(&vertices);
+
+    OGrid ogridA(gridA, &*projA);   // proj1 used to transform LL->XY when overlapping
+    OGrid ogridI(gridI, &*projI);   // proj2 used to transform LL->XY when overlapping
     ogridI.realize_rtree();
 
     OCell const *ocell1;
@@ -276,7 +272,15 @@ void GridGen_Exchange::make_grid(Grid &exgrid)
         }
     }
 
-    exgrid.indexing = Indexing({"i0"}, {0}, {exgrid.cells.nfull()}, {0});    // No n-D indexing available.
+    return Grid(
+        gridA->name + '-' + gridI->name,
+        GridType::GENERIC,
+        GridCoordinates::XY,
+        spec.sproj,
+        GridParameterization::L0,    // Why not?
+        Indexing({"i0"}, {0}, {exgrid.cells.nfull()}, {0}),    // No n-D indexing available.
+        std::unique_ptr<GridSpec>(new GridSpec(GridType::GENERIC)),
+        std::move(vertices), std::move(cells);
 
 }
 

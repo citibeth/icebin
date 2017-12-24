@@ -56,8 +56,8 @@ namespace glint2 {
 class VertexCache {
     std::unordered_map<std::pair<double,double>, Vertex *> _vertices;
 public:
-    Grid *grid;
-    VertexCache(Grid *_grid) : grid(_grid) {}
+    GridMap<Vertex> *vertices;
+    VertexCache(Grid *_vertices) : vertices(_vertices) {}
 
     Vertex *add_vertex(double x, double y);
     Vertex *add_vertex(Cell &cell, double x, double y);

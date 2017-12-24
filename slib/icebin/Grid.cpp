@@ -96,9 +96,7 @@ Point Cell::centroid() const
 // ------------------------------------------------------------
 Grid::Grid() :
     type(Grid::Type::GENERIC),
-    coordinates(Grid::Coordinates::XY),
-    _max_realized_cell_index(0),
-    _max_realized_vertex_index(0) {}
+    coordinates(Grid::Coordinates::XY) {}
 
 size_t Grid::ndata() const
 {
@@ -332,32 +330,19 @@ std::string const &vname)
     }
 }
 
-std::unique_ptr<Grid> new_grid(Grid::Type type)
-{
-    switch(type.index()) {
-        case Grid::Type::GENERIC :
-        case Grid::Type::EXCHANGE :
-            return std::unique_ptr<Grid>(new Grid());
-        case Grid::Type::XY :
-            return std::unique_ptr<Grid>(new Grid_XY());
-        case Grid::Type::LONLAT :
-            return std::unique_ptr<Grid>(new Grid_LonLat());
-        default :
-            (*icebin_error)(-1,
-                "Unrecognized Grid::Type: %s", type.str());
-    }
-}
-
 std::unique_ptr<Grid> new_grid(NcIO &ncio, std::string const &vname)
 {
     Grid::Type type;
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
     get_or_put_att_enum(info_v, ncio.rw, "type", type);
-    return new_grid(type);
+    return std::unique_ptr<Grid>(new Grid(type));
 }
 
 void Grid::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 {
+    // ------ Do the spec first, then the boring long stuff later
+    spec->ncio(ncio, vname);
+
     // ------ Attributes
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
 
@@ -504,11 +489,8 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
     vertices._nfull = vertices.nfull();
 
     // Remove cells that don't fit our filter
-    _max_realized_cell_index = -1;
     for (auto cell = cells.begin(); cell != cells.end(); ) { //++cell) {
         if (keep_fn(cell->index)) {
-            _max_realized_cell_index = std::max(_max_realized_cell_index, cell->index);
-
             // Make sure we don't delete this cell's vertices
             for (auto vertex = cell->begin(); vertex != cell->end(); ++vertex)
                 good_vertices.insert(vertex->index);
@@ -521,10 +503,8 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
     }
 
     // Remove vertices that don't fit our filter
-    _max_realized_vertex_index = -1;
     for (auto vertex = vertices.begin(); vertex != vertices.end(); ) {
         if (good_vertices.find(vertex->index) != good_vertices.end()) {
-            _max_realized_vertex_index = std::max(_max_realized_vertex_index, vertex->index);
             ++vertex;
         } else {
             // Careful with iterators: invalidated after erase()
@@ -536,7 +516,7 @@ printf("BEGIN filter_cells(%s) %p\n", name.c_str(), this);
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
+void GridSpec_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
 
     auto xb_d = get_or_add_dim(ncio,
@@ -557,11 +537,9 @@ void Grid_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
         n = ny();
         get_or_put_att(info_v, ncio.rw, "ny", "int", &n, 1);
     }
-
-    Grid::ncio(ncio, vname);
 }
 // ---------------------------------------------------------
-void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
+void GridSpec_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
 #ifdef BUILD_MODELE
     // Read the HntrGrid, if that's how we were made
@@ -609,15 +587,11 @@ void Grid_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_ful
         n = nlat();
         get_or_put_att(info_v, ncio.rw, "nlat", "int", &n, 1);
     }
-
-    Grid::ncio(ncio, vname);
 }
 // ---------------------------------------------------------
 
-int Grid_LonLat::nlat() const {
+int GridSpec_LonLat::nlat() const {
     int south_pole_offset, north_pole_offset;
-
-printf("poles = %d %d\n", south_pole, north_pole);
 
     // Get around GCC bug when converting uninitialized bools
     south_pole_offset = (south_pole ? 2 : 0);
@@ -626,13 +600,8 @@ printf("poles = %d %d\n", south_pole, north_pole);
     south_pole_offset >>= 1;
     north_pole_offset >>= 1;
 
-printf("Offsets = %d %d\n", south_pole_offset, north_pole_offset);
     return latb.size() - 1 + south_pole_offset + north_pole_offset;
 }
-
-
-
-
 
 }   // namespace
 

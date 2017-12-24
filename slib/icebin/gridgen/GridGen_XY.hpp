@@ -27,57 +27,11 @@
 namespace icebin {
 
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
-struct GridGen_XY : public GridGen {
-
-    std::string name;
-    std::string sproj;
-    std::function<bool(Cell const &)> euclidian_clip;
-    ibmisc::Indexing indexing;
-
-    /** Cell boundaries in the x direction.
-    Sorted low to high.
-    Number of grid cells in the x direction = x_boundaries.size() - 1. */
-    std::vector<double> xb;
-
-    /** Cell boundaries in the y direction.
-    Sorted low to high.
-    Number of grid cells in the y direction = y_boundaries.size() - 1. */
-    std::vector<double> yb;
-
-    int nx() const { return xb.size() - 1; }
-    int ny() const { return yb.size() - 1; }
-
-    void make_grid(Grid_XY &grid);
-
-};
-
-// -----------------------------------------------------------------
-
-
-
-// -----------------------------------------------------------------
-
-/** Create a new Cartesian grid with evenly spaced grid cell boundaries.
-@param name Value of <generic-name>.info:name in netCDF file.
-@param x0 Lowest boundary in the x direction.
-@param x1 Highest boundary in the x direction.  
-@param dx Size of grid cell in the x direction.
-    Will be adjusted if (x1-x0) is not an even multiple of dx
-@param y0 Lowest boundary in the y direction.
-@param y1 Highest boundary in the y direction.  
-@param dy Size of grid cell in the y direction.
-    Will be adjusted if (y1-y0) is not an even multiple of dy
-@param euclidian_clip Only realize grid cells that pass this test.
-@return The newly created GridGen_XY.
-@see EuclidianClip
-*/
-void set_xy_boundaries(GridGen_XY &grid,
-    double x0, double x1, double dx,
-    double y0, double y1, double dy);
-
-void set_xy_centers(GridGen_XY &grid,
-    double x0, double x1, double dx,
-    double y0, double y1, double dy);
+extern void Grid make_grid(
+    std::string const &name,
+    ibmisc::Indexing const &indexing,
+    GridSpec_XY const &spec,
+    std::function<bool(Cell const &)> euclidian_clip = &EuclidianClip::keep_all);
 
 
 

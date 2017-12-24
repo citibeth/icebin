@@ -17,7 +17,7 @@ HntrGrid::HntrGrid(HntrGrid const &other)
 }
 
 HntrGrid::HntrGrid(int _im, int _jm, double _offi, double _dlat) :
-    im(_im), jm(_jm), offi(_offi), dlat(_dlat)
+    HntrSpec(_im, _jm, _offi, _dlat)
 
 {
     init();

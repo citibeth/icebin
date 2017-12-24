@@ -65,8 +65,8 @@ protected:
     std::string _name;  /// "greenland", "antarctica", etc.
 
 public:
-    std::unique_ptr<AbbrGrid> gridI;            /// Ice grid outlines
-    std::unique_ptr<AbbrGrid> exgrid;       /// Exchange grid outlines (between GCM and Ice)
+    std::unique_ptr<AbbrGrid const> gridI;            /// Ice grid outlines
+    std::unique_ptr<AbbrGrid const> exgrid;       /// Exchange grid outlines (between GCM and Ice)
     InterpStyle interp_style;   /// How we interpolate I<-E.  Determines basis functions in E
 
     // ---------------------------------

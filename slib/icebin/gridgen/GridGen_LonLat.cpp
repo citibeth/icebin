@@ -44,7 +44,7 @@ inline int sgn(T val) {
 }
 
 // ---------------------------------------------------------
-std::vector<double> GridGen_LonLat::latc() const
+std::vector<double> GridSpec_LonLat::latc() const
 {
     std::vector<double> ret;
     ret.reserve(nlat()+1);
@@ -57,7 +57,7 @@ std::vector<double> GridGen_LonLat::latc() const
     return ret;
 }
 
-std::vector<double> GridGen_LonLat::lonc() const
+std::vector<double> GridSpec_LonLat::lonc() const
 {
     std::vector<double> ret;
     ret.reserve(nlon()-1);
@@ -93,7 +93,7 @@ static double graticule_area_exact(double eq_rad,
 
 /** The polar graticule is a (latitudinal) circle centered on the pole.
 This computes its area. */
-double polar_graticule_area_exact(double eq_rad,
+static double polar_graticule_area_exact(double eq_rad,
     double radius_deg)
 {
     // See http://en.wikipedia.org/wiki/Spherical_cap
@@ -106,56 +106,43 @@ double polar_graticule_area_exact(double eq_rad,
 @param spherical_clip Only realize grid cells that pass this test (before projection).
 @see EuclidianClip, SphericalClip
 */
-void GridGen_LonLat::make_grid(Grid_LonLat &grid)
+void Grid make_grid(
+    std::string const &name,
+    ibmisc::Indexing const &indexing,
+    GridSpec_LonLat const &spec,
+    std::function<bool(Cell const &)> spherical_clip = &SphericalClip::keep_all)
 {
-    grid.clear();
-    grid.type = Grid::Type::LONLAT;
-    grid.coordinates = Grid::Coordinates::LONLAT;
-    grid.parameterization = Grid::Parameterization::L0;
-    grid.name = this->name;
-    grid.eq_rad = this->eq_rad;
-    grid.points_in_side = points_in_side;
-
-    // Error-check the input parameters
-    if (this->south_pole && this->latb[0] == -90.0) {
-        (*icebin_error)(-1,
-            "latb[] cannot include -90.0 if you're including the south pole cap");
-    }
-    if (this->north_pole && this->latb.back() == 90.0) {
-        (*icebin_error)(-1,
-            "latb[] cannot include 90.0 if you're including the north pole cap");
-    }
 
 
-    // Set up to project lines on sphere (and eliminate duplicate vertices) 
-    VertexCache vcache(&grid);
+    GridMap<Vertex> vertices(-1);    // Unknown and don't care how many vertices in full grid
+    GridMap<Cell> cells(spec.nlon() * spec.nlat());
+
+    VertexCache vcache(&vertices);
 
     // ------------------- Set up the GCM Grid
-    const int south_pole_offset = (this->south_pole ? 1 : 0);
-    const int north_pole_offset = (this->north_pole ? 1 : 0);
-
-    grid.cells._nfull = this->nlon() * this->nlat();
+    const int south_pole_offset = (spec.south_pole ? 1 : 0);
+    const int north_pole_offset = (spec.north_pole ? 1 : 0);
 
     // Get a bunch of points.  (i,j) is gridcell's index in canonical grid
-    for (int ilat=0; ilat < this->latb.size()-1; ++ilat) {
-        double lat0 = this->latb[ilat];
-        double lat1 = this->latb[ilat+1];
+    for (int ilat=0; ilat < spec.latb.size()-1; ++ilat) {
+        double lat0 = spec.latb[ilat];
+        double lat1 = spec.latb[ilat+1];
 
-        for (int ilon=0; ilon< this->lonb.size()-1; ++ilon) {
+        for (int ilon=0; ilon< spec.lonb.size()-1; ++ilon) {
             Cell cell;
-            double lon0 = this->lonb[ilon];
-            double lon1 = this->lonb[ilon+1];
+            double lon0 = spec.lonb[ilon];
+            double lon1 = spec.lonb[ilon+1];
 
             // Figure out how to number this grid cell
             cell.j = ilat + south_pole_offset;  // 0-based 2-D index
             cell.i = ilon;
             cell.index = indexing.tuple_to_index<int,2>({cell.i, cell.j});
-            cell.native_area = graticule_area_exact(this->eq_rad, lat0,lat1,lon0,lon1);
+            cell.native_area = graticule_area_exact(spec.eq_rad, lat0,lat1,lon0,lon1);
 
-            if (!this->spherical_clip(cell.index, lon0, lat0, lon1, lat1)) continue;
+            if (!spec.spherical_clip(cell.index, lon0, lat0, lon1, lat1)) continue;
 
             // Project the grid cell boundary to a planar polygon
-            int n = this->points_in_side;
+            int n = spec.points_in_side;
 
             // Pre-compute our points so we use exact same ones each time.
             std::vector<double> lons;
@@ -182,24 +169,24 @@ void GridGen_LonLat::make_grid(Grid_LonLat &grid)
             for (int i=n; i>0; --i)
                 vcache.add_vertex(cell, lon0, lats[i]);
 
-            grid.cells.add(std::move(cell));
+            cells.add(std::move(cell));
         }
     }
 
     // Make the polar caps (if this grid specifies them)
 
     // North Pole cap
-    double lat = this->latb.back();
+    double lat = spec.latb.back();
     Cell pole;
-    pole.i = this->nlon()-1;
-    pole.j = this->nlat();
-    long index = (pole.j * this->nlon() + pole.i);
-    if (this->north_pole && this->spherical_clip(index, 0, lat, 360, 90)) {
-        for (int ilon=0; ilon< this->lonb.size()-1; ++ilon) {
-            double lon0 = this->lonb[ilon];
-            double lon1 = this->lonb[ilon+1];
+    pole.i = spec.nlon()-1;
+    pole.j = spec.nlat();
+    long index = (pole.j * spec.nlon() + pole.i);
+    if (spec.north_pole && spec.spherical_clip(index, 0, lat, 360, 90)) {
+        for (int ilon=0; ilon< spec.lonb.size()-1; ++ilon) {
+            double lon0 = spec.lonb[ilon];
+            double lon1 = spec.lonb[ilon+1];
 
-            int n = this->points_in_side;
+            int n = spec.points_in_side;
             for (int i=0; i<n; ++i) {
                 double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
                 pole.add_vertex(vcache.add_vertex(lon, lat));
@@ -207,21 +194,21 @@ void GridGen_LonLat::make_grid(Grid_LonLat &grid)
         }
 
         pole.index = index;
-        pole.native_area = polar_graticule_area_exact(this->eq_rad, 90.0 - lat);
+        pole.native_area = polar_graticule_area_exact(spec.eq_rad, 90.0 - lat);
 
-        grid.cells.add(std::move(pole));
+        cells.add(std::move(pole));
     }
 
     // South Pole cap
     index = 0;
-    lat = this->latb[0];
-    if (this->south_pole && this->spherical_clip(index, 0, -90, 360, lat)) {
+    lat = spec.latb[0];
+    if (spec.south_pole && spec.spherical_clip(index, 0, -90, 360, lat)) {
         Cell pole;
-        for (int ilon=this->lonb.size()-1; ilon >= 1; --ilon) {
-            double lon0 = this->lonb[ilon];     // Make the circle counter-clockwise
-            double lon1 = this->lonb[ilon-1];
+        for (int ilon=spec.lonb.size()-1; ilon >= 1; --ilon) {
+            double lon0 = spec.lonb[ilon];     // Make the circle counter-clockwise
+            double lon1 = spec.lonb[ilon-1];
 
-            int n = this->points_in_side;
+            int n = spec.points_in_side;
             for (int i=0; i<n; ++i) {
                 double lon = lon0 + (lon1-lon0) * ((double)i/(double)n);
                 pole.add_vertex(vcache.add_vertex(lon, lat));
@@ -230,16 +217,17 @@ void GridGen_LonLat::make_grid(Grid_LonLat &grid)
         pole.i = 0;
         pole.j = 0;
         pole.index = index;
-        pole.native_area = polar_graticule_area_exact(this->eq_rad, 90.0 + lat);
+        pole.native_area = polar_graticule_area_exact(spec.eq_rad, 90.0 + lat);
 
-        grid.cells.add(std::move(pole));
+        cells.add(std::move(pole));
     }
 
-    grid.lonb = std::move(lonb);
-    grid.latb = std::move(latb);
-    grid.south_pole = south_pole;
-    grid.north_pole = north_pole;
-    grid.indexing = indexing;
+    return Grid(name, GridType::LONLAT,
+        GridCoordinates::XY, "",
+        Grid::Parameterization::L0,
+        indexing,
+        std::unique_ptr<GridSpec>(new GridSpec_LonLat(spec)),
+        std::move(vertices), std::move(cells));
 }
 
 // ---------------------------------------------------------

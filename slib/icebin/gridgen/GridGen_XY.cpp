@@ -28,14 +28,14 @@ using namespace ibmisc;
 
 namespace icebin {
 
-void set_xy_boundaries(GridGen_XY &spec,
+GridSpec_XY GridSpec_XY::make_with_boundaries(
     double x0, double x1, double dx,
     double y0, double y1, double dy)
 {
+    GridGen_XY spec;
+
     // Set up x coordinates
-    spec.xb.clear();
     int nx = (int)(.5 + (x1 - x0) / dx);    // Round to nearest integer
-//printf("nxxxx: %g, %g, %g, %d\n", x1, x0, dx, nx);
     double nx_inv = 1.0 / (double)nx;
     for (int i=0; i<=nx; ++i) {
         double x = x0 + (x1-x0) * (double)i * nx_inv;
@@ -43,7 +43,6 @@ void set_xy_boundaries(GridGen_XY &spec,
     }
 
     // Set up y coordinates
-    spec.yb.clear();
     int ny = (int)(.5 + (y1 - y0) / dy);    // Round to nearest integer
     double ny_inv = 1.0 / (double)ny;
     for (int i=0; i<=ny; ++i) {
@@ -51,31 +50,23 @@ void set_xy_boundaries(GridGen_XY &spec,
         spec.yb.push_back(y);
     }
 
+    return spec;
 }
 
-void set_xy_centers(GridGen_XY &spec,
-    double x0, double x1, double dx,
-    double y0, double y1, double dy)
+void Grid make_grid(
+    std::string const &name,
+    ibmisc::Indexing const &indexing,
+    GridSpec_XY const &spec,
+    std::function<bool(Cell const &)> euclidian_clip = &EuclidianClip::keep_all)
 {
-    set_xy_boundaries(spec,
-        x0-.5*dx, x1+.5*dx, dx,
-        y0-.5*dy, y1+.5*dy, dy);
-}
-
-
-void GridGen_XY::make_grid(Grid_XY &grid)
-{
-    grid.type = Grid::Type::XY;
-    grid.coordinates = Grid::Coordinates::XY;
-    grid.parameterization = Grid::Parameterization::L0;
-    grid.name = this->name;
-    grid.sproj = this->sproj;
-
-    grid.cells._nfull = nx() * ny();
-    grid.vertices._nfull = xb.size() * yb.size();
+    auto &xb(spec.xb);
+    auto &yb(spec.yb);
 
     // Set up the main grid
-    VertexCache vcache(&grid);
+    GridMap<Vertex> vertices(xb.size() * yb.size());
+    GridMap<Cell> cells(spec.nx() * spec.ny());
+
+    VertexCache vcache(&vertices);
     for (int iy = 0; iy < yb.size()-1; ++iy) {      // j
         double y0 = yb[iy];
         double y1 = yb[iy+1];
@@ -93,20 +84,23 @@ void GridGen_XY::make_grid(Grid_XY &grid)
             vcache.add_vertex(cell, x0, y1);
 
             // Don't include things outside our clipping region
-            if (!this->euclidian_clip(cell)) continue;
+            if (!euclidian_clip(cell)) continue;
 
             cell.index = index;
             cell.i = ix;
             cell.j = iy;
-            cell.native_area = cell.proj_area(NULL);
+            cell.native_area = cell.proj_area(nullptr);
 
-            grid.cells.add(std::move(cell));
+            cells.add(std::move(cell));
         }
     }
 
-    grid.indexing = std::move(indexing);
-    grid.xb = std::move(xb);
-    grid.yb = std::move(yb);
+    return Grid(name, GridType::XY,
+        GridCoordinates::XY, sproj,
+        Gridparameterization::L0,
+        indexing,
+        std::unique_ptr<GridSpec>(new GridSpec_XY(spec)),
+        std::move(vertices), std::move(cells));
 }
 
 // ---------------------------------------------------------

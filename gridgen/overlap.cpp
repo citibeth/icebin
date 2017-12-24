@@ -51,11 +51,7 @@ int main(int argc, char **argv)
     printf("Done reading gridI\n");
 
     printf("--------------- Overlapping\n");
-    GridGen_Exchange spec;
-    spec.gridA = &gridA;
-    spec.gridI = &gridI;
-    Grid exgrid;
-    spec.make_grid(exgrid);
+    Grid exgrid(make_exchange_grid(&gridA, &gridI));
     sort_renumber_vertices(exgrid);
 
     printf("--------------- Writing out\n");

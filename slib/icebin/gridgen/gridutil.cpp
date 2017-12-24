@@ -26,7 +26,7 @@ Vertex *VertexCache::add_vertex(double x, double y) {
     if (ii != _vertices.end()) {    // Found in cache
         return ii->second;
     } else {
-        Vertex *vertex = grid->vertices.add(Vertex(x,y));
+        Vertex *vertex = vertices->add(Vertex(x,y));
         _vertices.insert(std::make_pair(
             std::make_pair(x,y), vertex));
         return vertex;

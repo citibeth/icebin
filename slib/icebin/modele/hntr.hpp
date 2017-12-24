@@ -7,17 +7,19 @@
 namespace icebin {
 namespace modele {
 
-class HntrGrid {
+
+
+class HntrGrid : public GridSpec_Hntr {
 public:
-    int im;    // Number of cells in east-west direction
-    int jm;    // Number of cells in north-south direction
+//    int im;    // Number of cells in east-west direction
+//    int jm;    // Number of cells in north-south direction
 
-    // number (fraction) of cells in east-west direction from
-    // International Date Line (180) to western edge of cell IA=1
-    double offi;
+//    // number (fraction) of cells in east-west direction from
+//    // International Date Line (180) to western edge of cell IA=1
+//    double offi;
 
-    // minutes of latitude for non-polar cells on grid A
-    double dlat;
+//    // minutes of latitude for non-polar cells on grid A
+//    double dlat;
 
 //protected:
     blitz::Array<double,1> _dxyp;

@@ -24,23 +24,9 @@
 
 namespace icebin {
 
-class GridGen_Exchange : public GridGen {
-public :
-    Grid const *gridA;
-    Grid const *gridI;
-
-    /** Transformation to get from local Grid coords to Exchange Grid coords */
-    std::string sproj;
-
-    /** Keep track of the "full" indexing space for the Overlap Matrix. */
-    long gridA_cells_nfull;
-    long gridI_cells_nfull;
-
-    GridGen_Exchange() : gridA(0), gridI(0), gridA_cells_nfull(-1), gridI_cells_nfull(-1) {}
-
-    void make_grid(Grid &grid);
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
-};
+extern void make_exchange_grid(
+    Grid const *gridA, grid const *gridI,
+    std::string const &sproj);
 
 
 
