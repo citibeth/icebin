@@ -3,13 +3,14 @@
 
 #include <ibmisc/blitz.hpp>
 #include <icebin/eigen_types.hpp>
+#include <icebin/GridSpec.hpp>
 
 namespace icebin {
 namespace modele {
 
 
 
-class HntrGrid : public GridSpec_Hntr {
+class HntrGrid : public HntrSpec {
 public:
 //    int im;    // Number of cells in east-west direction
 //    int jm;    // Number of cells in north-south direction
@@ -342,6 +343,8 @@ public:
         { return dim->in_sparse(ix); }
 };
 
+/** Convert HntrSpec to a GridSpec used to describe IceBin grids */
+void GridSpec_LonLat make_grid_spec(HntrSpec &hntr, int points_in_side, double eq_rad);
 
 
 }}
