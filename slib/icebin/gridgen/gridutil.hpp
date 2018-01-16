@@ -28,10 +28,11 @@ namespace icebin {
 /** Eliminates duplicate vertices in the Grid.
 DOES NOT account for floating point rounding error */
 class VertexCache {
-    std::unordered_map<std::pair<double,double>, Vertex *> _vertices;
+    // Associates the vertices with a point in a queriable fashion.
+    std::unordered_map<std::pair<double,double>, Vertex *> vertex_index;
 public:
-    Grid *grid;
-    VertexCache(Grid *_grid) : grid(_grid) {}
+    GridMap<Vertex> *vertices;    // Stores the vertices
+    VertexCache(GridMap<Vertex> *_vertices) : vertices(_vertices) {}
 
     Vertex *add_vertex(double x, double y);
     Vertex *add_vertex(Cell &cell, double x, double y);
