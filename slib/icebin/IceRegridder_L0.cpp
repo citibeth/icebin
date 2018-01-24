@@ -191,7 +191,7 @@ void IceRegridder_L0::GvAp(
 void IceRegridder_L0::ncio(NcIO &ncio, std::string const &vname)
 {
     IceRegridder::ncio(ncio, vname);
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     get_or_put_att_enum(info_v, ncio.rw, "interp_grid", interp_grid);
 }
 

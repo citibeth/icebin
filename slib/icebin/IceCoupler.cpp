@@ -49,7 +49,7 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     GCMCoupler const *_gcm_coupler)
 {
     std::string vname_sheet(vname + "." + sheet_name);
-    auto info_v = get_or_add_var(ncio, vname_sheet + ".info", "int64", {});
+    auto info_v = get_or_add_var(ncio, vname_sheet + ".info", "int", {});
 
     IceCoupler::Type type;
     get_or_put_att_enum(info_v, ncio.rw, "ice_coupler", type);

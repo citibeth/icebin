@@ -123,7 +123,7 @@ void GCMCoupler::_ncread(
     ibmisc::NcIO &ncio_config,
     std::string const &vname)        // comes from this->gcm_params
 {
-    auto config_info(get_or_add_var(ncio_config, vname + ".info", "int64", {}));
+    auto config_info(get_or_add_var(ncio_config, vname + ".info", "int", {}));
     std::string grid_fname;
     get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
     get_or_put_att(config_info, ncio_config.rw, "output_dir", output_dir);

@@ -78,7 +78,7 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
         aexgrid.ncio(ncio, vname + ".exgrid");
     }
 
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     get_or_put_att(info_v, ncio.rw, "name", _name);
     get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 

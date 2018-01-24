@@ -114,7 +114,7 @@ void GCMCoupler_ModelE::_ncread(
 {
     GCMCoupler::_ncread(ncio_config, vname);
 
-    auto config_info(get_or_add_var(ncio_config, vname + ".info", "int64", {}));
+    auto config_info(get_or_add_var(ncio_config, vname + ".info", "int", {}));
     // Retrieve name of TOPO file (without Greenland, and on Ocean grid)
     get_or_put_att(config_info, ncio_config.rw, "topo_ocean", topoO_fname);
 
@@ -214,7 +214,7 @@ int GCMCoupler_ModelE::_read_nhc_gcm()
     std::string grid_fname;
     {
         NcIO ncio_config(gcm_params.icebin_config_fname, NcFile::read);
-        auto config_info(get_or_add_var(ncio_config, "m.info", "int64", {}));
+        auto config_info(get_or_add_var(ncio_config, "m.info", "int", {}));
         get_or_put_att(config_info, ncio_config.rw, "grid", grid_fname);
     }
 

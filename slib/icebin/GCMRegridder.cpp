@@ -94,7 +94,7 @@ void GCMRegridder_Standard::clear()
 // -------------------------------------------------------------
 void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
 {
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
 
     if (ncio.rw == 'r') {
         clear();

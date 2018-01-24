@@ -121,7 +121,7 @@ void AbbrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
     ncio_grid_spec(ncio, spec, vname);
 
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     get_or_put_att_enum(info_v, ncio.rw, "coordinates", coordinates);
     get_or_put_att_enum(info_v, ncio.rw, "parameterization", parameterization);
     get_or_put_att(info_v, ncio.rw, "name", name);
