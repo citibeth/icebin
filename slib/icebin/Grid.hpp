@@ -131,10 +131,7 @@ class GridGen {};  // Tagging class
 /** Specialized dict-like structure used for cells and vertices in a grid. */
 template<class CellT>
 class GridMap {
-//    friend class Grid;
-//    friend class GridGen_XY;
-//    friend class GridGen_LonLat;
-//    friend class GridGen_Exchange;
+    friend class Grid;
 protected:
     typedef std::unordered_map<long, std::unique_ptr<CellT>> MapT;
     MapT _cells;
@@ -142,6 +139,7 @@ protected:
     long _max_realized_index = -1;
 
     GridMap(long nfull) : _nfull(nfull) {}
+    GridMap() : _nfull(-1) {}
 
 #if 0
     // ----------------
@@ -252,10 +250,10 @@ public:
     GridMap<Vertex> vertices;
     GridMap<Cell> cells;
 
-    Type type;
+    GridType type;
     std::unique_ptr<GridSpec> spec;    // Details used to generate the grid
-    Coordinates coordinates;
-    Parameterization parameterization;
+    GridCoordinates coordinates;
+    GridParameterization parameterization;
 
     /** Conversion between n-dimensional indexing used natively on the
     grid, and 1-D indexing used in IceBin. */
@@ -268,21 +266,7 @@ public:
     std::string sproj;
 
     // Just used for ncio() read
-    Grid(GridType _type)
-    : type(_type)
-    {
-        switch(type.index()) {
-            case Grid::Type::GENERIC :
-                spec = std::unique_ptr<GridSpec>(new GridSpec(GridType::GENERIC));
-            case Grid::Type::XY :
-                spec = std::unique_ptr<GridSpec>(new GridSpec_XY());
-            case Grid::Type::LONLAT :
-                spec = std::unique_ptr<GridSpec>(new GridSpec_LonLat());
-            default :
-                (*icebin_error)(-1,
-                    "Unrecognized Grid::Type: %s", type.str());
-        }
-    }
+    Grid(GridType _type);
 
     Grid(
         std::string const &_name,
@@ -297,12 +281,7 @@ public:
 
         std::unique_ptr<GridSpec> &&_spec,
         GridMap<Vertex> &&_vertices,
-        GridMap<Cell> &&_cells)
-    : name(_name), type(_type), spec(std::move(_spec)),
-    coordinates(_coordinates), sproj(_sproj), parameterization(_parameterization),
-    indexing(std::move(_indexing)), vertices(std::move(_vertices)), cells(std::move(_cells))
-    {}
-
+        GridMap<Cell> &&_cells);
 
 
     /** The size of the vector space defined by this grid.
@@ -328,82 +307,6 @@ public:
     void filter_cells(std::function<bool (long)> const &keep_fn);
 };
 
-
-
-
-
-class Grid_XY : public GridExtra
-{
-public:
-    ~Grid_XY() {}
-
-    /** Cell boundaries in the x direction.
-    Sorted low to high.
-    Number of grid cells in the x direction = x_boundaries.size() - 1. */
-    std::vector<double> xb;
-
-    /** Cell boundaries in the y direction.
-    Sorted low to high.
-    Number of grid cells in the y direction = y_boundaries.size() - 1. */
-    std::vector<double> yb;
-
-    int nx() const { return xb.size() - 1; }
-    int ny() const { return yb.size() - 1; }
-
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
-};
-
-extern void sort_renumber_vertices(Grid &grid);
-extern std::unique_ptr<Grid> new_grid(ibmisc::NcIO &ncio, std::string const &vname);
-
-
-class Grid_LonLat : public GridExtra
-{
-public:
-    ~Grid_LonLat() {}
-
-    /** Longitude of cell boundaries (degrees), sorted low to high.
-    <b>NOTE:</b> lon_boundares.last() = 360.0 + lonb.first() */
-    std::vector<double> lonb;
-
-    /** Latitude of cell boundaries (degrees), sorted low to high.
-    Does NOT include the polar "cap" cells.
-    90 = north pole, -90 = south pole. */
-    std::vector<double> latb;
-
-    /** True if this grid contains a circular cap on the south pole.
-    If not, then many triangular grid cells will meet at the south pole. */
-    bool south_pole;
-
-    /** True if this grid contains a circular cap on the north pole.
-    If not, then many triangular grid cells will meet at the north pole. */
-    bool north_pole;
-
-    /** Number of segments used to represent each side of a grid cell
-    with a polygonal approximation.  Increasing this number will
-    decrease geometric error at the expense of computation time for
-    the overlap matrix. */
-    int points_in_side;
-
-    /** Radius of Earth (m), or whatever planet you're looking at.
-    Used to compute theoretical exact areas of graticules. That's different
-    from the radius (or elliptical shape) used in the projection. */
-    double eq_rad;
-
-#ifdef BUILD_MODELE
-    /** The grid description, as needed for Hntr regridding algorithm. */
-    std::unique_ptr<modele::HntrGrid const> hntr;
-#endif
-
-
-    /** Number of grid cell indices in longitude dimension */
-    int nlon() const { return lonb.size() - 1; }
-
-    /** Number of grid cell indices in latitude dimension */
-    int nlat() const;
-
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
-};  // class Grid_LonLat
 
 }   // namespace
 

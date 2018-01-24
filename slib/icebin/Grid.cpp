@@ -94,9 +94,43 @@ Point Cell::centroid() const
 // ========================================================
 
 // ------------------------------------------------------------
-Grid::Grid() :
-    type(Grid::Type::GENERIC),
-    coordinates(Grid::Coordinates::XY) {}
+Grid::Grid(GridType _type)
+: type(_type)
+{
+    switch(type.index()) {
+        case GridType::GENERIC :
+            spec = std::unique_ptr<GridSpec>(new GridSpec_Generic());
+        case GridType::XY :
+            spec = std::unique_ptr<GridSpec>(new GridSpec_XY());
+        case GridType::LONLAT :
+            spec = std::unique_ptr<GridSpec>(new GridSpec_LonLat());
+        default :
+            (*icebin_error)(-1,
+                "Unrecognized GridType: %s", type.str());
+    }
+}
+
+Grid::Grid(
+    std::string const &_name,
+    GridType _type,
+    GridCoordinates _coordinates,
+    std::string const &_sproj,
+    GridParameterization _parameterization,
+
+    /** Conversion between n-dimensional indexing used natively on the
+    grid, and 1-D indexing used in IceBin. */
+    ibmisc::Indexing &&_indexing,
+
+    std::unique_ptr<GridSpec> &&_spec,
+    GridMap<Vertex> &&_vertices,
+    GridMap<Cell> &&_cells)
+: name(_name), type(_type), spec(std::move(_spec)),
+coordinates(_coordinates), sproj(_sproj), parameterization(_parameterization),
+indexing(std::move(_indexing)), vertices(std::move(_vertices)), cells(std::move(_cells))
+{}
+
+
+
 
 size_t Grid::ndata() const
 {
@@ -332,7 +366,7 @@ std::string const &vname)
 
 std::unique_ptr<Grid> new_grid(NcIO &ncio, std::string const &vname)
 {
-    Grid::Type type;
+    GridType type;
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
     get_or_put_att_enum(info_v, ncio.rw, "type", type);
     return std::unique_ptr<Grid>(new Grid(type));
@@ -357,7 +391,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
     get_or_put_att_enum(info_v, ncio.rw, "type", type);
     if (ncio.rw == 'w') info_v.putAtt("type.comment",
         "The overall type of grid, controlling the C++ class used "
-        "to represent the grid.  See Grid::Type in slib/icebin/Grid.hpp");
+        "to represent the grid.  See GridType in slib/icebin/GridSpec.hpp");
 
     get_or_put_att_enum(info_v, ncio.rw, "coordinates", coordinates);
     if (ncio.rw == 'w') info_v.putAtt("coordinates.comment",

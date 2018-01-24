@@ -1,6 +1,19 @@
 #include <icebin/GridSpec.hpp>
+#include <ibmisc/netcdf.hpp>
+
+using namespace netCDF;
+using namespace ibmisc;
 
 namespace icebin {
+
+
+void GridSpec_Generic::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+{
+    NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
+    get_or_put_att(info_v, ncio.rw, "ncells_full", "long", &ncells_full, 1);
+}
+
+
 
 void GridSpec_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
@@ -25,81 +38,99 @@ void GridSpec_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     }
 }
 // ---------------------------------------------------------
+GridSpec_LonLat::GridSpec_LonLat(
+    std::vector<double> &&_lonb,
+    std::vector<double> &&_latb,
+    std::vector<int> const &_indices,
+    bool _south_pole,
+    bool _north_pole,
+    int _points_in_side,
+    double _eq_rad,
+    HntrSpec const &hntr)
 
-
-GridSpec_Lonlat::GridSpec_LonLat(GridSpec_Hntr const &_hntr)
+: GridSpec(GridType::LONLAT), lonb(std::move(_lonb)), latb(std::move(_latb)),
+indices(_indices),
+south_pole(_south_pole), north_pole(_north_pole),
+points_in_side(_points_in_side), eq_rad(_eq_rad)
 {
-    hntr.reset(new GridSpec_Hntr(hntr));
-
+    // Error-check the input parameters
+    if (south_pole && latb[0] == -90.0) {
+        (*icebin_error)(-1,
+            "latb[] cannot include -90.0 if you're including the south pole cap");
+    }
+    if (north_pole && latb.back() == 90.0) {
+        (*icebin_error)(-1,
+            "latb[] cannot include 90.0 if you're including the north pole cap");
+    }
+}
+// ---------------------------------------------------------
+GridSpec_LonLat make_grid_spec(HntrSpec &hntr, bool pole_caps, int points_in_side, double eq_rad)
+{
     if (hntr.im % 2 != 0) (*icebin_error)(-1,
         "IM must be even");
 
-    GridGen_LonLat spec;
-    spec.name = name;
-    spec.spherical_clip = spherical_clip;
-    spec.points_in_side = points_in_side;
-    spec.eq_rad = eq_rad;
+    std::vector<double> lonb;
+    std::vector<double> latb;
 
     // Longitude grid boundaries
     double const deg_by_im = 360. / (double)hntr.im;
     for (int i=0; i<hntr.im; ++i) {
-        spec.lonb.push_back( 180. + (hntr.offi + (double)i) * deg_by_im );
+        lonb.push_back( 180. + (hntr.offi + (double)i) * deg_by_im );
     }
-    spec.lonb.push_back(spec.lonb[0] + 360.);
+    lonb.push_back(lonb[0] + 360.);
 
     // Latitude grid boundaries
-    spec.latb.push_back(0);
+    latb.push_back(0);
     double dlat_d = hntr.dlat / 60.;    // Convert minutes -> degrees
     for (int j=1; j<hntr.jm/2; ++j) {
         double lat = j * dlat_d;
-        spec.latb.push_back(lat);
-        spec.latb.push_back(-lat);
+        latb.push_back(lat);
+        latb.push_back(-lat);
     }
-    if (pole_caps) {
-        spec.north_pole = true;
-        spec.south_pole = true;
-
-    } else {
-        spec.north_pole = false;
-        spec.south_pole = false;
-
+    if (!pole_caps) {
         double lat = hntr.jm/2 * dlat_d;
         if (std::abs(lat-90.) < 1.e-10) lat = 90.;
-        spec.latb.push_back(lat);
-        spec.latb.push_back(-lat);
+        latb.push_back(lat);
+        latb.push_back(-lat);
     }
 
-    std::sort(spec.latb.begin(), spec.latb.end());
+    std::sort(latb.begin(), latb.end());
 
-    spec.indexing = Indexing(
-        {"lon", "lat"}, {0,0}, {spec.nlon(), spec.nlat()}, {1,0});  // col major
-    spec.make_grid(grid);
-
-
-
-
+    GridSpec_LonLat spec(
+        std::move(lonb), std::move(latb),
+        {1,0},    // Latitude has largest stride
+        pole_caps, pole_caps,
+        points_in_side,
+        eq_rad, hntr);
+    return spec;
 }
+// -----------------------------------------------------
+void HntrSpec::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+{
+    auto hntr_v = get_or_add_var(ncio, vname, "int64", {});
+    if (ncio.rw == 'w') hntr_v.putAtt("comment",
+        "Parameters to instantiate a icebin::modele::HntrGrid description of this grid");
 
+    get_or_put_att(hntr_v, ncio.rw, "im", "int", &im, 1);
+    get_or_put_att(hntr_v, ncio.rw, "jm", "int", &jm, 1);
+    get_or_put_att(hntr_v, ncio.rw, "offi", "double", &offi, 1);
+    get_or_put_att(hntr_v, ncio.rw, "dlat", "double", &dlat, 1);
+}
 
 void GridSpec_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
-#ifdef BUILD_MODELE
     // Read the HntrGrid, if that's how we were made
+    std::string const hntr_vname = vname + ".hntr";
     if (ncio.rw == 'r') {
-        std::string const hntr_vname = vname + ".hntr";
         auto hntr_v = ncio.nc->getVar(hntr_vname);
         if (!hntr_v.isNull()) {
-            HntrGrid _hntr;
-            _hntr.ncio(ncio, hntr_vname);
-            hntr.reset(new HntrGrid(std::move(_hntr)));
+            hntr.ncio(ncio, hntr_vname);
         }
     } else {
-        if (hntr.get()) {
-            HntrGrid _hntr(*hntr);
-            _hntr.ncio(ncio, vname + ".hntr");
+        if (hntr.is_set()) {
+            hntr.ncio(ncio, hntr_vname);
         }
     }
-#endif
 
     auto lonb_d = get_or_add_dim(ncio,
         vname + ".lon_boundaries.length", this->lonb.size());
@@ -131,11 +162,10 @@ void GridSpec_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     }
 }
 // ---------------------------------------------------------
-
 int GridSpec_LonLat::nlat() const {
     int south_pole_offset, north_pole_offset;
 
-    // Get around GCC bug when converting uninitialized bools
+    // Get around GCC (4.9.3) bug when converting uninitialized bools
     south_pole_offset = (south_pole ? 2 : 0);
     north_pole_offset = (north_pole ? 2 : 0);
 

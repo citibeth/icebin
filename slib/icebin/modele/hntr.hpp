@@ -2,6 +2,7 @@
 #define ICEBIN_HNTR_HPP
 
 #include <ibmisc/blitz.hpp>
+#include <ibmisc/indexing.hpp>
 #include <icebin/eigen_types.hpp>
 #include <icebin/GridSpec.hpp>
 
@@ -31,7 +32,7 @@ public:
     blitz::Array<double,1> dxyp;
 
     /** Standardized description of indexing for ModelE grids */
-    Indexing indexing;
+    ibmisc::Indexing indexing;
 
     int size() const { return im * jm; }
     int ndata() const { return size(); }    // Convention makes this more like regular ModelE grids
@@ -256,7 +257,7 @@ public:
 
 template<class AccumT, class IncludeT>
 void Hntr::overlap(
-    AccumT &accum,        // The output (sparse) matrix; 0-based indexing
+    AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
     double const eq_rad,        // Radius of the Earth
     IncludeT includeB)
 {
@@ -346,7 +347,7 @@ public:
 };
 
 /** Convert HntrSpec to a GridSpec used to describe IceBin grids */
-void GridSpec_LonLat make_grid_spec(HntrSpec &hntr, int points_in_side, double eq_rad);
+extern GridSpec_LonLat make_grid_spec(HntrSpec &hntr, int points_in_side, double eq_rad);
 
 
 }}

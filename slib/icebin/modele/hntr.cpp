@@ -44,15 +44,7 @@ void HntrGrid::init()
 
 void HntrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
-    auto hntr_v = get_or_add_var(ncio, vname, "int64", {});
-    if (ncio.rw == 'w') hntr_v.putAtt("comment",
-        "Parameters to instantiate a icebin::modele::HntrGrid description of this grid");
-
-    get_or_put_att(hntr_v, ncio.rw, "im", "int", &im, 1);
-    get_or_put_att(hntr_v, ncio.rw, "jm", "int", &jm, 1);
-    get_or_put_att(hntr_v, ncio.rw, "offi", "double", &offi, 1);
-    get_or_put_att(hntr_v, ncio.rw, "dlat", "double", &dlat, 1);
-
+    HntrSpec::ncio(ncio, vname);
     init();
 }
 

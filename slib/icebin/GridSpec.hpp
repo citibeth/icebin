@@ -1,3 +1,7 @@
+#include <boost/enum.hpp>
+#include <ibmisc/netcdf.hpp>
+#include <icebin/error.hpp>
+
 #ifndef ICEBIN_GRIDSPEC_HPP
 #define ICEBIN_GRIDSPEC_HPP
 
@@ -32,9 +36,18 @@ public:
     GridSpec() : type(GridType::GENERIC) {}
     GridSpec(GridType _type) : type(_type) {}
     virtual ~GridSpec() {}
-    virtual long ncells_full() = 0;
+    virtual long ncells_full() const = 0;
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname) = 0;
-    virtual std::unique_ptr<GridSpec> clone() = 0;
+//    virtual std::unique_ptr<GridSpec> clone() = 0;
+};
+// ----------------------------------------------------
+struct GridSpec_Generic : public GridSpec {
+    long _ncells_full;
+
+    GridSpec_Generic() : GridSpec(GridType::GENERIC), _ncells_full(-1) {}
+
+    long ncells_full() const { return _ncells_full; }
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };
 // ----------------------------------------------------
 struct GridSpec_XY : public GridSpec {
@@ -63,6 +76,8 @@ struct GridSpec_XY : public GridSpec {
         std::vector<int> const &_indices)
     : GridSpec(GridType::XY), xb(std::move(_xb)), yb(std::move(_yb)), indices(_indices) {}
 
+    long ncells_full() { return nx() * ny(); }
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
     /** Create a new Cartesian grid with evenly spaced grid cell boundaries.
     @param name Value of <generic-name>.info:name in netCDF file.
@@ -86,16 +101,18 @@ struct GridSpec_XY : public GridSpec {
         double x0, double x1, double dx,
         double y0, double y1, double dy)
     {
-        return GridSpec_XY::set_xy_boundaries(spec,
+        return make_with_boundaries(
             x0-.5*dx, x1+.5*dx, dx,
             y0-.5*dy, y1+.5*dy, dy);
     }
 
-    std::unique_ptr<GridSpec> clone()
-        { return std::unique_ptr(new GridSpec_XY(*this)); }
+//    std::unique_ptr<GridSpec> clone()
+//        { return std::unique_ptr<GridSpec>(new GridSpec_XY(*this)); }
 };
 // -------------------------------------------------------------------
-struct HntrSpec : public GridSpec {
+
+/** Used to create a GridSpec_LonLat; not a GridSpec itself. */
+struct HntrSpec {
     int im;    // Number of cells in east-west direction
     int jm;    // Number of cells in north-south direction
 
@@ -106,8 +123,10 @@ struct HntrSpec : public GridSpec {
     // minutes of latitude for non-polar cells on grid A
     double dlat;
 
-    std::unique_ptr<GridSpec> clone()
-        { return std::unique_ptr(new HntrSpec(*this)); }
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+
+    HntrSpec() : im(-1), jm(-1), offi(0.), dlat(0.) {}
+    bool is_set() { return (im >= 0); }
 };
 
 
@@ -150,7 +169,7 @@ struct GridSpec_LonLat : public GridSpec {
     double eq_rad;
 
     /** If this was created from a HntrSpec, here is that spec. */
-    std::unique_ptr<HntrSpec> hntr;
+    HntrSpec hntr;
 
     // --------------------------------------------
     GridSpec_LonLat(
@@ -160,22 +179,10 @@ struct GridSpec_LonLat : public GridSpec {
         bool _south_pole,
         bool _north_pole,
         int _points_in_side,
-        double _eq_rad)
-    : GridSpec(GridType::LONLAT), lonb(std::move(_lonb)), latb(std::move(_latb)),
-    indices(_indices),
-    south_pole(_south_pole), north_pole(_north_pole),
-    points_in_side(_points_in_side), eq_rad(_eq_rad)
-    {
-        // Error-check the input parameters
-        if (south_pole && latb[0] == -90.0) {
-            (*icebin_error)(-1,
-                "latb[] cannot include -90.0 if you're including the south pole cap");
-        }
-        if (north_pole && latb.back() == 90.0) {
-            (*icebin_error)(-1,
-                "latb[] cannot include 90.0 if you're including the north pole cap");
-        }
-    }
+        double _eq_rad,
+        HntrSpec const &hntr = HntrSpec());
+
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
     // --------------------------------------------
 
@@ -183,11 +190,10 @@ struct GridSpec_LonLat : public GridSpec {
     int nlon() const { return lonb.size() - 1; }
 
     /** Number of grid cell indices in latitude dimension */
-    int nlat() const {
-        const int south_pole_offset = (south_pole ? 1 : 0);
-        const int north_pole_offset = (north_pole ? 1 : 0);
-        return latb.size() - 1 + south_pole_offset + north_pole_offset;
-    }
+    int nlat() const;
+
+    long ncells_full() const { return nlon() * nlat(); }
+
 
     /** @return [nlat()] latidue of cell centers */
     std::vector<double> latc() const;
@@ -195,8 +201,12 @@ struct GridSpec_LonLat : public GridSpec {
     std::vector<double> lonc() const;
 
     std::unique_ptr<GridSpec> clone()
-        { return std::unique_ptr(new GridSpec_LonLat(*this)); }
+        { return std::unique_ptr<GridSpec>(new GridSpec_LonLat(*this)); }
 };
+
+/** Make a GridSpec_LonLat form a HntrSpec */
+extern GridSpec_LonLat make_grid_spec(HntrSpec &hntr, bool pole_caps, int points_in_side, double eq_rad);
+
 
 }    // namespace
 #endif
