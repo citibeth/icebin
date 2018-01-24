@@ -3,6 +3,7 @@
 #include <functional>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/IceRegridder_L0.hpp>
+#include <icebin/Grid.hpp>
 #include <spsparse/netcdf.hpp>
 
 using namespace std;
@@ -39,9 +40,9 @@ IceRegridder::~IceRegridder() {}
 NOTE: wAvAp == sApvA */
 void IceRegridder::sApvA(MakeDenseEigenT::AccumT &w) const
 {
-    ibmisc::Proj_LL2XY proj(gridI->sproj);
-    for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
-        w.add({cell->index, cell->index}, cell->native_area / cell->proj_area(&proj));
+    for (int id=0; id < gcm->agridA.dim.dense_extent(); ++id) {
+        auto index = gcm->agridA.dim.to_sparse(id);
+        w.add({index, index}, gcm->agridA.native_area(id) / gridA_proj_area(id));
     }
 }
 
@@ -49,53 +50,73 @@ void IceRegridder::sApvA(MakeDenseEigenT::AccumT &w) const
 NOTE: wAvAp == sApvA */
 void IceRegridder::sEpvE(MakeDenseEigenT::AccumT &w) const
 {
-    ibmisc::Proj_LL2XY proj(gridI->sproj);
-    for (auto cell=gcm->gridA->cells.begin(); cell != gcm->gridA->cells.end(); ++cell) {
-        long nhc = gcm->nhc(cell->index);
-        long tuple[2] = {cell->index, 0};
+    for (int id=0; id < gcm->agridA.dim.dense_extent(); ++id) {
+        auto index = gcm->agridA.dim.to_sparse(id);
+
+        long nhc = gcm->nhc(index);
+        long tuple[2] = {index, 0};
         long &ihp(tuple[1]);
         for (ihp=0; ihp<nhc; ++ihp) {
             long indexE = gcm->indexingHC.tuple_to_index(tuple);
-            w.add({indexE, indexE}, cell->native_area / cell->proj_area(&proj));
+            w.add({indexE, indexE}, gcm->agridA.native_area(id) / gridA_proj_area(id));
         }
     }
 }
 // -------------------------------------------------------------
+#if 0
 void IceRegridder::clear()
 {
-    gridI.reset();
-    exgrid.reset();
+    agridI.clear();
+    exgridI.clear();
 }
+#endif
 // -------------------------------------------------------------
-void IceRegridder::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
+void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 {
-printf("BEGIN IceRegridder::ncio(%s, %d)\n", vname.c_str(), rw_full);
+printf("BEGIN IceRegridder::ncio(%s, %d)\n", vname.c_str());
     if (ncio.rw == 'r') {
-        clear();
-        gridI = new_grid(ncio, vname + ".gridI");
-        exgrid = new_grid(ncio, vname + ".exgrid");
+        agridI.ncio(ncio, vname + ".gridI");
+        aexgrid.ncio(ncio, vname + ".exgrid");
     }
 
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
     get_or_put_att(info_v, ncio.rw, "name", _name);
     get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 
-    gridI->ncio(ncio, vname + ".gridI", rw_full);
-    exgrid->ncio(ncio, vname + ".exgrid", rw_full);
+    ncio_blitz(ncio, gridA_proj_area, vname + ".gridA_proj_area", "double",
+        get_or_add_dims(ncio, gridA_proj_area, {"gridA.ndata"}));
+    agridI.ncio(ncio, vname + ".agridI");
+    aexgrid.ncio(ncio, vname + ".aexgrid");
 
-printf("END IceRegridder::ncio(%s, %d)\n", vname.c_str(), rw_full);
+printf("END IceRegridder::ncio(%s, %d)\n", vname.c_str());
 }
 
 void IceRegridder::init(
     std::string const &name,
-    std::unique_ptr<Grid> &&_gridI,
-    std::unique_ptr<Grid> &&_exgrid,
+    AbbrGrid const &agridA,
+    Grid const &fgridA,
+    Grid const &_fgridI,
+    Grid const &_fexgrid,
     InterpStyle _interp_style)
 {
-    _name = (name != "" ? name : gridI->name);
-    gridI = std::move(_gridI);
-    exgrid = std::move(_exgrid);
+    _name = (name != "" ? name : _fgridI.name);
+    agridI = _fgridI;    // convert Grid -> AbbrGrid
+    aexgrid = _fexgrid;  // convert Grid -> AbbrGrid
     interp_style = _interp_style;
+
+    if (agridI.sproj == "") {
+        // No projection; projected and unproject area are the same
+        gridA_proj_area.reference(agridA.native_area);
+    } else {
+        // Use a projection
+        gridA_proj_area.reference(blitz::Array<double,1>(agridA.dim.dense_extent()));
+        ibmisc::Proj_LL2XY proj(_fgridI.sproj);
+        for (auto cell=fgridA.cells.begin(); cell != fgridA.cells.end(); ++cell) {
+            int const is = cell->index;    // sparse index
+            int const id = agridA.dim.to_dense(is);
+            gridA_proj_area(id) = cell->proj_area(&proj);
+        }
+    }
 }
 
 std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
@@ -115,7 +136,7 @@ std::unique_ptr<IceRegridder> new_ice_regridder(NcIO &ncio, std::string const &v
     std::string vn(vname + ".gridI.info");
     auto gridI_info_v = get_or_add_var(ncio, vn, "int64", {});
 
-    Grid::Parameterization parameterization;
+    GridParameterization parameterization;
     get_or_put_att_enum(gridI_info_v, ncio.rw, "parameterization", parameterization);
     return new_ice_regridder(parameterization);
 }

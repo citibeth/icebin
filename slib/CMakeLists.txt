@@ -34,6 +34,7 @@ set(icebin_SOURCES
     icebin/error.cpp
     icebin/GridSpec.cpp
     icebin/Grid.cpp
+    icebin/AbbrGrid.cpp
     icebin/IceRegridder.cpp
     icebin/smoother.cpp
     icebin/GCMRegridder.cpp

@@ -38,7 +38,7 @@ public:
     virtual ~GridSpec() {}
     virtual long ncells_full() const = 0;
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname) = 0;
-//    virtual std::unique_ptr<GridSpec> clone() = 0;
+    virtual std::unique_ptr<GridSpec> clone() const = 0;
 };
 // ----------------------------------------------------
 struct GridSpec_Generic : public GridSpec {
@@ -48,6 +48,8 @@ struct GridSpec_Generic : public GridSpec {
 
     long ncells_full() const { return _ncells_full; }
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+    std::unique_ptr<GridSpec> clone() const
+        { return std::unique_ptr<GridSpec>(new GridSpec_Generic(*this)); }
 };
 // ----------------------------------------------------
 struct GridSpec_XY : public GridSpec {
@@ -70,13 +72,15 @@ struct GridSpec_XY : public GridSpec {
     int nx() const { return xb.size() - 1; }
     int ny() const { return yb.size() - 1; }
 
+    GridSpec_XY() : GridSpec(GridType::XY) {}
+
     GridSpec_XY(
         std::vector<double> &&_xb,
         std::vector<double> &&_yb,
         std::vector<int> const &_indices)
     : GridSpec(GridType::XY), xb(std::move(_xb)), yb(std::move(_yb)), indices(_indices) {}
 
-    long ncells_full() { return nx() * ny(); }
+    long ncells_full() const { return nx() * ny(); }
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
     /** Create a new Cartesian grid with evenly spaced grid cell boundaries.
@@ -106,8 +110,8 @@ struct GridSpec_XY : public GridSpec {
             y0-.5*dy, y1+.5*dy, dy);
     }
 
-//    std::unique_ptr<GridSpec> clone()
-//        { return std::unique_ptr<GridSpec>(new GridSpec_XY(*this)); }
+    std::unique_ptr<GridSpec> clone() const
+        { return std::unique_ptr<GridSpec>(new GridSpec_XY(*this)); }
 };
 // -------------------------------------------------------------------
 
@@ -172,6 +176,7 @@ struct GridSpec_LonLat : public GridSpec {
     HntrSpec hntr;
 
     // --------------------------------------------
+    GridSpec_LonLat() : GridSpec(GridType::LONLAT) {}
     GridSpec_LonLat(
         std::vector<double> &&_lonb,
         std::vector<double> &&_latb,
@@ -200,13 +205,17 @@ struct GridSpec_LonLat : public GridSpec {
     /** @return [nlon()] longitude of cell centers */
     std::vector<double> lonc() const;
 
-    std::unique_ptr<GridSpec> clone()
+    std::unique_ptr<GridSpec> clone() const
         { return std::unique_ptr<GridSpec>(new GridSpec_LonLat(*this)); }
 };
 
 /** Make a GridSpec_LonLat form a HntrSpec */
 extern GridSpec_LonLat make_grid_spec(HntrSpec &hntr, bool pole_caps, int points_in_side, double eq_rad);
 
+extern void ncio_grid_spec(
+    ibmisc::NcIO &ncio,
+    std::unique_ptr<GridSpec> &spec,
+    std::string const &vname);
 
 }    // namespace
 #endif

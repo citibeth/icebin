@@ -35,11 +35,11 @@ public:
 
     /** Number of grid cells in the ice grid */
     size_t nI() const
-        { return gridI->cells.nfull(); }
+        { return agridI.ndata(); }
 
     /** Number of grid cells in the interpolation grid */
     size_t nG() const
-        { return interp_grid == IceExch::ICE ? nI() : exgrid->cells.nfull(); }
+        { return interp_grid == IceExch::ICE ? nI() : aexgrid.ndata(); }
 
     IceRegridder_L0() : interp_grid(IceExch::EXCH) {}
 

@@ -57,7 +57,8 @@ void GCMRegridder_Standard::init(
     ibmisc::Indexing &&_indexingHC,
     bool _correctA)
 {
-    gridA = std::move(_gridA);
+    fgridA = std::move(_gridA);
+    agridA = AbbrGrid(*fgridA);
 //  domainA = std::move(_domainA);
     hcdefs = std::move(_hcdefs);
     indexingHC = std::move(_indexingHC);

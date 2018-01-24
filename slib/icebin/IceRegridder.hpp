@@ -53,20 +53,21 @@ class IceRegridder {
     friend class GCMRegridder_Standard;
     friend class IceWriter;
 public:
-    typedef Grid::Parameterization Type;
+    typedef GridParameterization Type;
 
 
     /** Parent pointer; holds the IceRegridder for ALL ice sheets */
     GCMRegridder const *gcm;
+    blitz::Array<double,1> gridA_proj_area;    // Area of GCM's grid cells projected using gridI->sproj
 
 protected:
 
-    Type type;          /// Grid::Parameterization
+    Type type;          /// GridParameterization
     std::string _name;  /// "greenland", "antarctica", etc.
 
 public:
-    std::unique_ptr<AbbrGrid const> gridI;            /// Ice grid outlines
-    std::unique_ptr<AbbrGrid const> exgrid;       /// Exchange grid outlines (between GCM and Ice)
+    AbbrGrid agridI;            /// Ice grid outlines
+    AbbrGrid aexgrid;       /// Exchange grid outlines (between GCM and Ice)
     InterpStyle interp_style;   /// How we interpolate I<-E.  Determines basis functions in E
 
     // ---------------------------------
@@ -81,7 +82,7 @@ public:
     IceRegridder();
     virtual ~IceRegridder();
 
-    void clear();
+//    void clear();
 
     /**
     @param elevI The elevation of each (unmasked) ice grid cell.
@@ -89,8 +90,10 @@ public:
     */
     void init(
         std::string const &_name,
-        std::unique_ptr<AbbrGrid> &&_gridI,
-        std::unique_ptr<AbbrGrid> &&_exgrid,
+        AbbrGrid const &agridA,
+        Grid const &_fgridA,
+        Grid const &_fgridI,
+        Grid const &_fexgrid,
         InterpStyle _interp_style);
 
     /** @param elevI Elevation at points of ice sheet and land.
@@ -136,7 +139,7 @@ public:
 
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };  // class IceRegridder
 

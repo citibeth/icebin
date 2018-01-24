@@ -119,7 +119,7 @@ public:
     void reserve(size_t n) { _vertices.reserve(n); }
     void add_vertex(Vertex *vertex) { _vertices.push_back(vertex); }
 
-    double proj_area(ibmisc::Proj_LL2XY const *proj);   // OPTIONAL
+    double proj_area(ibmisc::Proj_LL2XY const *proj) const;   // OPTIONAL
 
     Point centroid() const;
 };      // class Cell
@@ -250,7 +250,7 @@ public:
     GridMap<Vertex> vertices;
     GridMap<Cell> cells;
 
-    GridType type;
+    // GridType type;    // now spec->type
     std::unique_ptr<GridSpec> spec;    // Details used to generate the grid
     GridCoordinates coordinates;
     GridParameterization parameterization;
@@ -266,11 +266,11 @@ public:
     std::string sproj;
 
     // Just used for ncio() read
-    Grid(GridType _type);
+    Grid() {}
 
     Grid(
         std::string const &_name,
-        GridType _type,
+        std::unique_ptr<GridSpec> &&_spec,
         GridCoordinates _coordinates,
         std::string const &_sproj,
         GridParameterization _parameterization,
@@ -279,7 +279,6 @@ public:
         grid, and 1-D indexing used in IceBin. */
         ibmisc::Indexing &&_indexing,
 
-        std::unique_ptr<GridSpec> &&_spec,
         GridMap<Vertex> &&_vertices,
         GridMap<Cell> &&_cells);
 

@@ -119,22 +119,23 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &sinterp_style)
 {
     NcIO ncio_I(gridI_fname, netCDF::NcFile::read);
-    std::unique_ptr<Grid> gridI(new_grid(ncio_I, "grid"));
-    gridI->ncio(ncio_I, "grid");
+    std::unique_ptr<Grid> fgridI(new_grid(ncio_I, "grid"));
+    fgridI->ncio(ncio_I, "grid");
     ncio_I.close();
 
     NcIO ncio_exgrid(exgrid_fname, netCDF::NcFile::read);
-    std::unique_ptr<Grid> exgrid(new_grid(ncio_exgrid, exgrid_vname));
-    exgrid->ncio(ncio_exgrid, exgrid_vname);
+    std::unique_ptr<Grid> fexgrid(new_grid(ncio_exgrid, exgrid_vname));
+    fexgrid->ncio(ncio_exgrid, exgrid_vname);
     ncio_exgrid.close();
 
     auto interp_style(parse_enum<InterpStyle>(sinterp_style));
 
-    auto sheet(new_ice_regridder(gridI->parameterization));
-    sheet->init(name, std::move(gridI), std::move(exgrid),
+    auto sheet(new_ice_regridder(fgridI->parameterization));
+    sheet->init(name, cself->agridA, *cself->fgridA, *fgridI, *fexgrid,
         interp_style);
+
     dynamic_cast<GCMRegridder_Standard *>(cself)
-        ->add_sheet(std::move(sheet));
+        ->add_sheet(std::move(sheet), gridA_proj_area);
 }
 
 /** Computes yy = M xx.  yy is allocated, not necessarily set. */

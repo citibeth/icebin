@@ -27,67 +27,69 @@
 #include <ibmisc/iter.hpp>
 #include <ibmisc/Proj2.hpp>
 #include <ibmisc/indexing.hpp>
+#include <spsparse/SparseSet.hpp>
 
 #include <icebin/error.hpp>
-
-#ifdef BUILD_MODELE
-#include <icebin/modele/hntr.hpp>
-#endif
+#include <icebin/GridSpec.hpp>
 
 namespace icebin {
 
-class AbbrGrid {
-    Grid::Type type;
-    std::shared_ptr<GridExtra> extra;
-    Grid::Coordinates coordinates;
-    Grid::Parameterization parameterization;
+class Grid;
+
+struct AbbrGrid {
+    GridType type;
+    std::unique_ptr<GridSpec> spec;
+    GridCoordinates coordinates;
+    GridParameterization parameterization;
+    ibmisc::Indexing indexing;
     std::string name;
-    std::string sproj;
+    std::string sproj;    // Set for ice grids, not GCM grid
 
 
     // Items here will correspond to cells (for L0) or vertices (for L1)
-    SparseSet<long,int> dim;
-    std::array<blitz::Array<int,1>,3> ijk;
+    spsparse::SparseSet<long,int> dim;    // cell->index = sparse
+    blitz::Array<int,2> ijk;    // ijk(index, ijk)
     blitz::Array<double,1> native_area;    // dense indexing
-    blitz::Array<double,1> proj_area;
-    blitz::Array<double,1> centroid;
+    // blitz::Array<double,1> proj_area;
+    blitz::Array<double,2> centroid;    // centroid(index, xy)
 
-    size_t ndata() { return dim.sparse_extent(); }
+    size_t ndata() const { return dim.sparse_extent(); }
 
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
-    AbbrGrid(Grid &g);
+    void operator=(Grid const &g);
+
+    AbbrGrid() {}
+    explicit AbbrGrid(Grid const &g)
+        { operator=(g); }
+
+
+    void filter_cells(std::function<bool(long)> const &keep_fn);
+
+
+
+#if 0
+    void operator=(AbbrGrid const &other)
+    {
+        type = other.type;
+        spec = other.spec->clone();
+        coordinates = other.coordinates;
+        parameterization = other.parameterization;
+        indexing = other.indexing;
+        name = other.name;
+        sproj = other.sproj;
+
+        dim = other.dim;
+        ijk.reference(other.ijk);
+        native_area.reference(other.native_area);
+        centroid.reference(other.centroid);
+    }
+#endif
 
 };
 
-AbbrGrid::AbbrGrid(Grid &g)
-{
-    type = g.type;
-    extra = g.extra;
-    coordinates = g.coordinates;
-    parameterization = g.parameterization;
-    name = g.name;
-    sproj = g.sproj;
 
-    // Allocate
-    nd = g.ndata();
-    for (int i=0; i<3; ++i) ijk[i].reference(blitz::Array<int,1>(nd));
-    native_area.reference(blitz::Array<double,1>(nd));
-    proj_area.reference(blitz::Array<double,1>(nd));
-    centroid.reference(blitz::Array<Point,1>(nd));
 
-    // Copy info into AbbrGrid
-    int id=0;
-    for (auto cell=g.cells.begin(); cell != g.cells.end(); ++cell) {
-        dim.add_dense(cell->index);
-        ijk[0](id) = cell->i;
-        ijk[1](id) = cell->j;
-        ijk[2](id) = cell->k;
-        native_area(id) = cell->native_area;
-        proj_area(id) = cell->proj_area;
-        centroid(id) = cell->centroid;
-    }
-}
 
 }    // namespace
 

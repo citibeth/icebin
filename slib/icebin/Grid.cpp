@@ -40,7 +40,7 @@ Area of the PROJECTED grid cell is returned.
 
 See Surveyor's`g Formula: http://www.maa.org/pubs/Calc_articles/ma063.pdf */
 double Cell::proj_area(
-    Proj_LL2XY const *proj) // OPTIONAL
+    Proj_LL2XY const *proj) const // OPTIONAL
 {
     double ret = 0;
     double x0, y0, x1, y1;
@@ -94,25 +94,9 @@ Point Cell::centroid() const
 // ========================================================
 
 // ------------------------------------------------------------
-Grid::Grid(GridType _type)
-: type(_type)
-{
-    switch(type.index()) {
-        case GridType::GENERIC :
-            spec = std::unique_ptr<GridSpec>(new GridSpec_Generic());
-        case GridType::XY :
-            spec = std::unique_ptr<GridSpec>(new GridSpec_XY());
-        case GridType::LONLAT :
-            spec = std::unique_ptr<GridSpec>(new GridSpec_LonLat());
-        default :
-            (*icebin_error)(-1,
-                "Unrecognized GridType: %s", type.str());
-    }
-}
-
 Grid::Grid(
     std::string const &_name,
-    GridType _type,
+    std::unique_ptr<GridSpec> &&_spec,
     GridCoordinates _coordinates,
     std::string const &_sproj,
     GridParameterization _parameterization,
@@ -121,10 +105,9 @@ Grid::Grid(
     grid, and 1-D indexing used in IceBin. */
     ibmisc::Indexing &&_indexing,
 
-    std::unique_ptr<GridSpec> &&_spec,
     GridMap<Vertex> &&_vertices,
     GridMap<Cell> &&_cells)
-: name(_name), type(_type), spec(std::move(_spec)),
+: name(_name), spec(std::move(_spec)),
 coordinates(_coordinates), sproj(_sproj), parameterization(_parameterization),
 indexing(std::move(_indexing)), vertices(std::move(_vertices)), cells(std::move(_cells))
 {}
@@ -134,7 +117,7 @@ indexing(std::move(_indexing)), vertices(std::move(_vertices)), cells(std::move(
 
 size_t Grid::ndata() const
 {
-    if (parameterization == Parameterization::L1)
+    if (parameterization == GridParameterization::L1)
         return vertices.nfull();
     else
         return cells.nfull();
@@ -364,18 +347,10 @@ std::string const &vname)
     }
 }
 
-std::unique_ptr<Grid> new_grid(NcIO &ncio, std::string const &vname)
-{
-    GridType type;
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
-    get_or_put_att_enum(info_v, ncio.rw, "type", type);
-    return std::unique_ptr<Grid>(new Grid(type));
-}
-
 void Grid::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 {
     // ------ Do the spec first, then the boring long stuff later
-    spec->ncio(ncio, vname);
+    ncio_grid_spec(ncio, spec, vname);
 
     // ------ Attributes
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
@@ -388,7 +363,6 @@ void Grid::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
         (*icebin_error)(-1, "Trying to read version %d, I only know how to read version 2 grids from NetCDF", version);
     }
 
-    get_or_put_att_enum(info_v, ncio.rw, "type", type);
     if (ncio.rw == 'w') info_v.putAtt("type.comment",
         "The overall type of grid, controlling the C++ class used "
         "to represent the grid.  See GridType in slib/icebin/GridSpec.hpp");
@@ -410,7 +384,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
 
     indexing.ncio(ncio, vname + ".indexing");
 
-    if (coordinates == Coordinates::XY) {
+    if (coordinates == GridCoordinates::XY) {
         get_or_put_att(info_v, ncio.rw, "projection", sproj);
         if (ncio.rw == 'w') info_v.putAtt("projection.comment",
             "If grid.info.coordinates = XY, this indicates the projection "

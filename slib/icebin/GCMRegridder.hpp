@@ -209,7 +209,11 @@ class GCMRegridder
 {
 
 public:
-    std::unique_ptr<Grid> gridA;
+    /** Only used when first creating a GCMRegridder (Cython).
+    This field is not stored or loaded with ncio(). */
+    std::unique_ptr<Grid> fgridA;
+
+    AbbrGrid agridA;
 
 //  ibmisc::Domain domainA;                // What's in our MPI halo?
 
@@ -237,8 +241,8 @@ public:
 
     /** Selection function so aid when A/E stuff uses the same code,
         indexed by GridAE::A or ::E. */
-    ibmisc::Indexing &indexing(int iAE)
-        { return (iAE == GridAE::A ? gridA->indexing : indexingE); }
+    ibmisc::Indexing const &indexing(int iAE) const
+        { return (iAE == GridAE::A ? agridA.indexing : indexingE); }
 
     /** Position of height points in elevation space (same for all GCM
     grid cells) */
@@ -263,7 +267,7 @@ public:
     unsigned int nhc(int i1) const { return hcdefs.size(); }
     unsigned int nhc() const { return nhc(-1); }
 
-    unsigned long nA() const { return gridA->ndata(); }
+    unsigned long nA() const { return agridA.ndata(); }
     unsigned long nE() const { return nA() * nhc(-1); }
 
     template<class AccumT>
@@ -297,11 +301,11 @@ template<class AccumT>
 void GCMRegridder::wA(AccumT &&accum, std::string const &ice_sheet_name, bool native)
 {
     IceRegridder *ice = &*ice_regridders().at(ice_sheet_name);
-    ibmisc::Proj_LL2XY proj(ice->gridI->sproj);
 
-    for (auto cell=gridA->cells.begin(); cell != gridA->cells.end(); ++cell) {
-        typename AccumT::val_type const index = cell->index;
-        accum.add({index}, native ? cell->native_area : cell->proj_area(&proj));
+    auto &areas(native ? agridA.native_area : ice->gridA_proj_area);
+    for (int id=0; id<agridA.dim.dense_extent(); ++id) {
+        auto index = agridA.dim.to_sparse(id);
+        accum.add({index}, areas(id));
     }
 }
 

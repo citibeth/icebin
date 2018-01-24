@@ -10,7 +10,7 @@ namespace icebin {
 void GridSpec_Generic::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
     NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
-    get_or_put_att(info_v, ncio.rw, "ncells_full", "long", &ncells_full, 1);
+    get_or_put_att(info_v, ncio.rw, "ncells_full", "long", &_ncells_full, 1);
 }
 
 
@@ -175,4 +175,36 @@ int GridSpec_LonLat::nlat() const {
     return latb.size() - 1 + south_pole_offset + north_pole_offset;
 }
 
+// -------------------------------------------------
+void ncio_grid_spec(
+    NcIO &ncio,
+    std::unique_ptr<GridSpec> &spec,
+    std::string const &vname)
+{
+    if (ncio.rw == 'w') {
+        spec->ncio(ncio, vname);
+    } else {
+        NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
+        GridType type;
+        get_or_put_att_enum(info_v, ncio.rw, "type", type);
+
+        switch(type.index()) {
+            case GridType::GENERIC :
+                spec.reset(new GridSpec_Generic());
+            break;
+            case GridType::XY :
+                spec.reset(new GridSpec_XY());
+            break;
+            case GridType::LONLAT :
+                spec.reset(new GridSpec_LonLat());
+            break;
+            default :
+                (*icebin_error)(-1,
+                    "Unrecognized GridType: %s", type.str());
+        }
+        spec->ncio(ncio, vname);
+    }
+}
+
 }    // namespace
+
