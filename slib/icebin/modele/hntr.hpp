@@ -22,17 +22,19 @@ public:
 //    // minutes of latitude for non-polar cells on grid A
 //    double dlat;
 
-//protected:
-    blitz::Array<double,1> _dxyp;
-
 protected:
     void init();    // Use after constructor or ncio()
 
 public:
+    /** Area of grid cell at lattitude index = j.
+    @param j One-based indexing. */
+    blitz::Array<double,1> dxyp;
+
+    /** Standardized description of indexing for ModelE grids */
+    Indexing indexing;
+
     int size() const { return im * jm; }
     int ndata() const { return size(); }    // Convention makes this more like regular ModelE grids
-
-    double dxyp(int j) const { return _dxyp(j); }
 
     HntrGrid() {}
     HntrGrid(int _im, int _jm, double _offi, double _dlat);
@@ -158,7 +160,7 @@ public:
     @see regrid1 */
     template<class AccumT, class IncludeT = IncludeConst<int,true>>
     void overlap(
-        AccumT &accum,        // The output (sparse) matrix; 0-based indexing
+        AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
         double const eq_rad,        // Radius of the Earth
         IncludeT includeB = IncludeT());
 

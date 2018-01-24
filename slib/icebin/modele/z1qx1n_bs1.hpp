@@ -259,11 +259,22 @@ public:
 
 };
 
+extern void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, ibmisc::FileLocator const &files);
 
 // =================================================================
 
-extern void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, ibmisc::FileLocator const &files);
+/** Output from procedure to generate hi-res ice cover and elevations */
+struct Etopo1Ice {
+    // Outputs of Etopo1Ice() procedure
+    spsparse::SparseSet<int,int> dimI;
+    /** Contains: fgiceId, elevId */
+    ibmisc::ArrayBundle<double,2> bundle;
 
+    Etopo1Ice(ibmisc::ArrayBundle<double,2> _bundle) :
+        bundle(_bundle) {}
+};
+
+// =================================================================
 
 /*
 Z1QX1N.BS1.F    Create Z1QX1N, Nonfractional ocean    2011/11/15
