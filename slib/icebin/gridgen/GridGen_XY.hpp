@@ -29,7 +29,6 @@ namespace icebin {
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
 extern void Grid make_grid(
     std::string const &name,
-    ibmisc::Indexing const &indexing,
     GridSpec_XY const &spec,
     std::function<bool(Cell const &)> euclidian_clip = &EuclidianClip::keep_all);
 

@@ -55,12 +55,13 @@ GridSpec_XY GridSpec_XY::make_with_boundaries(
 
 void Grid make_grid(
     std::string const &name,
-    ibmisc::Indexing const &indexing,
     GridSpec_XY const &spec,
     std::function<bool(Cell const &)> euclidian_clip = &EuclidianClip::keep_all)
 {
     auto &xb(spec.xb);
     auto &yb(spec.yb);
+
+    Indexing indexing({"x", "y"}, {0,0}, {spec.nx(), spec.ny()}, spec.indices);
 
     // Set up the main grid
     GridMap<Vertex> vertices(xb.size() * yb.size());
@@ -98,7 +99,7 @@ void Grid make_grid(
     return Grid(name, GridType::XY,
         GridCoordinates::XY, sproj,
         Gridparameterization::L0,
-        indexing,
+        std::move(indexing),
         std::unique_ptr<GridSpec>(new GridSpec_XY(spec)),
         std::move(vertices), std::move(cells));
 }

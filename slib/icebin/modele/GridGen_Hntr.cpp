@@ -9,7 +9,7 @@ using namespace std::placeholders;  // for _1, _2, _3...
 namespace icebin {
 namespace modele {
 
-void GridSpec_LonLat make_grid_spec(HntrSpec &hntr, int points_in_side, double eq_rad)
+void GridSpec_LonLat make_grid_spec(HntrSpec &hntr, bool pole_caps, int points_in_side, double eq_rad)
 {
     if (hntr.im % 2 != 0) (*icebin_error)(-1,
         "IM must be even");
@@ -43,6 +43,7 @@ void GridSpec_LonLat make_grid_spec(HntrSpec &hntr, int points_in_side, double e
 
     GridSpec_LonLat spec(
         std::move(lonb), std::move(latb),
+        {1,0},    // Latitude has largest stride
         pole_caps, pole_caps,
         points_in_side,
         eq_rad);

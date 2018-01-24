@@ -42,20 +42,26 @@ struct GridSpec_XY : public GridSpec {
     /** Cell boundaries in the x direction.
     Sorted low to high.
     Number of grid cells in the x direction = x_boundaries.size() - 1. */
-    std::vector<double> const xb;
+    std::vector<double> xb;
 
     /** Cell boundaries in the y direction.
     Sorted low to high.
     Number of grid cells in the y direction = y_boundaries.size() - 1. */
-    std::vector<double> const yb;
+    std::vector<double> yb;
+
+    /** (x,y) Dimensions in order of decreasing stride.
+        (0,1) = (x,y) = x has largest stride
+        (1,0) = (y,x) = y has largest stride */
+    std::vector<int> indices;
 
     int nx() const { return xb.size() - 1; }
     int ny() const { return yb.size() - 1; }
 
     GridSpec_XY(
         std::vector<double> &&_xb,
-        std::vector<double> &&_yb)
-    : GridSpec(GridType::XY), xb(std::move(_xb)), yb(std::move(_yb)) {}
+        std::vector<double> &&_yb,
+        std::vector<int> const &_indices)
+    : GridSpec(GridType::XY), xb(std::move(_xb)), yb(std::move(_yb)), indices(_indices) {}
 
 
     /** Create a new Cartesian grid with evenly spaced grid cell boundaries.
@@ -119,6 +125,11 @@ struct GridSpec_LonLat : public GridSpec {
     90 = north pole, -90 = south pole. */
     std::vector<double> latb;
 
+    /** (lon,lat) Dimensions in order of decreasing stride.
+        (0,1) = lon has largest stride
+        (1,0) = lat has largest stride (ModelE) */
+    std::vector<int> indices;
+
     /** True if this grid contains a circular cap on the south pole.
     If not, then many triangular grid cells will meet at the south pole. */
     bool south_pole;
@@ -145,11 +156,13 @@ struct GridSpec_LonLat : public GridSpec {
     GridSpec_LonLat(
         std::vector<double> &&_lonb,
         std::vector<double> &&_latb,
+        std::vector<int> const &_indices,
         bool _south_pole,
         bool _north_pole,
         int _points_in_side,
         double _eq_rad)
     : GridSpec(GridType::LONLAT), lonb(std::move(_lonb)), latb(std::move(_latb)),
+    indices(_indices),
     south_pole(_south_pole), north_pole(_north_pole),
     points_in_side(_points_in_side), eq_rad(_eq_rad)
     {

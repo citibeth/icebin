@@ -293,14 +293,14 @@ public:
 
         /** Conversion between n-dimensional indexing used natively on the
         grid, and 1-D indexing used in IceBin. */
-        ibmisc::Indexing const &_indexing,
+        ibmisc::Indexing &&_indexing,
 
         std::unique_ptr<GridSpec> &&_spec,
         GridMap<Vertex> &&_vertices,
         GridMap<Cell> &&_cells)
     : name(_name), type(_type), spec(std::move(_spec)),
     coordinates(_coordinates), sproj(_sproj), parameterization(_parameterization),
-    indexing(_indexing), vertices(std::move(_vertices)), cells(std::move(_cells))
+    indexing(std::move(_indexing)), vertices(std::move(_vertices)), cells(std::move(_cells))
     {}
 
 

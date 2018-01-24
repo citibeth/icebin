@@ -106,19 +106,23 @@ int main(int argc, char **argv)
 
     std::string sgrid = "2hx2";
     if (vm.count("grid")) sgrid = vm["grid"].as<std::string>();
-    HntrGrid const *hntr_grid = grids_by_name.at(sgrid);
+    HntrSpec const *hntr_spec = grids_by_name.at(sgrid);
 
     // -------------------------------------------------------------
-    GridGen_Hntr spec(*hntr_grid);
+    bool pole_caps = vm["pole-caps"].as<bool>();
+    spec.points_in_side = (hntr_spec->im > IM1 ? 1 : 2);    // Use 2 for comparison with past experiments
+    GridSpec_LonLat spec(*hntr_spec, pole_caps, points_in_side, EQ_RAD);
+
+
+
     spec.name = "modele_ll_" + szone + sgrid;
-    spec.pole_caps = vm["pole-caps"].as<bool>();
 
     spec.spherical_clip = std::bind(&ice_sheet::clip, zone, _1, _2, _3, _4, _5);
-    spec.points_in_side = (hntr_grid->im > IM1 ? 1 : 2);    // Use 2 for comparison with past experiments
-    spec.eq_rad = EQ_RAD;
     
 
     // ------------ Make the grid from the spec
+    Grid grid(make_grid("modele_ll_" + szone + sgrid, 
+
     Grid_LonLat grid;
     spec.make_grid(grid);
 

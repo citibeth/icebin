@@ -108,11 +108,10 @@ static double polar_graticule_area_exact(double eq_rad,
 */
 void Grid make_grid(
     std::string const &name,
-    ibmisc::Indexing const &indexing,
     GridSpec_LonLat const &spec,
     std::function<bool(Cell const &)> spherical_clip = &SphericalClip::keep_all)
 {
-
+    Indexing indexing({"lon", "lat"}, {0,0}, {spec.nlon(), spec.nlat()}, spec.indices);
 
     GridMap<Vertex> vertices(-1);    // Unknown and don't care how many vertices in full grid
     GridMap<Cell> cells(spec.nlon() * spec.nlat());
@@ -136,7 +135,7 @@ void Grid make_grid(
             // Figure out how to number this grid cell
             cell.j = ilat + south_pole_offset;  // 0-based 2-D index
             cell.i = ilon;
-            cell.index = indexing.tuple_to_index<int,2>({cell.i, cell.j});
+            cell.index = spec.indexing.tuple_to_index<int,2>({cell.i, cell.j});
             cell.native_area = graticule_area_exact(spec.eq_rad, lat0,lat1,lon0,lon1);
 
             if (!spec.spherical_clip(cell.index, lon0, lat0, lon1, lat1)) continue;
@@ -225,7 +224,7 @@ void Grid make_grid(
     return Grid(name, GridType::LONLAT,
         GridCoordinates::XY, "",
         Grid::Parameterization::L0,
-        indexing,
+        std::move(indexing),
         std::unique_ptr<GridSpec>(new GridSpec_LonLat(spec)),
         std::move(vertices), std::move(cells));
 }
