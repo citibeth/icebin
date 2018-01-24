@@ -7,8 +7,18 @@ using namespace ibmisc;
 namespace icebin {
 
 
+void GridSpec::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+{
+    if (ncio.rw == 'w') {
+        NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
+        info_v.putAtt("type", std::string(type.str()));
+    }
+}
+
+
 void GridSpec_Generic::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
+    GridSpec::ncio(ncio, vname);
     NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     get_or_put_att(info_v, ncio.rw, "ncells_full", "long", &_ncells_full, 1);
 }
@@ -17,6 +27,7 @@ void GridSpec_Generic::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 
 void GridSpec_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
+    GridSpec::ncio(ncio, vname);
 
     auto xb_d = get_or_add_dim(ncio,
         vname + ".x_boundaries.length", this->xb.size());
@@ -76,7 +87,11 @@ GridSpec_LonLat make_grid_spec(HntrSpec const &hntr, bool pole_caps, int points_
     // Longitude grid boundaries
     double const deg_by_im = 360. / (double)hntr.im;
     for (int i=0; i<hntr.im; ++i) {
-        lonb.push_back( 180. + (hntr.offi + (double)i) * deg_by_im );
+        // A longitude offset of -180 is added: in hntr grids,
+        // the cell with longitude index=0 starts at 180 degrees W.
+        // This splits the map in the Pacific Ocean when
+        // plotting data naively
+        lonb.push_back( -180. + (hntr.offi + (double)i) * deg_by_im );
     }
     lonb.push_back(lonb[0] + 360.);
 
@@ -129,6 +144,8 @@ void HntrSpec::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 
 void GridSpec_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
+    GridSpec::ncio(ncio, vname);
+
     // Read the HntrGrid, if that's how we were made
     std::string const hntr_vname = vname + ".hntr";
     if (ncio.rw == 'r') {

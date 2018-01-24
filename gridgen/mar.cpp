@@ -91,11 +91,17 @@ int main(int argc, char **argv)
     // ------------------------------------------------------
     double dsize = (double)grid_size;
 
+
+    GridSpec_XY spec(
+        strprintf("mar_g%d_%s", grid_size, icemodel.str()),
+        
+
+
+
     printf("------------- Set up the local ice grid\n");
 
     GridGen_XY spec;
     char xname[100];
-    snprintf(xname, sizeof(xname), "mar_g%d_%s", grid_size, icemodel.str());
     std::string name(xname);
 
     spec.name = name;

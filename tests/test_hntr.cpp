@@ -36,6 +36,7 @@ using namespace icebin;
 using namespace icebin::modele;
 using namespace blitz;
 using namespace spsparse;
+using namespace std::placeholders;
 
 extern "C" void write_hntr40(
     int const &ima, int const &jma, float const &offia, float const &dlata,
@@ -108,11 +109,11 @@ void cmp_array_rel(blitz::Array<double,1> const &cval, blitz::Array<double,1> co
 // ----------------------------------------------------------
 
 
-void cmp_hntr4(HntrGrid const &grida, HntrGrid const &gridb)
+void cmp_hntr4(HntrSpec const &speca, HntrSpec const &specb)
 {
     write_hntr40(
-        grida.im, grida.jm, grida.offi, grida.dlat,
-        gridb.im, gridb.jm, gridb.offi, gridb.dlat,
+        speca.im, speca.jm, speca.offi, speca.dlat,
+        specb.im, specb.jm, specb.offi, specb.dlat,
         0.);
 
     fortran::UnformattedInput fin("hntr4_common", Endian::LITTLE);
@@ -137,12 +138,12 @@ void cmp_hntr4(HntrGrid const &grida, HntrGrid const &gridb)
 
     fin.close();
 
-    EXPECT_EQ(grida.im, ina);
-    EXPECT_EQ(grida.jm, jna);
-    EXPECT_EQ(gridb.im, inb);
-    EXPECT_EQ(gridb.jm, jnb);
+    EXPECT_EQ(speca.im, ina);
+    EXPECT_EQ(speca.jm, jna);
+    EXPECT_EQ(specb.im, inb);
+    EXPECT_EQ(specb.jm, jnb);
 
-    Hntr hntr(grida, gridb, 0);
+    Hntr hntr(17.17, specb, speca, 0);
     // printf("------------- SINA\n");
     cmp_array(hntr.SINA, sina);
     // printf("------------- SINB\n");
@@ -165,15 +166,15 @@ void cmp_hntr4(HntrGrid const &grida, HntrGrid const &gridb)
     cmp_array(hntr.JMAX, jmax);
 
     for (int i=hntr.JMAX.lbound(0); i <= hntr.JMAX.ubound(0); ++i) {
-        EXPECT_TRUE(hntr.JMAX(i) <= hntr.Agrid.jm);
+        EXPECT_TRUE(hntr.JMAX(i) <= hntr.Agrid.spec.jm);
     }
 
 }
 
 TEST_F(HntrTest, simple_grids)
 {
-    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0*60);
-    HntrGrid g8(16, 8, 0.0, 22.5*60);
+    HntrSpec g4(8, 4, 0.0, 45.0*60);
+    HntrSpec g8(16, 8, 0.0, 22.5*60);
 
     cmp_hntr4(g4, g8);
     cmp_hntr4(g2mx2m, g1qx1);
@@ -183,56 +184,35 @@ TEST_F(HntrTest, simple_grids)
 }
 
 // ----------------------------------------------------------------
-void hntr_overlap(
-    MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
-    std::array<HntrGrid const *, 2> hntrs,    // {hntrB, hntrA}
-    double const R)            // Radius of the earth
-{
-    auto &dimB(*ret.dim(0).sparse_set);
-    Hntr hntr_BvA(hntrs, 0);    // BvA
-
-    hntr_BvA.overlap(ret, R, DimClip(&dimB));
-}
-// ----------------------------------------------------------------
-void hntr_scaled_regrid_matrix(
-    MakeDenseEigenT::AccumT &ret,        // {dimB, dimA}
-    std::array<HntrGrid const *, 2> hntrs)    // {hntrB, hntrA}
-{
-    auto &dimB(*ret.dim(0).sparse_set);
-    Hntr hntr_BvA(hntrs, 0);    // BvA
-
-    hntr_BvA.scaled_regrid_matrix(ret, DimClip(&dimB));
-}
-// ----------------------------------------------------------------
 extern "C" void call_hntr4(
     float const *WTA, int const &lwta,
     float const *A, int const &la,
     float  *B, int const &lb);
 
 void cmp_regrid(
-    HntrGrid const &gridA, HntrGrid const &gridB,
+    HntrSpec const &specA, HntrSpec const &specB,
     blitz::Array<double,2> const &WTAc,    // 1-based indexing
     blitz::Array<double,2> const &Ac)      // 1-based indexing
 {
 
     // Regrid with C++
-    auto Bc(gridB.Array<double>());
-    Hntr hntr(gridA, gridB, 0);
+    auto Bc(hntr_array<double>(specB));
+    Hntr hntr(17.17, specB, specA, 0);
     hntr.regrid(WTAc, Ac, Bc);
 
     // Regrid with Fortran
-    auto WTAf(gridA.Array<float>());
-    auto Af(gridA.Array<float>());
-    for (int j=1; j<=gridA.jm; ++j) {
-    for (int i=1; i<=gridA.im; ++i) {
+    auto WTAf(hntr_array<float>(specA));
+    auto Af(hntr_array<float>(specA));
+    for (int j=1; j<=specA.jm; ++j) {
+    for (int i=1; i<=specA.im; ++i) {
         WTAf(i,j) = WTAc(i,j);
         Af(i,j) = Ac(i,j);
     }}
 
-    auto Bf(gridB.Array<float>());
+    auto Bf(hntr_array<float>(specB));
     write_hntr40(
-        gridA.im, gridA.jm, gridA.offi, gridA.dlat,
-        gridB.im, gridB.jm, gridB.offi, gridB.dlat,
+        specA.im, specA.jm, specA.offi, specA.dlat,
+        specB.im, specB.jm, specB.offi, specB.dlat,
         0.);
     call_hntr4(
         WTAf.data(), WTAf.extent(0),
@@ -244,15 +224,17 @@ void cmp_regrid(
 
     // ----------------------------------------------------
     // Check conservation
+    HntrGrid gridA(specA);
     double Asum = 0;
-    for (int j=1; j<=gridA.jm; ++j) {
-    for (int i=1; i<=gridA.im; ++i) {
+    for (int j=1; j<=specA.jm; ++j) {
+    for (int i=1; i<=specA.im; ++i) {
         Asum += Ac(i,j) * gridA.dxyp(j);
     }}
 
+    HntrGrid gridB(specB);
     double Bsum = 0;
-    for (int j=1; j<=gridB.jm; ++j) {
-    for (int i=1; i<=gridB.im; ++i) {
+    for (int j=1; j<=specB.jm; ++j) {
+    for (int i=1; i<=specB.im; ++i) {
         Bsum += Bc(i,j) * gridB.dxyp(j);
     }}
 
@@ -263,19 +245,20 @@ void cmp_regrid(
     // For this test, they are set so the dense and sparse indexing
     // are equivalent
     SparseSetT dimB;
-    for (int i=0; i<gridB.ndata(); ++i) dimB.add_dense(i);
-    EXPECT_EQ(gridB.jm*gridB.im, dimB.dense_extent());
+    for (int i=0; i<specB.ndata(); ++i) dimB.add_dense(i);
+    EXPECT_EQ(specB.jm*specB.im, dimB.dense_extent());
 
     SparseSetT dimA;
-    for (int i=0; i<gridA.ndata(); ++i) dimA.add_dense(i);
-    EXPECT_EQ(gridA.jm*gridA.im, dimA.dense_extent());
+    for (int i=0; i<specA.ndata(); ++i) dimA.add_dense(i);
+    EXPECT_EQ(specA.jm*specA.im, dimA.dense_extent());
 
     // ---------------------------------------------------------
     // Regrid with scaled overlap matrix using matrix assembly machinery
     // Do it entirely in "sparse" indexing
+    Hntr hntr_BvA(17.17, specB, specA);
     MakeDenseEigenT BvA_m(
-        std::bind(&hntr_overlap, std::placeholders::_1,
-            std::array<HntrGrid const *,2>{&gridB, &gridA}, 1.0),
+        std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
+            &hntr_BvA, _1, 1.0, DimClip(&dimB)),
         {SparsifyTransform::TO_DENSE},
         {&dimB, &dimA}, '.');
     EigenSparseMatrixT BvA(BvA_m.to_eigen());
@@ -295,9 +278,10 @@ void cmp_regrid(
     // ---------------------------------------------------------
     // Regrid with scaled overlap matrix using matrix assembly machinery
     // Do it entirely in "sparse" indexing
+    Hntr hntr_BvA2(17.17, specB, specA);
     MakeDenseEigenT BvA2_m(
-        std::bind(&hntr_scaled_regrid_matrix, std::placeholders::_1,
-            std::array<HntrGrid const *,2>{&gridB, &gridA}),
+        std::bind(&Hntr::scaled_regrid_matrix<MakeDenseEigenT::AccumT,DimClip>,
+            &hntr_BvA, _1, DimClip(&dimB)),
         {SparsifyTransform::TO_DENSE},
         {&dimB, &dimA}, '.');
     EigenSparseMatrixT BvA2(BvA2_m.to_eigen());
@@ -312,13 +296,13 @@ void cmp_regrid(
 
     // Make sure sum matches (in C++)
     double sumA = 0;
-    for (int j=1; j<=gridA.jm; ++j) {
-    for (int i=1; i<=gridA.im; ++i) {
+    for (int j=1; j<=specA.jm; ++j) {
+    for (int i=1; i<=specA.im; ++i) {
         sumA += WTAc(i,j) * Ac(i,j) * gridA.dxyp(j);
     }}
     double sumB = 0;
-    for (int j=1; j<=gridB.jm; ++j) {
-    for (int i=1; i<=gridB.im; ++i) {
+    for (int j=1; j<=specB.jm; ++j) {
+    for (int i=1; i<=specB.im; ++i) {
         sumB += Bc(i,j) * gridB.dxyp(j);
     }}
     EXPECT_NEAR(1.0, sumA/sumB, 1.e-12);
@@ -332,54 +316,55 @@ double frand(double fMin, double fMax)
     return ret;
 }
 
-void cmp_random_regrid(HntrGrid const &gridA, HntrGrid const &gridB)
+void cmp_random_regrid(HntrSpec const &specA, HntrSpec const &specB)
 {
-    auto WTA(gridA.Array<double>());
-    auto A(gridA.Array<double>());
-    for (int j=1; j<=gridA.jm; ++j) {
-    for (int i=1; i<=gridA.im; ++i) {
+    auto WTA(hntr_array<double>(specA));
+    auto A(hntr_array<double>(specA));
+    for (int j=1; j<=specA.jm; ++j) {
+    for (int i=1; i<=specA.im; ++i) {
 //        WTA(i,j) = frand(0.,1.);
         WTA(i,j) = 1.;    // Don't know how to make tests work out with WTA != 1
         A(i,j) = frand(0.,1.);
     }}
-    cmp_regrid(gridA, gridB, WTA, A);
+    cmp_regrid(specA, specB, WTA, A);
 }
 
-void test_overlap(std::array<HntrGrid const *,2> grids,
+void test_overlap(std::array<HntrSpec const *,2> specs,
     bool check_spurious,
     std::string const &msg)
 {
     std::vector<double> Rvals {1.0,2.0};
 
-
-    Hntr hntrBvA(grids, 0);
-    auto &gB(*grids[0]);
-    auto &gA(*grids[1]);
+printf("AA1\n");
+    Hntr hntrBvA(17.17, *specs[0], *specs[1], 0);
+    auto &specB(*specs[0]);
+    auto &specA(*specs[1]);
 
     for (double R : Rvals) {
         TupleList<int,double,2> mBvA;
         double const R2 = R*R;
-        hntrBvA.overlap(mBvA, R);
+        hntrBvA.overlap(accum::ref(mBvA), R);
 
+printf("AA1\n");
 #if 0
 for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
     int ijB = ii->index(0);
-    int const jB = ijB / gB.im;
-    int const iB = ijB - (jB * gB.im);
+    int const jB = ijB / specB.im;
+    int const iB = ijB - (jB * specB.im);
 
     int ijA = ii->index(0);
-    int const jA = ijA / gA.im;
-    int const iA = ijA - (jA * gA.im);
+    int const jA = ijA / specA.im;
+    int const iA = ijA - (jA * specA.im);
 
     printf("mBvA[(%d %d), (%d %d)] = %f\n", iB,jB,iA,jA,ii->value());
 }
 #endif
 
 
-        // Compute sums of areas for grids A and B
-        blitz::Array<double,1> areaB(gB.ndata());
+        // Compute sums of areas for specs A and B
+        blitz::Array<double,1> areaB(specB.ndata());
         areaB = 0;
-        blitz::Array<double,1> areaA(gA.ndata());
+        blitz::Array<double,1> areaA(specA.ndata());
         areaA = 0;
         for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
             areaB(ii->index(0)) += ii->value();
@@ -389,21 +374,24 @@ for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
         double const epsilon = 1.e-12;
 
         // Check that computed B areas match
-        for (int ijB=0; ijB<gB.ndata(); ++ijB) {
-            int const jB = ijB / gB.im;
-            int const iB = ijB - (jB * gB.im);
+        HntrGrid gridB(specB);
+        for (int ijB=0; ijB<specB.ndata(); ++ijB) {
+            int const jB = ijB / specB.im;
+            int const iB = ijB - (jB * specB.im);
 
-            EXPECT_NEAR(1., gB.dxyp(jB+1)*R2 / areaB(ijB), epsilon) << "Grid B R=" << R << " " << msg;
+            EXPECT_NEAR(1., gridB.dxyp(jB+1)*R2 / areaB(ijB), epsilon) << "Grid B R=" << R << " " << msg;
         }
 
         // Check that computed A areas match
-        for (int ijA=0; ijA<gA.ndata(); ++ijA) {
-            int const jA = ijA / gA.im;
-            int const iA = ijA - (jA * gA.im);
+        HntrGrid gridA(specA);
+        for (int ijA=0; ijA<specA.ndata(); ++ijA) {
+            int const jA = ijA / specA.im;
+            int const iA = ijA - (jA * specA.im);
 
-            EXPECT_NEAR(1., gA.dxyp(jA+1)*R2 / areaA(ijA), epsilon) << "Grid A(" << iA << ", " << jA << ") R=" << R << " " << msg;
+            EXPECT_NEAR(1., gridA.dxyp(jA+1)*R2 / areaA(ijA), epsilon) << "Grid A(" << iA << ", " << jA << ") R=" << R << " " << msg;
         }
 
+printf("AA1\n");
         // Check total area
         double sumB = 0;
         for (int i=0; i<areaB.extent(0); ++i) sumB += areaB(i);
@@ -413,6 +401,7 @@ for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
         for (int i=0; i<areaA.extent(0); ++i) sumA += areaA(i);
         EXPECT_NEAR(1., 4.*M_PI*R2 / sumA, epsilon) << msg;
 
+printf("AA1\n");
         // Check for spurious overlaps
         if (check_spurious) {
             for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
@@ -424,6 +413,7 @@ for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
             }
         }
     }
+printf("AA1\n");
 
 }
 
@@ -432,8 +422,8 @@ for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
 some basic properties such a matrix should have. */
 TEST_F(HntrTest, overlap)
 {
-    HntrGrid gB(4, 2, 0.0, 90.0*60);
-    HntrGrid gA(8, 4, 0.0, 45.0*60);
+    HntrSpec gB(4, 2, 0.0, 90.0*60);
+    HntrSpec gA(8, 4, 0.0, 45.0*60);
 
     test_overlap({&gB, &gA}, true, "small-sample");
     test_overlap({&gA, &gB}, true, "small-sample");
@@ -444,13 +434,13 @@ TEST_F(HntrTest, overlap)
 
 TEST_F(HntrTest, regrid1)
 {
-    HntrGrid g2(4, 2, 0.0, 90.0*60);
-    HntrGrid g4(8, 4, 0.0, 45.0*60);
-    HntrGrid g8(16, 8, 0.0, 22.5*60);
+    HntrSpec g2(4, 2, 0.0, 90.0*60);
+    HntrSpec g4(8, 4, 0.0, 45.0*60);
+    HntrSpec g8(16, 8, 0.0, 22.5*60);
 
 
-    auto vals4(g4.Array<double>());
-    auto wt4(g4.Array<double>());
+    auto vals4(hntr_array<double>(g4));
+    auto wt4(hntr_array<double>(g4));
 
     for (int i=1; i<=g4.im; ++i) {
     for (int j=1; j<=g4.jm; ++j) {
@@ -466,8 +456,8 @@ TEST_F(HntrTest, regrid1)
 
 TEST_F(HntrTest, random_regrids)
 {
-    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0*60);
-    HntrGrid g8(16, 8, 0.0, 22.5*60);
+    HntrSpec g4(8, 4, 0.0, 45.0*60);
+    HntrSpec g8(16, 8, 0.0, 22.5*60);
 
     cmp_random_regrid(g8, g4);
     cmp_random_regrid(g2mx2m, g1qx1);
@@ -478,28 +468,30 @@ TEST_F(HntrTest, random_regrids)
 
 TEST_F(HntrTest, regrid)
 {
-    icebin::modele::HntrGrid g4(8, 4, 0.0, 45.0*60);
-    HntrGrid g8(16, 8, 0.0, 22.5*60);
-    auto vals8(g8.Array<double>());
-    auto wt8(g8.Array<double>());
-    auto vals4(g4.Array<double>());
+    HntrSpec g4(8, 4, 0.0, 45.0*60);
+    HntrSpec g8(16, 8, 0.0, 22.5*60);
+    HntrGrid grid_g8(g8);
+    auto vals8(hntr_array<double>(g8));
+    auto wt8(hntr_array<double>(g8));
+    auto vals4(hntr_array<double>(g4));
 
     double sum8=0;
     for (int i=1; i<=g8.im; ++i) {
     for (int j=1; j<=g8.jm; ++j) {
         wt8(i,j) = 1.0;
         vals8(i,j) = i+j;
-        sum8 += vals8(i,j) * g8.dxyp(j);
+        sum8 += vals8(i,j) * grid_g8.dxyp(j);
     }}
 
 
-    Hntr hntr(g8, g4, 0);
+    Hntr hntr(17.17, g4, g8);
     hntr.regrid(wt8, vals8, vals4);
 
     double sum4=0;
+    HntrGrid grid_g4(g4);
     for (int i=1; i<=g4.im; ++i) {
     for (int j=1; j<=g4.jm; ++j) {
-        sum4 += vals4(i,j) * g4.dxyp(j);
+        sum4 += vals4(i,j) * grid_g4.dxyp(j);
     }}
 
     EXPECT_DOUBLE_EQ(sum4, sum8);
@@ -531,12 +523,16 @@ TEST_F(HntrTest, sgeom)
     fortran::read(fin) >> dxyp >> dxyph >> dxyp2 >> fortran::endr;
     fin.close();
 
-    printf("-------------- g1qx1._dxyp\n");
-    cmp_array_rel(g1qx1._dxyp, dxyp, 1e-8);
-    printf("-------------- ghxh._dxyp\n");
-    cmp_array_rel(ghxh._dxyp, dxyph, 1e-8);
-    printf("-------------- g2mx2m._dxyp\n");
-    cmp_array_rel(g2mx2m._dxyp, dxyp2, 1e-8);
+    HntrGrid grid_g1qx1(g1qx1);
+    HntrGrid grid_ghxh(ghxh);
+    HntrGrid grid_g2mx2m(g2mx2m);
+
+    printf("-------------- g1qx1.dxyp\n");
+    cmp_array_rel(grid_g1qx1.dxyp, dxyp, 1e-8);
+    printf("-------------- ghxh.dxyp\n");
+    cmp_array_rel(grid_ghxh.dxyp, dxyph, 1e-8);
+    printf("-------------- g2mx2m.dxyp\n");
+    cmp_array_rel(grid_g2mx2m.dxyp, dxyp2, 1e-8);
 }
 
 

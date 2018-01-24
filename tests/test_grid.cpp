@@ -23,9 +23,9 @@
 #include <netcdf>
 #include <gtest/gtest.h>
 #include <icebin/Grid.hpp>
+#include <icebin/GridSpec.hpp>
 #include <icebin/gridgen/GridGen_LonLat.hpp>
 #ifdef BUILD_MODELE
-#include <icebin/modele/GridGen_Hntr.hpp>
 #include <icebin/modele/clippers.hpp>
 #endif
 
@@ -164,10 +164,10 @@ protected:
 TEST_F(GridTest, create_grid)
 {
     Grid grid;
-    grid.type = Grid::Type::XY;
+    grid.spec.reset(new GridSpec_XY("", {1,0}, {}, {}));
     grid.name = "Test Grid";
-    grid.coordinates = Grid::Coordinates::XY;
-    grid.parameterization = Grid::Parameterization::L0;
+    grid.coordinates = GridCoordinates::XY;
+    grid.parameterization = GridParameterization::L0;
 
     Vertex *vertex;
     auto &vertices(grid.vertices);
@@ -264,32 +264,30 @@ TEST_F(GridTest, centroid)
 
 TEST_F(GridTest, hntr)
 {
+    // Parts shared between two grids
+    auto clip(std::bind(&ice_sheet::clip,
+            ice_sheet::GREENLAND|ice_sheet::ANTARCTICA, _1, _2, _3, _4, _5));
+    bool const pole_caps = false;
+    int const points_in_side = 1;
+    double const eq_rad = 1.0;
+
     // Create a grid with Hntr-style parameterization
-    modele::GridGen_Hntr hntr(modele::HntrGrid(4, 4, 0., 60.*45.));
-    hntr.name = "hntr";
-    hntr.spherical_clip = std::bind(&ice_sheet::clip,
-        ice_sheet::GREENLAND|ice_sheet::ANTARCTICA, _1, _2, _3, _4, _5);
-    hntr.pole_caps = false;
-    hntr.points_in_side = 1;
-    hntr.eq_rad = 1.;
+    HntrSpec hspec(4, 4, 0., 60.*45.);
+    GridSpec_LonLat gspec_h(make_grid_spec(
+        hspec, pole_caps, points_in_side, eq_rad));
+
+    Grid hntr_grid(make_grid("hntr", gspec_h, clip));
 
     // Create a grid with traditional lon/lat parameterization
-    GridGen_LonLat ll;
-    ll.name = "ll";
-    ll.spherical_clip = hntr.spherical_clip;
-    ll.latb = std::vector<double>{-90., -45., 0., 45., 90.};
-    ll.lonb = std::vector<double>{0., 90., 180., 270., 360.};
-    ll.indexing = ibmisc::Indexing(
-        {"lon", "lat"}, {0,0}, {ll.nlon(), ll.nlat()}, {1,0});  // col major
-    ll.south_pole = hntr.pole_caps;
-    ll.north_pole = hntr.pole_caps;
-    ll.points_in_side = hntr.points_in_side;
-    ll.eq_rad = hntr.eq_rad;
+    GridSpec_LonLat gspec_ll(
+        std::vector<double>{-180., -90., 0., 90., 180.},
+        std::vector<double>{-90., -45., 0., 45., 90.},
+        {1,0},    // col major
+        pole_caps, pole_caps,
+        points_in_side, eq_rad);
+    Grid ll_grid(make_grid("ll", gspec_ll, clip));
 
     // Check the two grids are equal.
-    Grid_LonLat ll_grid, hntr_grid;
-    ll.make_grid(ll_grid);
-    hntr.make_grid(hntr_grid);
     expect_eq(ll_grid, hntr_grid);
 
 }

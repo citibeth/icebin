@@ -26,7 +26,7 @@ namespace icebin {
 
 extern Grid make_exchange_grid(
     Grid const *gridA, Grid const *gridI,
-    std::string const &sproj);
+    std::string sproj = "");
 
 
 

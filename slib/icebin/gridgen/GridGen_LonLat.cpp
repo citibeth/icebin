@@ -262,7 +262,6 @@ AbbrGrid make_abbr_grid(
 
 
     return AbbrGrid(
-        GridType::LONLAT,
         std::unique_ptr<GridSpec>(new GridSpec_LonLat(spec)),
         GridCoordinates::LONLAT, GridParameterization::L0,
         std::move(indexing), name, "",

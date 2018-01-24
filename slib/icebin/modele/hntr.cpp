@@ -162,13 +162,13 @@ void Hntr::regrid1(
     bool mean_polar) const
 {
     // Check array dimensions
-    if ((WTA.extent(0) != Agrid.size()) ||
-        (A.extent(0) != Agrid.size()) ||
-        (B.extent(0) != Bgrid.size()))
+    if ((WTA.extent(0) != Agrid.spec.size()) ||
+        (A.extent(0) != Agrid.spec.size()) ||
+        (B.extent(0) != Bgrid.spec.size()))
     {
         (*icebin_error)(-1, "Error in dimensions: (%d, %d, %d) vs. (%d, %d)\n",
             WTA.extent(0), A.extent(0), B.extent(0),
-            Agrid.size(), Bgrid.size());
+            Agrid.spec.size(), Bgrid.spec.size());
     }
 
     // ------------------

@@ -178,7 +178,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 # -------- Process subdirectories of the build
 add_subdirectory(slib)
 if (BUILD_MODELE)
-    add_subdirectory(modele)
+#    add_subdirectory(modele)    # Don't need this right now, but it is current
 endif()
 add_subdirectory(tests)
 if (BUILD_GRIDGEN)

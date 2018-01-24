@@ -26,6 +26,7 @@
 #include <boost/program_options.hpp>
 
 #include <ibmisc/enum.hpp>
+#include <ibmisc/stdio.hpp>
 
 #include <icebin/error.hpp>
 #include <icebin/gridgen/gridutil.hpp>
@@ -93,34 +94,32 @@ int main(int argc, char **argv)
 
     printf("------------- Set up the local ice grid\n");
 
+    // Get the spec
+    auto indices(icemodel == IceModel::pism
+        ? std::vector<int>{0,1}
+        : std::vector<int>{1,0});
+
     GridSpec_XY spec;
-    char xname[100];
-    snprintf(xname, sizeof(xname), "sr_g%d_%s", grid_size, icemodel.str());
-    std::string name(xname);
-
-    spec.name = name;
-    spec.euclidian_clip = &EuclidianClip::keep_all;
-
     if (zone == Zone::greenland) {
         spec = GridSpec_XY::make_with_boundaries(
             "+proj=stere +lon_0=-39 +lat_0=90 +lat_ts=71.0 +ellps=WGS84",
-            (icemodel == IceModel::pism ? {0,1} : {1,0}),
+            std::move(indices),
             (- 800.0 - .5*dsize)*km, (- 800.0 + 300.0*5 + .5*dsize)*km,   dsize*km,
             (-3400.0 - .5*dsize)*km, (-3400.0 + 560.0*5 + .5*dsize)*km,   dsize*km);
     } else {    // Antarctica
         spec = GridSpec_XY::make_with_boundaries(
             "+proj=stere +lon_0=0 +lat_0=-90 +lat_ts=71.0 +ellps=WGS84",
-            (icemodel == IceModel::pism ? {0,1} : {1,0}),
+            std::move(indices),
             (-2800.0 - .5*dsize)*km, (-2800.0 + 1200*5.0 + .5*dsize)*km,   dsize*km,
             (-2800.0 - .5*dsize)*km, (-2800.0 + 1200*5.0 + .5*dsize)*km,   dsize*km);
     }
 
-
     // ------------ Make the grid from the spec
-    auto Grid(make_grid(spec.name, spec));
+    std::string name(ibmisc::strprintf("sr_g%d_%s", grid_size, icemodel.str()));
+    Grid grid(make_grid(name, spec, &EuclidianClip::keep_all));
 
     // ------------- Write it out to NetCDF
-    ibmisc::NcIO ncio(spec.name + ".nc", netCDF::NcFile::replace);
+    ibmisc::NcIO ncio(name + ".nc", netCDF::NcFile::replace);
     grid.ncio(ncio, "grid");
     ncio.close();
 }

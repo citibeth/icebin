@@ -307,6 +307,8 @@ public:
     void filter_cells(std::function<bool (long)> const &keep_fn);
 };
 
+void sort_renumber_vertices(Grid &grid);
+
 
 }   // namespace
 

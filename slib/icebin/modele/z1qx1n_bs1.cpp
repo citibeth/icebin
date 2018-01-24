@@ -173,10 +173,10 @@ void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLoc
         greenland ? greenland->FOCEN2 : blitz::Array<double,2>(IM2,JM2,fortranArray));
     {NcIO ncio(files.locate("Z2MX2M.NGDC-SeparateGreenland.nc"), 'r');
         ncio_blitz(ncio, in.FOCEN2, "FOCEN2", "double",
-            get_dims(ncio, {"im2", "jm2"}));
+            get_dims(ncio, {"jm2", "im2"}));    // ncdims in nc order
 
         ncio_blitz(ncio, in.ZETOP2, "ZETOP2", "double",
-            get_dims(ncio, {"im2", "jm2"}));
+            get_dims(ncio, {"jm2", "im2"}));    // ncdims in nc order
 
         // Separate Greenland from the rest
         greenland_focen2 = NaN;
@@ -264,10 +264,13 @@ void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLoc
     // Read in ZNGDC1
     // Read hand-modified FCONT1 (formerly from "ZNGDC1")
     {NcIO ncio(files.locate("ZNGDC1-SeparateGreenland.nc"), 'r');
+printf("BB1\n");
         ncio_blitz(ncio, in.FCONT1, "FCONT1", "double",
-            get_dims(ncio, {"im1", "jm1"}));
+            get_dims(ncio, {"jm1", "im1"}));
+printf("BB2\n");
         ncio_blitz(ncio, in.FGICE1, "FGICE1", "double",
-            get_dims(ncio, {"im1", "jm1"}));
+            get_dims(ncio, {"jm1", "im1"}));
+printf("BB3\n");
 
         // Separate Greenland from the rest
         if (greenland) {

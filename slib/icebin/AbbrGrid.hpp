@@ -38,7 +38,6 @@ namespace icebin {
 class Grid;
 
 struct AbbrGrid {
-    GridType type;
     ibmisc::clonable_unique_ptr<GridSpec> spec;
     GridCoordinates coordinates;
     GridParameterization parameterization;
@@ -60,15 +59,11 @@ struct AbbrGrid {
 
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
-    void operator=(Grid const &g);
-
     AbbrGrid() {}
-    explicit AbbrGrid(Grid const &g)
-        { operator=(g); }
+    explicit AbbrGrid(Grid const &g);
 
 
     AbbrGrid(
-        GridType _type,
         std::unique_ptr<GridSpec> &&_spec,
         GridCoordinates _coordinates,
         GridParameterization _parameterization,

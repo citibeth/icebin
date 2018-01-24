@@ -31,13 +31,13 @@ BOOST_ENUM_VALUES( GridParameterization, int,
 class GridSpec
 {
 public:
-    const GridType type;
+    GridType type;
 
     //GridSpec() : type(GridType::GENERIC) {}
     GridSpec(GridType _type) : type(_type) {}
     virtual ~GridSpec() {}
     virtual long ncells_full() const = 0;
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname) = 0;
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
     virtual std::unique_ptr<GridSpec> clone() const = 0;
 };
 // -------------------------------------------------------------------
@@ -155,7 +155,9 @@ struct HntrSpec {
     HntrSpec() : im(-1), jm(-1), offi(0.), dlat(0.) {}
     HntrSpec(int _im, int _jm, double _offi, double _dlat);
 
-    int size() const { im*jm; }
+    int size() const { return im*jm; }
+    int ndata() const { return size(); }    // Convention makes this more like regular ModelE grids
+
     bool is_set() const { return (im >= 0); }
 };
 

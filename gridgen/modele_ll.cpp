@@ -30,7 +30,7 @@
 #include <icebin/error.hpp>
 #include <icebin/gridgen/gridutil.hpp>
 #include <icebin/gridgen/GridGen_LonLat.hpp>
-#include <icebin/modele/GridGen_Hntr.hpp>
+#include <icebin/GridSpec.hpp>
 #include <icebin/modele/clippers.hpp>
 #include <icebin/modele/grids.hpp>
 
@@ -51,7 +51,7 @@ void tolower(std::string &data)
         *ii = std::tolower(*ii);
 }
 
-std::map<std::string, HntrGrid const *> grids_by_name {
+std::map<std::string, HntrSpec const *> grids_by_name {
     {"2mx2m", &g2mx2m},
     {"10mx10m", &g10mx10m},
     {"hxh", &ghxh},
@@ -109,25 +109,19 @@ int main(int argc, char **argv)
     HntrSpec const *hntr_spec = grids_by_name.at(sgrid);
 
     // -------------------------------------------------------------
-    bool pole_caps = vm["pole-caps"].as<bool>();
-    spec.points_in_side = (hntr_spec->im > IM1 ? 1 : 2);    // Use 2 for comparison with past experiments
-    GridSpec_LonLat spec(*hntr_spec, pole_caps, points_in_side, EQ_RAD);
+    bool const pole_caps = vm["pole-caps"].as<bool>();
+    bool const points_in_side = (hntr_spec->im > IM1 ? 1 : 2);    // Use 2 for comparison with past experiments
+    GridSpec_LonLat spec(make_grid_spec(
+        *hntr_spec, pole_caps, points_in_side, EQ_RAD));
 
-
-
-    spec.name = "modele_ll_" + szone + sgrid;
-
-    spec.spherical_clip = std::bind(&ice_sheet::clip, zone, _1, _2, _3, _4, _5);
-    
 
     // ------------ Make the grid from the spec
-    Grid grid(make_grid("modele_ll_" + szone + sgrid, 
-
-    Grid_LonLat grid;
-    spec.make_grid(grid);
+    std::string grid_name = "modele_ll_" + szone + sgrid;
+    auto spherical_clip(std::bind(&ice_sheet::clip, zone, _1, _2, _3, _4, _5));
+    Grid grid(make_grid(grid_name, spec, spherical_clip));
 
     // ------------- Write it out to NetCDF
-    ibmisc::NcIO ncio(spec.name + ".nc", netCDF::NcFile::replace);
+    ibmisc::NcIO ncio(grid_name + ".nc", netCDF::NcFile::replace);
     grid.ncio(ncio, "grid");
     ncio.close();
 }

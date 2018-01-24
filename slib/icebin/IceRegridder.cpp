@@ -99,9 +99,9 @@ void IceRegridder::init(
     AbbrGrid const &&_aexgrid,
     InterpStyle _interp_style)
 {
-    _name = (name != "" ? name : _fgridI.name);
     agridI = std::move(_agridI);    // convert Grid -> AbbrGrid
     aexgrid = std::move(_aexgrid);  // convert Grid -> AbbrGrid
+    _name = (name != "" ? name : agridI.name);
     interp_style = _interp_style;
 
     if (agridI.sproj == "") {
@@ -110,7 +110,7 @@ void IceRegridder::init(
     } else {
         // Use a projection
         gridA_proj_area.reference(blitz::Array<double,1>(agridA.dim.dense_extent()));
-        ibmisc::Proj_LL2XY proj(_fgridI.sproj);
+        ibmisc::Proj_LL2XY proj(agridI.sproj);
         for (auto cell=fgridA.cells.begin(); cell != fgridA.cells.end(); ++cell) {
             int const is = cell->index;    // sparse index
             int const id = agridA.dim.to_dense(is);

@@ -8,7 +8,6 @@ using namespace spsparse;
 namespace icebin {
 
 AbbrGrid::AbbrGrid(
-    GridType _type,
     std::unique_ptr<GridSpec> &&_spec,
     GridCoordinates _coordinates,
     GridParameterization _parameterization,
@@ -19,7 +18,7 @@ AbbrGrid::AbbrGrid(
     blitz::Array<int,2> const &_ijk,
     blitz::Array<double,1> const &_native_area,
     blitz::Array<double,2> const &_centroid_xy)
-: type(_type), spec(std::move(_spec)),
+: spec(std::move(_spec)),
 coordinates(_coordinates), parameterization(_parameterization),
 indexing(_indexing), name(_name), sproj(_sproj),
 dim(std::move(_dim)),
@@ -39,15 +38,15 @@ void AbbrGrid::clear()
 }
 
 
-void AbbrGrid::operator=(Grid const &g)
+/** Convert from Grid */
+AbbrGrid::AbbrGrid(Grid const &g) :
+    spec(g.spec),
+    coordinates(g.coordinates),
+    parameterization(g.parameterization),
+    indexing(g.indexing),
+    name(g.name),
+    sproj(g.sproj)
 {
-    spec = g.spec->clone();
-    coordinates = g.coordinates;
-    parameterization = g.parameterization;
-    indexing = g.indexing;
-    name = g.name;
-    sproj = g.sproj;
-
     // Allocate
     auto nd = g.ndata();
     ijk.reference(blitz::Array<int,2>(nd,3));
@@ -121,7 +120,6 @@ void AbbrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     ncio_grid_spec(ncio, spec, vname);
 
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
-    get_or_put_att_enum(info_v, ncio.rw, "type", type);
     get_or_put_att_enum(info_v, ncio.rw, "coordinates", coordinates);
     get_or_put_att_enum(info_v, ncio.rw, "parameterization", parameterization);
     get_or_put_att(info_v, ncio.rw, "name", name);

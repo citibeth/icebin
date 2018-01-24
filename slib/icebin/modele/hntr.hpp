@@ -35,8 +35,10 @@ public:
     /** Standardized description of indexing for ModelE grids */
     ibmisc::Indexing indexing;
 
-    int size() const { spec.size(); }
+#if 0
+    int size() const { return spec.size(); }
     int ndata() const { return size(); }    // Convention makes this more like regular ModelE grids
+#endif
 
     HntrGrid() {}
     HntrGrid(int _im, int _jm, double _offi, double _dlat);
@@ -44,13 +46,14 @@ public:
     HntrGrid(HntrGrid const &other);
     explicit HntrGrid(HntrSpec const &spec);
 
-    template<class TypeT>
-    blitz::Array<TypeT, 2> Array() const
-        { return blitz::Array<TypeT,2>(spec.im,spec.jm, blitz::fortranArray); }
-
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };
+
+template<class TypeT>
+blitz::Array<TypeT,2> hntr_array(HntrSpec const &spec)
+    { return blitz::Array<TypeT,2>(spec.im,spec.jm, blitz::fortranArray); }
+
 
 /** Pre-computed overlap details needed to regrid from one lat/lon
     grid to another on the sphere. */
@@ -341,7 +344,7 @@ blitz::Array<double,RANK> Hntr::regrid(
     blitz::Array<double,RANK> const &A,
     bool mean_polar) const
 {
-    blitz::Array<double,2> B(Bgrid.Array<double>());
+    blitz::Array<double,2> B(hntr_array<double>(Bgrid.spec));
     regrid(WTA, A, B, mean_polar);
     return B;
 }
