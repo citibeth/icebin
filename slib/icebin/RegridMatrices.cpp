@@ -24,7 +24,7 @@ struct UrAE {
     std::string name;    // For deugging
     const long nfull;
 
-    typedef std::function<void(MakeDenseEigenT::AccumT &)> matrix_fn;
+    typedef std::function<void(MakeDenseEigenT::AccumT &&)> matrix_fn;
 
     const matrix_fn GvAp;
     const matrix_fn sApvA;
@@ -198,8 +198,8 @@ std::unique_ptr<WeightedSparse> compute_IvAE(
 
         // Obtain the smoothing matrix (smoother.hpp)
         TupleListT<2> smoothI_t({dimI->dense_extent(), dimI->dense_extent()});
-        smoothing_matrix(smoothI_t, &*regridder->gridI,
-            *dimI, elevI, ret->wM, params.sigma);
+        smoothing_matrix(smoothI_t, regridder->agridI,
+            *dimI, *elevI, ret->wM, params.sigma);
         auto smoothI(to_eigen_sparsematrix(smoothI_t));
 
         // Smooth the underlying unsmoothed regridding transformation

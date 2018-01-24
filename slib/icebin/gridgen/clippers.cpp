@@ -69,7 +69,7 @@ double lon0, double lat0, double lon1, double lat1)
     return true;
 }
 
-bool SphericalClip::keep_all(
+bool SphericalClip::keep_all(long index,
 double lon0, double lat0, double lon1, double lat1)
     { return true; }
 

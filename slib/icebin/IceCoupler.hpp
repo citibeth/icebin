@@ -84,8 +84,8 @@ public:
     blitz::Array<char,1> maskI;      // 'O'=ocean, 'L'=land, 'I'=ice sheet
 public:
     std::string const &name() const { return _name; }
-    Grid const *gridI() { return ice_regridder->gridI.get(); }
-    long nI() const { return ice_regridder->gridI->ndata(); }
+    AbbrGrid const &agridI() { return ice_regridder->agridI; }
+    long nI() const { return ice_regridder->agridI.ndata(); }
 
     // ======================================================
 

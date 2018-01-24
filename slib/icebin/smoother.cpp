@@ -67,16 +67,17 @@ void Smoother::matrix(TupleListT<2> &ret)
 }
 // -----------------------------------------------------------
 void smoothing_matrix(TupleListT<2> &ret_d,
-    Grid const *gridX,
+    AbbrGrid const &agridX,
     SparseSetT const &dimX,
-    DenseArrayT<1> const *elev_s,
+    DenseArrayT<1> const &elev_s,
     DenseArrayT<1> const &area_d,
     std::array<double,3> const &sigma)
 {
     std::vector<Smoother::Tuple> tuples;
-    for (auto cell(gridX->cells.begin()); cell != gridX->cells.end(); ++cell) {
-        auto iX_s(cell->index);
-        if (!dimX.in_sparse(iX_s)) continue;
+
+    for (int id=0; id<agridX.dim.dense_extent(); ++id) {
+        auto iX_s(agridX.dim.to_sparse(id));
+        if (!dimX.in_sparse(iX_s)) continue;    // TODO: dimX and agridX.dim are probably the same
 
         auto iX_d(dimX.to_dense(iX_s));
 
@@ -84,14 +85,13 @@ void smoothing_matrix(TupleListT<2> &ret_d,
         if (area == 0.) (*icebin_error)(-1,
             "Area of cell %ld must be non-zero\n", iX_s);
 
-        double elev((*elev_s)(iX_s));
+        double elev(elev_s(iX_s));
         if (std::isnan(elev)) (*icebin_error)(-1,
             "Grid cell %ld cannot be masked out\n", iX_s);
 
-        Point const &centroid(gridX->centroid(*cell));
         tuples.push_back(
             Smoother::Tuple(iX_d,
-                centroid,
+                {agridX.centroid_xy(id,0), agridX.centroid_xy(id,1)},
                 elev, area));
     }
     Smoother smoother(std::move(tuples), sigma);

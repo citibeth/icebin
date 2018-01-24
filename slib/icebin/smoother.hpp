@@ -27,9 +27,9 @@ public:
         double area;
 
         Tuple(int _iX_d,
-            Point const _centroid, double z, double _area)
+            std::array<double,2> _centroid, double z, double _area)
         : iX_d(_iX_d),
-        centroid{_centroid.x, _centroid.y, z},
+        centroid{_centroid[0], _centroid[1], z},
         area(_area)
         {}
     };
@@ -101,9 +101,9 @@ public:
         different elevation classes.
 */
 extern void smoothing_matrix(TupleListT<2> &ret,
-    Grid const *gridX,
+    AbbrGrid const &agridX,
     SparseSetT const &dimX,
-    DenseArrayT<1> const *elev_s,
+    DenseArrayT<1> const &elev_s,
     DenseArrayT<1> const &area_d,
     std::array<double,3> const &sigma);
 

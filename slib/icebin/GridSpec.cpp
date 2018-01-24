@@ -64,7 +64,7 @@ points_in_side(_points_in_side), eq_rad(_eq_rad)
     }
 }
 // ---------------------------------------------------------
-GridSpec_LonLat make_grid_spec(HntrSpec &hntr, bool pole_caps, int points_in_side, double eq_rad)
+GridSpec_LonLat make_grid_spec(HntrSpec const &hntr, bool pole_caps, int points_in_side, double eq_rad)
 {
     if (hntr.im % 2 != 0) (*icebin_error)(-1,
         "IM must be even");
@@ -103,6 +103,15 @@ GridSpec_LonLat make_grid_spec(HntrSpec &hntr, bool pole_caps, int points_in_sid
         points_in_side,
         eq_rad, hntr);
     return spec;
+}
+// -----------------------------------------------------
+HntrSpec::HntrSpec(int _im, int _jm, double _offi, double _dlat)
+    : im(_im), jm(_jm), offi(_offi), dlat(_dlat)
+{
+    // Check for common error of degrees instead of minutes
+    // (this is heuristic)
+    if (dlat < .1 * (180.*60./jm)) (*icebin_error)(-1,
+        "dlat in HntrGrid(%d,%d,%f,%f) seems to small; it should be in MINUTES ,not DEGREES: %f", im,jm,offi,dlat, .1 * (180.*60./jm));
 }
 // -----------------------------------------------------
 void HntrSpec::ncio(ibmisc::NcIO &ncio, std::string const &vname)

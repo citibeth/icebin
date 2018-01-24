@@ -40,6 +40,7 @@ public:
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname) = 0;
     virtual std::unique_ptr<GridSpec> clone() const = 0;
 };
+// -------------------------------------------------------------------
 // ----------------------------------------------------
 struct GridSpec_Generic : public GridSpec {
     long _ncells_full;
@@ -130,7 +131,10 @@ struct HntrSpec {
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
     HntrSpec() : im(-1), jm(-1), offi(0.), dlat(0.) {}
-    bool is_set() { return (im >= 0); }
+    HntrSpec(int _im, int _jm, double _offi, double _dlat);
+
+    int size() const { im*jm; }
+    bool is_set() const { return (im >= 0); }
 };
 
 
@@ -210,7 +214,7 @@ struct GridSpec_LonLat : public GridSpec {
 };
 
 /** Make a GridSpec_LonLat form a HntrSpec */
-extern GridSpec_LonLat make_grid_spec(HntrSpec &hntr, bool pole_caps, int points_in_side, double eq_rad);
+extern GridSpec_LonLat make_grid_spec(HntrSpec const &hntr, bool pole_caps, int points_in_side, double eq_rad);
 
 extern void ncio_grid_spec(
     ibmisc::NcIO &ncio,

@@ -106,10 +106,10 @@ static double polar_graticule_area_exact(double eq_rad,
 @param spherical_clip Only realize grid cells that pass this test (before projection).
 @see EuclidianClip, SphericalClip
 */
-void Grid make_grid(
+Grid make_grid(
     std::string const &name,
     GridSpec_LonLat const &spec,
-    std::function<bool(Cell const &)> spherical_clip = &SphericalClip::keep_all)
+    std::function<bool(long, double,double,double,double)> spherical_clip = &SphericalClip::keep_all)
 {
     Indexing indexing({"lon", "lat"}, {0,0}, {spec.nlon(), spec.nlat()}, spec.indices);
 
@@ -227,6 +227,43 @@ void Grid make_grid(
         std::move(indexing),
         std::unique_ptr<GridSpec>(new GridSpec_LonLat(spec)),
         std::move(vertices), std::move(cells));
+}
+
+AbbrGrid make_abbr_grid(
+    std::string const &name,
+    GridSpec_LonLat const &spec,
+    spsparse::SparseSet<long,int> &&dim)    // Indices of gridcells we want to keep
+
+    // std::function<bool(Cell const &)> spherical_clip = &SphericalClip::keep_all)
+{
+    Indexing indexing({"lon", "lat"}, {0,0}, {spec.nlon(), spec.nlat()}, spec.indices);
+
+    int const N = dim.dense_extent();
+    blitz::Array<int,2> ijk(N,3);
+    blitz::Array<double,1> native_area(N);
+
+    // Pre-compute area of grid cells
+    blitz::Array<double,1> dxyp(spec.nlat());
+    for (int j=0; j<spec.nlat(); ++j) {
+        dxyp(j) = sin(spec.latb(j+1)) - sin(spec.latb(j));
+    }
+
+    double const D2R_R2 = D2R * spec.eq_rad * spec.eq_rad;
+    for (int id=0; id<dim.dense_extent(); ++id) {
+        long iI = dim.to_sparse();
+        int * const _ij = &ijk(id,0);
+        indexing.index_to_tuple(_ij, iI);    // Fills in ijk
+        native_area(id) = dxyp(_ij[1]) * (spec.lonb(i+1) - spec.lonb(i)) * D2R_R2;
+    }
+
+
+    return AbbrGrid(
+        GridType::LONLAT,
+        std::unique_ptr<GridSpec>(new GridSpec_LonLat(spec)),
+        GridCoordinates::LONLAT, GridParameterization::L0,
+        std::move(indexing), name, "",
+        std::move(dim), ijk, native_area,
+        blitz::Array<double,2>());
 }
 
 // ---------------------------------------------------------

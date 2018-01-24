@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <spsparse/netcdf.hpp>
 #include <icebin/GCMRegridder.hpp>
+#include <icebin/Grid.hpp>
 
 using namespace std;
 using namespace netCDF;
@@ -27,6 +28,9 @@ using namespace std::placeholders;  // for _1, _2, _3...
 using namespace spsparse;
 
 namespace icebin {
+
+GCMRegridder::~GCMRegridder() {}
+
 
 // ========================================================
 /** Determines correct indexing for the E grid.
@@ -51,14 +55,16 @@ ibmisc::Indexing const &indexingHC)    // iA,iHC
 }
 // -------------------------------------------------------------
 void GCMRegridder_Standard::init(
-    std::unique_ptr<Grid> &&_gridA,
+    AbbrGrid &&_agridA,
+//    std::unique_ptr<Grid> &&_gridA,
 //  ibmisc::Domain<int> &&_domainA,     // Tells us which cells in gridA to keep...
     std::vector<double> &&_hcdefs,  // [nhc]
     ibmisc::Indexing &&_indexingHC,
     bool _correctA)
 {
-    fgridA = std::move(_gridA);
-    agridA = AbbrGrid(*fgridA);
+    agridA = std::move(_agridA);
+//    fgridA = std::move(_gridA);
+//    agridA = AbbrGrid(*fgridA);
 //  domainA = std::move(_domainA);
     hcdefs = std::move(_hcdefs);
     indexingHC = std::move(_indexingHC);
@@ -67,36 +73,35 @@ void GCMRegridder_Standard::init(
     if (indexingHC.rank() != 2) (*icebin_error)(-1,
         "indexingHC has rank %d, it must have rank=2", indexingHC.rank());
 
-    indexingE = derive_indexingE(gridA->indexing, indexingHC);
+    indexingE = derive_indexingE(agridA.indexing, indexingHC);
 }
 // -------------------------------------------------------------
 
 // -------------------------------------------------------------
 // ==============================================================
-void GCMRegridder::ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full)
+void GCMRegridder::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
     (*icebin_error)(-1, "Not implemented");
 }
 // ==============================================================
 void GCMRegridder_Standard::clear()
 {
-    gridA.reset();
+    agridA.clear();
     hcdefs.clear();
     ice_regridders().index.clear();
     ice_regridders().clear();
 }
 // -------------------------------------------------------------
-void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
+void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
 {
     auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
 
     if (ncio.rw == 'r') {
         clear();
-        gridA = new_grid(ncio, vname + ".gridA");   // Instantiates but does not read/write
     }
 
     // Read/Write gridA and other global stuff
-    gridA->ncio(ncio, vname + ".gridA", rw_full);
+    agridA.ncio(ncio, vname + ".gridA");
     indexingHC.ncio(ncio, vname + ".indexingHC");
     ncio_vector(ncio, hcdefs, true, vname + ".hcdefs", "double",
         get_or_add_dims(ncio, {vname + ".nhc"}, {hcdefs.size()} ));
@@ -120,11 +125,11 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname, bool rw_f
         }
     }
     for (auto ice_regridder=ice_regridders().begin(); ice_regridder != ice_regridders().end(); ++ice_regridder) {
-        (*ice_regridder)->ncio(ncio, vname + "." + (*ice_regridder)->name(), rw_full);
+        (*ice_regridder)->ncio(ncio, vname + "." + (*ice_regridder)->name());
     }
 
 
-    indexingE = derive_indexingE(gridA->indexing, indexingHC);
+    indexingE = derive_indexingE(agridA.indexing, indexingHC);
 
 }
 // -------------------------------------------------------------
@@ -139,13 +144,13 @@ void GCMRegridder_Standard::filter_cellsA(std::function<bool(long)> const &keepA
         (*ice_regridder)->filter_cellsA(keepA);
     }
 
-    gridA->filter_cells(keepA);
+    agridA.filter_cells(keepA);
 }
 
 void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 {
     filter_cellsA(std::bind(&ibmisc::in_domain,
-        &domainA, &gridA->indexing, _1));
+        &domainA, &agridA.indexing, _1));
 }
 
 // ---------------------------------------------------------------------

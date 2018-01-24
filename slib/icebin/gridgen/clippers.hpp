@@ -63,7 +63,7 @@ public:
     @param lon1 Free parameter, not to be bound by bost::bind().
     @param lat0 Free parameter, not to be bound by bost::bind().
     @param lat1 Free parameter, not to be bound by bost::bind(). */
-    static bool keep_all(double lon0, double lat0, double lon1, double lat1);
+    static bool keep_all(long index, double lon0, double lat0, double lon1, double lat1);
 
 };
 

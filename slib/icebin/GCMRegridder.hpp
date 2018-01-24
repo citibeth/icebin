@@ -211,7 +211,7 @@ class GCMRegridder
 public:
     /** Only used when first creating a GCMRegridder (Cython).
     This field is not stored or loaded with ncio(). */
-    std::unique_ptr<Grid> fgridA;
+//    std::unique_ptr<Grid> fgridA;
 
     AbbrGrid agridA;
 
@@ -259,8 +259,7 @@ public:
     ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> const &ice_regridders() const
         { return *_ice_regridders; }
 
-    virtual ~GCMRegridder() {}
-
+    virtual ~GCMRegridder();
 
     /** @return Number of elevation points for grid cells in general */
     /** @return Number of elevation points for a given grid cell */
@@ -293,7 +292,7 @@ public:
                    are using MPI and this is not the root), then avoid reading
                    grid details, etc.
     */
-    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };
 
@@ -344,7 +343,8 @@ public:
     @param _indexingHC
         How to convert (iA, iHP) <--> (iE) */
     void init(
-        std::unique_ptr<Grid> &&_gridA,
+        AbbrGrid &&_agridA,
+//        std::unique_ptr<Grid> &&_gridA,
 //      ibmisc::Domain &&_domainA,     // Tells us which cells in gridA to keep...
         std::vector<double> &&_hcdefs,
         ibmisc::Indexing &&_indexingHC,
@@ -392,7 +392,7 @@ public:
         { return const_iterator(ice_regridders().cend()); }
 
     // -----------------------------------------
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname, bool rw_full=true);
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };  // class GCMRegridder_Standard
 // ===========================================================

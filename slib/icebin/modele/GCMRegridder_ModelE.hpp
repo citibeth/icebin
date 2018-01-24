@@ -135,7 +135,7 @@ public:
 };
 
 /** Casts to a Grid_Lonlat, which is what we know is used by ModelE */
-Grid_LonLat const *cast_Grid_LonLat(Grid const *_gridO);
+GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO);
 
 }}    // namespace
 #endif

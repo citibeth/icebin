@@ -1,7 +1,7 @@
 #include <spsparse/eigen.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/hntr.hpp>
-#include <icebin/modele/GridGen_Hntr.hpp>
+#include <icebin/gridgen/GridGen_LonLat.hpp>
 
 using namespace icebin;
 using namespace ibmisc;
@@ -48,12 +48,13 @@ NOTES:
    invert='-', which produces the inverse matrix of invet='+'.
 */
 static void scaled_AOmvAOp(
-    MakeDenseEigenT::AccumT &ret,        // {dimAOm, dimAOp}
+    MakeDenseEigenT::AccumT &&ret,        // {dimAOm, dimAOp}
     blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
     blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
     char invert = '+')
 {
-    SparseSetT &dimAOp(*ret.dim(1).sparse_set);
+//    SparseSetT &dimAOp(*ret.dim(1).sparse_set);
+    SparseSetT &dimAOp(*ret.sparse_sets[1]);
 
     // By looping over only things in IceBin ice sheet, we implicitly only
     // look at ice on ocean grid cells where both ModelE and IceBin have something.
@@ -102,15 +103,15 @@ static blitz::Array<double,1> dim_clip(SparseSetT const &dim)
 @see raw_EOvEA */
 class RawEOvEA {
 public:
-    MakeDenseEigenT::AccumT &ret;    // Final place for EOvEA
+    MakeDenseEigenT::AccumT ret;    // Final place for EOvEA
     GCMRegridder_ModelE const *gcmA;
     blitz::Array<double,1> const &wEO_d;
 
     RawEOvEA(
-        MakeDenseEigenT::AccumT &_ret,
+        MakeDenseEigenT::AccumT &&_ret,
         GCMRegridder_ModelE const *_gcmA,
         blitz::Array<double,1> const &_wEO_d)
-    : ret(_ret), gcmA(_gcmA), wEO_d(_wEO_d) {}
+    : ret(std::move(_ret)), gcmA(_gcmA), wEO_d(_wEO_d) {}
 
     /** Called by Hntr::matrix() (AvO) */
     void add(std::array<int,2> index, double value)
@@ -119,7 +120,7 @@ public:
         if (std::abs(value) < 1e-8) (*icebin_error)(-1,
             "Found a stray overlap; what should we do about it?");
 
-        SparseSetT &dimEO(*ret.dim(0).sparse_set);
+        SparseSetT &dimEO(*ret.sparse_sets[0]);
         long lAO_s = index[0];
         long lAA_s = index[1];
 
@@ -162,18 +163,20 @@ NOTES:
           EOvEA_corrected = EOvEA_raw * diag(sum(EOvEA,1,'-') .* wEA)
 */
 static void raw_EOvEA(
-    MakeDenseEigenT::AccumT &ret,        // {dimEA, dimEO}; dimEO should not change here.
-    std::array<HntrGrid const *, 2> hntrs,    // {hntrO, hntrA}
+    MakeDenseEigenT::AccumT &&ret,        // {dimEA, dimEO}; dimEO should not change here.
+    HntrSpec const &hntrO,
+    HntrSpec const &hntrA,
     double const eq_rad,
     SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> &wEO_d)            // == EOvI.wM.  Dense indexing.
 {
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
-    Hntr hntr_AOvAA(hntrs, 0);    // dimB=A,  dimA=O
-    RawEOvEA raw(ret, gcmA, wEO_d);
+    Hntr hntr_AOvAA(17.17, hntrO, hntrA, 0);    // dimB=A,  dimA=O
 
-    hntr_AOvAA.overlap<RawEOvEA, DimClip>(raw, eq_rad, DimClip(dimAO));
+    hntr_AOvAA.overlap<RawEOvEA, DimClip>(
+        RawEOvEA(std::move(ret), gcmA, wEO_d),
+        eq_rad, DimClip(dimAO));
 }
 
 
@@ -214,38 +217,33 @@ public:
 };
 
 
-Grid_LonLat const *cast_Grid_LonLat(Grid const *_gridO)
+GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO)
 {
-    // -------- Check types on gridO
-    Grid_LonLat const *gridO(dynamic_cast<Grid_LonLat const *>(_gridO));
-    if (!gridO) (*icebin_error)(-1,
+    // -------- Check types on specO
+    GridSpec_LonLat const *specO(dynamic_cast<GridSpec_LonLat const *>(&_specO));
+    if (!specO) (*icebin_error)(-1,
         "make_gridA() requires type Grid_LonLat");
 
-    if (gridO->north_pole != gridO->south_pole) (*icebin_error)(-1,
-        "north_pole=%d and south_pole=%d must match in gridO",
-        gridO->north_pole, gridO->south_pole);
+    if (specO->north_pole != specO->south_pole) (*icebin_error)(-1,
+        "north_pole=%d and south_pole=%d must match in specO",
+        specO->north_pole, specO->south_pole);
 
-    HntrGrid const *_hntrO(&*gridO->hntr);
-    if (!_hntrO) (*icebin_error)(-1,
-        "make_gridA() requires gridO have a Hntr source");
+    if (!specO->hntr.is_set()) (*icebin_error)(-1,
+        "make_gridA() requires specO have a Hntr source");
 
-    return gridO;
+    return *specO;
 }
 
 
-static HntrGrid const make_hntrA(Grid_LonLat const *gridO)
+static HntrSpec make_hntrA(HntrSpec const &hntrO)
 {
-    HntrGrid const &hntrO(*gridO->hntr);
-
     if ((hntrO.im % 2 != 0) || (hntrO.jm % 2 != 0)) (*icebin_error)(-1,
         "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
         hntrO.im, hntrO.jm);
 
     // --------------------------
     // Define Atmosphere grid to be exactly twice the Ocean grid
-    HntrGrid const hntrA(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
-
-    return hntrA;
+    return HntrSpec(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
 }
 
 
@@ -257,44 +255,33 @@ code on it.
     will happen if it was defined using GridGen_Hntr (or loaded from
     a NetCDF file generated that way).
 */
-static std::unique_ptr<Grid> make_gridA(Grid_LonLat const *gridO)
+static AbbrGrid make_agridA(
+    std::string const &name,
+    SparseSet<long,int> const &dimO,
+    HntrSpec const &hspecO,
+    double eq_rad)
 {
 
-    HntrGrid const &hntrO(*gridO->hntr);
-    HntrGrid const hntrA(make_hntrA(gridO));
-
-    // Determine set of used grid cells in gridO
-    SparseSetT dimO;
-    for (auto cell=gridO->cells.begin(); cell != gridO->cells.end(); ++cell) {
-        dimO.add_dense(cell->index);
-    }
+    HntrSpec const hspecA(make_hntrA(hspecO));
 
     // Use hntr to figure out which grid cells should be realized in A, based
     // on realized grid cells in O
-    SparseSetT dimA;
-    Hntr hntrOvA({&hntrO, &hntrA}, 0);
+    SparseSet<long,int> dimA;
+    Hntr hntrOvA(17.17, hspecO, hspecA, 0);
+    HntrGrid const &hgridA(hntrOvA.Bgrid);
+    AbbrGrid agridA;
+    hntrOvA.overlap(
+            accum::SparseSetAccum<SparseSetT,double,2>({nullptr, &dimA}),
+        1.0, DimClip(&dimO));
 
-    // blitz::Array<double,1> wtO(dim_clip(dimO));
+    GridSpec_LonLat specA(make_grid_spec(hspecA, false, 1, eq_rad));
+    return make_abbr_grid(name, specA, std::move(dimA));
+}
 
-    accum::SparseSetAccum<SparseSetT,double,2> acc({nullptr, &dimA});
-    hntrOvA.overlap(acc, 1.0, DimClip(&dimO));
-
-    // ------- Produce a full gridA, based on hntrA and realized cells in dimA
-    GridGen_Hntr spec(hntrA);
-    spec.name = gridO->name + "_A";
-    spec.pole_caps = gridO->north_pole;
-
-    // Keep cells listed in dimA
-    spec.spherical_clip = std::bind(&dim_clip_fn, &dimA, _1);
-    spec.points_in_side = 1;    // Keep it simple, we don't need this anyway
-    spec.eq_rad = gridO->eq_rad;
-
-    std::unique_ptr<Grid_LonLat> gridA(new Grid_LonLat);
-    spec.make_grid(*gridA);
-
-    std::unique_ptr<Grid> ret(gridA.release());
-
-    return ret;
+inline AbbrGrid make_agridA(AbbrGrid &agridO)
+{
+    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*agridO.spec));
+    return make_agridA(agridO.name, agridO.dim, specO.hntr, specO.eq_rad);
 }
 
 // ========================================================================
@@ -314,15 +301,15 @@ static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
 
 
     // Obtain hntrA and hntrO for process below.
-    Grid_LonLat const *_gcmO = cast_Grid_LonLat(&*gcmA->gcmO->gridA);
-    Grid_LonLat const *_gcmA = cast_Grid_LonLat(&*gcmA->gridA);
+    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec));
+    GridSpec_LonLat const &specA(cast_GridSpec_LonLat(*gcmA->agridA.spec));
 
-    Hntr hntr_XOmvXAm(std::array<HntrGrid const *,2>{&*_gcmO->hntr, &*_gcmA->hntr});
+    Hntr hntr_XOmvXAm(17.17, specO.hntr, specA.hntr);
 
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));    // conservative
     reset_ptr(ret->M, MakeDenseEigenT(
         std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
-            &hntr_XOmvXAm, _1, _gcmA->eq_rad, DimClip(&dimAOm)),
+            &hntr_XOmvXAm, _1, specA.eq_rad, DimClip(&dimAOm)),
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
         {&dimAOm, &dimAAm}, transpose).to_eigen());
 
@@ -413,10 +400,13 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
 
     // ------------- Compute wAAm and AAmvAOm
     // Obtain hntrA and hntrO for process below.
-    HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
-    HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
+    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
 
-    Hntr hntr_AOmvAAm(std::array<HntrGrid const *,2>{&hntrO, &hntrA});
+    if (!hntrA.is_set()) (*icebin_error)(-1, "hntrA must be set");
+    if (!hntrO.is_set()) (*icebin_error)(-1, "hntrO must be set");
+
+    Hntr hntr_AOmvAAm(17.17, hntrO, hntrA);
     EigenSparseMatrixT AAmvAOm(MakeDenseEigenT(
         std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
             &hntr_AOmvAAm, _1, eq_rad, DimClip(&dimAOm)),
@@ -444,7 +434,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     // ------------ Compute EOmvEAm
     EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
         std::bind(&raw_EOvEA, _1,
-            std::array<HntrGrid const *,2>{&hntrO, &hntrA},
+            hntrO, hntrA,
             eq_rad, &dimAOm, gcmA, wEOm),
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
         {&dimEOm, &dimEAm}, '.').to_eigen());
@@ -530,8 +520,8 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     SparseSetT &dimAOm(c1->dimAOm);
     EigenColVectorT &wAOm_e(c1->wAOm_e);
 
-    HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
-    HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
+    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
 
     dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
     dimIp.set_sparse_extent(rmO->ice_regridder->nI());
@@ -576,7 +566,7 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
-                std::array<HntrGrid const *,2>{&hntrO, &hntrA},
+                hntrO, hntrA,
                 eq_rad, &dimAOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
@@ -597,7 +587,7 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         SparseSetT &dimAAm(dimXAm);
 
         // Actually AOmvAAm
-        Hntr hntr_XOmvXAm(std::array<HntrGrid const *,2>{&hntrO, &hntrA});
+        Hntr hntr_XOmvXAm(17.17, hntrO, hntrA);
         reset_ptr(XAmvXOm, MakeDenseEigenT(
             std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
                 &hntr_XOmvXAm, _1, eq_rad, DimClip(&dimAOm)),
@@ -731,18 +721,19 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     std::shared_ptr<icebin::GCMRegridder> const &_gcmO)
     :  gcmO(_gcmO)
 {
+    // Initialize superclass member
+    agridA = gcmO->agridA;
+
     _ice_regridders = &gcmO->ice_regridders();
 
-    // Initialize baseclass members
-    gridA = make_gridA(cast_Grid_LonLat(&*gcmO->gridA));
     correctA = gcmO->correctA;    // Not used
     hcdefs = gcmO->hcdefs;
     indexingHC = Indexing(
         {"O", "HC"},
         {0L, 0L},
-        {gridA->ndata(), gcmO->indexingHC[1].extent},
+        {agridA.ndata(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
-    indexingE = derive_indexingE(gridA->indexing, indexingHC);
+    indexingE = derive_indexingE(agridA.indexing, indexingHC);
 
     auto const nO = gcmO->nA();
     foceanAOp.reference(blitz::Array<double,1>(nO));
@@ -753,7 +744,8 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 RegridMatrices GCMRegridder_ModelE::regrid_matrices(
     int sheet_index, blitz::Array<double,1> const &elevI) const
 {
-    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
+//    AbbrGrid const &gridO(gcmO->agridA);
+    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
 
     // Delicate construction of rmO
     RegridMatrices _rmO(gcmO->regrid_matrices(sheet_index, elevI));
@@ -761,36 +753,36 @@ RegridMatrices GCMRegridder_ModelE::regrid_matrices(
     RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(std::move(_rmO)));
 
     rm.add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'E', gridO->eq_rad, &rmO));
+        this, 'E', specO.eq_rad, &rmO));
     rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'A', gridO->eq_rad, &rmO));
+        this, 'A', specO.eq_rad, &rmO));
 
 
     rm.add_regrid("AAmvEAm", std::bind(*compute_AAmvEAm, _1, _2,
-        this, gridO->eq_rad, &rmO));
+        this, specO.eq_rad, &rmO));
 
 
     rm.add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'E', gridO->eq_rad, &rmO));
+        this, 'E', specO.eq_rad, &rmO));
     rm.add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'A', gridO->eq_rad, &rmO));
+        this, 'A', specO.eq_rad, &rmO));
 
 
     // --------------- Simply-named aliases
     rm.add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'E', gridO->eq_rad, &rmO));
+        this, 'E', specO.eq_rad, &rmO));
     rm.add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'A', gridO->eq_rad, &rmO));
+        this, 'A', specO.eq_rad, &rmO));
 
 
     rm.add_regrid("AvE", std::bind(*compute_AAmvEAm, _1, _2,
-        this, gridO->eq_rad, &rmO));
+        this, specO.eq_rad, &rmO));
 
 
     rm.add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'E', gridO->eq_rad, &rmO));
+        this, 'E', specO.eq_rad, &rmO));
     rm.add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'A', gridO->eq_rad, &rmO));
+        this, 'A', specO.eq_rad, &rmO));
 
 
 

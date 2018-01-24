@@ -34,7 +34,6 @@ import warnings
 cdef class IceRegridder:
     pass
 
-
 cdef split_shape(ashape, alen):
     # See if we can find some set of dimensions matching ilen
     cumlen = np.cumprod(tuple(reversed(ashape)))
@@ -124,6 +123,7 @@ cdef class RegridMatrices:
 
 cdef class GCMRegridder:
     cdef cibmisc.shared_ptr[cicebin.GCMRegridder] cself
+    cdef cibmisc.unique_ptr[cicebin.Grid] fgridA
 
     def __init__(self, *args):
         cdef ibmisc.NcIO ncio
@@ -131,8 +131,8 @@ cdef class GCMRegridder:
         # Create a brand new GCMRegridder
         if len(args) == 4:
             gridA_fname, gridA_vname, hcdefs, correctA = args
-            self.cself = cicebin.new_GCMRegridder_Standard(
-                gridA_fname.encode(), gridA_vname.encode(), hcdefs, correctA)
+            self.fgridA = read_fgrid(gridA_fname.encode(), gridA_vname.encode())
+            self.cself = cicebin.new_GCMRegridder_Standard(*self.fgridA.get(), hcdefs, correctA)
         elif len(args) == 1:
             self.cself.reset(new cicebin.GCMRegridder_Standard())
             (regridder_fname,) = args

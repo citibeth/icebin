@@ -24,13 +24,15 @@
 #include <ibmisc/string.hpp>
 #include <ibmisc/f90blitz.hpp>
 #include <ibmisc/math.hpp>
-#include <spsparse/eigen.hpp>
-#include <spsparse/SparseSet.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/domain_splitter.hpp>
 #include <boost/filesystem.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
+#include <icebin/modele/hntr.hpp>
+#include <spsparse/accum.hpp>
+#include <spsparse/eigen.hpp>
+#include <spsparse/SparseSet.hpp>
 
 // See here to serialize objects with non-default constructor
 //    http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
@@ -122,8 +124,9 @@ void GCMCoupler_ModelE::_ncread(
     gcm_regridder.reset(gcmA);
 
     // Allocate foceanOm0
-    Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmA->gcmO->gridA);
-    foceanOm0.reference(blitz::Array<double,2>(gridO->nlat(), gridO->nlon()));
+//    Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmA->gcmO->gridA);
+    GridSpec_LonLat *specO = dynamic_cast<GridSpec_LonLat *>(&*gcmA->gcmO->agridA.spec);
+    foceanOm0.reference(blitz::Array<double,2>(specO->nlat(), specO->nlon()));
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()
@@ -434,7 +437,7 @@ bool run_ice)    // if false, only initialize
     VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());
     std::vector<double> val(self->gcm_outputsE.size());    // Temporary
 
-    auto &indexingA(self->gcm_regridder->gridA->indexing);
+    auto &indexingA(self->gcm_regridder->agridA.indexing);
 
     // domain uses alphabetical order, 0-based indexing...
     const auto base_hc(self->gcm_params.icebin_base_hc);
@@ -650,16 +653,17 @@ blitz::Array<char,1> &changedO)    // OUT
 
         // Interpolate into foceanOp_s
         IceRegridder *iceO = &*gcmO->ice_regridders()[sheet_index];
-        ibmisc::Proj_LL2XY proj(iceO->gridI->sproj);
+        ibmisc::Proj_LL2XY proj(iceO->agridI.sproj);
 
-        Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmO->gridA);
+        GridSpec_LonLat const *gridO = dynamic_cast<GridSpec_LonLat *>(&*gcmO->agridA.spec);
         for (int iO_d=0; iO_d<fcontOp_d.extent(0); ++iO_d) {
+
+
 
             // fcont will be 0 or 1; must multiply by fraction of gridcell covered by continent.
             auto const iO_s = dimO.to_sparse(iO_d);
-            auto ijO(gcmO->gridA->indexing.index_to_tuple<int,2>(iO_s));
-            int const jO(ijO[1]);
-            double const area = gridO->cells.at(iO_s)->proj_area(&proj);
+            // double const area = gridO->cells.at(iO_s)->proj_area(&proj);
+            double const area = iceO->gridA_proj_area(iO_d);
 
             foceanOp(iO_s) = foceanOp(iO_s) - round_mantissa(fcontOp_d(iO_d) / area, 12);
             changedO(iO_s) = 1;    // true
@@ -846,17 +850,17 @@ void update_topo(
 
     // ----------------------------------------------
     // Eliminate single-cell oceans
-    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
-    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
+    auto shapeO(blitz::shape(specO.nlat(), specO.nlon()));
     auto foceanOm2(reshape<double,1,2>(foceanOm, shapeO));
 
-    auto const im(gridO->nlon());
-    auto const jm(gridO->nlat());
+    auto const im(specO.nlon());
+    auto const jm(specO.nlat());
     // Avoid edges, where indexing is more complex (and we don't need to correct anyway)
     std::array<int,2> ijO{1,1};
     for (ijO[1]=1; ijO[1]<jm-1; ++ijO[1]) {
     for (ijO[0]=1; ijO[0]<im-1; ++ijO[0]) {
-        int iO(gcmO->gridA->indexing.tuple_to_index(ijO));
+        int iO(gcmO->agridA.indexing.tuple_to_index(ijO));
         auto const i(ijO[0]);
         auto const j(ijO[1]);
 
@@ -883,14 +887,14 @@ void update_topo(
 // Debugging NetCDF file
 {NcIO ncio("y.nc", 'w');
 
-    Grid_LonLat const *gridA(cast_Grid_LonLat(&*gcmA->gridA));
-    auto shapeA(blitz::shape(gridA->nlat(), gridA->nlon()));
-    Grid_LonLat const *gridO(cast_Grid_LonLat(&*gcmO->gridA));
-    auto shapeO(blitz::shape(gridO->nlat(), gridO->nlon()));
+    GridSpec_LonLat const &specA(cast_GridSpec_LonLat(*gcmA->agridA.spec));
+    auto shapeA(blitz::shape(specA.nlat(), specA.nlon()));
+    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
+    auto shapeO(blitz::shape(specO.nlat(), specO.nlon()));
 
     // (IM, IM)
-    auto dimsO(get_or_add_dims(ncio, {"jmO", "imO"}, {gridO->nlat(), gridO->nlon()}));
-    auto dimsA(get_or_add_dims(ncio, {"jmA", "imA"}, {gridA->nlat(), gridA->nlon()}));
+    auto dimsO(get_or_add_dims(ncio, {"jmO", "imO"}, {specO.nlat(), specO.nlon()}));
+    auto dimsA(get_or_add_dims(ncio, {"jmA", "imA"}, {specA.nlat(), specA.nlon()}));
 
     auto foceanOp2(reshape<double,1,2>(foceanOp, shapeO));
     ncio_blitz(ncio, foceanOp2, false, "foceanOp", dimsO);
@@ -908,12 +912,12 @@ void update_topo(
 
     // =====================================================
     // Regrid TOPO to Atmosphere grid
-    HntrGrid const &hntrA(*cast_Grid_LonLat(&*gcmA->gridA)->hntr);
-    HntrGrid const &hntrO(*cast_Grid_LonLat(&*gcmA->gcmO->gridA)->hntr);
-    Hntr hntrAvO({&hntrA, &hntrO});
+    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
+    Hntr hntrAvO(17.17, hntrA, hntrO);
 
     TupleListT<2> AvO_tp;
-    hntrAvO.scaled_regrid_matrix(AvO_tp);
+    hntrAvO.scaled_regrid_matrix(spsparse::accum::ref(AvO_tp));
     EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
     AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
 

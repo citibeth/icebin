@@ -10,58 +10,56 @@ namespace icebin {
 namespace modele {
 
 HntrGrid::HntrGrid(HntrGrid const &other)
-    : im(other.im), jm(other.jm), offi(other.offi), dlat(other.dlat),
-    _dxyp(blitz::Range(other._dxyp.lbound(0), other._dxyp.ubound(0)))
+    : spec(other.spec),
+    dxyp(blitz::Range(other.dxyp.lbound(0), other.dxyp.ubound(0)))
 {
-    _dxyp = other._dxyp;
+    dxyp = other.dxyp;
 }
 
-HntrGrid::HntrGrid(int _im, int _jm, double _offi, double _dlat) :
-    HntrSpec(_im, _jm, _offi, _dlat)
 
+HntrGrid::HntrGrid(HntrSpec const &_spec) :
+    spec(_spec)
 {
     init();
 }
 
+
 void HntrGrid::init()
 {
-    _dxyp.reference(blitz::Array<double,1>(blitz::Range(1,jm)));
+    auto const jm(spec.jm);
 
-    // Check for common error of degrees instead of minutes
-    // (this is heuristic)
-    if (dlat < .1 * (180.*60./jm)) (*icebin_error)(-1,
-        "dlat in HntrGrid(%d,%d,%f,%f) seems to small; it should be in MINUTES ,not DEGREES: %f", im,jm,offi,dlat, .1 * (180.*60./jm));
+    dxyp.reference(blitz::Array<double,1>(blitz::Range(1,jm)));
 
     // Calculate the sperical area of grid cells
-    double dLON = (2.*M_PI) / im;
+    double dLON = (2.*M_PI) / spec.im;
     double dLAT = M_PI / jm;
-    for (int j=1; j<=jm; ++j) {
+    for (int j=1; j<=spec.jm; ++j) {
         double SINS = sin(dLAT*(j-jm/2-1));
         double SINN = sin(dLAT*(j-jm/2));
-        _dxyp(j) = dLON * (SINN - SINS);
+        dxyp(j) = dLON * (SINN - SINS);
     }
 }
 
 void HntrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
-    HntrSpec::ncio(ncio, vname);
+    spec.ncio(ncio, vname);
     init();
 }
 
 // =============================================================
 
-Hntr::Hntr(HntrGrid const &_Agrid, HntrGrid const &_Bgrid, double _DATMIS)
-    : Agrid(_Agrid), Bgrid(_Bgrid),
-      SINA(Range(0, Agrid.jm)),
-      SINB(Range(0, Bgrid.jm)),
-      FMIN(Range(1, Bgrid.im)),
-      FMAX(Range(1, Bgrid.im)),
-      IMIN(Range(1, Bgrid.im)),
-      IMAX(Range(1, Bgrid.im)),
-      GMIN(Range(1, Bgrid.jm)),
-      GMAX(Range(1, Bgrid.jm)),
-      JMIN(Range(1, Bgrid.jm)),
-      JMAX(Range(1, Bgrid.jm)),
+Hntr::Hntr(double yp17, HntrSpec const &_Bgrid, HntrSpec const &_Agrid, double _DATMIS)
+    : Agrid(HntrGrid(_Agrid)), Bgrid(HntrGrid(_Bgrid)),
+      SINA(Range(0, Agrid.spec.jm)),
+      SINB(Range(0, Bgrid.spec.jm)),
+      FMIN(Range(1, Bgrid.spec.im)),
+      FMAX(Range(1, Bgrid.spec.im)),
+      IMIN(Range(1, Bgrid.spec.im)),
+      IMAX(Range(1, Bgrid.spec.im)),
+      GMIN(Range(1, Bgrid.spec.jm)),
+      GMAX(Range(1, Bgrid.spec.jm)),
+      JMIN(Range(1, Bgrid.spec.jm)),
+      JMAX(Range(1, Bgrid.spec.jm)),
       DATMIS(_DATMIS)
 {
 
@@ -70,15 +68,15 @@ Hntr::Hntr(HntrGrid const &_Agrid, HntrGrid const &_Bgrid, double _DATMIS)
 }
 
 // Partitions in east-west (I) direction
-// Domain, around the globe, is scaled to fit from 0 to IMA*Bgrid.im
+// Domain, around the globe, is scaled to fit from 0 to IMA*Bgrid.spec.im
 void Hntr::partition_east_west()
 {
-    double DIA = Bgrid.im;  //  width of single A grid cell in scaled domain
+    double DIA = Bgrid.spec.im;  //  width of single A grid cell in scaled domain
     int IA = 1;
-    double RIA = (IA+Agrid.offi - Agrid.im)*Bgrid.im;  //  scaled longitude of eastern edge
-    int IB  = Bgrid.im;
-    for (int IBp1=1; IBp1 <= Bgrid.im; ++IBp1) {
-        double RIB = (IBp1-1+Bgrid.offi)*Agrid.im;    //  scaled longitude of eastern edge
+    double RIA = (IA+Agrid.spec.offi - Agrid.spec.im)*Bgrid.spec.im;  //  scaled longitude of eastern edge
+    int IB  = Bgrid.spec.im;
+    for (int IBp1=1; IBp1 <= Bgrid.spec.im; ++IBp1) {
+        double RIB = (IBp1-1+Bgrid.spec.offi)*Agrid.spec.im;    //  scaled longitude of eastern edge
         while (RIA < RIB) {
             IA  += 1;
             RIA += DIA;
@@ -101,7 +99,7 @@ void Hntr::partition_east_west()
         }
         IB = IBp1;
     }
-    IMAX(Bgrid.im) += Agrid.im;
+    IMAX(Bgrid.spec.im) += Agrid.spec.im;
 }
 
 
@@ -113,28 +111,28 @@ void Hntr::partition_north_south()
     // ------------------------------------------------
     // Partitions in the north-south (J) direction
     // Domain is measured in minutes (1/60-th of a degree)
-    double FJEQA = .5*(1+Agrid.jm);
-    for (int JA=1; JA <= Agrid.jm-1; ++JA) {
-        double RJA = (JA + .5-FJEQA) * Agrid.dlat;  //  latitude in minutes of northern edge
+    double FJEQA = .5*(1+Agrid.spec.jm);
+    for (int JA=1; JA <= Agrid.spec.jm-1; ++JA) {
+        double RJA = (JA + .5-FJEQA) * Agrid.spec.dlat;  //  latitude in minutes of northern edge
         SINA(JA) = sin(RJA * MIN_TO_RAD);
     }
     SINA(0) = -1;
-    SINA(Agrid.jm)=  1;
+    SINA(Agrid.spec.jm)=  1;
 
     // -----------
-    double FJEQB = .5*(1+Bgrid.jm);
-    for (int JB=1; JB <= Bgrid.jm-1; ++JB) {
-        double RJB = (JB+.5-FJEQB)*Bgrid.dlat;  //  latitude in minutes of northern edge
+    double FJEQB = .5*(1+Bgrid.spec.jm);
+    for (int JB=1; JB <= Bgrid.spec.jm-1; ++JB) {
+        double RJB = (JB+.5-FJEQB)*Bgrid.spec.dlat;  //  latitude in minutes of northern edge
         SINB(JB) = sin(RJB * MIN_TO_RAD);
     }
     SINB(0) = -1;
-    SINB(Bgrid.jm) = 1;
+    SINB(Bgrid.spec.jm) = 1;
 
     // -----------
     JMIN(1) = 1;
     GMIN(1) = 0;
     int JA = 1;
-    for (int JB=1; JB <= Bgrid.jm-1; ++JB) {
+    for (int JB=1; JB <= Bgrid.spec.jm-1; ++JB) {
         while (SINA(JA) < SINB(JB)) ++JA;
 
         if (SINA(JA) == SINB(JB)) {
@@ -152,8 +150,8 @@ void Hntr::partition_north_south()
             GMIN(JB+1) = SINB(JB) - SINA(JA-1);
         }
     }
-    JMAX(Bgrid.jm) = Agrid.jm;
-    GMAX(Bgrid.jm) = 0;
+    JMAX(Bgrid.spec.jm) = Agrid.spec.jm;
+    GMAX(Bgrid.spec.jm) = 0;
 
 }
 
@@ -176,12 +174,12 @@ void Hntr::regrid1(
     // ------------------
     // Interpolate the A grid onto the B grid
 
-    for (int JB=1; JB <= Bgrid.jm; ++JB) {
+    for (int JB=1; JB <= Bgrid.spec.jm; ++JB) {
         int JAMIN = JMIN(JB);
         int JAMAX = JMAX(JB);
 
-        for (int IB=1; IB <= Bgrid.im; ++IB) {
-            int const IJB = IB + Bgrid.im * (JB-1);
+        for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
+            int const IJB = IB + Bgrid.spec.im * (JB-1);
             double WEIGHT= 0;
             double VALUE = 0;
             int const IAMIN = IMIN(IB);
@@ -192,8 +190,8 @@ void Hntr::regrid1(
                 if (JA==JAMAX) G -= GMAX(JB);
 
                 for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
-                    int const IA  = 1 + ((IAREV-1) % Agrid.im);
-                    int const IJA = IA + Agrid.im * (JA-1);
+                    int const IA  = 1 + ((IAREV-1) % Agrid.spec.im);
+                    int const IJA = IA + Agrid.spec.im * (JA-1);
                     double F = 1;
                     if (IAREV==IAMIN) F -= FMIN(IB);
                     if (IAREV==IAMAX) F -= FMAX(IB);
@@ -209,22 +207,22 @@ void Hntr::regrid1(
 
     if (mean_polar) {
         // Replace individual values near the poles by longitudinal mean
-        for (int JB=1; JB <= Bgrid.jm; JB += Bgrid.jm-1) {
+        for (int JB=1; JB <= Bgrid.spec.jm; JB += Bgrid.spec.jm-1) {
             double BMEAN  = DATMIS;
             double WEIGHT = 0;
             double VALUE  = 0;
             for (int IB=1; ; ++IB) {
-                if (IB > Bgrid.im) {
+                if (IB > Bgrid.spec.im) {
                     if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
                     break;
                 }
-                int IJB = IB + Bgrid.im * (JB-1);
+                int IJB = IB + Bgrid.spec.im * (JB-1);
                 if (B(IJB) == DATMIS) break;
                 WEIGHT += 1;
                 VALUE  += B(IJB);
             }
-            for (int IB=1; IB <= Bgrid.im; ++IB) {
-                int IJB = IB + Bgrid.im * (JB-1);
+            for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
+                int IJB = IB + Bgrid.spec.im * (JB-1);
                 B(IJB) = BMEAN;
             }
         }
@@ -238,22 +236,22 @@ void Hntr::mean_polar_matrix()
 {
     if (mean_polar) {
         // Replace individual values near the poles by longitudinal mean
-        for (int JB=1; JB <= Bgrid.jm; JB += Bgrid.jm-1) {
+        for (int JB=1; JB <= Bgrid.spec.jm; JB += Bgrid.spec.jm-1) {
             double BMEAN  = DATMIS;
             double WEIGHT = 0;
             double VALUE  = 0;
             for (int IB=1; ; ++IB) {
-                if (IB > Bgrid.im) {
+                if (IB > Bgrid.spec.im) {
                     if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
                     break;
                 }
-                int IJB = IB + Bgrid.im * (JB-1);
+                int IJB = IB + Bgrid.spec.im * (JB-1);
                 if (B(IJB) == DATMIS) break;
                 WEIGHT += 1;
                 VALUE  += B(IJB);
             }
-            for (int IB=1; IB <= Bgrid.im; ++IB) {
-                int IJB = IB + Bgrid.im * (JB-1);
+            for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
+                int IJB = IB + Bgrid.spec.im * (JB-1);
                 B(IJB) = BMEAN;
             }
         }

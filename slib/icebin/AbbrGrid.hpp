@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <functional>
 
+#include <ibmisc/memory.hpp>
 #include <ibmisc/enum.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/iter.hpp>
@@ -38,7 +39,7 @@ class Grid;
 
 struct AbbrGrid {
     GridType type;
-    std::unique_ptr<GridSpec> spec;
+    ibmisc::clonable_unique_ptr<GridSpec> spec;
     GridCoordinates coordinates;
     GridParameterization parameterization;
     ibmisc::Indexing indexing;
@@ -51,7 +52,9 @@ struct AbbrGrid {
     blitz::Array<int,2> ijk;    // ijk(index, ijk)
     blitz::Array<double,1> native_area;    // dense indexing
     // blitz::Array<double,1> proj_area;
-    blitz::Array<double,2> centroid;    // centroid(index, xy)
+
+    // Only set if coordinates == GridCoordinates::XY
+    blitz::Array<double,2> centroid_xy;    // centroid(index, xy)
 
     size_t ndata() const { return dim.sparse_extent(); }
 
@@ -63,6 +66,22 @@ struct AbbrGrid {
     explicit AbbrGrid(Grid const &g)
         { operator=(g); }
 
+
+    AbbrGrid(
+        GridType _type,
+        std::unique_ptr<GridSpec> &&_spec,
+        GridCoordinates _coordinates,
+        GridParameterization _parameterization,
+        ibmisc::Indexing _indexing,
+        std::string const &_name,
+        std::string const &_sproj,
+        spsparse::SparseSet<long,int> &&_dim,
+        blitz::Array<int,2> const &_ijk,
+        blitz::Array<double,1> const &_native_area,
+        blitz::Array<double,2> const &_centroid_xy);
+
+
+    void clear();
 
     void filter_cells(std::function<bool(long)> const &keep_fn);
 

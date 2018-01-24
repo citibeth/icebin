@@ -54,7 +54,7 @@ namespace gpism {
 
 class IceCoupler_PISM : public IceCoupler
 {
-    icebin::Grid_XY const *icebin_gridI;
+    icebin::GridSpec_XY const *icebin_specI;
     MPI_Comm pism_comm;         // Commnicator used by ice model
     PetscMPIInt _pism_rank, _pism_size;
     const int pism_root = 0;

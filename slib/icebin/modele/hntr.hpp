@@ -11,8 +11,9 @@ namespace modele {
 
 
 
-class HntrGrid : public HntrSpec {
+class HntrGrid {
 public:
+    HntrSpec spec;
 //    int im;    // Number of cells in east-west direction
 //    int jm;    // Number of cells in north-south direction
 
@@ -34,17 +35,18 @@ public:
     /** Standardized description of indexing for ModelE grids */
     ibmisc::Indexing indexing;
 
-    int size() const { return im * jm; }
+    int size() const { spec.size(); }
     int ndata() const { return size(); }    // Convention makes this more like regular ModelE grids
 
     HntrGrid() {}
     HntrGrid(int _im, int _jm, double _offi, double _dlat);
 
     HntrGrid(HntrGrid const &other);
+    explicit HntrGrid(HntrSpec const &spec);
 
     template<class TypeT>
     blitz::Array<TypeT, 2> Array() const
-        { return blitz::Array<TypeT,2>(im,jm, blitz::fortranArray); }
+        { return blitz::Array<TypeT,2>(spec.im,spec.jm, blitz::fortranArray); }
 
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
@@ -80,12 +82,18 @@ public:
     double DATMIS;
 
 public:
+
+
     /** Initialize overlap data structures, get ready to re-grid.
     TODO: Reference, don't copy, these HntrGrid instances. */
-    Hntr(HntrGrid const &_A, HntrGrid const &_B, double _DATMIS);
+//    Hntr(HntrGrid const &_A, HntrGrid const &_B, double _DATMIS);
 
-    Hntr(std::array<HntrGrid const *,2> grids, double _DATMIS = 0)
-        : Hntr(*grids[1], *grids[0], _DATMIS) {}
+//    Hntr(std::array<HntrGrid const *,2> grids, double _DATMIS = 0)
+//        : Hntr(*grids[1], *grids[0], _DATMIS) {}
+
+    Hntr(double yp17, HntrSpec const &_B, HntrSpec const &_A, double _DATMIS=0.0);
+
+
 
 
     /**
@@ -169,7 +177,7 @@ public:
     Equivalent to running overlap() and then scaling. */
     template<class AccumT, class IncludeT = IncludeConst<int,true>>
     void scaled_regrid_matrix(
-        AccumT &accum,        // The output (sparse) matrix; 0-based indexing
+        AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
         IncludeT includeB = IncludeT());
 };    // class Hntr
 
@@ -181,13 +189,13 @@ void Hntr::matrix(
 {
     // ------------------
     // Interpolate the A grid onto the B grid
-    for (int JB=1; JB <= Bgrid.jm; ++JB) {
+    for (int JB=1; JB <= Bgrid.spec.jm; ++JB) {
         int JAMIN = JMIN(JB);
         int JAMAX = JMAX(JB);
 
 
-        for (int IB=1; IB <= Bgrid.im; ++IB) {
-            int const IJB = IB + Bgrid.im * (JB-1);
+        for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
+            int const IJB = IB + Bgrid.spec.im * (JB-1);
             if (!includeB(IJB-1)) continue;
 
             mataccum.clear();
@@ -201,8 +209,8 @@ void Hntr::matrix(
                 if (JA==JAMAX) G -= GMAX(JB);
 
                 for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
-                    int const IA  = 1 + ((IAREV-1) % Agrid.im);
-                    int const IJA = IA + Agrid.im * (JA-1);
+                    int const IA  = 1 + ((IAREV-1) % Agrid.spec.im);
+                    int const IJA = IA + Agrid.spec.im * (JA-1);
 
                     double F = 1;
                     if (IAREV==IAMIN) F -= FMIN(IB);
@@ -228,7 +236,7 @@ class OverlapMatAccum {
     double WEIGHT;
 
 public:
-    OverlapMatAccum(AccumT &_accum, HntrGrid const &_Bgrid, double _R2) : accum(_accum), Bgrid(_Bgrid), R2(_R2) {}
+    OverlapMatAccum(AccumT &&_accum, HntrGrid const &_Bgrid, double _R2) : accum(_accum), Bgrid(_Bgrid), R2(_R2) {}
 
     void clear()
     {
@@ -261,12 +269,12 @@ void Hntr::overlap(
     double const eq_rad,        // Radius of the Earth
     IncludeT includeB)
 {
-    matrix(OverlapMatAccum<AccumT>(accum, Bgrid, eq_rad*eq_rad), includeB);
+    matrix(OverlapMatAccum<AccumT>(std::move(accum), Bgrid, eq_rad*eq_rad), includeB);
 }
 // ----------------------------------------------------------
 template<class AccumT>
 class ScaledRegridMatAccum {
-    AccumT &accum;
+    AccumT accum;
     HntrGrid const &Agrid;
 
     // Buffer for unscaled matrix elements for a single B gridcell
@@ -274,7 +282,7 @@ class ScaledRegridMatAccum {
     double WEIGHT;
 
 public:
-    ScaledRegridMatAccum(AccumT &_accum, HntrGrid const &_Agrid) : accum(_accum), Agrid(_Agrid) {}
+    ScaledRegridMatAccum(AccumT &&_accum, HntrGrid const &_Agrid) : accum(std::move(_accum)), Agrid(_Agrid) {}
 
     void clear()
     {
@@ -302,10 +310,12 @@ public:
 
 template<class AccumT, class IncludeT>
 void Hntr::scaled_regrid_matrix(
-    AccumT &accum,        // The output (sparse) matrix; 0-based indexing
+    AccumT &&accum,        // The output (sparse) matrix; 0-based indexing
     IncludeT includeB)
 {
-    matrix(ScaledRegridMatAccum<AccumT>(accum, Agrid), includeB);
+    matrix(
+        ScaledRegridMatAccum<AccumT>(std::move(accum), Agrid),
+        std::move(includeB));
 }
 // ---------------------------------------------------
 
@@ -345,9 +355,6 @@ public:
     bool operator()(int ix) const
         { return dim->in_sparse(ix); }
 };
-
-/** Convert HntrSpec to a GridSpec used to describe IceBin grids */
-extern GridSpec_LonLat make_grid_spec(HntrSpec &hntr, int points_in_side, double eq_rad);
 
 
 }}

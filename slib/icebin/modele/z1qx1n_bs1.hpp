@@ -268,10 +268,10 @@ struct Etopo1Ice {
     // Outputs of Etopo1Ice() procedure
     spsparse::SparseSet<int,int> dimI;
     /** Contains: fgiceId, elevId */
-    ibmisc::ArrayBundle<double,2> bundle;
+    ibmisc::ArrayBundle<double,1> bundle;
 
-    Etopo1Ice(ibmisc::ArrayBundle<double,2> _bundle) :
-        bundle(_bundle) {}
+    Etopo1Ice(ibmisc::ArrayBundle<double,1> &&_bundle) :
+        bundle(std::move(_bundle)) {}
 };
 
 // =================================================================

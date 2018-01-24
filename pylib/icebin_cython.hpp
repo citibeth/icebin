@@ -26,11 +26,15 @@
 namespace icebin {
 namespace cython {
 
+extern std::unique_ptr<Grid> read_fgrid(
+    std::string const &fgridA_fname,
+    std::string const &fgridA_vname);
+
 extern std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
-    std::string const &gridA_fname,
-    std::string const &gridA_vname,
+    Grid const &fgridA,
     std::vector<double> &hcdefs,
     bool _correctA);
+
 
 /** Instantiates a new C++ object of type GCMRegridder_ModelE.
 NOTE: This function is only enabled if BUILD_MODELE is enabled in CMake. */

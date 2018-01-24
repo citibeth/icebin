@@ -19,15 +19,15 @@ int const JM1 = 180;
 int const IM = 288;
 int const JM = 180;
 
-extern HntrGrid const g1mx1m;
-extern HntrGrid const g2mx2m;
-extern HntrGrid const g10mx10m;
-extern HntrGrid const ghxh;
-extern HntrGrid const g1x1;
+extern HntrSpec const g1mx1m;
+extern HntrSpec const g2mx2m;
+extern HntrSpec const g10mx10m;
+extern HntrSpec const ghxh;
+extern HntrSpec const g1x1;
 double const dLATM = 180.*60./JM;  //  latitude spacing (minutes)
-extern HntrGrid const g1qx1;
-extern HntrGrid const g2hx2;
-extern HntrGrid const g5x4;
+extern HntrSpec const g1qx1;
+extern HntrSpec const g2hx2;
+extern HntrSpec const g5x4;
 
 }}    // namespace
 

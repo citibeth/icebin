@@ -45,11 +45,11 @@ public:
 
 public:
     // Implementations of virtual functions
-    void GvEp(MakeDenseEigenT::AccumT &ret,
+    void GvEp(MakeDenseEigenT::AccumT &&ret,
         blitz::Array<double,1> const *elevI) const;
-    void GvI(MakeDenseEigenT::AccumT &ret,
+    void GvI(MakeDenseEigenT::AccumT &&ret,
         blitz::Array<double,1> const *elevI) const;
-    void GvAp(MakeDenseEigenT::AccumT &ret,
+    void GvAp(MakeDenseEigenT::AccumT &&ret,
         blitz::Array<double,1> const *elevI) const;
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };

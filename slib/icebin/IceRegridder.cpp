@@ -38,7 +38,7 @@ IceRegridder::~IceRegridder() {}
 // -------------------------------------------------------------
 /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
 NOTE: wAvAp == sApvA */
-void IceRegridder::sApvA(MakeDenseEigenT::AccumT &w) const
+void IceRegridder::sApvA(MakeDenseEigenT::AccumT &&w) const
 {
     for (int id=0; id < gcm->agridA.dim.dense_extent(); ++id) {
         auto index = gcm->agridA.dim.to_sparse(id);
@@ -48,7 +48,7 @@ void IceRegridder::sApvA(MakeDenseEigenT::AccumT &w) const
 
 /** Produces the diagonal matrix [Elevation projected] <-- [Elevation]
 NOTE: wAvAp == sApvA */
-void IceRegridder::sEpvE(MakeDenseEigenT::AccumT &w) const
+void IceRegridder::sEpvE(MakeDenseEigenT::AccumT &&w) const
 {
     for (int id=0; id < gcm->agridA.dim.dense_extent(); ++id) {
         auto index = gcm->agridA.dim.to_sparse(id);
@@ -159,17 +159,17 @@ void IceRegridder::filter_cellsA(std::function<bool (long)> const &useA)
 
 
     std::unordered_set<int> good_j;
-    for (auto excell = exgrid->cells.begin(); excell != exgrid->cells.end(); ++excell) {
-        int index1 = excell->i;
-        if (useA(index1)) {
-            good_index_gridI.insert(excell->j);
-            good_index_exgrid.insert(excell->index);
+    for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
+        auto const is = aexgrid.dim.to_sparse(id);
+        if (useA(is)) {
+            good_index_gridI.insert(aexgrid.ijk(id,1));    // j
+            good_index_exgrid.insert(is);
         }
     }
 
     // Remove unneeded cells from gridI
-    gridI->filter_cells(std::bind(&in_good, &good_index_gridI, _1));
-    exgrid->filter_cells(std::bind(&in_good, &good_index_exgrid, _1));
+    agridI.filter_cells(std::bind(&in_good, &good_index_gridI, _1));
+    aexgrid.filter_cells(std::bind(&in_good, &good_index_exgrid, _1));
 }
 // ================================================================
 // ==============================================================

@@ -76,8 +76,8 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname
     printf("BEGIN IceCoupler_PISM::ncread(%s)\n", vname_sheet.c_str());
     GCMParams const &_gcm_params(gcm_coupler->gcm_params);
 
-    this->icebin_gridI = ice_regridder ?
-        dynamic_cast<Grid_XY const *>(gridI())
+    this->icebin_specI = ice_regridder ?
+        dynamic_cast<GridSpec_XY const *>(&*agridI().spec)
         : NULL;
 
     // General args passed to the ice sheet, regardless of which ice model is being used
@@ -400,10 +400,10 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     // ============== Miscellaneous
     // Check that grid dimensions match
-    if (icebin_gridI) {
-        if ((pism_grid->Mx() != icebin_gridI->nx()) || (pism_grid->My() != icebin_gridI->ny())) {
+    if (icebin_specI) {
+        if ((pism_grid->Mx() != icebin_specI->nx()) || (pism_grid->My() != icebin_specI->ny())) {
             (*icebin_error)(-1,
-                "Grid mismatch: pism=(%d, %d) icebin=(%d, %d)", pism_grid->Mx(), pism_grid->My(), icebin_gridI->nx(), icebin_gridI->ny());
+                "Grid mismatch: pism=(%d, %d) icebin=(%d, %d)", pism_grid->Mx(), pism_grid->My(), icebin_specI->nx(), icebin_specI->ny());
         }
     }
 

@@ -22,15 +22,23 @@
 #include <functional>
 #include <memory>
 #include <ibmisc/indexing.hpp>
+#include <icebin/gridgen/clippers.hpp>
 
 namespace icebin {
 
+class Grid;
+class Cell;
+
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
-extern void Grid make_grid(
+extern Grid make_grid(
     std::string const &name,
     GridSpec_LonLat const &spec,
-    std::function<bool(Cell const &)> spherical_clip = &SphericalClip::keep_all);
+    std::function<bool(long, double,double,double,double)> spherical_clip = &SphericalClip::keep_all);
 
+extern AbbrGrid make_abbr_grid(
+    std::string const &name,
+    GridSpec_LonLat const &spec,
+    spsparse::SparseSet<long,int> &&dim);    // Indices of gridcells we want to keep
 
 
 }   // Namespace

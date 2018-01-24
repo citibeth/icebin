@@ -39,26 +39,33 @@ namespace cython {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
+std::unique_ptr<Grid> read_fgrid(
+    std::string const &fgridA_fname,
+    std::string const &fgridA_vname)
+{
+    // Read fgridA
+    NcIO ncio(fgridA_fname, netCDF::NcFile::read);
+    std::unique_ptr<Grid> fgridA = new_grid(ncio, fgridA_vname);
+    fgridA->ncio(ncio, fgridA_vname);
+    ncio.close();
+
+    return fgridA;
+}
+
 std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
-    std::string const &gridA_fname,
-    std::string const &gridA_vname,
+    Grid const &fgridA,
     std::vector<double> &hcdefs,
     bool _correctA)
 {
     std::shared_ptr<GCMRegridder_Standard> cself(new GCMRegridder_Standard());
 
-    // Read gridA
-    NcIO ncio(gridA_fname, netCDF::NcFile::read);
-    std::unique_ptr<Grid> gridA = new_grid(ncio, gridA_vname);
-    gridA->ncio(ncio, gridA_vname);
-    ncio.close();
-
     // Put it together
     long nhc = hcdefs.size();
     cself->init(
-        std::move(gridA),
+        AbbrGrid(fgridA),
+//        std::move(fgridA),
         std::move(hcdefs),
-        Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhc}, {1,0}),
+        Indexing({"A", "HC"}, {0,0}, {fgridA->ndata(), nhc}, {1,0}),
         _correctA);
 
     return cself;

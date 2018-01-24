@@ -119,22 +119,22 @@ public:
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sApvA(MakeDenseEigenT::AccumT &w) const;
+    void sApvA(MakeDenseEigenT::AccumT &&w) const;
 
     /** Produces the diagonal matrix [Atmosphere projected] <-- [Atmosphere]
     NOTE: wAvAp == sApvA */
-    void sEpvE(MakeDenseEigenT::AccumT &w) const;
+    void sEpvE(MakeDenseEigenT::AccumT &&w) const;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
-    virtual void GvEp(MakeDenseEigenT::AccumT &ret,
+    virtual void GvEp(MakeDenseEigenT::AccumT &&ret,
         blitz::Array<double,1> const *elevI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Ice] */
-    virtual void GvI(MakeDenseEigenT::AccumT &ret,
+    virtual void GvI(MakeDenseEigenT::AccumT &&ret,
         blitz::Array<double,1> const *elevI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
-    virtual void GvAp(MakeDenseEigenT::AccumT &ret,
+    virtual void GvAp(MakeDenseEigenT::AccumT &&ret,
         blitz::Array<double,1> const *elevI) const = 0;
 
     /** Define, read or write this data structure inside a NetCDF file.

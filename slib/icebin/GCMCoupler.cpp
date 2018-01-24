@@ -131,14 +131,14 @@ void GCMCoupler::_ncread(
 
     printf("BEGIN GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 
-    bool rw_full = am_i_root();
+//    bool rw_full = am_i_root();
 
     // Load the MatrixMaker (filtering by our domain, of course)
     // Also load the ice sheets
     {
         std::unique_ptr<GCMRegridder_Standard> gcmr(new GCMRegridder_Standard());
         NcIO ncio_grid(grid_fname, NcFile::read);
-        gcmr->ncio(ncio_grid, vname, rw_full);
+        gcmr->ncio(ncio_grid, vname);
         static_move(gcm_regridder, gcmr);    // Move gcm_regridder <- gcm
     }
 

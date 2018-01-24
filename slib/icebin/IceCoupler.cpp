@@ -497,7 +497,7 @@ IceWriter::IceWriter(
 {
     printf("BEGIN IceWriter::init(%s)\n", fname.c_str());
 
-    ibmisc::Indexing const &indexing(ice_coupler->ice_regridder->gridI->indexing);
+    ibmisc::Indexing const &indexing(ice_coupler->ice_regridder->agridI.indexing);
 
     file_initialized = false;
 

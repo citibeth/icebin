@@ -65,7 +65,6 @@ if (BUILD_COUPLER)
 
         if (BUILD_GRIDGEN)
             list(APPEND icebin_SOURCES
-                icebin/modele/GridGen_Hntr.cpp
                 icebin/modele/clippers.cpp
             )
         endif()
