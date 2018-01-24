@@ -20,7 +20,7 @@ void GridSpec_Generic::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
     GridSpec::ncio(ncio, vname);
     NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
-    get_or_put_att(info_v, ncio.rw, "ncells_full", "long", &_ncells_full, 1);
+    get_or_put_att(info_v, ncio.rw, "ncells_full", "int64", &_ncells_full, 1);
 }
 
 

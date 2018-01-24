@@ -81,6 +81,19 @@ struct AbbrGrid {
     void filter_cells(std::function<bool(long)> const &keep_fn);
 
 
+    // ===============================================================
+    // We only need to define these because blitz::Array does not follow STL conventions
+    // and is not movable.
+    void operator=(AbbrGrid &&other);
+
+    AbbrGrid(AbbrGrid &&other);
+
+    void operator=(AbbrGrid const &other);
+
+    AbbrGrid(AbbrGrid const &other);
+
+    // ===============================================================
+
 
 #if 0
     void operator=(AbbrGrid const &other)

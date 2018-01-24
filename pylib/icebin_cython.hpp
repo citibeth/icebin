@@ -26,7 +26,8 @@
 namespace icebin {
 namespace cython {
 
-extern std::unique_ptr<Grid> read_fgrid(
+extern void read_fgrid(
+    std::unique_ptr<Grid> &fgridA,    // OUTPUT
     std::string const &fgridA_fname,
     std::string const &fgridA_vname);
 
@@ -57,6 +58,7 @@ extern PyObject *GCMRegridder_wA(
     double fill);
 
 extern void GCMRegridder_add_sheet(GCMRegridder *cself,
+    Grid const &fgridA,
     std::string const &name,
     std::string const &gridI_fname, std::string const &gridI_vname,
     std::string const &exgrid_fname, std::string const &exgrid_vname,

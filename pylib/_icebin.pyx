@@ -131,8 +131,9 @@ cdef class GCMRegridder:
         # Create a brand new GCMRegridder
         if len(args) == 4:
             gridA_fname, gridA_vname, hcdefs, correctA = args
-            self.fgridA = read_fgrid(gridA_fname.encode(), gridA_vname.encode())
-            self.cself = cicebin.new_GCMRegridder_Standard(*self.fgridA.get(), hcdefs, correctA)
+            
+            cicebin.read_fgrid(self.fgridA, gridA_fname.encode(), gridA_vname.encode())
+            self.cself = cicebin.new_GCMRegridder_Standard(self.fgridA.get()[0], hcdefs, correctA)
         elif len(args) == 1:
             self.cself.reset(new cicebin.GCMRegridder_Standard())
             (regridder_fname,) = args
@@ -205,6 +206,7 @@ cdef class GCMRegridder:
         interp_style):
 
         cicebin.GCMRegridder_add_sheet(self.cself.get(),
+            self.fgridA.get()[0],
             name.encode(),
             gridI_fname.encode(), gridI_vname.encode(),
             exgrid_fname.encode(), exgrid_vname.encode(),
@@ -241,14 +243,14 @@ def coo_multiply(M, xx, double fill=np.nan, ignore_nan=False):
 
 # ============================================================
 
-cdef class HntrGrid:
-    cdef cicebin.HntrGrid *cself;
+cdef class HntrSpec:
+    cdef cicebin.HntrSpec *cself;
 
-    def __dealloc__(HntrGrid self):
+    def __dealloc__(HntrSpec self):
         del self.cself
 
-    def __init__(HntrGrid self, int im, int jm, float offi, float dlat):
-        self.cself = new cicebin.HntrGrid(im, jm, offi, dlat)
+    def __init__(HntrSpec self, int im, int jm, float offi, float dlat):
+        self.cself = new cicebin.HntrSpec(im, jm, offi, dlat)
 
     @property
     def im(self):
@@ -270,9 +272,9 @@ cdef class HntrGrid:
     def dlat(self):
         return self.cself.dlat
 
-    @property
-    def dxyp(self, int j):
-        return self.cself.dxyp(j)
+#    @property
+#    def dxyp(self, int j):
+#        return self.cself.dxyp(j)
 
 
 cdef class Hntr:
@@ -281,8 +283,8 @@ cdef class Hntr:
     def __dealloc__(self):
         del self.cself
 
-    def __init__(self, HntrGrid Agrid, HntrGrid Bgrid, float DATMIS):
-        self.cself = new cicebin.Hntr(Agrid.cself[0], Bgrid.cself[0], DATMIS)
+    def __init__(self, double yp17, HntrSpec Bgrid, HntrSpec Agrid, float DATMIS):
+        self.cself = new cicebin.Hntr(17.17, Bgrid.cself[0], Agrid.cself[0], DATMIS)
 
     def regrid(self, WTA, A, bool mean_polar):
         cicebin.Hntr_regrid(self.cself, WTA, A, mean_polar)

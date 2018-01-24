@@ -288,6 +288,10 @@ public:
     @return cells.nfull() (for L0) or cells.nvertices() (for L1) */
     size_t ndata() const;
 
+    /** The number of grid cells / basis vectors used in the vector
+    space. */
+    size_t nrealized() const;
+
     void clear();
 
     /** For now, just return the geographic center of the cell's polygon.

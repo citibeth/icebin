@@ -223,7 +223,7 @@ Grid make_grid(
 
     return Grid(name,
         std::unique_ptr<GridSpec>(new GridSpec_LonLat(spec)),
-        GridCoordinates::XY, "",
+        GridCoordinates::LONLAT, "",
         GridParameterization::L0,
         std::move(indexing),
         std::move(vertices), std::move(cells));

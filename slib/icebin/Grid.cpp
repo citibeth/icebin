@@ -123,6 +123,14 @@ size_t Grid::ndata() const
         return cells.nfull();
 }
 
+size_t Grid::nrealized() const
+{
+    if (parameterization == GridParameterization::L1)
+        return vertices.nrealized();
+    else
+        return cells.nrealized();
+}
+
 void Grid::clear()
 {
     vertices.clear();
@@ -353,7 +361,7 @@ void Grid::ncio(NcIO &ncio, std::string const &vname, bool rw_full)
     ncio_grid_spec(ncio, spec, vname);
 
     // ------ Attributes
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
 
     get_or_put_att(info_v, ncio.rw, "name", name);
 

@@ -119,7 +119,9 @@ int main(int argc, char **argv)
     Grid grid(make_grid(name, spec, &EuclidianClip::keep_all));
 
     // ------------- Write it out to NetCDF
-    ibmisc::NcIO ncio(name + ".nc", netCDF::NcFile::replace);
+    std::string const fname(strprintf("%s.nc", name.c_str()));    // Using operator+() or append() doesn't work here with GCC 4.9.3
+
+    ibmisc::NcIO ncio(fname, netCDF::NcFile::replace);
     grid.ncio(ncio, "grid");
     ncio.close();
 }

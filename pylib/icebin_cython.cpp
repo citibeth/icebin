@@ -23,6 +23,7 @@
 #include <spsparse/SparseSet.hpp>
 #include <icebin/IceRegridder.hpp>
 #include <icebin/GCMCoupler.hpp>
+#include <icebin/Grid.hpp>
 #ifdef BUILD_MODELE
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #endif
@@ -39,17 +40,16 @@ namespace cython {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-std::unique_ptr<Grid> read_fgrid(
+void read_fgrid(
+    std::unique_ptr<Grid> &fgridA,    // Return value goes here
     std::string const &fgridA_fname,
     std::string const &fgridA_vname)
 {
     // Read fgridA
     NcIO ncio(fgridA_fname, netCDF::NcFile::read);
-    std::unique_ptr<Grid> fgridA = new_grid(ncio, fgridA_vname);
+    fgridA.reset(new Grid);
     fgridA->ncio(ncio, fgridA_vname);
     ncio.close();
-
-    return fgridA;
 }
 
 std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
@@ -65,7 +65,7 @@ std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
         AbbrGrid(fgridA),
 //        std::move(fgridA),
         std::move(hcdefs),
-        Indexing({"A", "HC"}, {0,0}, {fgridA->ndata(), nhc}, {1,0}),
+        Indexing({"A", "HC"}, {0,0}, {fgridA.ndata(), nhc}, {1,0}),
         _correctA);
 
     return cself;
@@ -108,7 +108,7 @@ PyObject *GCMRegridder_wA(
     double fill)
 {
     PyObject *wA_py = ibmisc::cython::new_pyarray<double,1>(
-        std::array<int,1>{gcm_regridder->gridA->ndata()});
+        std::array<int,1>{gcm_regridder->agridA.ndata()});
     auto wA(np_to_blitz<double,1>(wA_py, "wA", {-1}));
     wA = fill;
 
@@ -120,29 +120,32 @@ PyObject *GCMRegridder_wA(
 
 
 void GCMRegridder_add_sheet(GCMRegridder *cself,
+    Grid const &fgridA,
     std::string const &name,
     std::string const &gridI_fname, std::string const &gridI_vname,
     std::string const &exgrid_fname, std::string const &exgrid_vname,
     std::string const &sinterp_style)
 {
     NcIO ncio_I(gridI_fname, netCDF::NcFile::read);
-    std::unique_ptr<Grid> fgridI(new_grid(ncio_I, "grid"));
+    std::unique_ptr<Grid> fgridI(new Grid);
     fgridI->ncio(ncio_I, "grid");
     ncio_I.close();
 
     NcIO ncio_exgrid(exgrid_fname, netCDF::NcFile::read);
-    std::unique_ptr<Grid> fexgrid(new_grid(ncio_exgrid, exgrid_vname));
+    std::unique_ptr<Grid> fexgrid(new Grid);
     fexgrid->ncio(ncio_exgrid, exgrid_vname);
     ncio_exgrid.close();
 
     auto interp_style(parse_enum<InterpStyle>(sinterp_style));
 
     auto sheet(new_ice_regridder(fgridI->parameterization));
-    sheet->init(name, cself->agridA, *cself->fgridA, *fgridI, *fexgrid,
+    sheet->init(
+        name, cself->agridA, fgridA,
+        AbbrGrid(*fgridI), AbbrGrid(*fexgrid),
         interp_style);
 
     dynamic_cast<GCMRegridder_Standard *>(cself)
-        ->add_sheet(std::move(sheet), gridA_proj_area);
+        ->add_sheet(std::move(sheet));
 }
 
 /** Computes yy = M xx.  yy is allocated, not necessarily set. */
@@ -315,9 +318,9 @@ PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself)
 PyObject *Hntr_regrid(Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool mean_polar)
 {
     // Get Fortran-style (base index = 1) arrays out of this.
-    auto WTA(np_to_blitz<double,1>(WTA_py, "WTA", {hntr->Agrid.size()}, blitz::fortranArray));
-    auto A(np_to_blitz<double,1>(A_py, "WTA", {hntr->Agrid.size()}, blitz::fortranArray));
-    PyObject *B_py(ibmisc::cython::new_pyarray<double,1>(make_array(hntr->Bgrid.size())));
+    auto WTA(np_to_blitz<double,1>(WTA_py, "WTA", {hntr->Agrid.spec.size()}, blitz::fortranArray));
+    auto A(np_to_blitz<double,1>(A_py, "WTA", {hntr->Agrid.spec.size()}, blitz::fortranArray));
+    PyObject *B_py(ibmisc::cython::new_pyarray<double,1>(make_array(hntr->Bgrid.spec.size())));
     auto B(np_to_blitz<double,1>(B_py, "WTA", {-1}, blitz::fortranArray));
 
     hntr->regrid(WTA, A, B, mean_polar);
@@ -414,9 +417,9 @@ void update_topo(
 
     // --------------------------------------------------------
     // Convert arrays to C++ Data Structures
-    Grid_LonLat *gridA = dynamic_cast<Grid_LonLat *>(&*gcmA->gridA);
-    int nj = gridA->nlat();
-    int ni = gridA->nlon();
+    GridSpec_LonLat *specA = dynamic_cast<GridSpec_LonLat *>(&*gcmA->agridA.spec);
+    int nj = specA->nlat();
+    int ni = specA->nlon();
 
     icebin::modele::Topos toposA;
 
@@ -434,9 +437,9 @@ void update_topo(
 
     // Convert 2D on the Ocean Grid
     GCMRegridder *gcmO = &*gcmA->gcmO;
-    Grid_LonLat *gridO = dynamic_cast<Grid_LonLat *>(&*gcmO->gridA);
-    int njO = gridO->nlat();
-    int niO = gridO->nlon();
+    GridSpec_LonLat *specO = dynamic_cast<GridSpec_LonLat *>(&*gcmO->agridA.spec);
+    int njO = specO->nlat();
+    int niO = specO->nlon();
     auto foceanOm0(np_to_blitz<double,2>(foceanOm0_py, "foceanOm0", {njO, niO}));
 
     // --------------------------------------------------------

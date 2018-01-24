@@ -73,7 +73,6 @@ void IceRegridder::clear()
 // -------------------------------------------------------------
 void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 {
-printf("BEGIN IceRegridder::ncio(%s, %d)\n", vname.c_str());
     if (ncio.rw == 'r') {
         agridI.ncio(ncio, vname + ".gridI");
         aexgrid.ncio(ncio, vname + ".exgrid");
@@ -88,7 +87,6 @@ printf("BEGIN IceRegridder::ncio(%s, %d)\n", vname.c_str());
     agridI.ncio(ncio, vname + ".agridI");
     aexgrid.ncio(ncio, vname + ".aexgrid");
 
-printf("END IceRegridder::ncio(%s, %d)\n", vname.c_str());
 }
 
 void IceRegridder::init(

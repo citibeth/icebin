@@ -46,7 +46,7 @@ class IceRegridder;
 
 
 
-/** Represents a single ice sheet.
+/** Represents a single ice sheet (with respect to a particular GCM Grid).
 Produces low-level unscaled matrices *for that single ice sheet*. */
 class IceRegridder {
     friend class IceCoupler;
@@ -91,7 +91,7 @@ public:
     void init(
         std::string const &_name,
         AbbrGrid const &agridA,
-        Grid const &_fgridA,
+        Grid const &fgridA,
         AbbrGrid const &&_agridI,
         AbbrGrid const &&_aexgrid,
         InterpStyle _interp_style);

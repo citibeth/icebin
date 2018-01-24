@@ -20,6 +20,7 @@
 #include <boost/filesystem.hpp>
 
 #include <ibmisc/netcdf.hpp>
+#include <ibmisc/stdio.hpp>
 
 #include <icebin/Grid.hpp>
 #include <icebin/gridgen/GridGen_Exchange.hpp>
@@ -55,9 +56,9 @@ int main(int argc, char **argv)
     sort_renumber_vertices(exgrid);
 
     printf("--------------- Writing out\n");
-    std::string fname = exgrid.name + ".nc";
+    std::string const fname(strprintf("%s.nc", exgrid.name.c_str()));    // Using operator+() or append() doesn't work here with GCC 4.9.3
 
-    ibmisc::NcIO ncio(exgrid.name + ".nc", 'w');
+    ibmisc::NcIO ncio(fname, 'w');
     gridA.ncio(ncio, "gridA");
     gridI.ncio(ncio, "gridI");
     exgrid.ncio(ncio, "exgrid");

@@ -77,11 +77,13 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
     cdef cppclass CythonWeightedSparse:
         object shape() except +
 
-    cdef cibmisc.unique_ptr[Grid] read_fgrid(
+    cdef void read_fgrid(
+        cibmisc.unique_ptr[Grid] &fgridA,
         string &gridA_fname,
         string &gridA_vname) except +
 
     cdef cibmisc.shared_ptr[GCMRegridder] new_GCMRegridder_Standard(
+        Grid &fgridA,
         vector[double] &hcdefs,
         bool correctA) except +
 
@@ -100,7 +102,7 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         double fill) except +
 
     cdef void GCMRegridder_add_sheet(
-        GCMRegridder *cself,
+        GCMRegridder *cself, Grid &fgridA,
         string &name,
         string &gridI_fname, string &gridI_vname,
         string &exgrid_fname, string &exgrid_vname,
@@ -129,21 +131,24 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         PyObject *focean_py, PyObject *flake_py, PyObject *fgrnd_py,
         PyObject *fgice_py, PyObject *zatmo_py, PyObject *foceanOm0_py) except +
 
-cdef extern from "icebin/modele/hntr.hpp" namespace "icebin::modele":
+cdef extern from "icebin/GridSpec.hpp" namespace "icebin":
     pass
 
-    cdef cppclass HntrGrid:
+    cdef cppclass HntrSpec:
         const int im
         const int jm
         const double offi
         const double dlat
 
-        HntrGrid(int, int, double, double)
+        HntrSpec(int, int, double, double)
         int size()
-        double dxyp(int)
+#        double dxyp(int)
+
+cdef extern from "icebin/modele/hntr.hpp" namespace "icebin::modele":
+    pass
 
     cdef cppclass Hntr:
         pass
 
-        Hntr(HntrGrid &A, HntrGrid &B, double DATMIS)
+        Hntr(double yp17, HntrSpec &A, HntrSpec &B, double DATMIS)
 

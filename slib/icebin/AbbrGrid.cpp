@@ -48,7 +48,7 @@ AbbrGrid::AbbrGrid(Grid const &g) :
     sproj(g.sproj)
 {
     // Allocate
-    auto nd = g.ndata();
+    auto nd = g.nrealized();    // dense extent
     ijk.reference(blitz::Array<int,2>(nd,3));
     native_area.reference(blitz::Array<double,1>(nd));
     if (g.coordinates == GridCoordinates::XY) {
@@ -56,10 +56,12 @@ AbbrGrid::AbbrGrid(Grid const &g) :
     }
 
     // Copy info into AbbrGrid
-    int id=0;
     ibmisc::Proj_LL2XY proj(g.sproj);
     for (auto cell=g.cells.begin(); cell != g.cells.end(); ++cell) {
-        dim.add_dense(cell->index);
+        int id = dim.add_dense(cell->index);    // Dense index
+        if (id >= nd) (*icebin_error)(-1,
+            "Index out of range: %d vs %d", id, nd);
+
         ijk[0](id) = cell->i;
         ijk[1](id) = cell->j;
         ijk[2](id) = cell->k;
@@ -126,21 +128,70 @@ void AbbrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     get_or_put_att(info_v, ncio.rw, "sproj", sproj);
 
     indexing.ncio(ncio, vname + ".indexing");
+
+    // Store dim; retrieve dimension from it
     dim.ncio(ncio, vname + ".dim");
 
-    auto sparse_extent_d(get_or_add_dim(ncio,
-        vname+".dim.sparse_extent", ijk.extent(0)));
+    auto dense_extent_d(get_or_add_dim(ncio,
+        vname+".dim.dense_extent", ijk.extent(0)));
     auto three_d(get_or_add_dim(ncio, "three", 3));
     auto two_d(get_or_add_dim(ncio, "two", 2));
 
     ncio_blitz_alloc(ncio, ijk, vname + ".ijk", "int",
-        {sparse_extent_d, three_d});
+        {dense_extent_d, three_d});
     ncio_blitz_alloc(ncio, native_area, vname + ".native_area", "double",
-        {sparse_extent_d});
+        {dense_extent_d});
     ncio_blitz_alloc(ncio, centroid_xy, vname + ".centroid_xy", "double",
-        {sparse_extent_d, two_d});
+        {dense_extent_d, two_d});
 
 }
+
+// ==============================================================================
+// We only need to define these because blitz::Array does not follow STL conventions
+// and is not movable.
+void AbbrGrid::operator=(AbbrGrid &&other)
+{
+    // Standard stuff
+    spec = std::move(other.spec);
+    coordinates = other.coordinates;
+    parameterization = other.parameterization;
+    indexing = std::move(other.indexing);
+    name = std::move(other.name);
+    sproj = std::move(other.sproj);
+    dim = std::move(other.dim);
+
+    // Non-standard stuff, why we have to write our own operator=(&&)
+    // We don't really move here, just copy the shared pointer.
+    ijk.reference(other.ijk);
+    native_area.reference(other.native_area);
+    centroid_xy.reference(other.centroid_xy);
+}
+
+AbbrGrid::AbbrGrid(AbbrGrid &&other)
+    { *this = std::move(other); }
+
+void AbbrGrid::operator=(AbbrGrid const &other)
+{
+    // Standard stuff
+    spec = other.spec;
+    coordinates = other.coordinates;
+    parameterization = other.parameterization;
+    indexing = other.indexing;
+    name = other.name;
+    sproj = other.sproj;
+    dim = other.dim;
+
+    // Non-standard stuff, why we have to write our own operator=(&&)
+    // We don't really move here, just copy the shared pointer.
+    ijk.reference(other.ijk);
+    native_area.reference(other.native_area);
+    centroid_xy.reference(other.centroid_xy);
+}
+
+AbbrGrid::AbbrGrid(AbbrGrid const &other)
+    { *this = other; }
+
+
 
 
 }    // namespace
