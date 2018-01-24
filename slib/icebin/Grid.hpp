@@ -138,6 +138,7 @@ protected:
     long _nfull = -1;
     long _max_realized_index = -1;
 
+public:
     GridMap(long nfull) : _nfull(nfull) {}
     GridMap() : _nfull(-1) {}
 

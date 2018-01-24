@@ -19,27 +19,27 @@ namespace modele {
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 std::unique_ptr<GCMRegridder_Standard> load_AI_regridder(
-    std::string const &gridA_fname,
-    std::string const &gridA_vname,
+    std::string const &agridA_fname,
+    std::string const &agridA_vname,
     std::vector<std::tuple<std::string,std::string>> const &overlap_fnames)    // sheet name, fname
 {
     std::unique_ptr<GCMRegridder_Standard> gcm_regridder(new GCMRegridder_Standard());
 
-    // Read gridA
-    printf("Opening %s\n", gridA_fname.c_str());
-    NcIO ncio(gridA_fname, netCDF::NcFile::read);
-    std::unique_ptr<Grid> gridA(new Grid); //new_grid(ncio, gridA_vname));
-    gridA->ncio(ncio, gridA_vname);
+    // Read agridA
+    printf("Opening %s\n", agridA_fname.c_str());
+    NcIO ncio(agridA_fname, netCDF::NcFile::read);
+    std::unique_ptr<Grid> agridA(new Grid); //new_grid(ncio, agridA_vname));
+    agridA->ncio(ncio, agridA_vname);
     ncio.close();
-    printf("Closing %s\n", gridA_fname.c_str());
+    printf("Closing %s\n", agridA_fname.c_str());
 
-    // Initialize the gcm_regridder with gridA
+    // Initialize the gcm_regridder with agridA
     std::vector<double> hcdefs {0};    // Dummy
     int nhc = hcdefs.size();
     gcm_regridder->init(
-        std::move(gridA),
+        std::move(agridA),
         std::move(hcdefs),
-        Indexing({"A", "HC"}, {0,0}, {gridA->ndata(), nhc}, {1,0}),
+        Indexing({"A", "HC"}, {0,0}, {agridA->ndata(), nhc}, {1,0}),
         true);    // correctA; not used directly
 
     // Add gridI and exgrid for each ice sheet
@@ -168,8 +168,8 @@ printf("dimI: ndense=%d nsparse%ld\n", dimI.dense_extent(), dimI.sparse_extent()
     for (int i_d=0; i_d<dimA.dense_extent(); ++i_d) {
         auto i_s(dimA.to_sparse(i_d));
 
-        double area = gcm_regridder.gridA->cells.at(i_s)->proj_area(&proj);
-        //double area = gcm_regridder.gridA->cells.at(i_s)->native_area;
+        double area = gcm_regridder.agridA->cells.at(i_s)->proj_area(&proj);
+        //double area = gcm_regridder.agridA->cells.at(i_s)->native_area;
         WT2_1(i_s) += AvI->wM(i_d) / area;
 
         FCONT2_1(i_s) = AA_d(FCONT, i_d);
@@ -211,12 +211,12 @@ void do_main()
 
 
     // Load the IceBin Regridder
-    std::string const gridA_fname = "modele_ll_g2mx2m.nc";
+    std::string const agridA_fname = "modele_ll_g2mx2m.nc";
     std::string const overlap_fname = "modele_ll_g2mx2m-sr_g20_searise.nc";
     std::string const pism_fname = "/home2/rpfische/f15/modelE/init_cond/pism/std-greenland/ex_g20km_10ka.nc";
 
     std::unique_ptr<GCMRegridder_Standard> gcm_regridder(load_AI_regridder(
-        overlap_fname, "gridA",
+        overlap_fname, "agridA",
         {std::make_tuple("greenland", overlap_fname)}));
 
     icebin::modele::greenland_2m(pism_fname, *gcm_regridder, bundle2);

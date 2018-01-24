@@ -23,14 +23,15 @@
 #include <ibmisc/blitz.hpp>
 #include <icebin/Grid.hpp>
 #include <ibmisc/indexing.hpp>
+#include <icebin/gridgen/clippers.hpp>
 
 namespace icebin {
 
 /** Represents a Cartesian grid with non-equally-spaced grid cell boundaries. */
-extern void Grid make_grid(
+extern Grid make_grid(
     std::string const &name,
     GridSpec_XY const &spec,
-    std::function<bool(Cell const &)> euclidian_clip = &EuclidianClip::keep_all);
+    std::function<bool(Cell const &)> const &euclidian_clip = &EuclidianClip::keep_all);
 
 
 

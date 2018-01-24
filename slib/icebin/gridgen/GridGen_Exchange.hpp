@@ -24,10 +24,10 @@
 
 namespace icebin {
 
-extern void make_exchange_grid(
-    Grid const *gridA, grid const *gridI,
+extern Grid make_exchange_grid(
+    Grid const *gridA, Grid const *gridI,
     std::string const &sproj);
 
 
 
-}   // namespace glint2
+}   // namespace icebin

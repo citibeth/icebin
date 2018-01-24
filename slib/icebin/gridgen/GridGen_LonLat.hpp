@@ -23,6 +23,7 @@
 #include <memory>
 #include <ibmisc/indexing.hpp>
 #include <icebin/gridgen/clippers.hpp>
+#include <icebin/AbbrGrid.hpp>
 
 namespace icebin {
 

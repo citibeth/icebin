@@ -33,7 +33,7 @@ class GridSpec
 public:
     const GridType type;
 
-    GridSpec() : type(GridType::GENERIC) {}
+    //GridSpec() : type(GridType::GENERIC) {}
     GridSpec(GridType _type) : type(_type) {}
     virtual ~GridSpec() {}
     virtual long ncells_full() const = 0;
@@ -55,6 +55,9 @@ struct GridSpec_Generic : public GridSpec {
 // ----------------------------------------------------
 struct GridSpec_XY : public GridSpec {
 
+    /** Projection of this XY grid onto the sphere. */
+    std::string sproj;
+
     /** Cell boundaries in the x direction.
     Sorted low to high.
     Number of grid cells in the x direction = x_boundaries.size() - 1. */
@@ -65,7 +68,7 @@ struct GridSpec_XY : public GridSpec {
     Number of grid cells in the y direction = y_boundaries.size() - 1. */
     std::vector<double> yb;
 
-    /** (x,y) Dimensions in order of decreasing stride.
+    /** (x,y) Dimensions in order of decreasing stride (same as Indexing class).
         (0,1) = (x,y) = x has largest stride
         (1,0) = (y,x) = y has largest stride */
     std::vector<int> indices;
@@ -73,16 +76,31 @@ struct GridSpec_XY : public GridSpec {
     int nx() const { return xb.size() - 1; }
     int ny() const { return yb.size() - 1; }
 
-    GridSpec_XY() : GridSpec(GridType::XY) {}
-
-    GridSpec_XY(
-        std::vector<double> &&_xb,
-        std::vector<double> &&_yb,
-        std::vector<int> const &_indices)
-    : GridSpec(GridType::XY), xb(std::move(_xb)), yb(std::move(_yb)), indices(_indices) {}
-
+    // -------------------------------------------
     long ncells_full() const { return nx() * ny(); }
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
+
+    std::unique_ptr<GridSpec> clone() const
+        { return std::unique_ptr<GridSpec>(new GridSpec_XY(*this)); }
+    // -------------------------------------------
+
+
+    // Used only when reading with ncio()
+    GridSpec_XY() : GridSpec(GridType::XY) {}
+
+
+
+    GridSpec_XY(
+        std::string const &_sproj,
+        std::vector<int> const &&_indices,
+        std::vector<double> &&_xb,
+        std::vector<double> &&_yb)
+    : GridSpec(GridType::XY), sproj(_sproj), indices(std::move(_indices)),
+        xb(std::move(_xb)),
+        yb(std::move(_yb))
+    {}
+
+
 
     /** Create a new Cartesian grid with evenly spaced grid cell boundaries.
     @param name Value of <generic-name>.info:name in netCDF file.
@@ -99,21 +117,25 @@ struct GridSpec_XY : public GridSpec {
     @see EuclidianClip
     */
     static GridSpec_XY make_with_boundaries(
+        std::string const &sproj,
+        std::vector<int> const &&indices,    // Decreasing stride
         double x0, double x1, double dx,
         double y0, double y1, double dy);
 
     static GridSpec_XY make_with_centers(
+        std::string const &sproj,
+        std::vector<int> const &&indices,    // Decreasing stride
         double x0, double x1, double dx,
         double y0, double y1, double dy)
     {
         return make_with_boundaries(
+            sproj, std::move(indices),
             x0-.5*dx, x1+.5*dx, dx,
             y0-.5*dy, y1+.5*dy, dy);
     }
 
-    std::unique_ptr<GridSpec> clone() const
-        { return std::unique_ptr<GridSpec>(new GridSpec_XY(*this)); }
 };
+
 // -------------------------------------------------------------------
 
 /** Used to create a GridSpec_LonLat; not a GridSpec itself. */

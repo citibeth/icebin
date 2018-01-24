@@ -29,34 +29,38 @@ using namespace ibmisc;
 namespace icebin {
 
 GridSpec_XY GridSpec_XY::make_with_boundaries(
+    std::string const &sproj,
+    std::vector<int> const &&indices,    // Decreasing stride
     double x0, double x1, double dx,
     double y0, double y1, double dy)
 {
-    GridGen_XY spec;
-
     // Set up x coordinates
+    std::vector<double> xb;
     int nx = (int)(.5 + (x1 - x0) / dx);    // Round to nearest integer
     double nx_inv = 1.0 / (double)nx;
     for (int i=0; i<=nx; ++i) {
         double x = x0 + (x1-x0) * (double)i * nx_inv;
-        spec.xb.push_back(x);
+        xb.push_back(x);
     }
 
     // Set up y coordinates
+    std::vector<double> yb;
     int ny = (int)(.5 + (y1 - y0) / dy);    // Round to nearest integer
     double ny_inv = 1.0 / (double)ny;
     for (int i=0; i<=ny; ++i) {
         double y = y0 + (y1-y0) * (double)i * ny_inv;
-        spec.yb.push_back(y);
+        yb.push_back(y);
     }
 
-    return spec;
+    return GridSpec_XY(
+        sproj, std::move(indices),
+        std::move(xb), std::move(yb));
 }
 
-void Grid make_grid(
+Grid make_grid(
     std::string const &name,
     GridSpec_XY const &spec,
-    std::function<bool(Cell const &)> euclidian_clip = &EuclidianClip::keep_all)
+    std::function<bool(Cell const &)> const &euclidian_clip)
 {
     auto &xb(spec.xb);
     auto &yb(spec.yb);
@@ -96,11 +100,11 @@ void Grid make_grid(
         }
     }
 
-    return Grid(name, GridType::XY,
-        GridCoordinates::XY, sproj,
-        Gridparameterization::L0,
-        std::move(indexing),
+    return Grid(name,
         std::unique_ptr<GridSpec>(new GridSpec_XY(spec)),
+        GridCoordinates::XY, spec.sproj,
+        GridParameterization::L0,
+        std::move(indexing),
         std::move(vertices), std::move(cells));
 }
 

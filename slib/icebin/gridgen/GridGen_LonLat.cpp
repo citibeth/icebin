@@ -109,7 +109,7 @@ static double polar_graticule_area_exact(double eq_rad,
 Grid make_grid(
     std::string const &name,
     GridSpec_LonLat const &spec,
-    std::function<bool(long, double,double,double,double)> spherical_clip = &SphericalClip::keep_all)
+    std::function<bool(long, double,double,double,double)> spherical_clip)
 {
     Indexing indexing({"lon", "lat"}, {0,0}, {spec.nlon(), spec.nlat()}, spec.indices);
 
@@ -135,10 +135,10 @@ Grid make_grid(
             // Figure out how to number this grid cell
             cell.j = ilat + south_pole_offset;  // 0-based 2-D index
             cell.i = ilon;
-            cell.index = spec.indexing.tuple_to_index<int,2>({cell.i, cell.j});
+            cell.index = indexing.tuple_to_index<int,2>({cell.i, cell.j});
             cell.native_area = graticule_area_exact(spec.eq_rad, lat0,lat1,lon0,lon1);
 
-            if (!spec.spherical_clip(cell.index, lon0, lat0, lon1, lat1)) continue;
+            if (!spherical_clip(cell.index, lon0, lat0, lon1, lat1)) continue;
 
             // Project the grid cell boundary to a planar polygon
             int n = spec.points_in_side;
@@ -180,7 +180,7 @@ Grid make_grid(
     pole.i = spec.nlon()-1;
     pole.j = spec.nlat();
     long index = (pole.j * spec.nlon() + pole.i);
-    if (spec.north_pole && spec.spherical_clip(index, 0, lat, 360, 90)) {
+    if (spec.north_pole && spherical_clip(index, 0, lat, 360, 90)) {
         for (int ilon=0; ilon< spec.lonb.size()-1; ++ilon) {
             double lon0 = spec.lonb[ilon];
             double lon1 = spec.lonb[ilon+1];
@@ -201,7 +201,7 @@ Grid make_grid(
     // South Pole cap
     index = 0;
     lat = spec.latb[0];
-    if (spec.south_pole && spec.spherical_clip(index, 0, -90, 360, lat)) {
+    if (spec.south_pole && spherical_clip(index, 0, -90, 360, lat)) {
         Cell pole;
         for (int ilon=spec.lonb.size()-1; ilon >= 1; --ilon) {
             double lon0 = spec.lonb[ilon];     // Make the circle counter-clockwise
@@ -221,12 +221,14 @@ Grid make_grid(
         cells.add(std::move(pole));
     }
 
-    return Grid(name, GridType::LONLAT,
-        GridCoordinates::XY, "",
-        Grid::Parameterization::L0,
-        std::move(indexing),
+    return Grid(name,
         std::unique_ptr<GridSpec>(new GridSpec_LonLat(spec)),
+        GridCoordinates::XY, "",
+        GridParameterization::L0,
+        std::move(indexing),
         std::move(vertices), std::move(cells));
+
+
 }
 
 AbbrGrid make_abbr_grid(
@@ -245,15 +247,17 @@ AbbrGrid make_abbr_grid(
     // Pre-compute area of grid cells
     blitz::Array<double,1> dxyp(spec.nlat());
     for (int j=0; j<spec.nlat(); ++j) {
-        dxyp(j) = sin(spec.latb(j+1)) - sin(spec.latb(j));
+        dxyp(j) = sin(spec.latb[j+1]) - sin(spec.latb[j]);
     }
 
     double const D2R_R2 = D2R * spec.eq_rad * spec.eq_rad;
-    for (int id=0; id<dim.dense_extent(); ++id) {
-        long iI = dim.to_sparse();
-        int * const _ij = &ijk(id,0);
-        indexing.index_to_tuple(_ij, iI);    // Fills in ijk
-        native_area(id) = dxyp(_ij[1]) * (spec.lonb(i+1) - spec.lonb(i)) * D2R_R2;
+    for (int iId=0; iId<dim.dense_extent(); ++iId) {
+        long iI = dim.to_sparse(iId);
+        int * const _ij = &ijk(iId,0);
+        auto &i(_ij[0]);
+        auto &j(_ij[1]);
+        indexing.index_to_tuple(_ij, iI);    // Fills in i&j of ijk
+        native_area(iId) = dxyp(j) * (spec.lonb[i+1] - spec.lonb[i]) * D2R_R2;
     }
 
 

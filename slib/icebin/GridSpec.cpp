@@ -29,6 +29,7 @@ void GridSpec_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
         vname + ".y_boundaries", "double", {yb_d});
 
     NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
+    get_or_put_att(info_v, ncio.rw, "sproj", sproj);
     if (ncio.rw == 'w') {
         int n;
         n = nx();

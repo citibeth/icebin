@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 
     printf("------------- Set up the local ice grid\n");
 
-    GridGen_XY spec;
+    GridSpec_XY spec;
     char xname[100];
     snprintf(xname, sizeof(xname), "sr_g%d_%s", grid_size, icemodel.str());
     std::string name(xname);
@@ -102,29 +102,22 @@ int main(int argc, char **argv)
     spec.euclidian_clip = &EuclidianClip::keep_all;
 
     if (zone == Zone::greenland) {
-        // The true exact SeaRISE grid
-        spec.sproj = "+proj=stere +lon_0=-39 +lat_0=90 +lat_ts=71.0 +ellps=WGS84";
-        set_xy_boundaries(spec,
+        spec = GridSpec_XY::make_with_boundaries(
+            "+proj=stere +lon_0=-39 +lat_0=90 +lat_ts=71.0 +ellps=WGS84",
+            (icemodel == IceModel::pism ? {0,1} : {1,0}),
             (- 800.0 - .5*dsize)*km, (- 800.0 + 300.0*5 + .5*dsize)*km,   dsize*km,
             (-3400.0 - .5*dsize)*km, (-3400.0 + 560.0*5 + .5*dsize)*km,   dsize*km);
     } else {    // Antarctica
-        spec.sproj = "+proj=stere +lon_0=0 +lat_0=-90 +lat_ts=71.0 +ellps=WGS84";
-
-        // The true exact SeaRISE grid
-        set_xy_boundaries(spec,
+        spec = GridSpec_XY::make_with_boundaries(
+            "+proj=stere +lon_0=0 +lat_0=-90 +lat_ts=71.0 +ellps=WGS84",
+            (icemodel == IceModel::pism ? {0,1} : {1,0}),
             (-2800.0 - .5*dsize)*km, (-2800.0 + 1200*5.0 + .5*dsize)*km,   dsize*km,
             (-2800.0 - .5*dsize)*km, (-2800.0 + 1200*5.0 + .5*dsize)*km,   dsize*km);
     }
 
 
     // ------------ Make the grid from the spec
-    Grid_XY grid;
-    if (icemodel == IceModel::pism) {
-        spec.indexing = Indexing({"x", "y"}, {0,0}, {spec.nx(), spec.ny()}, {0,1});   // row major: x has largest stride
-    } else {    // Native SeaRISE (and ModelE)
-        spec.indexing = Indexing({"x", "y"}, {0,0}, {spec.nx(), spec.ny()}, {1,0});   // column major: y has largest stride
-    }
-    spec.make_grid(grid);
+    auto Grid(make_grid(spec.name, spec));
 
     // ------------- Write it out to NetCDF
     ibmisc::NcIO ncio(spec.name + ".nc", netCDF::NcFile::replace);

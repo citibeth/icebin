@@ -92,8 +92,8 @@ public:
         std::string const &_name,
         AbbrGrid const &agridA,
         Grid const &_fgridA,
-        Grid const &_fgridI,
-        Grid const &_fexgrid,
+        AbbrGrid const &_agridI,
+        AbbrGrid const &_aexgrid,
         InterpStyle _interp_style);
 
     /** @param elevI Elevation at points of ice sheet and land.

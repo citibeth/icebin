@@ -172,7 +172,7 @@ void OGrid::realize_rtree() {
     vertices in gridA or gridI.  No more than a "best effort" is
     needed to eliminate duplicate vertices.
 @return Always returns true (tells RTree search algorithm to keep going) */
-static bool overlap_callback(VertexCache *exvcache, long gridI_ndata,
+static bool overlap_callback(VertexCache *exvcache, GridMap<Cell> *cells, long gridI_ndata,
     OCell const **ocell1p, OCell const *ocell2)
 {
     // Enable using same std::function callback for many values of gridA
@@ -200,21 +200,21 @@ static bool overlap_callback(VertexCache *exvcache, long gridI_ndata,
     excell.native_area = excell.proj_area(NULL);
 
     // Add it to the grid
-    exvcache->grid->cells.add(std::move(excell));
+    cells->add(std::move(excell));
 
     return true;
 }
 // --------------------------------------------------------------------
 
 /** @param gridI Put in an RTree */
-void make_exchange_grid(
-    Grid const *gridA, grid const *gridI,
+Grid make_exchange_grid(
+    Grid const *gridA, Grid const *gridI,
     std::string sproj)
 {
     // Determine compatibility and projections between the two grids
-    std::unique_ptr<Proj2> proj1, proj2;
-    if (gridA->coordinates == Grid::Coordinates::XY) {
-        if (gridI->coordinates == Grid::Coordinates::XY) {
+    std::unique_ptr<Proj2> projA, projI;
+    if (gridA->coordinates == GridCoordinates::XY) {
+        if (gridI->coordinates == GridCoordinates::XY) {
             // No projections needed
             if (gridA->sproj != gridI->sproj) {
                 (*icebin_error)(-1, "Two XY grids must have the same projection\n");
@@ -222,13 +222,13 @@ void make_exchange_grid(
             if (sproj == "") sproj = std::string(gridA->sproj.c_str());
         } else {
             // gridA=xy, gridI=ll: Project from grid 2 to gridA's xy
-            proj2.reset(new Proj2(gridA->sproj, Proj2::Direction::LL2XY));
+            projI.reset(new Proj2(gridA->sproj, Proj2::Direction::LL2XY));
             if (sproj == "") sproj = std::string(gridA->sproj.c_str());
         }
     } else {
-        if (gridI->coordinates == Grid::Coordinates::XY) {
+        if (gridI->coordinates == GridCoordinates::XY) {
             // gridA=ll, gridI=xy: Project from grid 1 to gridI's xy
-            proj1.reset(new Proj2(gridI->sproj, Proj2::Direction::LL2XY));
+            projA.reset(new Proj2(gridI->sproj, Proj2::Direction::LL2XY));
             if (sproj == "") sproj = std::string(gridI->sproj.c_str());
         } else {
             // Both in Lat/Lon: Project them both to XY for overlap computation
@@ -244,12 +244,12 @@ void make_exchange_grid(
 
     VertexCache exvcache(&vertices);
 
-    OGrid ogridA(gridA, &*projA);   // proj1 used to transform LL->XY when overlapping
-    OGrid ogridI(gridI, &*projI);   // proj2 used to transform LL->XY when overlapping
+    OGrid ogridA(gridA, &*projA);   // projA used to transform LL->XY when overlapping
+    OGrid ogridI(gridI, &*projI);   // projI used to transform LL->XY when overlapping
     ogridI.realize_rtree();
 
     OCell const *ocell1;
-    auto callback(std::bind(&overlap_callback, &exvcache,
+    auto callback(std::bind(&overlap_callback, &exvcache, &cells,
         gridI->ndata(), &ocell1, _1));
 
     int nprocessed=0;
@@ -268,19 +268,18 @@ void make_exchange_grid(
         ++nprocessed;
         if (nprocessed % 100 == 0) {
             printf("Processed %d of %d from gridA, total overlaps = %d\n",
-                nprocessed+1, ogridA.ocells.size(), exgrid.cells.nrealized());
+                nprocessed+1, ogridA.ocells.size(), cells.nrealized());
         }
     }
 
     return Grid(
         gridA->name + '-' + gridI->name,
-        GridType::GENERIC,
+        std::unique_ptr<GridSpec>(new GridSpec_Generic()),
         GridCoordinates::XY,
-        spec.sproj,
+        sproj,
         GridParameterization::L0,    // Why not?
-        Indexing({"i0"}, {0}, {exgrid.cells.nfull()}, {0}),    // No n-D indexing available.
-        std::unique_ptr<GridSpec>(new GridSpec(GridType::GENERIC)),
-        std::move(vertices), std::move(cells);
+        Indexing({"i0"}, {0}, {cells.nfull()}, {0}),    // No n-D indexing available.
+        std::move(vertices), std::move(cells));
 
 }
 

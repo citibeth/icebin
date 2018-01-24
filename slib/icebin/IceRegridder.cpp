@@ -95,13 +95,13 @@ void IceRegridder::init(
     std::string const &name,
     AbbrGrid const &agridA,
     Grid const &fgridA,
-    Grid const &_fgridI,
-    Grid const &_fexgrid,
+    AbbrGrid const &&_agridI,
+    AbbrGrid const &&_aexgrid,
     InterpStyle _interp_style)
 {
     _name = (name != "" ? name : _fgridI.name);
-    agridI = _fgridI;    // convert Grid -> AbbrGrid
-    aexgrid = _fexgrid;  // convert Grid -> AbbrGrid
+    agridI = std::move(_agridI);    // convert Grid -> AbbrGrid
+    aexgrid = std::move(_aexgrid);  // convert Grid -> AbbrGrid
     interp_style = _interp_style;
 
     if (agridI.sproj == "") {
