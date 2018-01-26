@@ -82,7 +82,7 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
     get_or_put_att(info_v, ncio.rw, "name", _name);
     get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 
-    ncio_blitz(ncio, gridA_proj_area, vname + ".gridA_proj_area", "double",
+    ncio_blitz_alloc(ncio, gridA_proj_area, vname + ".gridA_proj_area", "double",
         get_or_add_dims(ncio, gridA_proj_area, {"agridA.ndata"}));
     agridI.ncio(ncio, vname + ".agridI");
     aexgrid.ncio(ncio, vname + ".aexgrid");
@@ -132,7 +132,7 @@ std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
 std::unique_ptr<IceRegridder> new_ice_regridder(NcIO &ncio, std::string const &vname)
 {
     std::string vn(vname + ".agridI.info");
-    auto gridI_info_v = get_or_add_var(ncio, vn, "int64", {});
+    auto gridI_info_v = get_or_add_var(ncio, vn, "int", {});
 
     GridParameterization parameterization;
     get_or_put_att_enum(gridI_info_v, ncio.rw, "parameterization", parameterization);

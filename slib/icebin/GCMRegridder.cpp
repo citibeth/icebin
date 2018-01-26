@@ -101,7 +101,7 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
     }
 
     // Read/Write gridA and other global stuff
-    agridA.ncio(ncio, vname + ".gridA");
+    agridA.ncio(ncio, vname + ".agridA");
     indexingHC.ncio(ncio, vname + ".indexingHC");
     ncio_vector(ncio, hcdefs, true, vname + ".hcdefs", "double",
         get_or_add_dims(ncio, {vname + ".nhc"}, {hcdefs.size()} ));

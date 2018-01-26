@@ -215,10 +215,8 @@ cdef class GCMRegridder:
     def regrid_matrices(self, str sheet_name, elevI):
         elevI = elevI.reshape(-1)
         cdef cicebin.RegridMatrices *crm = \
-            cicebin.new_regrid_matrices(self.cself.get(), sheet_name.encode(), <PyObject *>elevI)        # PyObject=Borrowed reference, object = owned reference
-
-#        cdef cicebin.RegridMatrices *crm = new cicebin.RegridMatrices(
-#            self.cself.regrid_matrices(sheet_name.encode()))
+            cicebin.new_regrid_matrices(self.cself.get(), sheet_name.encode(),
+            <PyObject *>elevI)   # PyObject=Borrowed reference, object = owned reference
         rm = RegridMatrices()
         rm.cself = crm
         return rm
