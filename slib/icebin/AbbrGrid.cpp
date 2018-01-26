@@ -133,7 +133,7 @@ void AbbrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     dim.ncio(ncio, vname + ".dim");
 
     auto dense_extent_d(get_or_add_dim(ncio,
-        vname+".dim.dense_extent", ijk.extent(0)));
+        vname+".dim.dense_extent", ijk.extent(0)));    // extent ignored on read
     auto three_d(get_or_add_dim(ncio, "three", 3));
     auto two_d(get_or_add_dim(ncio, "two", 2));
 
