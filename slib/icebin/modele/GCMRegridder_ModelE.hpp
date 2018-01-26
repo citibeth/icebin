@@ -131,7 +131,7 @@ public:
        2. It can also generate AOmvAAm and AAmvAOm, for testing purposes. */
     RegridMatrices regrid_matrices(
         int sheet_index,
-        blitz::Array<double,1> const &elevI) const;
+        blitz::Array<double,1> const &elevmaskI) const;
 };
 
 /** Casts to a Grid_Lonlat, which is what we know is used by ModelE */

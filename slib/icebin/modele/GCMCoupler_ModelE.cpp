@@ -603,9 +603,6 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     removed.  Starting out, foceanOp should be 0 or 1 everywhere.
     This function will change foceanOp in areas of ice sheets, setting
     to values in the range [0,1]
-@param fcont_elevIs Elevation on each grid in the GCMRegridder.
-    Should be nan where there is no land; and either 0, or an actual
-    elevation, where there is.
 */
 static void update_foceanOp(
 GCMRegridder *gcmO,
@@ -1000,7 +997,7 @@ void update_topo(
     // =======================================================
     // ----------- Set up elevation class structure
 
-    // Set up elevation class segments: fhc, underice, elevI
+    // Set up elevation class segments: fhc, underice, elevmaskI
     fhcE2 = 0;
     undericeE2 = 0;
     elevE2 = 0;
@@ -1107,7 +1104,7 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
     std::vector<std::array<double,3>> sigmas;
     for (size_t sheet_index=0; sheet_index < gcmA->ice_regridders().index.size(); ++sheet_index) {
         IceCoupler *icec(&*ice_couplers[sheet_index]);
-        elevmasks.push_back(ElevMask<1>(icec->elevI, icec->maskI));
+        elevmasks.push_back(ElevMask<1>(icec->elevmaskI, icec->maskI));
         sigmas.push_back(icec->sigma);
     }
 

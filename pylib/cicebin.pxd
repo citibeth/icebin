@@ -123,7 +123,7 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
 
     cdef Hntr_regrid(Hntr *hntr, object WTA_py, object A_py, bool mean_polar) except +
 
-    cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name, PyObject *elevI_py) except +
+    cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name, PyObject *elevmaskI_py) except +
 
     cdef void update_topo(GCMRegridder *_gcmA, string &topoO_fname,
         PyObject *elev_sigmas_py, bool initial_timestep, string &segments_py, string &primary_segment_py,

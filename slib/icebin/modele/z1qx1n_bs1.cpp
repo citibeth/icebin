@@ -710,7 +710,7 @@ void z1qx1n_bs1(TopoInputs &in, std::string const &etopo1_fname, TopoOutputs<2> 
         blitz::Array<double,2> &fgiceAs;
         blitz::Array<double,2> &elevAs;
         blitz::Array<double,1> &fgiceId;
-        blitz::Array<double,1> &elevId;
+        blitz::Array<double,1> &elevId;	// Mas is implied; masked-out cells aren't in dimI
         MyAccum(
             SparseSet<int,int> &_dimI,
             ArrayBundle<double,1> &bundleId,

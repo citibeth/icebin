@@ -267,7 +267,8 @@ extern void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, 
 struct Etopo1Ice {
     // Outputs of Etopo1Ice() procedure
     spsparse::SparseSet<int,int> dimI;
-    /** Contains: fgiceId, elevId */
+    /** Contains: fgiceId, elevId
+    	(mask is implied, since masked-out cells are not included in dimI) */
     ibmisc::ArrayBundle<double,1> bundle;
 
     Etopo1Ice(ibmisc::ArrayBundle<double,1> &&_bundle) :

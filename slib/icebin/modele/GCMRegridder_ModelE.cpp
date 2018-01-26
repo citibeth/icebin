@@ -742,13 +742,13 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 
 
 RegridMatrices GCMRegridder_ModelE::regrid_matrices(
-    int sheet_index, blitz::Array<double,1> const &elevI) const
+    int sheet_index, blitz::Array<double,1> const &elevmaskI) const
 {
 //    AbbrGrid const &gridO(gcmO->agridA);
     GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
 
     // Delicate construction of rmO
-    RegridMatrices _rmO(gcmO->regrid_matrices(sheet_index, elevI));
+    RegridMatrices _rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
     RegridMatrices rm(_rmO.ice_regridder);
     RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(std::move(_rmO)));
 

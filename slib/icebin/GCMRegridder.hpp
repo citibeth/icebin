@@ -369,7 +369,7 @@ public:
     /** Produce regridding matrices for this setup. */
     RegridMatrices regrid_matrices(
         int sheet_index,
-        blitz::Array<double,1> const &elevI) const;
+        blitz::Array<double,1> const &elevmaskI) const;
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):

@@ -348,7 +348,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 
     ix = contract[OUTPUT].index.at("mask");
         pism_ovars[ix] = &pism_ice_model->cell_type();
-    ix = contract[OUTPUT].index.at("elevI");
+    ix = contract[OUTPUT].index.at("elev");
         pism_ovars[ix] = &pism_ice_model->elevI;
 
 

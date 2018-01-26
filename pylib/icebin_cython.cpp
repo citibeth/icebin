@@ -328,12 +328,12 @@ PyObject *Hntr_regrid(Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool m
     return B_py;
 }
 
-RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py)
+RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevmaskI_py)
 {
     auto sheet_index = gcm->ice_regridders().index.at(sheet_name);
     IceRegridder *ice_regridder = &*gcm->ice_regridders()[sheet_index];
-    auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {ice_regridder->nI()}));
-    return new RegridMatrices(gcm->regrid_matrices(sheet_index, elevI));
+    auto elevmaskI(np_to_blitz<double,1>(elevmaskI_py, "elevmaskI", {ice_regridder->nI()}));
+    return new RegridMatrices(gcm->regrid_matrices(sheet_index, elevmaskI));
 }
 
 std::string to_string(PyObject *str, std::string const &vname)
@@ -350,7 +350,7 @@ void update_topo(
     // ====== INPUT parameters
     GCMRegridder *_gcmA,
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
-    PyObject *elevmask_sigmas_py,    // {'greenland' : (elevI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
+    PyObject *elevmask_sigmas_py,    // {'greenland' : (elevmaskI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
     bool initial_timestep,    // true if this is the first (initialization) timestep
     std::string const &segments,    // string, eg: "legacy,sealand,ec"
     std::string const &primary_segment,    // [('name', base), ...]
@@ -384,9 +384,9 @@ void update_topo(
         int nI = icer->nI();
 
         // Parse the main tuple
-        PyObject *elevI_py, *maskI_py, *sigma_py;
-        PyArg_ParseTuple(value, "OOO", &elevI_py, &maskI_py, &sigma_py);
-        auto elevI(np_to_blitz<double,1>(elevI_py, "elevI", {nI}));
+        PyObject *elevmaskI_py, *maskI_py, *sigma_py;
+        PyArg_ParseTuple(value, "OOO", &elevmaskI_py, &maskI_py, &sigma_py);
+        auto elevmaskI(np_to_blitz<double,1>(elevmaskI_py, "elevmaskI", {nI}));
         auto maskI(np_to_blitz<char,1>(maskI_py, "maskI", {nI}));
 
         // Further parse sigma_py
@@ -395,7 +395,7 @@ void update_topo(
 
         // Add to temporary C++ Data Structures
         tdata.insert(std::make_pair(sheet,
-            std::make_pair(ElevMask<1>(elevI, maskI), sigma)));
+            std::make_pair(ElevMask<1>(elevmaskI, maskI), sigma)));
     }
 
     // Convert temporary to permanent C++ data structure

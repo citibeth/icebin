@@ -97,7 +97,7 @@ void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
 PyObject *Hntr_regrid(modele::Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool mean_polar);
 
 
-RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevI_py);
+RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevmaskI_py);
 
 /** Allows Python users access to GCMCoupler_Modele::update_topo().
 Starting from output of Gary's program (on the Ocean grid), this subroutine
@@ -106,7 +106,7 @@ void update_topo(
     // ====== INPUT parameters
     GCMRegridder *_gcmA,
     std::string const &topoO_fname,    // Name of Ocean-based TOPO file (aka Gary)
-    PyObject *elevmask_sigmas_py,    // {'greenland' : (elevI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
+    PyObject *elevmask_sigmas_py,    // {'greenland' : (elevmaskI<1>, maskI<1>, (sigma_x,signa_y,sigma_z)), ...}
     bool initial_timestep,    // true if this is the first (initialization) timestep
     std::string const &segments,    // [('name', base), ...]
     std::string const &primary_segment,    // [('name', base), ...]

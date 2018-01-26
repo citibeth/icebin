@@ -76,10 +76,10 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
     self->ice_regridder = &*_gcm_coupler->gcm_regridder->ice_regridders().at(sheet_name);
-    self->elevI.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
-    self->elevI = nan;
+    self->elevmaskI.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
+    self->elevmaskI = nan;
 
-//    if (rw_full) ncio_blitz(ncio, elevI, true, vname + ".elevI", "double",
+//    if (rw_full) ncio_blitz(ncio, elevmaskI, true, vname + ".elevmaskI", "double",
 //        get_dims(ncio ,{vname + ".gridI.cells.nfull"}));
 
 //    self->ice_constants.init(&_coupler->ut_system);
@@ -327,16 +327,16 @@ bool run_ice)
     blitz::Array<double,1> out_maskI(ice_ovalsI(maskI_ix, blitz::Range::all()));
     for (int i=0; i<nI(); ++i) maskI(i) = (char)out_maskI(i);
 
-    int elevI_ix = standard_names[OUTPUT].at("elevI");
-    blitz::Array<double,1> out_elevI(ice_ovalsI(elevI_ix, blitz::Range::all()));
-    // Check that elevI is an alias for variable #elevI_ix in ice_ovalsI
-    if (&ice_ovalsI(elevI_ix,0) != &out_elevI(0)) (*icebin_error)(-1,
-        "ice_ovalsI <%p> != elevI <%p>\n", &ice_ovalsI(elevI_ix,0), &out_elevI(0));
+    int elevmaskI_ix = standard_names[OUTPUT].at("elevmaskI");
+    blitz::Array<double,1> out_elevmaskI(ice_ovalsI(elevmaskI_ix, blitz::Range::all()));
+    // Check that elevmaskI is an alias for variable #elevmaskI_ix in ice_ovalsI
+    if (&ice_ovalsI(elevmaskI_ix,0) != &out_elevmaskI(0)) (*icebin_error)(-1,
+        "ice_ovalsI <%p> != elevmaskI <%p>\n", &ice_ovalsI(elevmaskI_ix,0), &out_elevmaskI(0));
 
-    elevI = out_elevI;    // Copy
+    elevmaskI = out_elevmaskI;    // Copy
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
-    RegridMatrices rm(gcmr->regrid_matrices(sheet_index, elevI));
+    RegridMatrices rm(gcmr->regrid_matrices(sheet_index, elevmaskI));
     RegridMatrices::Params regrid_params(true, true, {0,0,0});
     RegridMatrices::Params regrid_params_nc(true, false, {0,0,0});    // correctA=False
 

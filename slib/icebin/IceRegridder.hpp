@@ -82,12 +82,6 @@ public:
     IceRegridder();
     virtual ~IceRegridder();
 
-//    void clear();
-
-    /**
-    @param elevI The elevation of each (unmasked) ice grid cell.
-    Indicate a masked-out grid cell with elevI[i] = NaN
-    */
     void init(
         std::string const &_name,
         AbbrGrid const &agridA,
@@ -95,12 +89,6 @@ public:
         AbbrGrid const &&_agridI,
         AbbrGrid const &&_aexgrid,
         InterpStyle _interp_style);
-
-    /** @param elevI Elevation at points of ice sheet and land.
-    @param maskI Land surface type of each grid cell (ocean, land, ice) */
-    void set_elevI(
-        DenseArrayT<1> const &_elevI,
-        blitz::Array<char,1> const &maskI);
 
     // ------------------------------------------------
     /** Number of dimensions of ice vector space */
@@ -127,15 +115,15 @@ public:
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
     virtual void GvEp(MakeDenseEigenT::AccumT &&ret,
-        blitz::Array<double,1> const *elevI) const = 0;
+        blitz::Array<double,1> const *elevmaskI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Ice] */
     virtual void GvI(MakeDenseEigenT::AccumT &&ret,
-        blitz::Array<double,1> const *elevI) const = 0;
+        blitz::Array<double,1> const *elevmaskI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
     virtual void GvAp(MakeDenseEigenT::AccumT &&ret,
-        blitz::Array<double,1> const *elevI) const = 0;
+        blitz::Array<double,1> const *elevmaskI) const = 0;
 
     /** Define, read or write this data structure inside a NetCDF file.
     @param vname: Variable name (or prefix) to define/read/write it under. */

@@ -85,13 +85,12 @@ extern void linterp_1d_b(
 
 
 /** Builds an interpolation matrix to go from height points to ice/exchange grid.
-@param ret Put the regrid matrix here.
-@param elevIh Must be the result of this->elevI_hash() */
+@param ret Put the regrid matrix here. */
 void IceRegridder_L0::GvEp(
     MakeDenseEigenT::AccumT &&ret,
-    blitz::Array<double,1> const *_elevI) const
+    blitz::Array<double,1> const *_elevmaskI) const
 {
-    blitz::Array<double,1> const &elevI(*_elevI);
+    blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
     IceExch dest = interp_grid;
 
     if (gcm->hcdefs.size() == 0) (*icebin_error)(-1,
@@ -107,9 +106,9 @@ void IceRegridder_L0::GvEp(
         long const iX = aexgrid.dim.to_sparse(id);    // X=Exchange Grid
         long const iG = (dest == IceExch::ICE ? iI : iX);   // G=Interpolation Grid
 
-        if (!std::isnan(elevI(iI))) {
+        if (!std::isnan(elevmaskI(iI))) {
             // This cell not masked: look up elevation point as usual
-            double elevation = std::max(elevI(iI), 0.0);
+            double elevation = std::max(elevmaskI(iI), 0.0);
 
             // Interpolate in height points
             switch(interp_style.index()) {
@@ -135,9 +134,9 @@ void IceRegridder_L0::GvEp(
 // --------------------------------------------------------
 void IceRegridder_L0::GvI(
     MakeDenseEigenT::AccumT &&ret,
-    blitz::Array<double,1> const *_elevI) const
+    blitz::Array<double,1> const *_elevmaskI) const
 {
-    blitz::Array<double,1> const &elevI(*_elevI);
+    blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
     if (interp_grid == IceExch::ICE) {
         // Ice <- Ice = Indentity Matrix (scaled)
         // But we need this unscaled... so we use the weight of
@@ -146,9 +145,9 @@ void IceRegridder_L0::GvI(
             long iIs = agridI.dim.to_sparse(iId);
 
             // Only include I cells that are NOT masked out
-            // Depending on elevI, this could be either just ice
+            // Depending on elevmaskI, this could be either just ice
             // or ice and dry land
-             if (!std::isnan(elevI(iIs)))
+             if (!std::isnan(elevmaskI(iIs)))
                 ret.add({iIs, iIs}, agridI.native_area(iId));
         }
     } else {
@@ -159,9 +158,9 @@ void IceRegridder_L0::GvI(
             long const iX = aexgrid.dim.to_sparse(id);    // index in exchange grid
 
             // Only include I cells that are NOT masked out
-            // Depending on elevI, this could be either just ice
+            // Depending on elevmaskI, this could be either just ice
             // or ice and dry land
-            if (!std::isnan(elevI(iI)))
+            if (!std::isnan(elevmaskI(iI)))
                 ret.add({iX,iI}, aexgrid.native_area(id));
         }
     }
@@ -169,9 +168,9 @@ void IceRegridder_L0::GvI(
 // --------------------------------------------------------
 void IceRegridder_L0::GvAp(
     MakeDenseEigenT::AccumT &&ret,
-    blitz::Array<double,1> const *_elevI) const
+    blitz::Array<double,1> const *_elevmaskI) const
 {
-    blitz::Array<double,1> const &elevI(*_elevI);
+    blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
     for (int id=0; id<aexgrid.ndata(); ++id) {
         long const iG = (interp_grid == IceExch::ICE ?
             aexgrid.ijk(id,1) : aexgrid.dim.to_sparse(id));
@@ -179,9 +178,9 @@ void IceRegridder_L0::GvAp(
         long const iI = aexgrid.ijk(id,1);
 
         // Only include I cells that are NOT masked out
-        // Depending on elevI, this could be either just ice
+        // Depending on elevmaskI, this could be either just ice
         // or ice and dry land
-        if (!std::isnan(elevI(iI)))
+        if (!std::isnan(elevmaskI(iI)))
             if (aexgrid.native_area(id) > 0) {
                 ret.add({iG, iA}, aexgrid.native_area(id));
             }
