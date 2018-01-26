@@ -74,8 +74,8 @@ void IceRegridder::clear()
 void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 {
     if (ncio.rw == 'r') {
-        agridI.ncio(ncio, vname + ".gridI");
-        aexgrid.ncio(ncio, vname + ".exgrid");
+        agridI.ncio(ncio, vname + ".agridI");
+        aexgrid.ncio(ncio, vname + ".aexgrid");
     }
 
     auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
@@ -83,7 +83,7 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
     get_or_put_att_enum(info_v, ncio.rw, "interp_style", interp_style);
 
     ncio_blitz(ncio, gridA_proj_area, vname + ".gridA_proj_area", "double",
-        get_or_add_dims(ncio, gridA_proj_area, {"gridA.ndata"}));
+        get_or_add_dims(ncio, gridA_proj_area, {"agridA.ndata"}));
     agridI.ncio(ncio, vname + ".agridI");
     aexgrid.ncio(ncio, vname + ".aexgrid");
 
@@ -131,7 +131,7 @@ std::unique_ptr<IceRegridder> new_ice_regridder(IceRegridder::Type type)
 }
 std::unique_ptr<IceRegridder> new_ice_regridder(NcIO &ncio, std::string const &vname)
 {
-    std::string vn(vname + ".gridI.info");
+    std::string vn(vname + ".agridI.info");
     auto gridI_info_v = get_or_add_var(ncio, vn, "int64", {});
 
     GridParameterization parameterization;
