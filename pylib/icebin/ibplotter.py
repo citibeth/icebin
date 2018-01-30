@@ -10,7 +10,7 @@ import numpy as np
 def _Grid_XY_read_plotter(nc, vname) :
     """Reads an plotter out of a netCDF file for a simple Cartesian grid"""
 
-    sproj = nc.variables[vname + '.info'].projection
+    sproj = nc.variables[vname + '.info'].sproj
     xb2 = nc.variables[vname + '.x_boundaries'][:]
     yb2 = nc.variables[vname + '.y_boundaries'][:]
     indexing = ibgrid.Indexing(nc, vname + '.indexing')
@@ -37,11 +37,14 @@ def read_nc(nc, vname):
     return ret
 # ---------------------------------------------------
 class PlotterE(giss.plot.Plotter):
-    def __init__(self, icebin_config, ice_sheet, IvE=None, correctA=True):
+    def __init__(self, icebin_config, ice_sheet, elevmaskI=None, IvE=None, correctA=True):
         """icebin_config: str
             Name of IceBin configuration file
         ice_sheet: str
             Name of ice sheet to create plotter for
+        elevmaskI:
+            Elevation on ice grid; NaN if no ice
+            OPTIONAL: Only needed for interactive plot (lookup())
         IvE: sparse matrix
             Matrix to convert [Ice Grid <-- Elevation Grid]"""
         self.ice_sheet = ice_sheet
@@ -54,16 +57,18 @@ class PlotterE(giss.plot.Plotter):
         self.IvE = IvE
 
         with netCDF4.Dataset(icebin_config) as nc:
-            self.plotterI = read_nc(nc=nc, vname='m.' + ice_sheet + '.gridI')
+            self.plotterI = read_nc(nc=nc, vname='m.' + ice_sheet + '.agridI')
 
             # Create a plotterA, to help determine coords when user clicks
-            self.plotterA = _Grid_LonLat_read_plotter(nc, 'm.gridA')
+            self.plotterA = _Grid_LonLat_read_plotter(nc, 'm.agridA')
 
             # Used to determine nearest elevation point (for display)
             # (convert sparse to dense vector)
-            elevI = nc.variables['m.'+ice_sheet+'.elevI'][:]
+            #elevI = nc.variables['m.'+ice_sheet+'.elevI'][:]
 
-            self.elevI = elevI.reshape(self.plotterI.ny2, self.plotterI.nx2)
+            self.elevmaskI = elevmaskI
+            if elevmaskI is not None:
+                self.elevmaskI = elevmaskI.reshape(self.plotterI.ny2, self.plotterI.nx2)
             self.hcdefs = nc.variables['m.hcdefs'][:]
 
             # self.mask2 = nc.variables['m.' + ice_sheet + '.mask2'][:]
@@ -100,7 +105,7 @@ class PlotterE(giss.plot.Plotter):
         coordsI,valI = self.plotterI.lookup(context['contextI'], lon_d, lat_d)
 
         # Find closest elevation point, based on our elevation on the ice grid.
-        elev = self.elevI[coordsI]
+        elev = self.elevmaskI[coordsI] if self.elevmaskI is not None else 0.
         ihp0 = bisect.bisect_left(self.hcdefs, elev)   # "rounds down"
         delta0 = abs(elev - self.hcdefs[ihp0])
         delta1 = abs(elev - self.hcdefs[ihp0+1])
