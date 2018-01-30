@@ -42,10 +42,11 @@ public:
 };
 // -------------------------------------------------------------------
 // ----------------------------------------------------
-struct GridSpec_Generic : public GridSpec {
+class GridSpec_Generic : public GridSpec {
     long _ncells_full;
 
-    GridSpec_Generic() : GridSpec(GridType::GENERIC), _ncells_full(-1) {}
+public:
+    GridSpec_Generic(long ncells_full = -1) : GridSpec(GridType::GENERIC), _ncells_full(ncells_full) {}
 
     long ncells_full() const { return _ncells_full; }
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);

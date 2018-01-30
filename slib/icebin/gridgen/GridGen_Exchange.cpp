@@ -274,7 +274,7 @@ Grid make_exchange_grid(
 
     return Grid(
         gridA->name + '-' + gridI->name,
-        std::unique_ptr<GridSpec>(new GridSpec_Generic()),
+        std::unique_ptr<GridSpec>(new GridSpec_Generic(cells.nfull())),
         GridCoordinates::XY,
         sproj,
         GridParameterization::L0,    // Why not?
