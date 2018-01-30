@@ -56,9 +56,12 @@ AbbrGrid::AbbrGrid(Grid const &g) :
         centroid_xy.reference(blitz::Array<double,2>(nd,2));
     }
 
+
     // Copy info into AbbrGrid
     ibmisc::Proj_LL2XY proj(g.sproj);
-    for (auto cell=g.cells.begin(); cell != g.cells.end(); ++cell) {
+    std::vector<Cell const *> cells(g.cells.sorted());
+    for (auto ii=cells.begin(); ii != cells.end(); ++ii) {
+        Cell const *cell(*ii);
         int id = dim.add_dense(cell->index);    // Dense index
         if (id >= nd) (*icebin_error)(-1,
             "Index out of range: %d vs %d", id, nd);
