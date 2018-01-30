@@ -108,7 +108,7 @@ PyObject *GCMRegridder_wA(
     double fill)
 {
     PyObject *wA_py = ibmisc::cython::new_pyarray<double,1>(
-        std::array<int,1>{gcm_regridder->agridA.ndata()});
+        std::array<int,1>{gcm_regridder->agridA.dim.sparse_extent()});
     auto wA(np_to_blitz<double,1>(wA_py, "wA", {-1}));
     wA = fill;
 
@@ -293,6 +293,12 @@ PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself)
     // -------------- M
     // Convert a sparse matrix w/ dense indices to a sparse matrix with sparse indices
     TupleListT<2> RM_sp;
+printf("DD1 about to copy: sparse_extent=(%ld, %ld), dense_extent=(%d, %d)\n",
+cself->dims[0].sparse_extent(),
+cself->dims[1].sparse_extent(),
+cself->dims[0].dense_extent(),
+cself->dims[1].dense_extent());
+
     spcopy(
         accum::to_sparse(make_array(&cself->dims[0], &cself->dims[1]),
         accum::ref(RM_sp)),
@@ -333,6 +339,7 @@ RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &
     auto sheet_index = gcm->ice_regridders().index.at(sheet_name);
     IceRegridder *ice_regridder = &*gcm->ice_regridders()[sheet_index];
     auto elevmaskI(np_to_blitz<double,1>(elevmaskI_py, "elevmaskI", {ice_regridder->nI()}));
+
     return new RegridMatrices(gcm->regrid_matrices(sheet_index, elevmaskI));
 }
 

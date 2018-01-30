@@ -731,7 +731,7 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     indexingHC = Indexing(
         {"O", "HC"},
         {0L, 0L},
-        {agridA.ndata(), gcmO->indexingHC[1].extent},
+        {agridA.dim.sparse_extent(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
     indexingE = derive_indexingE(agridA.indexing, indexingHC);
 

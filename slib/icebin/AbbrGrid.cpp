@@ -45,7 +45,8 @@ AbbrGrid::AbbrGrid(Grid const &g) :
     parameterization(g.parameterization),
     indexing(g.indexing),
     name(g.name),
-    sproj(g.sproj)
+    sproj(g.sproj),
+    dim(g.ndata())    // sparse_extent
 {
     // Allocate
     auto nd = g.nrealized();    // dense extent

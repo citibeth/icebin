@@ -90,6 +90,7 @@ void IceRegridder_L0::GvEp(
     MakeDenseEigenT::AccumT &&ret,
     blitz::Array<double,1> const *_elevmaskI) const
 {
+printf("BEGIN IceRegridder_L0::GvEp()\n");
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
     IceExch dest = interp_grid;
 
@@ -100,7 +101,7 @@ void IceRegridder_L0::GvEp(
     // Handle Z_INTERP or ELEV_CLASS_INTERP
 
     // Interpolate in the vertical
-    for (int id=0; id<aexgrid.ndata(); ++id) {
+    for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
         long const iA = aexgrid.ijk(id,0);        // GCM Atmosphere grid
         long const iI = aexgrid.ijk(id,1);        // Ice Grid
         long const iX = aexgrid.dim.to_sparse(id);    // X=Exchange Grid
@@ -130,6 +131,7 @@ void IceRegridder_L0::GvEp(
             }
         }
     }
+printf("END IceRegridder_L0::GvEp()\n");
 }
 // --------------------------------------------------------
 void IceRegridder_L0::GvI(
@@ -141,7 +143,7 @@ void IceRegridder_L0::GvI(
         // Ice <- Ice = Indentity Matrix (scaled)
         // But we need this unscaled... so we use the weight of
         // each grid cell.
-        for (int iId=0; iId<agridI.ndata(); ++iId) {
+        for (int iId=0; iId<agridI.dim.dense_extent(); ++iId) {
             long iIs = agridI.dim.to_sparse(iId);
 
             // Only include I cells that are NOT masked out
@@ -152,7 +154,7 @@ void IceRegridder_L0::GvI(
         }
     } else {
         // Exchange <- Ice
-        for (int id=0; id<aexgrid.ndata(); ++id) {
+        for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
             // cell->i = index in atmosphere grid
             long const iI = aexgrid.ijk(id,1);        // index in ice grid
             long const iX = aexgrid.dim.to_sparse(id);    // index in exchange grid
@@ -170,8 +172,9 @@ void IceRegridder_L0::GvAp(
     MakeDenseEigenT::AccumT &&ret,
     blitz::Array<double,1> const *_elevmaskI) const
 {
+printf("BEGIN IceRegridder_L0::GvAp()\n");
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
-    for (int id=0; id<aexgrid.ndata(); ++id) {
+    for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
         long const iG = (interp_grid == IceExch::ICE ?
             aexgrid.ijk(id,1) : aexgrid.dim.to_sparse(id));
         long const iA = aexgrid.ijk(id,0);
@@ -185,6 +188,7 @@ void IceRegridder_L0::GvAp(
                 ret.add({iG, iA}, aexgrid.native_area(id));
             }
     }
+printf("END IceRegridder_L0::GvAp()\n");
 }
 // --------------------------------------------------------
 void IceRegridder_L0::ncio(NcIO &ncio, std::string const &vname)

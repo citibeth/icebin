@@ -129,6 +129,7 @@ std::unique_ptr<WeightedSparse> compute_IvAE(
     blitz::Array<double,1> const *elevmaskI,
     UrAE const &AE)
 {
+printf("BEGIN compute_IvAE\n");
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
     SparseSetT _dimG;
@@ -139,14 +140,17 @@ std::unique_ptr<WeightedSparse> compute_IvAE(
     dimG->set_sparse_extent(regridder->nG());
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
+printf("AA1\n");
     MakeDenseEigenT GvAp_m(
         AE.GvAp,
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimA}, '.');
+printf("AA2\n");
     MakeDenseEigenT IvG_m(
         std::bind(&IceRegridder::GvI, regridder, _1, elevmaskI),
         {SparsifyTransform::ADD_DENSE},
         {dimG, dimI}, 'T');
+printf("AA3\n");
 
     // ----- Convert to Eigen
     auto GvAp(GvAp_m.to_eigen());
@@ -205,6 +209,8 @@ std::unique_ptr<WeightedSparse> compute_IvAE(
         // Smooth the underlying unsmoothed regridding transformation
         ret->M.reset(new EigenSparseMatrixT(smoothI * *ret->M));
     }
+printf("END compute_IvAE\n");
+
     return ret;
 }
 
@@ -292,7 +298,7 @@ static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder
 
 RegridMatrices GCMRegridder_Standard::regrid_matrices(
     int sheet_index,
-    blitz::Array<double,1> const &elevmaskI) const
+    blitz::Array<double,1> const &_elevmaskI) const
 {
     IceRegridder const *regridder = &*ice_regridders()[sheet_index];
 
@@ -306,6 +312,7 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(
 #endif
 
     RegridMatrices rm(regridder);
+    auto &elevmaskI(rm.tmp.take(_elevmaskI.copy()));
 
     UrAE urA("UrA", this->nA(),
         std::bind(&IceRegridder::GvAp, regridder, _1, &elevmaskI),

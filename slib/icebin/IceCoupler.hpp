@@ -85,7 +85,7 @@ public:
 public:
     std::string const &name() const { return _name; }
     AbbrGrid const &agridI() { return ice_regridder->agridI; }
-    long nI() const { return ice_regridder->agridI.ndata(); }
+    long nI() const { return ice_regridder->agridI.dim.sparse_extent(); }
 
     // ======================================================
 

@@ -266,7 +266,7 @@ public:
     unsigned int nhc(int i1) const { return hcdefs.size(); }
     unsigned int nhc() const { return nhc(-1); }
 
-    unsigned long nA() const { return agridA.ndata(); }
+    unsigned long nA() const { return agridA.dim.sparse_extent(); }
     unsigned long nE() const { return nA() * nhc(-1); }
 
     template<class AccumT>

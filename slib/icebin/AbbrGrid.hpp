@@ -48,14 +48,12 @@ struct AbbrGrid {
 
     // Items here will correspond to cells (for L0) or vertices (for L1)
     spsparse::SparseSet<long,int> dim;    // cell->index = sparse
-    blitz::Array<int,2> ijk;    // ijk(index, ijk)
+    blitz::Array<int,2> ijk;    // ijk(index, ijk)  (OPTIONAL; and second dimension varies in size)
     blitz::Array<double,1> native_area;    // dense indexing
     // blitz::Array<double,1> proj_area;
 
     // Only set if coordinates == GridCoordinates::XY
     blitz::Array<double,2> centroid_xy;    // centroid(index, xy)
-
-    size_t ndata() const { return dim.sparse_extent(); }
 
     virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
