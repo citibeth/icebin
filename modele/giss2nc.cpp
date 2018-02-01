@@ -18,7 +18,7 @@ using namespace icebin;
 using namespace icebin::modele;
 namespace po = boost::program_options;
 
-
+#if 0
 namespace boost {
 template<>
 Endian lexical_cast<Endian, std::string>(std::string const &token)
@@ -46,10 +46,12 @@ std::string lexical_cast<std::string, Endian>(Endian const &endian)
 
 
 }
+#endif
 
 
 
 std::vector<fortran::Shape<2>> stdshapes {
+    fortran::Shape<2>({"im1m", "jm1m"}, {IM1m, JM1m}),
     fortran::Shape<2>({"im2", "jm2"}, {IM2, JM2}),
     fortran::Shape<2>({"ims", "jms"}, {IMS, JMS}),
     fortran::Shape<2>({"imh", "jmh"}, {IMH, JMH}),
@@ -101,6 +103,63 @@ Info parse_titlei(std::string const &str, std::string const &use_name)
         }
     } else {
         return Info(use_name, str, "", "");
+    }
+}
+// ----------------------------------------------------------------------
+template<class IType, class OType>
+void giss2nc(
+    std::string const &ifname,
+    std::string const &ofname,
+    Endian endian,
+    std::vector<std::string> const &names)
+{
+    std::array<char, 80> titlei;
+    fortran::Shape<2> const *data_shape;
+
+    {fortran::UnformattedInput fin(ifname, endian);
+    TmpAlloc tmp;
+    NcIO ncio(ofname, 'w');
+
+        // Read and then write a single array
+        for (size_t i=0;; ++i) {
+
+            if (names.size() > 0 && i >= names.size()) break;
+
+	        auto &data(tmp.make<blitz::Array<IType,2>>());
+
+            // Read from Fortran binary file
+	        fortran::read(fin) >> titlei
+	            >> fortran::star(data, data_shape, stdshapes)
+	            >> fortran::endr;
+
+            // EOF gets set if we tried to read off the end of the file
+            if (fin.eof()) break;
+
+            // Parse titlei
+            // https://panthema.net/2007/0314-BoostRegex
+            std::string const &use_name = (i < names.size() ? names[i] : "");
+            std::string titlei_cxx(fortran::trim(titlei));
+            Info info(parse_titlei(titlei_cxx, use_name));
+            if (info.name == "") {
+                fprintf(stderr,
+                    "Cannot parse titlei='%s'; try using names parameter\n", titlei_cxx.c_str());
+                info.name = string_printf("var%02d", i);
+            }
+
+            printf("Read variable named %s: description=\"%s\"\n", info.name.c_str(), info.description.c_str());
+            if (info.name != "_") {
+
+                // Write to NetCDF
+	            auto ncvar(ncio_blitz(ncio, data, info.name, get_nc_type<OType>(),
+    	            get_or_add_dims(ncio,
+                        to_vector(data_shape->sshape),
+                        to_vector_cast<int,long,2>(data_shape->shape)),
+                    DimOrderMatch::MEMORY, false));
+                get_or_put_att(ncvar, ncio.rw, "description", info.description);
+                get_or_put_att(ncvar, ncio.rw, "units", info.units);
+                get_or_put_att(ncvar, ncio.rw, "source", info.source);
+            }
+        }
     }
 }
 // ----------------------------------------------------------------------
@@ -158,51 +217,6 @@ int main(int argc, char **argv)
     printf("ARGS: %s %s\n", ifname.c_str(), ofname.c_str());
 
 
-    std::array<char, 80> titlei;
-    fortran::Shape<2> const *data_shape;
-
-    {fortran::UnformattedInput fin(ifname, endian);
-    TmpAlloc tmp;
-    NcIO ncio(ofname, 'w');
-
-        // Read and then write a single array
-        for (size_t i=0;; ++i) {
-
-            if (names.size() > 0 && i >= names.size()) break;
-
-	        auto &data(tmp.make<blitz::Array<float,2>>());
-
-            // Read from Fortran binary file
-	        fortran::read(fin) >> titlei
-	            >> fortran::star(data, data_shape, stdshapes)
-	            >> fortran::endr;
-
-            // EOF gets set if we tried to read off the end of the file
-            if (fin.eof()) break;
-
-            // Parse titlei
-            // https://panthema.net/2007/0314-BoostRegex
-            std::string const &use_name = (i < names.size() ? names[i] : "");
-            std::string titlei_cxx(fortran::trim(titlei));
-            Info info(parse_titlei(titlei_cxx, use_name));
-            if (info.name == "") {
-                fprintf(stderr,
-                    "Cannot parse titlei='%s'; try using names parameter\n", titlei_cxx.c_str());
-                info.name = string_printf("var%02d", i);
-            }
-
-            printf("Read variable named %s: description=\"%s\"\n", info.name.c_str(), info.description.c_str());
-            if (info.name != "_") {
-
-                // Write to NetCDF
-	            auto ncvar(ncio_blitz(ncio, data, false, info.name,
-    	            get_or_add_dims(ncio,
-                        to_vector(data_shape->sshape),
-                        to_vector_cast<int,long,2>(data_shape->shape))));
-                get_or_put_att(ncvar, ncio.rw, "description", info.description);
-                get_or_put_att(ncvar, ncio.rw, "units", info.units);
-                get_or_put_att(ncvar, ncio.rw, "source", info.source);
-            }
-        }
-    }
+    giss2nc<int16_t,int16_t>(ifname, ofname, endian, names);
 }
+
