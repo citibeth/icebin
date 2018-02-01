@@ -18,37 +18,6 @@ using namespace icebin;
 using namespace icebin::modele;
 namespace po = boost::program_options;
 
-#if 0
-namespace boost {
-template<>
-Endian lexical_cast<Endian, std::string>(std::string const &token)
-{
-    if (token == "little")
-        return ibmisc::Endian::LITTLE;
-    if (token == "big")
-        return ibmisc::Endian::BIG;
-
-    throw boost::bad_lexical_cast();    
-}
-
-template<>
-std::string lexical_cast<std::string, Endian>(Endian const &endian)
-{
-    switch(endian) {
-        case ibmisc::Endian::LITTLE:
-            return "little";
-        case ibmisc::Endian::BIG:
-            return "big";
-    }
-
-    throw boost::bad_lexical_cast();    
-}
-
-
-}
-#endif
-
-
 
 std::vector<fortran::Shape<2>> stdshapes {
     fortran::Shape<2>({"im1m", "jm1m"}, {IM1m, JM1m}),
@@ -128,8 +97,9 @@ void giss2nc(
 	        auto &data(tmp.make<blitz::Array<IType,2>>());
 
             // Read from Fortran binary file
+            // Allocates as blitz::fortranArray
 	        fortran::read(fin) >> titlei
-	            >> fortran::star(data, data_shape, stdshapes)
+	            >> fortran::allocate(data, data_shape, stdshapes)
 	            >> fortran::endr;
 
             // EOF gets set if we tried to read off the end of the file
@@ -150,7 +120,8 @@ void giss2nc(
             if (info.name != "_") {
 
                 // Write to NetCDF
-	            auto ncvar(ncio_blitz(ncio, data, info.name, get_nc_type<OType>(),
+	            auto ncvar(ncio_blitz(
+                    ncio, data, info.name, get_nc_type<OType>(),
     	            get_or_add_dims(ncio,
                         to_vector(data_shape->sshape),
                         to_vector_cast<int,long,2>(data_shape->shape)),
@@ -217,6 +188,6 @@ int main(int argc, char **argv)
     printf("ARGS: %s %s\n", ifname.c_str(), ofname.c_str());
 
 
-    giss2nc<int16_t,int16_t>(ifname, ofname, endian, names);
+    giss2nc<float,double>(ifname, ofname, endian, names);
 }
 

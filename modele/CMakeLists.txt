@@ -4,7 +4,8 @@ find_package(TCLAP REQUIRED)
 include_directories(${TCLAP_INCLUDE_DIR})
 
 foreach (PRG
-    giss2nc make_topo oneway
+    giss2nc
+    # make_topo oneway
 
     # Obsolete
     # make_topo_icebin icebin22m
