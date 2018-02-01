@@ -10,6 +10,9 @@ make_topo:
 oneway:
     Driver for one-way GCM - ice coupling
 
+etopo1_ice:
+    Generates elevmaskI on the ETOPO1 grid
+
 
 OBSOLETE
 =========
