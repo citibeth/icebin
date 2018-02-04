@@ -8,8 +8,8 @@ namespace modele {
 
 int const IM1m = 21600;
 int const JM1m = 10801;
-int const IM2 = 10800;
-int const JM2 = 5400;
+int const IM2m = 10800;
+int const JM2m = 5400;
 int const IMS = 2160;
 int const JMS = 1080;
 int const IMH = 720;

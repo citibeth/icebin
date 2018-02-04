@@ -1,5 +1,6 @@
 // Convert GISS-format binary Fortran files to NetCDF
 
+#include <functional>
 #include <iostream>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
@@ -134,13 +135,32 @@ void giss2nc(
     }
 }
 // ----------------------------------------------------------------------
+// Build multiple instantiations of giss2nc(), let user choose at runtime.
+typedef std::map<std::string,
+    std::function<void(
+        std::string const &ifname,
+        std::string const &ofname,
+        Endian endian,
+        std::vector<std::string> const &names)>>
+Giss2NcMap;
 
+Giss2NcMap make_giss2nc_map()
+{
+    Giss2NcMap ret;
+    ret.insert(std::make_pair("float-double", &giss2nc<float,double>));
+    ret.insert(std::make_pair("int16", &giss2nc<int16_t,int16_t>));
+    return ret;
+}
+Giss2NcMap giss2nc_map(make_giss2nc_map());
+
+// ----------------------------------------------------------------------
 int main(int argc, char **argv)
 {
     // Parse comamnd line arguments
     std::string ifname, ofname;
     Endian endian;
     std::vector<std::string> names;
+    std::string stype;
 
     try {
 	    po::options_description desc("Allowed options");
@@ -149,6 +169,8 @@ int main(int argc, char **argv)
 	        ("input-file", po::value<string>(), "input file")
 	        ("output-file", po::value<string>(), "output file")
             ("endian", po::value<Endian>()->default_value(Endian::LITTLE), "[big | little]")
+            ("type", po::value<string>()->default_value("float-double"),
+                "Data type of (a) Fortran input, (b) NetCDF output [float-double | int16_t]")
             ("names", po::value<string>()->default_value(""), "(OPTIONAL) comma-separated variable names")
 	    ;
 
@@ -175,6 +197,7 @@ int main(int argc, char **argv)
         ifname = vm["input-file"].as<std::string>();
         ofname = vm["output-file"].as<std::string>();
         endian = vm["endian"].as<Endian>();
+        stype = vm["type"].as<std::string>();
 
         std::string snames = vm["names"].as<std::string>();
         if (snames != "")
@@ -187,7 +210,7 @@ int main(int argc, char **argv)
 
     printf("ARGS: %s %s\n", ifname.c_str(), ofname.c_str());
 
-
-    giss2nc<float,double>(ifname, ofname, endian, names);
+    auto _giss2nc(giss2nc_map.at(stype));
+    _giss2nc(ifname, ofname, endian, names);
 }
 

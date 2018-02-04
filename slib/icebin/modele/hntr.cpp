@@ -26,19 +26,28 @@ HntrGrid::HntrGrid(HntrSpec const &_spec) :
 
 void HntrGrid::init()
 {
+    dxyp.reference(make_dxyp(spec), blitz::fortranArray);
+}
+
+blitz::Array<double,1> make_dxyp(
+    HntrSpec const &spec,
+    blitz::GeneralArrayStorage<1> const &storage = blitz::GeneralArrayStorage<1>())
+{
     auto const jm(spec.jm);
 
-    dxyp.reference(blitz::Array<double,1>(blitz::Range(1,jm)));
+    blitz::Array<double,1> dxyp(jm, storage);
 
     // Calculate the sperical area of grid cells
+    // (on a radius=1 sphere)
     double dLON = (2.*M_PI) / spec.im;
     double dLAT = M_PI / jm;
     for (int j=1; j<=spec.jm; ++j) {
         double SINS = sin(dLAT*(j-jm/2-1));
         double SINN = sin(dLAT*(j-jm/2));
-        dxyp(j) = dLON * (SINN - SINS);
+        dxyp(j-1+dzyp.lbound(0)) = dLON * (SINN - SINS);
     }
 }
+
 
 void HntrGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 {
