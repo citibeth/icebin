@@ -50,11 +50,8 @@ void etopo1_ice(
 
     // Read in ZNGDC1 (1-degree resolution)
     // Read hand-modified FCONT1 (formerly from "ZNGDC1")
-    blitz::Array<int16_t,2> fcont1(JM1,IM1);    // cast to int16_t
     blitz::Array<double,2> fgice1(JM1,IM1);
     {NcIO ncio(files.locate("ZNGDC1-SeparateGreenland.nc"), 'r');
-        // ------- GrIS Mask
-        ncio_blitz(ncio, fcont1, "FCONT1", "double", {});
         // ------- Ice Fractions
         ncio_blitz(ncio, fgice1, "FGICE1", "double", {});
     }
@@ -66,12 +63,14 @@ void etopo1_ice(
     std::array<char,80> titlei;
     blitz::Array<int16_t,2> zicetop1m(JM1m, IM1m);
     blitz::Array<int16_t,2> focean1m(JM1m, IM1m);
-    {fortran::UnformattedInput fin(files.locate("ZETOPO1.NCEI"), Endian::BIG);
+    {std::string fname(files.locate("ZETOPO1.NCEI-SeparateGreenland.nc"));
+        printf("Opening ETOPO1 at %s\n", fname.c_str());
+        NcIO fin(files.locate("ZETOPO1.NCEI-SeparateGreenland.nc"));
 
         // Continental cells north of 78N are entirely glacial ice.
         // (Except for Greenland, if that is to be done on a separate ice sheet)
         {
-            fortran::read(fin) >> titlei >> focean1m >> fortran::endr;
+            ncio_blitz(fin, focean1m, "FOCEAN", "short", {});
 
             // Continental cells north of 78N are entirely glacial ice.
             // (but ignore Greenland)
@@ -82,66 +81,18 @@ void etopo1_ice(
                     int const i1 = i1m / 60;
                     int const j1 = j1m / 60;
 
-                    if (include_greenland || fcont1(j1,i1) != GREENLAND_VAL)
-                        fgice1m(j1m, i1m) = 1;
+                    fgice1m(j1m, i1m) = 1;
                 }
             }}
-
-
-            // Remove Greenland from focean1m
-            if (!include_greenland) {
-                for (int j1=JM1/2; j1 < JM1; ++j1) {
-                for (int i1=0; i1 < IM1; ++i1) {
-                    if (fcont1(j1,i1) == GREENLAND_VAL) {
-                        for (int j1m=j1*60; j1m < (j1+1)*60; ++j1m) {
-                        for (int i1m=i1*60; i1m < (i1+1)*60; ++i1m) {
-                            focean1m(j1m,i1m) = 1;
-                        }}
-                    }
-                }}
-            }
-
-            // Save focean1m
-            {NcIO ncout(fname_out, 'w');
-                auto dims(get_or_add_dims(ncout, {"jm1m", "im1m"}, {JM1m, IM1m}));
-                ncio_blitz(ncout, focean1m, "FOCEAN1m", "short", dims);
-                store_h(nch, focean1m, "FOCEANh");
-            }
         }
-
 
         // Antarctica is supplied by ETOPO1
         {
             blitz::Array<int16_t,2> zsolid1m(JM1m, IM1m);
 
             // Read zicetop1m, zsolid1m
-            fortran::read(fin) >> titlei >> zicetop1m >> fortran::endr;
-            fortran::read(fin) >> titlei >> zsolid1m >> fortran::endr;
-
-
-            // Remove Greenland from zicetop1m, zsolid1m
-            if (!include_greenland) {
-                for (int j1=JM1/2; j1 < JM1; ++j1) {
-                for (int i1=0; i1 < IM1; ++i1) {
-                    if (fcont1(j1,i1) == GREENLAND_VAL) {
-                        for (int j1m=j1*60; j1m < (j1+1)*60; ++j1m) {
-                        for (int i1m=i1*60; i1m < (i1+1)*60; ++i1m) {
-                            zicetop1m(j1m,i1m) = -300;
-                            zsolid1m(j1m,i1m) = -300;
-                        }}
-                    }
-                }}
-            }
-
-            // Store zicetop1m, zsolid1m
-            {NcIO ncout(fname_out, 'a');
-                auto dims(get_or_add_dims(ncout, {"jm1m", "im1m"}, {JM1m, IM1m}));
-                ncio_blitz(ncout, zicetop1m, "ZICETOP1m", "short", dims);
-                ncio_blitz(ncout, zsolid1m, "ZSOLG1m", "short", dims);
-
-                store_h(nch, zicetop1m, "ZICETOPh");
-                store_h(nch, zsolid1m, "ZSOLGh");
-            }
+            ncio_blitz(fin, zicetop1m, "ZICTOP", "short", {});
+            ncio_blitz(fin, zsolid1m, "ZSOLID", "short", {});
 
             // Use ETOPO1 for Southern Hemisphere Ice
             for (int j1m=0; j1m < JM1m/2; ++j1m) {
@@ -157,27 +108,47 @@ void etopo1_ice(
             if (include_greenland) {
                 for (int j1m=JM1m/2; j1m < JM1m; ++j1m) {
                 for (int i1m=0; i1m < IM1m; ++i1m) {
-                    if ( (focean1m(j1m,i1m) == 0)
+                    if ( (focean1m(j1m,i1m) == GREENLAND_VAL)
                         && (zicetop1m(j1m,i1m) != zsolid1m(j1m,i1m)))
                     {
                         fgice1m(j1m, i1m) = 1;
                     }
                 }}
             }
+
+
+            // Remove Greenland from zicetop1m, zsolid1m
+            for (int j1m=JM1m/2; j1m < JM1m; ++j1m) {
+            for (int i1m=0; i1m < IM1m; ++i1m) {
+                if (focean1m(j1m,i1m) == GREENLAND_VAL) {
+                    if (!include_greenland) {
+                        zicetop1m(j1m,i1m) = -300;
+                        zsolid1m(j1m,i1m) = -300;
+                    }
+                }}
+            }
+
+            // Store zicetop1m, zsolid1m
+            {NcIO ncout(fname_out, 'w');
+                auto dims(get_or_add_dims(ncout, {"jm1m", "im1m"}, {JM1m, IM1m}));
+
+                ncio_blitz(ncout, zicetop1m, "ZICETOP1m", "short", dims);
+                ncio_blitz(ncout, zsolid1m, "ZSOLG1m", "short", dims);
+
+            }
+            store_h(nch, zicetop1m, "ZICETOPh");
+            store_h(nch, zsolid1m, "ZSOLGh");
         }
     }
 
 
     // Add northern-hemisphere non-Greenland ice specified in ZNGDC1
     // This must be downscaled to ETOPO1 grid
-printf("AA3\n");
     auto g1mx1m_dxyp(make_dxyp(g1mx1m));
     auto g1x1_dxyp(make_dxyp(g1x1));
     std::vector<std::tuple<int16_t,int,int>> cells;
     for (int j1=JM1/2; j1 < JM1; ++j1) {
     for (int i1=0; i1 < IM1; ++i1) {
-        if (fcont1(j1,i1) == GREENLAND_VAL) continue;    // 2 marks greenland
-
         double const snow1 = fgice1(j1, i1);
         if (snow1 == 0) continue;
 
@@ -186,7 +157,7 @@ printf("AA3\n");
         cells.clear();
         for (int j1m=j1*60; j1m < (j1+1)*60; ++j1m) {
         for (int i1m=i1*60; i1m < (i1+1)*60; ++i1m) {
-            if (focean1m(j1m,i1m) == 0) {
+            if (focean1m(j1m,i1m) == 0 || (include_greenland && focean1m(j1m,i1m)) == GREENLAND_VAL) {
                 double const elev = zicetop1m(j1m,i1m);
                 cells.push_back(std::make_tuple(-elev, j1m, i1m));
             }
@@ -201,7 +172,7 @@ printf("j1 i1=%d %d (area = %g %g)\n", j1, i1, snow1, remain1m);
             int16_t const elev1m = -std::get<0>(*ii);
             int const j1m(std::get<1>(*ii));
             int const i1m(std::get<2>(*ii));
-
+//printf("--> %d %d\n", j1m, i1m);
             double const area1m = g1mx1m_dxyp(j1m);
             if (area1m <= remain1m) {
                 remain1m -= area1m;
@@ -218,14 +189,28 @@ printf("j1 i1=%d %d (area = %g %g)\n", j1, i1, snow1, remain1m);
 
     }}
 
-
-    // Save fgice1m
-    {NcIO ncout(fname_out, 'a');
-        auto dims1m(get_or_add_dims(ncout, {"jm1m", "im1m"}, {JM1m, IM1m}));
-        ncio_blitz(ncout, fgice1m, "FGICE1m", "short", dims1m);
-
-        store_h(nch, fgice1m, "FGICEh");
+    // Remove Greenland from focean1m
+    for (int j1m=JM1m/2; j1m < JM1m; ++j1m) {
+    for (int i1m=0; i1m < IM1m; ++i1m) {
+        if (focean1m(j1m,i1m) == GREENLAND_VAL) {
+            if (include_greenland) {
+                focean1m(j1m,i1m) = 0;
+            } else {
+                focean1m(j1m,i1m) = 1;
+            }
+        }}
     }
+
+    // Store zicetop1m, zsolid1m
+    {NcIO ncout(fname_out, 'a');
+        auto dims(get_or_add_dims(ncout, {"jm1m", "im1m"}, {JM1m, IM1m}));
+        ncio_blitz(ncout, focean1m, "FOCEAN1m", "short", dims);
+        ncio_blitz(ncout, fgice1m, "FGICE1m", "short", dims);
+
+    }
+    store_h(nch, focean1m, "FOCEANh");
+    store_h(nch, fgice1m, "FGICEh");
+
 }
 
 // ============================================================
