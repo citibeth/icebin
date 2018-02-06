@@ -9,6 +9,9 @@
 namespace icebin {
 namespace modele {
 
+extern blitz::Array<double,1> make_dxyp(
+    HntrSpec const &spec,
+    blitz::GeneralArrayStorage<1> const &storage = blitz::GeneralArrayStorage<1>());
 
 
 class HntrGrid {
@@ -139,6 +142,13 @@ public:
         blitz::Array<double,RANK> const &A,
         bool mean_polar = false) const;
 
+    template<class WeightT, class SrcT, class DestT>
+    void regrid_cast(
+        blitz::Array<WeightT,1> const &WTA,
+        blitz::Array<SrcT,1> const &A,
+        blitz::Array<DestT,1> &B,
+        bool mean_polar) const;
+
 private:
     void partition_east_west();
     void partition_north_south();
@@ -227,6 +237,83 @@ void Hntr::matrix(
         }
     }
 }
+
+template<class WeightT, class SrcT, class DestT>
+void Hntr::regrid_cast(
+    blitz::Array<WeightT,1> const &WTA,
+    blitz::Array<SrcT,1> const &A,
+    blitz::Array<DestT,1> &B,
+    bool mean_polar) const
+{
+    // Check array dimensions
+    if ((WTA.extent(0) != Agrid.spec.size()) ||
+        (A.extent(0) != Agrid.spec.size()) ||
+        (B.extent(0) != Bgrid.spec.size()))
+    {
+        (*icebin_error)(-1, "Error in dimensions: (%d, %d, %d) vs. (%d, %d)\n",
+            WTA.extent(0), A.extent(0), B.extent(0),
+            Agrid.spec.size(), Bgrid.spec.size());
+    }
+
+    // ------------------
+    // Interpolate the A grid onto the B grid
+
+    for (int JB=1; JB <= Bgrid.spec.jm; ++JB) {
+        int JAMIN = JMIN(JB);
+        int JAMAX = JMAX(JB);
+
+        for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
+            int const IJB = IB + Bgrid.spec.im * (JB-1);
+            double WEIGHT= 0;
+            double VALUE = 0;
+            int const IAMIN = IMIN(IB);
+            int const IAMAX = IMAX(IB);
+            for (int JA=JAMIN; JA <= JAMAX; ++JA) {
+                double G = SINA(JA) - SINA(JA-1);
+                if (JA==JAMIN) G -= GMIN(JB);
+                if (JA==JAMAX) G -= GMAX(JB);
+
+                for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
+                    int const IA  = 1 + ((IAREV-1) % Agrid.spec.im);
+                    int const IJA = IA + Agrid.spec.im * (JA-1);
+                    double F = 1;
+                    if (IAREV==IAMIN) F -= FMIN(IB);
+                    if (IAREV==IAMAX) F -= FMAX(IB);
+
+                    double const wt = F*G*WTA(IJA);
+                    WEIGHT += wt;
+                    VALUE  += wt*A(IJA);
+                }
+            }
+            B(IJB) = (WEIGHT == 0 ? DATMIS : VALUE / WEIGHT);
+        }
+    }
+
+    if (mean_polar) {
+        // Replace individual values near the poles by longitudinal mean
+        for (int JB=1; JB <= Bgrid.spec.jm; JB += Bgrid.spec.jm-1) {
+            double BMEAN  = DATMIS;
+            double WEIGHT = 0;
+            double VALUE  = 0;
+            for (int IB=1; ; ++IB) {
+                if (IB > Bgrid.spec.im) {
+                    if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
+                    break;
+                }
+                int IJB = IB + Bgrid.spec.im * (JB-1);
+                if (B(IJB) == DATMIS) break;
+                WEIGHT += 1;
+                VALUE  += B(IJB);
+            }
+            for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
+                int IJB = IB + Bgrid.spec.im * (JB-1);
+                B(IJB) = BMEAN;
+            }
+        }
+    }
+}
+
+
 // ----------------------------------------------------------
 template<class AccumT>
 class OverlapMatAccum {

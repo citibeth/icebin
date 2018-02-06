@@ -1,7 +1,7 @@
 #ifndef ICEBIN_MODELE_GRIDS_HPP
 #define ICEBIN_MODELE_GRIDS_HPP
 
-#include <icebin/modele/hntr.hpp>
+#include <icebin/GridSpec.hpp>
 
 namespace icebin {
 namespace modele {

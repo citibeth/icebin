@@ -5,7 +5,7 @@ namespace modele {
 
 // Grids we use (lon x lat)
 HntrSpec const g1mx1m(IM1m, JM1m, 0., 1.);
-HntrSpec const g2mx2m(IM2, JM2, 0., 2.);
+HntrSpec const g2mx2m(IM2m, JM2m, 0., 2.);
 HntrSpec const g10mx10m(IMS, JMS, 0., 10.);
 HntrSpec const ghxh(IMH, JMH, 0., 30.);
 HntrSpec const g1x1(IM1, JM1, 0., 60.);

@@ -2,16 +2,19 @@
 
 #include <functional>
 #include <iostream>
+
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
+
 #include <ibmisc/fortranio.hpp>
 #include <ibmisc/memory.hpp>
 #include <ibmisc/blitz.hpp>
 #include <ibmisc/endian.hpp>
-#include <icebin/error.hpp>
-#include <icebin/modele/z1qx1n_bs1.hpp>
 #include <ibmisc/string.hpp>
+
+#include <icebin/error.hpp>
+#include <icebin/modele/grids.hpp>
 
 using namespace std;
 using namespace ibmisc;
@@ -22,7 +25,7 @@ namespace po = boost::program_options;
 
 std::vector<fortran::Shape<2>> stdshapes {
     fortran::Shape<2>({"im1m", "jm1m"}, {IM1m, JM1m}),
-    fortran::Shape<2>({"im2", "jm2"}, {IM2, JM2}),
+    fortran::Shape<2>({"im2m", "jm2m"}, {IM2m, JM2m}),
     fortran::Shape<2>({"ims", "jms"}, {IMS, JMS}),
     fortran::Shape<2>({"imh", "jmh"}, {IMH, JMH}),
     fortran::Shape<2>({"im1", "jm1"}, {IM1, JM1}),

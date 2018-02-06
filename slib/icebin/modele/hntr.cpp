@@ -26,12 +26,12 @@ HntrGrid::HntrGrid(HntrSpec const &_spec) :
 
 void HntrGrid::init()
 {
-    dxyp.reference(make_dxyp(spec), blitz::fortranArray);
+    dxyp.reference(make_dxyp(spec, blitz::fortranArray));
 }
 
 blitz::Array<double,1> make_dxyp(
     HntrSpec const &spec,
-    blitz::GeneralArrayStorage<1> const &storage = blitz::GeneralArrayStorage<1>())
+    blitz::GeneralArrayStorage<1> const &storage)
 {
     auto const jm(spec.jm);
 
@@ -44,8 +44,10 @@ blitz::Array<double,1> make_dxyp(
     for (int j=1; j<=spec.jm; ++j) {
         double SINS = sin(dLAT*(j-jm/2-1));
         double SINN = sin(dLAT*(j-jm/2));
-        dxyp(j-1+dzyp.lbound(0)) = dLON * (SINN - SINS);
+        dxyp(j-1+dxyp.lbound(0)) = dLON * (SINN - SINS);
     }
+
+    return dxyp;
 }
 
 

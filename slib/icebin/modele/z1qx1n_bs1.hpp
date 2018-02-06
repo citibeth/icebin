@@ -203,11 +203,11 @@ public:
 
     // --- 2 minutes (IM2, JM2)
     // FOCEAN = Ocean Fraction (0:1)                     NGDC 2x2 (minutes)
-    blitz::Array<double, 2> &FOCEN2;
+    blitz::Array<double, 2> &FOCEN1m;
     // ZICTOP2 = Solid Ground Topography (m)              NGDC 2x2 (minutes)
-    blitz::Array<double, 2> &ZICTOP2;
-    blitz::Array<double, 2> &FGICE2;
-    blitz::Array<double, 2> &ZSOLG2;
+    blitz::Array<double, 2> &ZICTOP1m;
+    blitz::Array<double, 2> &FGICE1m;
+    blitz::Array<double, 2> &ZSOLG1m;
 
 
     // --- 10 minute (IMS, JMS)
