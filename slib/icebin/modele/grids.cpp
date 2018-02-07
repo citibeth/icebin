@@ -1,5 +1,7 @@
 #include <icebin/modele/grids.hpp>
 
+using namespace std;
+
 namespace icebin {
 namespace modele {
 
@@ -12,5 +14,24 @@ HntrSpec const g1x1(IM1, JM1, 0., 60.);
 HntrSpec const g1qx1(IM, JM, 0., dLATM);
 HntrSpec const g2hx2(144, 90, 0., dLATM * 2.);
 HntrSpec const g5x4(72, 45, 0., dLATM * 4.);
+
+std::map<std::string, HntrSpec &> make_grids()
+{
+    std::map<std::string, HntrSpec &> ret;
+
+    ret.insert(make_pair("g1mx1m", g1mx1m));
+    ret.insert(make_pair("g2mx2m", g2mx2m));
+    ret.insert(make_pair("g10mx10m", g10mx10m));
+    ret.insert(make_pair("ghxh", ghxh));
+    ret.insert(make_pair("g1x1", g1x1));
+    ret.insert(make_pair("g1qx1", g1qx1));
+    ret.insert(make_pair("g2hx2", g2hx2));
+    ret.insert(make_pair("g5x4", g5x4));
+    
+    return ret; 
+}
+
+std::map<std::string, HntrSpec &> grids(make_grids());
+
 
 }}

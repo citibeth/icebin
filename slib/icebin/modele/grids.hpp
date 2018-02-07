@@ -29,6 +29,8 @@ extern HntrSpec const g1qx1;
 extern HntrSpec const g2hx2;
 extern HntrSpec const g5x4;
 
+std::map<std::string, HntrSpec &> grids;
+
 }}    // namespace
 
 #endif    // guard

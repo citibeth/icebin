@@ -357,8 +357,6 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
 int main(int argc, char** argv)
 {
-    using namespace TCLAP;
-
     everytrace_init();
     ParseArgs args(argc, argv);
 
