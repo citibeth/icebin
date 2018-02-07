@@ -27,6 +27,81 @@ void store_h(NcIO &ncout, blitz::Array<int16_t,2> val1m, std::string const &vnam
     ncio_blitz(ncout, valh, vname, "double", dimsh);
 }
 
+/** Stores the value of any NetCDF attribute */
+class NcAttValue {
+    std::unique_ptr<NcType> nctype;
+    std::vector<char> data;
+public:
+    size_t getAttLength() const
+        { return data.size() / nctype->getSize(); }
+    size_t getTypeSize() const
+        { return nctype->getSize(); }
+
+    static NcAttValue get(NcAtt const &ncatt);
+    void put(NcVar const &ncvar, std::string const &name) const;
+};
+
+
+NcAttValue NcAttValue::get(NcAtt const &ncatt)
+{
+    NcAttValue aval;
+    aval.nctype.reset(new NcType(ncatt.getType()));
+    size_t const nbytes = ncatt.getAttLength() * aval.nctype->getSize();
+    aval.data.resize(nbytes);
+    ncatt.getValues((void *)&aval.data[0]);
+    return aval;
+}
+void NcAttValue::put(NcVar const &ncvar, std::string const &name) const
+{
+    ncvar.putAtt(name, *nctype, getAttLength(), &data[0]);
+}
+
+
+void get_or_put_att(
+    NcVar &ncvar, char rw,
+    const std::string &name,
+    NcAttValue &aval)
+{
+    if (rw == 'r') {
+        NcVarAtt ncatt(ncvar.getAtt(name));
+        aval = NcAttValue::get(ncatt);
+    } else {
+        aval.put(ncvar, name);
+    }
+}
+
+
+NcVar get_or_put_all_atts(
+    NcVar &ncvar, char rw,
+    std::vector<std::pair<std::string, NcAttValue>> &avals)
+{
+    if (rw == 'r') {
+        avals.clear();
+        auto atts(ncvar.getAtts());
+        for (auto ii=atts.begin(); ii != atts.end(); ++ii) {
+            avals.push_back(std::make_pair(
+                ii->first, NcAttValue::get(ii->second)));
+
+        }
+    } else {
+        for (auto ii=avals.begin(); ii != avals.end(); ++ii) {
+            std::string const &name(ii->first);
+            NcAttValue const &aval(ii->second);
+
+            aval.put(ncvar, name);
+        }
+    }
+    return ncvar;
+}
+
+std::vector<std::pair<std::string, NcAttValue>> get_all_atts(NcVar const &ncvar)
+{
+    std::vector<std::pair<std::string, NcAttValue>> ret;
+    get_or_put_all_atts(*const_cast<NcVar *>(&ncvar), 'r', ret);
+    return ret;
+}
+
+
 // ============================================================
 // ------ Files:
 // * ETOPO1: Topo everywhere, Ice ONLY for GrIS and AIS
@@ -42,7 +117,7 @@ void store_h(NcIO &ncout, blitz::Array<int16_t,2> val1m, std::string const &vnam
 void etopo1_ice(
     FileLocator const &files,
     bool include_greenland,
-    std::string const &fname_out)
+    std::string const &ofname_root)
 {
     // This is what we construct
     blitz::Array<int16_t,2> fgice1m(JM1m, IM1m);
@@ -57,9 +132,14 @@ void etopo1_ice(
     }
 
 
-    NcIO nch("globaliceh.nc", 'w');
+    NcIO nch(ofname_root + "h.nc", 'w');
 
     // ------- Process ETOPO1
+    // Attributes from ETOPO1 input file, by variable
+    std::map<std::string,
+        std::vector<std::pair<std::string, NcAttValue>>
+    > etopo1_atts;
+
     std::array<char,80> titlei;
     blitz::Array<int16_t,2> zicetop1m(JM1m, IM1m);
     blitz::Array<int16_t,2> focean1m(JM1m, IM1m);
@@ -70,7 +150,8 @@ void etopo1_ice(
         // Continental cells north of 78N are entirely glacial ice.
         // (Except for Greenland, if that is to be done on a separate ice sheet)
         {
-            ncio_blitz(fin, focean1m, "FOCEAN", "short", {});
+            etopo1_atts.insert(std::make_pair("FOCEAN", get_all_atts(
+                ncio_blitz(fin, focean1m, "FOCEAN", "short", {}))));
 
             // Continental cells north of 78N are entirely glacial ice.
             // (but ignore Greenland)
@@ -91,8 +172,10 @@ void etopo1_ice(
             blitz::Array<int16_t,2> zsolid1m(JM1m, IM1m);
 
             // Read zicetop1m, zsolid1m
-            ncio_blitz(fin, zicetop1m, "ZICTOP", "short", {});
-            ncio_blitz(fin, zsolid1m, "ZSOLID", "short", {});
+            etopo1_atts.insert(std::make_pair("ZICTOP", get_all_atts(
+                ncio_blitz(fin, zicetop1m, "ZICTOP", "short", {}))));
+            etopo1_atts.insert(std::make_pair("ZSOLID", get_all_atts(
+                ncio_blitz(fin, zsolid1m, "ZSOLID", "short", {}))));
 
             // Use ETOPO1 for Southern Hemisphere Ice
             for (int j1m=0; j1m < JM1m/2; ++j1m) {
@@ -129,12 +212,20 @@ void etopo1_ice(
             }
 
             // Store zicetop1m, zsolid1m
-            {NcIO ncout(fname_out, 'w');
+            {NcIO ncout(ofname_root + "1m.nc", 'w');
+                ncout.nc->putAtt("source", include_greenland ? "etopo1_ice.cpp" : "etopo1_ice.cpp, Greenland removed");
                 auto dims(get_or_add_dims(ncout, {"jm1m", "im1m"}, {JM1m, IM1m}));
 
-                ncio_blitz(ncout, zicetop1m, "ZICETOP1m", "short", dims);
-                ncio_blitz(ncout, zsolid1m, "ZSOLG1m", "short", dims);
+                NcVar ncvar;
+                ncvar = ncio_blitz(ncout, zicetop1m, "ZICETOP1m", "short", dims);
+                get_or_put_all_atts(ncvar, 'w', etopo1_atts.at("ZICTOP"));
+                ncvar.putAtt("units", "m");
+                ncvar.putAtt("source", include_greenland ? "ETOPO1" : "ETOPO1, Greenland removed");
 
+                ncvar = ncio_blitz(ncout, zsolid1m, "ZSOLG1m", "short", dims);
+                get_or_put_all_atts(ncvar, 'w', etopo1_atts.at("ZSOLID"));
+                ncvar.putAtt("units", "m");
+                ncvar.putAtt("source", include_greenland ? "ETOPO1" : "ETOPO1, Greenland removed");
             }
             store_h(nch, zicetop1m, "ZICETOPh");
             store_h(nch, zsolid1m, "ZSOLGh");
@@ -202,10 +293,19 @@ printf("j1 i1=%d %d (area = %g %g)\n", j1, i1, snow1, remain1m);
     }
 
     // Store zicetop1m, zsolid1m
-    {NcIO ncout(fname_out, 'a');
+    {NcIO ncout(ofname_root + "1m.nc", 'a');
         auto dims(get_or_add_dims(ncout, {"jm1m", "im1m"}, {JM1m, IM1m}));
-        ncio_blitz(ncout, focean1m, "FOCEAN1m", "short", dims);
-        ncio_blitz(ncout, fgice1m, "FGICE1m", "short", dims);
+
+        NcVar ncvar;
+        ncvar = ncio_blitz(ncout, focean1m, "FOCEAN1m", "short", dims);
+        get_or_put_all_atts(ncvar, 'w', etopo1_atts.at("FOCEAN"));
+        ncvar.putAtt("units", "m");
+        ncvar.putAtt("source", include_greenland ? "ETOPO1" : "ETOPO1, Greenland removed");
+
+        ncvar = ncio_blitz(ncout, fgice1m, "FGICE1m", "short", dims);
+        ncvar.putAtt("description", "Fractional ice cover (0 or 1)");
+        ncvar.putAtt("units", "1");
+        ncvar.putAtt("source", include_greenland ? "etopo1_ice.cpp output" : "etopo1_ice.cpp output, Greenland removed");
 
     }
     store_h(nch, focean1m, "FOCEANh");
@@ -216,7 +316,7 @@ printf("j1 i1=%d %d (area = %g %g)\n", j1, i1, snow1, remain1m);
 // ============================================================
 
 struct ParseArgs {
-    std::string ofname;
+    std::string ofname_root;
     bool greenland;
 
     ParseArgs(int argc, char **argv);
@@ -237,15 +337,15 @@ ParseArgs::ParseArgs(int argc, char **argv)
         // that it contains. 
         TCLAP::CmdLine cmd("Command description message", ' ', "<no-version>");
 
-        TCLAP::UnlabeledValueArg<std::string> ofname_a(
-            "ofname", "Name of output file", true, "etopo1_ice.nc", "output filename", cmd);
+        TCLAP::UnlabeledValueArg<std::string> ofname_root_a(
+            "ofname-root", "Root name of output file (without resolution marker or .nc)", true, "etopo1_ice", "output filename", cmd);
         TCLAP::SwitchArg greenland_a("g", "greenland", "Include Greenland?", cmd, false);
 
         // Parse the argv array.
         cmd.parse( argc, argv );
 
         // Get the value parsed by each arg.
-        ofname = ofname_a.getValue();
+        ofname_root = ofname_root_a.getValue();
         greenland = greenland_a.getValue();
 
     } catch (TCLAP::ArgException &e) { // catch any exceptions
@@ -263,5 +363,5 @@ int main(int argc, char** argv)
     ParseArgs args(argc, argv);
 
     // Read the input files
-    etopo1_ice(EnvSearchPath("MODELE_FILE_PATH"), args.greenland, args.ofname);
+    etopo1_ice(EnvSearchPath("MODELE_FILE_PATH"), args.greenland, args.ofname_root);
 }

@@ -101,10 +101,10 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
     // Handle Z_INTERP or ELEV_CLASS_INTERP
 
     // Interpolate in the vertical
-    for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
+    for (int id=0; id<aexgrid.dense_extent(); ++id) {
         long const iA = aexgrid.ijk(id,0);        // GCM Atmosphere grid
         long const iI = aexgrid.ijk(id,1);        // Ice Grid
-        long const iX = aexgrid.dim.to_sparse(id);    // X=Exchange Grid
+        long const iX = aexgrid.to_sparse(id);    // X=Exchange Grid
         long const iG = (dest == IceExch::ICE ? iI : iX);   // G=Interpolation Grid
 
         if (!std::isnan(elevmaskI(iI))) {
@@ -154,10 +154,10 @@ void IceRegridder_L0::GvI(
         }
     } else {
         // Exchange <- Ice
-        for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
+        for (int id=0; id<aexgrid.dense_extent(); ++id) {
             // cell->i = index in atmosphere grid
             long const iI = aexgrid.ijk(id,1);        // index in ice grid
-            long const iX = aexgrid.dim.to_sparse(id);    // index in exchange grid
+            long const iX = aexgrid.to_sparse(id);    // index in exchange grid
 
             // Only include I cells that are NOT masked out
             // Depending on elevmaskI, this could be either just ice
@@ -174,9 +174,9 @@ void IceRegridder_L0::GvAp(
 {
 printf("BEGIN IceRegridder_L0::GvAp()\n");
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
-    for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
+    for (int id=0; id<aexgrid.dense_extent(); ++id) {
         long const iG = (interp_grid == IceExch::ICE ?
-            aexgrid.ijk(id,1) : aexgrid.dim.to_sparse(id));
+            aexgrid.ijk(id,1) : aexgrid.to_sparse(id));
         long const iA = aexgrid.ijk(id,0);
         long const iI = aexgrid.ijk(id,1);
 

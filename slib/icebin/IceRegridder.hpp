@@ -67,7 +67,7 @@ protected:
 
 public:
     AbbrGrid agridI;            /// Ice grid outlines
-    AbbrGrid aexgrid;       /// Exchange grid outlines (between GCM and Ice)
+    ExchangeGrid aexgrid;       /// Exchange grid overlaps (between GCM and Ice)
     InterpStyle interp_style;   /// How we interpolate I<-E.  Determines basis functions in E
 
     // ---------------------------------
@@ -87,7 +87,7 @@ public:
         AbbrGrid const &agridA,
         Grid const &fgridA,
         AbbrGrid const &&_agridI,
-        AbbrGrid const &&_aexgrid,
+        ExchangeGrid const &&_aexgrid,
         InterpStyle _interp_style);
 
     // ------------------------------------------------

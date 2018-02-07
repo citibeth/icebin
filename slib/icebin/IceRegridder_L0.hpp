@@ -39,8 +39,8 @@ public:
 
     /** Number of grid cells in the interpolation grid */
     size_t nG() const {
-        return (interp_grid == IceExch::ICE ? agridI : aexgrid)
-            .dim.sparse_extent();
+        if (interp_grid == IceExch::ICE) return agridI.dim.sparse_extent();
+        return aexgrid.sparse_extent();
     }
 
     IceRegridder_L0() : interp_grid(IceExch::EXCH) {}

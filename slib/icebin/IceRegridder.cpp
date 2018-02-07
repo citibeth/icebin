@@ -94,7 +94,7 @@ void IceRegridder::init(
     AbbrGrid const &agridA,
     Grid const &fgridA,
     AbbrGrid const &&_agridI,
-    AbbrGrid const &&_aexgrid,
+    ExchangeGrid const &&_aexgrid,
     InterpStyle _interp_style)
 {
     agridI = std::move(_agridI);    // convert Grid -> AbbrGrid
@@ -157,8 +157,8 @@ void IceRegridder::filter_cellsA(std::function<bool (long)> const &useA)
 
 
     std::unordered_set<int> good_j;
-    for (int id=0; id<aexgrid.dim.dense_extent(); ++id) {
-        auto const is = aexgrid.dim.to_sparse(id);
+    for (int id=0; id<aexgrid.dense_extent(); ++id) {
+        auto const is = aexgrid.to_sparse(id);
         if (useA(is)) {
             good_index_gridI.insert(aexgrid.ijk(id,1));    // j
             good_index_exgrid.insert(is);
@@ -167,7 +167,13 @@ void IceRegridder::filter_cellsA(std::function<bool (long)> const &useA)
 
     // Remove unneeded cells from gridI
     agridI.filter_cells(std::bind(&in_good, &good_index_gridI, _1));
-    aexgrid.filter_cells(std::bind(&in_good, &good_index_exgrid, _1));
+
+    /** NOTE: This will result in ExchangeGrid cells being renumbered,
+    resulting in different numbering schemes for different processors.
+    That is not a problem because matrices based on this grid are only
+    used temporarily; and this dimension is ultimately multiplied away
+    before being shared between processors or in time. */
+    aexgrid.filter_cellsB(useA);
 }
 // ================================================================
 // ==============================================================

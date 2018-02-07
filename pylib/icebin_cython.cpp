@@ -141,7 +141,7 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
     auto sheet(new_ice_regridder(fgridI->parameterization));
     sheet->init(
         name, cself->agridA, fgridA,
-        AbbrGrid(*fgridI), AbbrGrid(*fexgrid),
+        AbbrGrid(*fgridI), ExchangeGrid(*fexgrid),
         interp_style);
 
     dynamic_cast<GCMRegridder_Standard *>(cself)

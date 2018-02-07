@@ -37,6 +37,64 @@ namespace icebin {
 
 class Grid;
 
+class ExchangeGrid {
+    std::vector<int> indices;    // Length*2: (ixB, ixA)
+    std::vector<double> overlaps;
+
+public:
+    ExchangeGrid() {}
+
+    /** Only works for Grid objects resulting from the overlap program. */
+    explicit ExchangeGrid(Grid const &g);
+
+    void reserve(size_t n)
+    {
+        indices.reserve(n*2);
+        overlaps.reserve(n);
+    }
+
+    void add(std::array<int,2> const &index, double _area)
+    {
+        indices.push_back(index[0]);
+        indices.push_back(index[1]);
+        overlaps.push_back(_area);
+    }
+
+    int dense_extent() const 
+        { return overlaps.size(); }
+
+    long sparse_extent() const
+        { return overlaps.size(); }
+
+    /** Exchange gridcells are numbered in order from 0.
+    Therefore, dense and sparse indexing are equivalent. */
+    long to_sparse(int id) const
+        { return id; }
+
+    int ijk(int id, int index) const
+        { return indices[id*2 + index]; }
+    double native_area(int id) const
+        { return overlaps[id]; }
+
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname)
+    {
+        ncio_vector(ncio, indices, true, vname + ".indices", "int",
+            get_or_add_dims(ncio, indices, {vname + ".nindices"}));
+        ncio_vector(ncio, overlaps, true, vname + ".overlaps", "int",
+            get_or_add_dims(ncio, overlaps, {vname + ".noverlaps"}));
+    }
+
+    /** NOTE: This will result in ExchangeGrid cells being renumbered,
+    resulting in different numbering schemes for different processors.
+    That is not a problem because matrices based on this grid are only
+    used temporarily; and this dimension is ultimately multiplied away
+    before being shared between processors or in time. */
+    void filter_cellsB(std::function<bool(long)> const &keep_B_fn);
+
+};
+
+
+
 struct AbbrGrid {
     ibmisc::clonable_unique_ptr<GridSpec> spec;
     GridCoordinates coordinates;
@@ -91,26 +149,6 @@ struct AbbrGrid {
     AbbrGrid(AbbrGrid const &other);
 
     // ===============================================================
-
-
-#if 0
-    void operator=(AbbrGrid const &other)
-    {
-        type = other.type;
-        spec = other.spec->clone();
-        coordinates = other.coordinates;
-        parameterization = other.parameterization;
-        indexing = other.indexing;
-        name = other.name;
-        sproj = other.sproj;
-
-        dim = other.dim;
-        ijk.reference(other.ijk);
-        native_area.reference(other.native_area);
-        centroid.reference(other.centroid);
-    }
-#endif
-
 };
 
 

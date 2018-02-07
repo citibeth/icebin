@@ -7,6 +7,40 @@ using namespace spsparse;
 
 namespace icebin {
 
+ExchangeGrid::ExchangeGrid(Grid const &g)
+{
+    reserve(g.nrealized());
+
+    // Copy info into ExchangeGrid
+    std::vector<Cell const *> cells(g.cells.sorted());
+    for (auto ii=cells.begin(); ii != cells.end(); ++ii) {
+        Cell const *cell(*ii);
+
+        add({cell->i, cell->j}, cell->native_area);
+    }
+}
+
+/** Filters overlaps based on the destination (BvA = B = index[0]) grid. */
+void ExchangeGrid::filter_cellsB(std::function<bool(long)> const &keep_B_fn)
+{
+    std::vector<int> _indices;    // Length*2: (ixB, ixA)
+    std::vector<double> _overlaps;
+
+    for (size_t id=0; id<overlaps.size(); ++id) {
+        long const iA = _indices[id*2];
+        if (keep_B_fn(iA)) {
+            _indices.push_back(indices[id*2]);
+            _indices.push_back(indices[id*2+1]);
+            _overlaps.push_back(overlaps[id]);
+        }
+    }
+
+    indices = std::move(_indices);
+    overlaps = std::move(_overlaps);
+}
+
+// ====================================================
+
 AbbrGrid::AbbrGrid(
     std::unique_ptr<GridSpec> &&_spec,
     GridCoordinates _coordinates,
@@ -66,9 +100,9 @@ AbbrGrid::AbbrGrid(Grid const &g) :
         if (id >= nd) (*icebin_error)(-1,
             "Index out of range: %d vs %d", id, nd);
 
-        ijk[0](id) = cell->i;
-        ijk[1](id) = cell->j;
-        ijk[2](id) = cell->k;
+        ijk(id,0) = cell->i;
+        ijk(id,1) = cell->j;
+        ijk(id,2) = cell->k;
         native_area(id) = cell->native_area;
         if (g.coordinates == GridCoordinates::XY) {
             auto ctr(cell->centroid());
