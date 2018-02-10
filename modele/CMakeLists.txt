@@ -5,7 +5,7 @@ include_directories(${TCLAP_INCLUDE_DIR})
 
 foreach (PRG
     giss2nc
-    etopo1_ice overlap_hntr
+    etopo1_ice overlap_hntr make_topoo
     # make_topo oneway
 
     # Obsolete

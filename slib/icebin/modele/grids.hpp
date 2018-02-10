@@ -10,7 +10,7 @@ int const IM1m = 21600;
 int const JM1m = 10801;
 int const IM2m = 10800;
 int const JM2m = 5400;
-int const IMS = 2160;
+int const IMS = 2160;        // 10-minute
 int const JMS = 1080;
 int const IMH = 720;
 int const JMH = 360;
@@ -29,7 +29,9 @@ extern HntrSpec const g1qx1;
 extern HntrSpec const g2hx2;
 extern HntrSpec const g5x4;
 
-std::map<std::string, HntrSpec &> grids;
+extern std::map<std::string, HntrSpec const *> const grids;
+
+const double EQ_RAD = 6.371e6; /// Radius of the Earth (same as in ModelE)
 
 }}    // namespace
 

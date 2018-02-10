@@ -41,7 +41,6 @@ using namespace icebin::modele;
 namespace po = boost::program_options;
 
 const double km = 1000.0;
-const double EQ_RAD = 6.371e6; /// Radius of the Earth (same as in ModelE)
 
 
 // http://stackoverflow.com/questions/313970/how-to-convert-stdstring-to-lower-case
@@ -112,7 +111,7 @@ int main(int argc, char **argv)
     bool const pole_caps = vm["pole-caps"].as<bool>();
     bool const points_in_side = (hntr_spec->im > IM1 ? 1 : 2);    // Use 2 for comparison with past experiments
     GridSpec_LonLat spec(make_grid_spec(
-        *hntr_spec, pole_caps, points_in_side, EQ_RAD));
+        *hntr_spec, pole_caps, points_in_side, modele::EQ_RAD));
 
 
     // ------------ Make the grid from the spec

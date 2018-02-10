@@ -55,6 +55,16 @@ int main(int argc, char** argv)
     everytrace_init();
     ParseArgs args(argc, argv);
 
+    std::string et1mfile("etopo1_ice_g1m.nc");
+    make_topoo(EnvSearchPath("MODELE_FILE_PATH"), {
+        "FGICE1m", et1mfile, "FGICE1m",
+        "ZICETOP1m", et1mfile, "ZICETOP",
+        "ZSOLG1m", et1mfile, "ZSOLG",
+        "FOCEAN1m", et1mfile, "FOCEAN",
+        "FLAKES", "Z10MX10M.nc", "FLAKES"
+    });
+
+
     // Read the input files
     printf("============ Reading Input Files\n");
     TopoInputs topo_inputs(topo_inputs_bundle(true));
