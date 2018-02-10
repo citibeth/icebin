@@ -16,29 +16,94 @@ static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 
 
+
+// ==================================================================
+ibmisc::ArrayBundle<int16_t,2> read_etopo1(std::string const &fname)
+{
+    ibmisc::ArrayBundle<int16_t,2> bundle;
+
+    // --------- Arrays we return
+    auto &focean(bundle.add("focean", {
+        "units", "m",
+        "description", "Ice Top Topography (dense indexing)"
+    }));
+    auto &zictop(bundle.add("zictop", {
+        "units", "m",
+        "description", "Ice Top Topography (dense indexing)"
+    }));
+    auto &zsolid(bundle.add("zsolid", {
+        "units", "m",
+        "description", "Solid Ground Topography (dense indexing)"
+    }));
+    bundle.allocate({IM1m, JM1m}, {"im1m", "jm1m"}, true, blitz::fortranArray);
+
+    // ----------- Read into those arrays
+    {fortran::UnformattedInput fin(fname, Endian::BIG);
+    std::array<char,80> titlei;
+
+        // Read from file
+        fortran::read(fin) >> titlei >> focean >> fortran::endr;
+        fortran::read(fin) >> titlei >> zictop >> fortran::endr;
+        fortran::read(fin) >> titlei >> zsolid >> fortran::endr;
+    }
+
+    return bundle;
+}
+
+// ==================================================================
+// -------------------------------------------------------
+ArrayBundle<double,2> greenland_inputs_bundle(bool allocate)
+{
+    ArrayBundle<double, 2> bundle;
+    bundle.add("FOCEN2", {IM2, JM2}, {"im2", "jm2"}, {});
+    bundle.add("ZETOP2", {IM2, JM2}, {"im2", "jm2"}, {
+        "description", "Solid Topography except for ice shelves",
+        "units", "m",
+        "source", "Z2MX2M.NGDC"
+    });
+
+    bundle.add("FOCENS", {IMS, JMS}, {"ims", "jms"}, {});
+
+    bundle.add("FLAKES", {IMS, JMS}, {"ims", "jms"}, {});
+
+    bundle.add("FGICEH", {IMH, JMH}, {"imh", "jmh"}, {});
+
+    bundle.add("FCONT1", {IM1, JM1}, {"im1", "jm1"}, {});
+    bundle.add("FGICE1", {IM1, JM1}, {"im1", "jm1"}, {});
+
+    if (allocate) bundle.allocate(true, blitz::fortranArray);
+
+    return bundle;
+}
+
+GreenlandInputs::GreenlandInputs(ArrayBundle<double,2> &&_bundle) :
+    bundle(std::move(_bundle)),
+    FOCEN2(bundle.array("FOCEN2")),
+    ZETOP2(bundle.array("ZETOP2")),
+    FOCENS(bundle.array("FOCENS")),
+    FLAKES(bundle.array("FLAKES")),
+    FGICEH(bundle.array("FGICEH")),
+    FCONT1(bundle.array("FCONT1")),
+    FGICE1(bundle.array("FGICE1"))
+{
+}
+
+
+
 ArrayBundle<double,2> topo_inputs_bundle(bool allocate)
 {
 
     ArrayBundle<double,2> bundle;
-    // ---------------------------------------------------
-    // ---- Output from etopo1_ice
-    bundle.add("FOCEN1m", {IM1m, JM1m}, {"im2", "jm2"}, {
+    bundle.add("FOCEN2", {IM2, JM2}, {"im2", "jm2"}, {
         "description", "Ocean Fraction",
+        "units", "0 or 1",
     });
-    bundle.add("FGICE1m", {IM1m, JM1m}, {"im2", "jm2"}, {
-        "description", "Ocean Fraction",
+    bundle.add("ZETOP2", {IM2, JM2}, {"im2", "jm2"}, {
+        "description", "Solid Topography except for ice shelves",
+        "units", "m",
+        "source", "Z2MX2M.NGDC"
     });
 
-    bundle.add("ZICTOP1m", {IM1m, JM1m}, {"im2", "jm2"}, {
-        "description", "Solid Topography, top of ice",
-        "units", "m",
-    });
-    bundle.add("ZSOLG1m", {IM1m, JM1m}, {"im2", "jm2"}, {
-        "description", "Solid Bedrock Topography",
-        "units", "m",
-    });
-
-    // ---------------------------------------------------
     bundle.add("FLAKES", {IMS, JMS}, {"ims", "jms"}, {
         "description", "Lake Fraction",
         "units", "0:1",
@@ -80,12 +145,8 @@ ArrayBundle<double,2> topo_inputs_bundle(bool allocate)
 
 TopoInputs::TopoInputs(ArrayBundle<double,2> &&_bundle) :
     bundle(std::move(_bundle)),
-    FOCEN1m(bundle.array("FOCEN1m")),
-    FGICE1m(bundle.array("FGICE1m")),
-    ZICTOP1m(bundle.array("ZICTOP1m")),
-    ZSOLG1m(bundle.array("ZSOLG1m")),
-   
-
+    FOCEN2(bundle.array("FOCEN2")),
+    ZETOP2(bundle.array("ZETOP2")),
     FLAKES(bundle.array("FLAKES")),
     dZGICH(bundle.array("dZGICH")),
     FGICEH(bundle.array("FGICEH")),
@@ -99,16 +160,41 @@ TopoInputs::TopoInputs(ArrayBundle<double,2> &&_bundle) :
 
 
 // ======================================================================
-void read_raw(TopoInputs &in, FileLocator const &files)
+void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLocator const &files)
 {
     std::array<char,80> titlei;
 
     printf("BEGIN z1qx1n_bs1 Read Input Files\n");
 
     // ---------------------------------------------------------
-    // Read output of etopo1_ice (on 2mx2m grid)
-    // Read hand-modified FOCEN1m
-    TODO
+    // Read in Z2MX2M.NGDC
+    // Read hand-modified FOCEN2
+    blitz::Array<double,2> greenland_focen2(
+        greenland ? greenland->FOCEN2 : blitz::Array<double,2>(IM2,JM2,fortranArray));
+    {NcIO ncio(files.locate("Z2MX2M.NGDC-SeparateGreenland.nc"), 'r');
+        ncio_blitz(ncio, in.FOCEN2, "FOCEN2", "double",
+            get_dims(ncio, {"jm2", "im2"}));    // ncdims in nc order
+
+        ncio_blitz(ncio, in.ZETOP2, "ZETOP2", "double",
+            get_dims(ncio, {"jm2", "im2"}));    // ncdims in nc order
+
+        // Separate Greenland from the rest
+        greenland_focen2 = NaN;
+
+        for (int j=1; j<=JM2; ++j) {
+        for (int i=1; i<=IM2; ++i) {
+            if (in.FOCEN2(i,j) == 2.0) {
+                if (separate) {
+                    greenland_focen2(i,j) = 0.0;
+                    if (greenland) greenland->ZETOP2(i,j) = in.ZETOP2(i,j);
+                    in.FOCEN2(i,j) = 1.0;
+                    in.ZETOP2(i,j) = -300.0;    // Greenland -> -300m ocean basin
+                } else {
+                    in.FOCEN2(i,j) = 0.0;
+                }
+            }
+        }}
+    }
 
     // ---------------------------------------------------------
     // Read in Z10MX10M
@@ -122,25 +208,24 @@ void read_raw(TopoInputs &in, FileLocator const &files)
     }
 
 
-    // Zero out lakes over Greenland
-#if 0
-TODO
-    blitz::Array<double, 2> WT2(const_array(shape(IM1m, JM1m), 1.0, FortranArray<2>()));
-    Hntr hntr1mh(17.17, g10mx10m, g1mx1m, 0);
-    blitz::Array<double,2> greenland_focens(
-        greenland ? greenland->FOCENS : blitz::Array<double,2>(IMS,JMS,fortranArray));
+    if (separate) {
+        // Zero out lakes over Greenland
+        blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
+        Hntr hntr2mh(17.17, g10mx10m, g2mx2m, 0);
+        blitz::Array<double,2> greenland_focens(
+            greenland ? greenland->FOCENS : blitz::Array<double,2>(IMS,JMS,fortranArray));
 
-    hntr1mh.regrid(WT2, greenland_focen2, greenland_focens, 0);
+        hntr2mh.regrid(WT2, greenland_focen2, greenland_focens, 0);
 
-    if (greenland) greenland->FLAKES = NaN;
-    for (int j=1; j<=JMS; ++j) {
-    for (int i=1; i<=IMS; ++i) {
-        if (std::abs(greenland_focens(i,j)) < 1e-14) {
-            if (greenland) greenland->FLAKES(i,j) = in.FLAKES(i,j);
-            in.FLAKES(i,j) = 0.0;
-        }
-    }}
-#endif
+        if (greenland) greenland->FLAKES = NaN;
+        for (int j=1; j<=JMS; ++j) {
+        for (int i=1; i<=IMS; ++i) {
+            if (std::abs(greenland_focens(i,j)) < 1e-14) {
+                if (greenland) greenland->FLAKES(i,j) = in.FLAKES(i,j);
+                in.FLAKES(i,j) = 0.0;
+            }
+        }}
+    }
 
     // ---------------------------------------------------------
     // Read in ZICEHXH
@@ -179,10 +264,13 @@ TODO
     // Read in ZNGDC1
     // Read hand-modified FCONT1 (formerly from "ZNGDC1")
     {NcIO ncio(files.locate("ZNGDC1-SeparateGreenland.nc"), 'r');
+printf("BB1\n");
         ncio_blitz(ncio, in.FCONT1, "FCONT1", "double",
             get_dims(ncio, {"jm1", "im1"}));
+printf("BB2\n");
         ncio_blitz(ncio, in.FGICE1, "FGICE1", "double",
             get_dims(ncio, {"jm1", "im1"}));
+printf("BB3\n");
 
         // Separate Greenland from the rest
         if (greenland) {
@@ -209,11 +297,175 @@ TODO
 }
 
 
+template<class TypeT, int RANK>
+ibmisc::ArrayBundle<TypeT, RANK> elev_ice_bundle()
+{
+    ibmisc::ArrayBundle<TypeT, RANK> bundle;
+    bundle.add("fgice", {
+        "description", "Fractional ice cover (rounded to 0 or 1)",
+        "units", "1",
+        "source", "ETOPO1 + FGICEH"});
+    bundle.add("elev", {
+        "description", "Elevation, bottom of atmosphere",
+        "units", "m",
+        "source", "ETOPO1"});
+    return bundle;
+}
+
+Etopo1Ice etopo1_ice(
+    HntrSpec const &hntrA,              // Coarse grid
+    blitz::Array<double,2> &FGICE,      // As read from Fortran file
+    HntrSpec const &hntrI,              // Fine-scale grid
+    blitz::Array<int16_t,2> &FOCEAN,      // As read from Fortran file
+    blitz::Array<int16_t,2> &ZICTOP,    // As read from Fortran file
+    blitz::Array<int16_t,2> &ZSOLID)
+{
+    Etopo1Ice ret(elev_ice_bundle<double,1>());
+    auto &dimI(ret.dimI);
+
+    blitz::Array<double,1> fgiceAs(reshape1(FGICE));
+    blitz::Array<int16_t,1> foceanIs(reshape1(FOCEAN));
+    blitz::Array<int16_t,1> zictopIs(reshape1(ZICTOP));
+    blitz::Array<int16_t,1> zsolidIs(reshape1(ZSOLID));
+    int nIs = foceanIs.extent(0);
+
+    int const nIS = hntrI.size();
+
+
+
+    // ---------------- Determine dimI
+
+    // ------- Grid cells we know are 100% ice
+    // Continental cells north of 78N are entirely glacial ice.
+    for (int ijIs=(hntrI.jm*14/15) * hntrI.im; ijIs < nIs; ++ijIs)
+        if (foceanIs(ijIs) == 0) dimI.add_dense(ijIs);
+
+    // Add ETOP1 gridcells to the indexing
+    // Count number of used grid cells
+    for (int iIs=0; iIs<nIs; ++iIs)
+        if (zictopIs(iIs) != zsolidIs(iIs)) dimI.add_dense(iIs);
+
+    // Mark where the 100% ice grid cells end
+    int const nId_Etopo1 = dimI.dense_extent();    // Indices that are JUST Etopo1
+
+    // -------- Grid cells that may be <100% ice
+    // Add to dimI indices from AvI (unscaled), derived from from fgiceA
+    Hntr hntr(17.17, hntrA, hntrI);
+    TupleList<int,double,2> AvI;
+
+    struct IncludeIce {
+        blitz::Array<double,1> const & fgice;    // 0-based
+        IncludeIce(blitz::Array<double,1> const &_fgice) : fgice(_fgice) {}
+        bool operator()(int i)  // true if we want to use this cell
+            { return fgice(i) > 0.; }
+    };
+    hntr.overlap(
+            accum::to_dense_ignore_missing(
+                std::array<decltype(&dimI),2>{nullptr, &dimI},
+            accum::ref(AvI)),
+        1.0,    // Don't need radius here, we are scale free
+        IncludeIce(fgiceAs));
+
+
+
+    // ---------------------- Allocate
+    int nId = dimI.dense_extent();
+
+    blitz::Array<double,1> &fgiceId(ret.bundle.array("fgice"));
+    blitz::Array<double,1> &elevId(ret.bundle.array("elev"));
+    ret.bundle.allocate({nId}, {"nId"});
+    fgiceId = NaN;
+    elevId = NaN;
+
+    // Densify into allocated space
+    // Set 100% ice cells to 100% ice
+    for (int iId=0; iId<nId_Etopo1; ++iId) {
+        int const iIs = dimI.to_sparse(iId);
+        fgiceId(iId) = 1.0;
+        elevId(iId) = zictopIs(iIs);
+    }
+    // Fill in elevId for everywhere
+    for (int iId = nId_Etopo1; iId < dimI.dense_extent(); ++iId) {
+        int const iIs = dimI.to_sparse(iId);
+        elevId(iId) = zictopIs(iIs);
+    }
+
+    // ---------- Determine snow-covered areas from fgiceA
+    // If fgiceA(iA) = xyz%, then select the top xyz% of grid
+    // cells in iI corresponding to iA.
+
+
+    // sort AvI by A, then descending elevation in I...
+    struct Compare {    // Tuple is (iAs, iId)
+        blitz::Array<double,1> &elevId;
+        Compare(blitz::Array<double,1> &_elevId) : elevId(_elevId) {}
+
+        bool operator()(
+            Tuple<int,double,2> const &a,
+            Tuple<int,double,2> const &b)
+        {
+            if (a.index(0) < b.index(0)) return true;
+            if (a.index(0) > b.index(0)) return false;
+            return elevId(a.index(1)) > elevId(b.index(1));
+        }
+    };
+    std::sort(AvI.tuples.begin(), AvI.tuples.end(), Compare(elevId));
+
+    // Add a sentinel to make block-scan easier
+    AvI.add({-1, -1}, 0.0);
+
+    // Scan through by A grid cell (and the I cells that overlap it)
+    HntrGrid hgridI(hntrI);    // Make dxyp available
+    HntrGrid hgridA(hntrA);    // Make dxyp available
+    int l0 = 0;
+    int lastAs = AvI[0].index(0);
+    for (int l1=1; l1<AvI.size(); ++l1) {
+        auto const ijAs(AvI[l1].index(0));    // Sparse indexing
+        auto const ijId(AvI[l1].index(1));    // Dense indexing
+
+        if (ijAs != lastAs) {
+            // ---------- Process block l0...l1
+
+            // Get latitude index from 1-D index
+            int jA = ijAs / hntrA.im;    // ModelE indexing
+
+            // Snow-covered area for this A cell
+            double snowA = fgiceAs(ijAs) * hgridA.dxyp(jA+1);     // [m^2]
+
+            // Amount of snow-covered area we need to allocate to ice grid
+            double remainI = snowA;
+            for (int ix=l0; ix<l1; ++ix) {
+                int const ijIs = dimI.to_sparse(ijId);    // to sparse indexing
+                int const jI = ijIs / hntrI.im;    // ModelE 2-D indexing
+                double const areaI = hgridI.dxyp(jI+1);
+
+                if (areaI <= remainI) {
+                    fgiceId(ijId) = 1.0;
+                    remainI -= areaI;
+                } else {
+                    // I grid cell overflows allocated ice in A
+                    fgiceId(ijId) = remainI / areaI;
+                    remainI = 0;
+                    break;
+                }
+            }
+            lastAs = ijAs;
+        }
+    }
+
+    // Round fgiceI to get final hi-res ice mask
+    for (int iId=0; iId<fgiceId.extent(0); ++iId)
+        fgiceId(iId) = std::round(fgiceId(iId));
+
+    return ret;
+}
+
+
 void callZ(
-    // (IM1m, JM1m)
-    blitz::Array<double,2> &FOCEN1m,
-    blitz::Array<double,2> &ZICTOP1m,
-    blitz::Array<double,2> &ZSOLG1m,
+    // (IM2, JM2)
+    blitz::Array<double,2> &FOCEN2,
+    blitz::Array<double,2> &ZSOLD2,
+    blitz::Array<double,2> &ZSOLG2,
 
     // (IM, IM)
     blitz::Array<double,2> &FOCEAN,
@@ -235,10 +487,10 @@ void callZ(
 
     ArrayBundle<double,2> bundle;
 
-    // (IM1m, JM1m)
-    bundle.add("FOCEN1m", FOCEN1m, {"im2", "jm2"}, {});
-    bundle.add("ZICTOP1m", ZICTOP1m, {"im2", "jm2"}, {});
-    bundle.add("ZSOLG1m", ZSOLG1m, {"im2", "jm2"}, {});
+    // (IM2, JM2)
+    bundle.add("FOCEN2", FOCEN2, {"im2", "jm2"}, {});
+    bundle.add("ZSOLD2", ZSOLD2, {"im2", "jm2"}, {});
+    bundle.add("ZSOLG2", ZSOLG2, {"im2", "jm2"}, {});
 
     // (IM, IM)
     bundle.add("FOCEAN", FOCEAN, {"im", "jm"}, {});
@@ -260,28 +512,28 @@ void callZ(
 
 
     //
-    // Input:  FOCEN1m = ocean fraction at 2 x 2 (minute)
-    //         ZICTOP1m = solid topography (above ice) at 2 x 2 (minute)
-    //         ZSOLG1m = solid ground topography at 2 x 2 (minute)
+    // Input:  FOCEN2 = ocean fraction at 2 x 2 (minute)
+    //         ZSOLD2 = solid topography (above ice) at 2 x 2 (minute)
+    //         ZSOLG2 = solid ground topography at 2 x 2 (minute)
     //
     // Output: ZATMO  = atmospheric topography (m)
     //         dZLAKE = mean lake thickness (m)
     //         ZSOLDG = solid ground topography (m)
-    //         ZSGLO  = lowest value of ZICTOP1m in model cell (m)
+    //         ZSGLO  = lowest value of ZSOLD2 in model cell (m)
     //         ZLAKE  = surface lake topography (m)
     //         ZGRND  = altitude break between ground and land ice (m)
-    //         ZSGHI  = highes value of ZICTOP1m in model cell (m)
+    //         ZSGHI  = highes value of ZSOLD2 in model cell (m)
     //
 
-    HntrGrid grid_g1mx1m(g1mx1m);
+    HntrGrid grid_g2mx2m(g2mx2m);
 
     for (int J=1; J <= JM; ++J) {
-        int J11 = (J-1)*JM1m/JM + 1;    // 1-minute cells inside (I,J)
-        int J1M = J*JM1m/JM;
+        int J21 = (J-1)*JM2/JM + 1;    // 2-minute cells inside (I,J)
+        int J2M = J*JM2/JM;
         int const IMAX= (J==1 || J==JM ? 1 : IM);
         for (int I=1; I<=IMAX; ++I) {
-            int I11 = (I-1)*IM1m/IM + 1;
-            int I1m = (IMAX == 1 ? IM1m : I*IM1m/IM);
+            int I21 = (I-1)*IM2/IM + 1;
+            int I2M = (IMAX == 1 ? IM2 : I*IM2/IM);
 
             if (FOCEAN(I,J) != 0) {   // (I,J) is an ocean cell
                 ZATMO(I,J) = 0;
@@ -291,18 +543,18 @@ void callZ(
                 ZGRND(I,J) = 0;
                 ZSGHI(I,J) = 0;
                 ZSGLO(I,J) = 999999;
-                for (int J2=J11; J2 <= J1M; ++J2) {
-                for (int I2=I11; I2 <= I1m; ++I2) {
-                    if (ZSGLO(I,J) > ZICTOP1m(I2,J2) && FOCEN1m(I2,J2) == 1.) {
-                        ZSGLO(I,J) = ZICTOP1m(I2,J2);
+                for (int J2=J21; J2 <= J2M; ++J2) {
+                for (int I2=I21; I2 <= I2M; ++I2) {
+                    if (ZSGLO(I,J) > ZSOLD2(I2,J2) && FOCEN2(I2,J2) == 1.) {
+                        ZSGLO(I,J) = ZSOLD2(I2,J2);
                     }
                 }}
 
                 if (ZSGLO(I,J) == 999999) (*icebin_error)(-1,
                     "Ocean cell (%d,%d) has no ocean area on 2-minute grid; "
-                    "I11,I1m,J11,J1M = %d,%d,%d,%d",
+                    "I21,I2M,J21,J2M = %d,%d,%d,%d",
                     I,J,
-                    I11,I1m,J11,J1M);
+                    I21,I2M,J21,J2M);
             } else {  // (I,J) is a continental cell
                 // Order 2-minute continental cells within (I,J) and sum their area
                 struct AreaDepth {
@@ -318,20 +570,20 @@ void callZ(
                 double SAREA = 0;
                 double SAZSG = 0;
                 int NM = 0;
-                for (int J1m=J11; J1m <= J1M; ++J1m) {
-                for (int I2m=I11; I2m <= I1m; ++I2m) {
-                    if (FOCEN1m(I2m,J1m) == 1) continue;
-                    double area = grid_g1mx1m.dxyp(J1m);
-                    cells2.push_back(AreaDepth(area, ZICTOP1m(I2m,J1m)));
+                for (int J2=J21; J2 <= J2M; ++J2) {
+                for (int I2=I21; I2 <= I2M; ++I2) {
+                    if (FOCEN2(I2,J2) == 1) continue;
+                    double area = grid_g2mx2m.dxyp(J2);
+                    cells2.push_back(AreaDepth(area, ZSOLD2(I2,J2)));
 
                     SAREA += area;
-                    SAZSG += area*ZSOLG1m(I2m,J1m);
+                    SAZSG += area*ZSOLG2(I2,J2);
                 }}
                 std::sort(cells2.begin(), cells2.end());
 
                 if (SAREA == 0) (*icebin_error)(-1,
                     "Continental cell (%d,%d) has no continental area on 2-minute grid. (%d-%d, %d-%d)",
-                    I,J,I11,I1m,J11,J1M);
+                    I,J,I21,I2M,J21,J2M);
 
                 // Determine ZSOLDG
                 ZSOLDG(I,J) = SAZSG / SAREA;
@@ -432,14 +684,176 @@ void z1qx1n_bs1(TopoInputs &in, std::string const &etopo1_fname, TopoOutputs<2> 
     double const TWOPI = 2. * M_PI;
     double const AREAG = 4. * M_PI;
 
+    // ----------- Get hi-res ice mask and elevations
+    ibmisc::ArrayBundle<int16_t,2> etopo1(read_etopo1(etopo1_fname));
+    Etopo1Ice e1ice(etopo1_ice(
+        ghxh,
+            in.FGICEH,
+        g1mx1m,
+            etopo1.array("focean"),
+            etopo1.array("zictop"),
+            etopo1.array("zsolid")));
+    etopo1.free();
+
+
+#if 1
+// ------- Test: convert what we have so far to 1-degree so we can see it.
+{
+    // ------------ Convert to 1-degree
+    Hntr hntr(17.17, g1x1, g1mx1m);
+
+    auto bundleA(elev_ice_bundle<double,2>());
+    bundleA.allocate({g1x1.im, g1x1.jm}, {"im1", "jm1"}, true, blitz::fortranArray);
+
+    struct MyAccum {
+        SparseSet<int,int> &dimI;
+        blitz::Array<double,2> &fgiceAs;
+        blitz::Array<double,2> &elevAs;
+        blitz::Array<double,1> &fgiceId;
+        blitz::Array<double,1> &elevId;	// Mas is implied; masked-out cells aren't in dimI
+        MyAccum(
+            SparseSet<int,int> &_dimI,
+            ArrayBundle<double,1> &bundleId,
+            ArrayBundle<double,2> &bundleAs)
+        :
+            dimI(_dimI),
+            fgiceId(bundleId.array("fgice")),
+            elevId(bundleId.array("elev")),
+            fgiceAs(bundleAs.array("fgice")),
+            elevAs(bundleAs.array("elev"))
+        {
+            fgiceAs = 0;
+            elevAs = 0;
+        }
+        void add(std::array<int,2> index, double val) {
+            auto const iAs = index[0];
+            auto const iIs = index[1];
+            if (!dimI.in_sparse(iIs)) return;
+
+            int const iId = dimI.to_dense(iIs);
+            fgiceAs(iAs) += val * fgiceId(iId);
+            elevAs(iAs) += val * elevId(iId);
+        }
+    };
+
+    hntr.scaled_regrid_matrix(MyAccum(e1ice.dimI, e1ice.bundle, bundleA));
+
+
+    // ------------ Store for manual checking
+    NcIO ncio("allice.nc", 'w');
+    bundleA.ncio(ncio, {}, "", "double");
+}
+return;
+#endif
+
+
+    //
+    // Add small ice cap and glacier data to FGICEH and dZGICH
+    // north of Antarctic area.
+
+    blitz::Array<double, 2> WT1(const_array(blitz::shape(IM1, JM1), 1.0, FortranArray<2>()));
+    Hntr hntr1h(17.17, ghxh, g1x1);
+    auto FCON1H(hntr1h.regrid(WT1, in.FCONT1));
+    auto FGIC1H(hntr1h.regrid(WT1, in.FGICE1));
+
+    // RGIC1H = areal ratio of glacial ice to continent
+    // For smaller ice caps and glaciers, dZGICH = CONSTK * RGIC1H^.3
+    // Constant is chosen so that average value of dZGICH is 264.7 m
+    // 264.7  =  sum(DXYP*FGIC1H*dZGICH) / sum(DXYP*FGIC1H)  =
+    //        =  CONSTK * sum(DXYP*FGIC1H*RGIC1H^.3) / sum(DXYP*FGIC1H)
+    double SUMDFR = 0;
+    double SUMDF = 0;
+    HntrGrid grid_ghxh(ghxh);
+    blitz::Array<double,2> RGIC1H(IMH, JMH, fortranArray);
+    for (int JH=1+JMH/6; JH<=JMH; ++JH) {
+        double sum1 = 0;
+        double sum2 = 0;
+        for (int IH=1; IH<=IMH; ++IH) {
+            if (in.FGICEH(IH,JH) > 0)
+                FGIC1H(IH,JH) = 0;  //  ignore Greenland
+            RGIC1H(IH,JH) = FGIC1H(IH,JH) / (FCON1H(IH,JH)+1e-20);
+            sum1 += FGIC1H(IH,JH) * std::pow(RGIC1H(IH,JH),.3);
+            sum2 += FGIC1H(IH,JH);
+        }
+        SUMDFR += grid_ghxh.dxyp(JH) * sum1;
+        SUMDF += grid_ghxh.dxyp(JH) * sum2;
+    }
+    double CONSTK = 264.7 * SUMDF / SUMDFR;
+
+    // Replace in.FGICEH and dZGICH away from Greenland
+    for (int JH=JMH/6+1; JH <= JMH; ++JH) {
+        for (int IH=1; IH <= IMH; ++IH) {
+            if (in.FGICEH(IH,JH) == 0) {
+                in.FGICEH(IH,JH) = FGIC1H(IH,JH);
+                in.dZGICH(IH,JH) = CONSTK * std::pow(RGIC1H(IH,JH), .3);
+            }
+        }
+    }
+
+
+    // ETOPO2 treats Antarctic ice shelves as ocean.
+    // When this happens ETOPO2 data are replaced with interpolated data
+    // from in.FGICEH and dZGICH.  Resulting files are:
+    // FOCEN2 = Ocean fraction (0 or 1) correct for Antarctic ice shelves
+    // FCONT2 = Continental fraction (0 or 1)
+    // FGICE2 = Glacial ice fraction (0 or 1)
+    // dZGIC2 = Thickness of glacial ice (m)
+    // ZSOLD2 = Solid topography (m)        (above ice)
+    // ZSOLG2 = Solid ground topography (m) (beneath ice)
+    //
+    blitz::Array<double, 2> WTH(const_array(blitz::shape(IMH, JMH), 1.0, FortranArray<2>()));
+    Hntr hntrhm2(17.17, g2mx2m, ghxh);
+    auto FGICE2(hntrhm2.regrid(WTH, in.FGICEH));
+    auto dZGIC2(hntrhm2.regrid(in.FGICEH, in.dZGICH));
+    auto ZSOLD2(hntrhm2.regrid(in.FGICEH, in.ZSOLDH));
+
+    // North of Antarctic area: 60S to 90N
+    blitz::Array<double,2> FCONT2(IM2, JM2, fortranArray);
+    blitz::Array<double,2> ZSOLG2(IM2, JM2, fortranArray);
+    for (int J2=JM2/6+1; J2 <= JM2; ++J2) {
+        FCONT2(Range::all(), J2) = 1. - in.FOCEN2(Range::all(), J2);
+        FGICE2(Range::all(), J2) = FGICE2(Range::all(), J2) * FCONT2(Range::all(), J2);
+        dZGIC2(Range::all(), J2) = dZGIC2(Range::all(), J2) * FCONT2(Range::all(), J2);
+        ZSOLD2(Range::all(), J2) = in.ZETOP2(Range::all(), J2);
+        ZSOLG2(Range::all(), J2) = in.ZETOP2(Range::all(), J2) - dZGIC2(Range::all(), J2);
+    }
+
+    // Antarctic area: 90S to 60S
+    for (int J2=1; J2<=JM2/6; ++J2) {
+    for (int I2=1; I2<=IM2; ++I2) {
+        if (in.FOCEN2(I2,J2) == 0) {
+            // in.FOCEN2(I2,J2) = 0
+            FCONT2(I2,J2) = 1;
+            FGICE2(I2,J2) = 1;
+            // dZGIC2(I2,J2) = dZGIC2(I2,J2)  //  in.ZETOP2 has 2m and other low
+            // ZSOLD2(I2,J2) = ZSOLD2(I2,J2)       values over ice shelves
+            if (in.ZETOP2(I2,J2) >= 100)  ZSOLD2(I2,J2) = in.ZETOP2(I2,J2);
+            ZSOLG2(I2,J2) = ZSOLD2(I2,J2) - dZGIC2(I2,J2);
+        } else if (FGICE2(I2,J2) <= .5) {  //  and in.FOCEN2(I2,J2) == 1
+            // in.FOCEN2(I2,J2) = 1
+            FCONT2(I2,J2) = 0;
+            FGICE2(I2,J2) = 0;
+            dZGIC2(I2,J2) = 0;
+            ZSOLD2(I2,J2) = in.ZETOP2(I2,J2);
+            ZSOLG2(I2,J2) = in.ZETOP2(I2,J2);
+        } else if (FGICE2(I2,J2) > .5) {  //  and in.FOCEN2(I2,J2) == 1
+            in.FOCEN2(I2,J2) = 0;
+            FCONT2(I2,J2) = 1;
+            FGICE2(I2,J2) = 1;
+            dZGIC2(I2,J2) = ZSOLD2(I2,J2) - in.ZETOP2(I2,J2);
+            // ZSOLD2(I2,J2) = ZSOLD2(I2,J2)
+            ZSOLG2(I2,J2) = in.ZETOP2(I2,J2);
+        }
+    }}
+
 
     //
     // FOCEAN: Ocean Surface Fraction (0:1)
     //
     // Fractional ocean cover FOCENF is interpolated from FOAAH2
-    blitz::Array<double, 2> WT2(const_array(shape(IM1m, JM1m), 1.0, FortranArray<2>()));
-    Hntr hntr1mq1(17.17, g1qx1, g1mx1m);
-    hntr1mq1.regrid(WT2, in.FOCEN1m, out.FOCENF, true);    // Fractional ocean cover
+    blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
+    Hntr hntr2mq1(17.17, g1qx1, g2mx2m);
+    hntr2mq1.regrid(WT2, in.FOCEN2, out.FOCENF, true);    // Fractional ocean cover
 
     // FOCEAN (0 or 1) is rounded from FOCEAN
     for (int j=1; j<=JM; ++j) {
@@ -565,8 +979,31 @@ void z1qx1n_bs1(TopoInputs &in, std::string const &etopo1_fname, TopoOutputs<2> 
     //
     // FGICE: Glacial Ice Surface Fraction (0:1)
     //
-    // FGICE is interpolated from FGICE1m
-    hntr1mq1.regrid(FCONT2, in.FGICE1m, out.FGICE, true);
+    // FGICE is interpolated from FGICE2
+    hntr2mq1.regrid(FCONT2, FGICE2, out.FGICE, true);
+
+    // Antarctica is entirely glacial ice, no lakes nor ground
+    for (int j=1; j<=JM/6; ++j) {
+        out.FGICE(Range::all(), j) = 1. - out.FOCEAN(Range::all(), j);
+    }
+
+    // Continental cells north of 78N are entirely glacial ice
+    for (int j=(JM*14)/15+1; j<=JM; ++j) {
+        out.FGICE(Range::all(), j) = 1. - out.FOCEAN(Range::all(), j);
+    }
+
+    // There is no glacial ice over oceans
+    for (int j=JM/6+1; j<=JM; ++j) {
+        out.FGICE(Range::all(), j) *= (1. - out.FOCEAN(Range::all(), j));
+    }
+
+    // Round FGICE to nearest 1/256
+    for (int j=1; j<=JM; ++j) {
+    for (int i=1; i<=IM; ++i) {
+        out.FGICE(i,j) = std::round(out.FGICE(i,j)*256.) / 256.;
+    }}
+
+
 
     // Check that FGICE is between 0 and 1
     // If out.FGICE+FLAKE exceeds 1, reduce FLAKE
@@ -607,7 +1044,7 @@ void z1qx1n_bs1(TopoInputs &in, std::string const &etopo1_fname, TopoOutputs<2> 
     //
     // dZOCEN: Ocean Thickness (m)
     //
-    hntr1mq1.regrid(in.FOCEN1m, in.ZSOLG1m, out.dZOCEN, true);
+    hntr2mq1.regrid(in.FOCEN2, ZSOLG2, out.dZOCEN, true);
     for (int j=1; j<=JM; ++j) {
     for (int i=1; i<=IM; ++i) {
         out.dZOCEN(i,j) = -out.dZOCEN(i,j) * out.FOCEAN(i,j);
@@ -621,16 +1058,11 @@ void z1qx1n_bs1(TopoInputs &in, std::string const &etopo1_fname, TopoOutputs<2> 
     //
     // dZGICE: Glacial Ice Thickness (m)
     //
-    blitz::Array<double, 2> zictop(IM,JM, blitz::fortranArray);
-    hntr1mq1.regrid_cast<int16_t,double>(in.FGICE1m, in.ZICTOP1m, zictop, true);
-    blitz::Array<double, 2> zsolg(IM,JM, blitz::fortranArray);
-    hntr1mq1.regrid_cast<int16_t,double>(in.FGICE1m, in.ZSOLG1m, zsolg, true);
-
+    hntr2mq1.regrid(FGICE2, dZGIC2, out.dZGICE, true);
     for (int J=1; J<=JM; ++J) {
     for (int I=1; I<=IM; ++I) {
-        double dzgice = zictop(I,J) - zsolg(I,J);
         if (out.FGICE(I,J) > 0) {
-            out.dZGICE(I,J) = std::max(dzgice, 1.);
+            out.dZGICE(I,J) = std::max(out.dZGICE(I,J), 1.);
         } else {
             out.dZGICE(I,J) = 0;
         }
@@ -640,14 +1072,14 @@ void z1qx1n_bs1(TopoInputs &in, std::string const &etopo1_fname, TopoOutputs<2> 
     // ZATMO  = Atmospheric topography (m)
     // dZLAKE = Mean lake thickness (m)
     // ZSOLDG = Solid ground topography (m)
-    // ZSGLO  = Lowest value of ZICTOP1m in model cell (m)
+    // ZSGLO  = Lowest value of ZSOLD2 in model cell (m)
     // ZLAKE  = Surface lake topography (m)
     // ZGRND  = Altitude break between ground and land ice (m)
-    // ZSGHI  = Highest value of ZICTOP1m in model cell (m)
+    // ZSGHI  = Highest value of ZSOLD2 in model cell (m)
     //
     out.ZSOLDG = - out.dZOCEN;  //  solid ground topography of ocean
     callZ(
-        in.FOCEN1m,in.ZICTOP1m,in.ZSOLG1m,
+        in.FOCEN2,ZSOLD2,ZSOLG2,
         out.FOCEAN, out.FLAKE, out.FGRND, out.ZATMO,
         out.dZLAKE,out.ZSOLDG,out.ZSGLO,out.ZLAKE,out.ZGRND,out.ZSGHI);
 
