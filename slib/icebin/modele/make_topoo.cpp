@@ -1,10 +1,9 @@
 #include <cmath>
-#include <boost/filesystem.hpp>
 #include <ibmisc/fortranio.hpp>
 #include <icebin/error.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/make_topoo.hpp>
-
+#include <icebin/modele/grids.hpp>
 
 using namespace blitz;
 using namespace ibmisc;
@@ -204,18 +203,18 @@ static const std::vector<ElevPoints> resets
 
 
 
-blitz::ArrayBundle<double,2> make_topoO(
+static ibmisc::ArrayBundle<double,2> make_topoO(
     // -------- 1-minute resolution
-    blitz::Array<uint16_t,2> const &FGICE1m,
-    blitz::Array<uint16_t,2> const &ZICETOP1m,
-    blitz::Array<uint16_t,2> const &ZSOLG1m,
-    blitz::Array<uint16_t,2> const &FOCEAN1m,
+    blitz::Array<int16_t,2> const &FGICE1m,
+    blitz::Array<int16_t,2> const &ZICETOP1m,
+    blitz::Array<int16_t,2> const &ZSOLG1m,
+    blitz::Array<int16_t,2> const &FOCEAN1m,
     // -------- 10-minute resolution
     blitz::Array<double,2> const &FLAKES)
 
 {
     // ----------------------- Set up output variables
-    blitz::ArrayBundle<double,2> out;
+    ibmisc::ArrayBundle<double,2> out;
     auto &FOCEAN(out.add("FOCEAN", {
         "description", "0 or 1, Bering Strait 1 cell wide",
         "units", "1",
@@ -286,12 +285,12 @@ blitz::ArrayBundle<double,2> make_topoO(
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
-    auto &FOCENF(out.add("FOCENF", {
+    auto &FOCEANF(out.add("FOCEANF", {
         "description", "Fractional ocean ocver",
         "units", "1",
         "sources", "GISS 1Qx1",
     }));
-    out.allocate(blitz::shape(IM,JM), {"im", "jm"},
+    out.allocate({IM,JM}, {"im", "jm"},
         true, blitz::fortranArray);
 
     // ------------------------------------------------------
@@ -304,7 +303,7 @@ blitz::ArrayBundle<double,2> make_topoO(
     // Fractional ocean cover FOCEANF is interpolated from FOAAH2
     blitz::Array<double, 2> WT1m(const_array(shape(IM1m, JM1m), 1.0, FortranArray<2>()));
     Hntr hntr1q1m(17.17, g1qx1, g1mx1m);
-    hntr1q1m.regrid(WT1m, FOCEAN1m, FOCEANF, true);    // Fractional ocean cover
+    hntr1q1m.regrid_cast<double,int16_t,double>(WT1m, FOCEAN1m, FOCEANF, true);    // Fractional ocean cover
 
     // FOCEAN (0 or 1) is rounded from FOCEAN
     for (int j=1; j<=JM; ++j) {
@@ -551,7 +550,7 @@ blitz::ArrayBundle<double,2> make_topoO(
 /** Reads a bunch of blitz::Arrays from a bunch of NetCDF files */
 class BulkNcReader
 {
-    FileLocator const &files,
+    FileLocator const &files;
     std::map<std::string, std::array<std::string,2>> varmap;
 
     // Actions, keyed by filename
@@ -643,15 +642,15 @@ public:
 
 
 // ======================================================================
-blitz::ArrayBundle<double,2> make_topoO(
+ibmisc::ArrayBundle<double,2> make_topoO(
     FileLocator const &files,
     std::vector<std::string> const &_varinputs)
 {
     // -------- 1-minute resolution
-    blitz::Array<uint16_t,2> FGICE1m(IM1m, JM1m, fortranArray),
-    blitz::Array<uint16_t,2> ZICETOP1m(IM1m, JM1m, fortranArray),
-    blitz::Array<uint16_t,2> ZSOLG1m(IM1m, JM1m, fortranArray),
-    blitz::Array<uint16_t,2> FOCEAN1m(IM1m, JM1m, fortranArray),
+    blitz::Array<int16_t,2> FGICE1m(IM1m, JM1m, fortranArray),
+    blitz::Array<int16_t,2> ZICETOP1m(IM1m, JM1m, fortranArray),
+    blitz::Array<int16_t,2> ZSOLG1m(IM1m, JM1m, fortranArray),
+    blitz::Array<int16_t,2> FOCEAN1m(IM1m, JM1m, fortranArray),
     // -------- 10-minute resolution (Z10MX10M.nc)
     blitz::Array<double,2> FLAKES(IMS, JMS, fortranArray)
 

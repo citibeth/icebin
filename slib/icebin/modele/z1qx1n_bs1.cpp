@@ -3,6 +3,7 @@
 #include <ibmisc/fortranio.hpp>
 #include <icebin/error.hpp>
 #include <icebin/modele/hntr.hpp>
+#include <icebin/modele/grids.hpp>
 #include <icebin/modele/z1qx1n_bs1.hpp>
 
 using namespace blitz;
@@ -55,8 +56,8 @@ ibmisc::ArrayBundle<int16_t,2> read_etopo1(std::string const &fname)
 ArrayBundle<double,2> greenland_inputs_bundle(bool allocate)
 {
     ArrayBundle<double, 2> bundle;
-    bundle.add("FOCEN2", {IM2, JM2}, {"im2", "jm2"}, {});
-    bundle.add("ZETOP2", {IM2, JM2}, {"im2", "jm2"}, {
+    bundle.add("FOCEN2", {IM2m, JM2m}, {"im2m", "jm2m"}, {});
+    bundle.add("ZETOP2", {IM2m, JM2m}, {"im2m", "jm2m"}, {
         "description", "Solid Topography except for ice shelves",
         "units", "m",
         "source", "Z2MX2M.NGDC"
@@ -94,11 +95,11 @@ ArrayBundle<double,2> topo_inputs_bundle(bool allocate)
 {
 
     ArrayBundle<double,2> bundle;
-    bundle.add("FOCEN2", {IM2, JM2}, {"im2", "jm2"}, {
+    bundle.add("FOCEN2", {IM2m, JM2m}, {"im2m", "jm2m"}, {
         "description", "Ocean Fraction",
         "units", "0 or 1",
     });
-    bundle.add("ZETOP2", {IM2, JM2}, {"im2", "jm2"}, {
+    bundle.add("ZETOP2", {IM2m, JM2m}, {"im2m", "jm2m"}, {
         "description", "Solid Topography except for ice shelves",
         "units", "m",
         "source", "Z2MX2M.NGDC"
@@ -170,19 +171,19 @@ void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLoc
     // Read in Z2MX2M.NGDC
     // Read hand-modified FOCEN2
     blitz::Array<double,2> greenland_focen2(
-        greenland ? greenland->FOCEN2 : blitz::Array<double,2>(IM2,JM2,fortranArray));
+        greenland ? greenland->FOCEN2 : blitz::Array<double,2>(IM2m,JM2m,fortranArray));
     {NcIO ncio(files.locate("Z2MX2M.NGDC-SeparateGreenland.nc"), 'r');
         ncio_blitz(ncio, in.FOCEN2, "FOCEN2", "double",
-            get_dims(ncio, {"jm2", "im2"}));    // ncdims in nc order
+            get_dims(ncio, {"jm2m", "im2m"}));    // ncdims in nc order
 
         ncio_blitz(ncio, in.ZETOP2, "ZETOP2", "double",
-            get_dims(ncio, {"jm2", "im2"}));    // ncdims in nc order
+            get_dims(ncio, {"jm2m", "im2m"}));    // ncdims in nc order
 
         // Separate Greenland from the rest
         greenland_focen2 = NaN;
 
-        for (int j=1; j<=JM2; ++j) {
-        for (int i=1; i<=IM2; ++i) {
+        for (int j=1; j<=JM2m; ++j) {
+        for (int i=1; i<=IM2m; ++i) {
             if (in.FOCEN2(i,j) == 2.0) {
                 if (separate) {
                     greenland_focen2(i,j) = 0.0;
@@ -210,7 +211,7 @@ void read_raw(TopoInputs &in, bool separate, GreenlandInputs *greenland, FileLoc
 
     if (separate) {
         // Zero out lakes over Greenland
-        blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
+        blitz::Array<double, 2> WT2(const_array(shape(IM2m, JM2m), 1.0, FortranArray<2>()));
         Hntr hntr2mh(17.17, g10mx10m, g2mx2m, 0);
         blitz::Array<double,2> greenland_focens(
             greenland ? greenland->FOCENS : blitz::Array<double,2>(IMS,JMS,fortranArray));
@@ -462,7 +463,7 @@ Etopo1Ice etopo1_ice(
 
 
 void callZ(
-    // (IM2, JM2)
+    // (IM2m, JM2m)
     blitz::Array<double,2> &FOCEN2,
     blitz::Array<double,2> &ZSOLD2,
     blitz::Array<double,2> &ZSOLG2,
@@ -487,10 +488,10 @@ void callZ(
 
     ArrayBundle<double,2> bundle;
 
-    // (IM2, JM2)
-    bundle.add("FOCEN2", FOCEN2, {"im2", "jm2"}, {});
-    bundle.add("ZSOLD2", ZSOLD2, {"im2", "jm2"}, {});
-    bundle.add("ZSOLG2", ZSOLG2, {"im2", "jm2"}, {});
+    // (IM2m, JM2m)
+    bundle.add("FOCEN2", FOCEN2, {"im2m", "jm2m"}, {});
+    bundle.add("ZSOLD2", ZSOLD2, {"im2m", "jm2m"}, {});
+    bundle.add("ZSOLG2", ZSOLG2, {"im2m", "jm2m"}, {});
 
     // (IM, IM)
     bundle.add("FOCEAN", FOCEAN, {"im", "jm"}, {});
@@ -528,12 +529,12 @@ void callZ(
     HntrGrid grid_g2mx2m(g2mx2m);
 
     for (int J=1; J <= JM; ++J) {
-        int J21 = (J-1)*JM2/JM + 1;    // 2-minute cells inside (I,J)
-        int J2M = J*JM2/JM;
+        int J21 = (J-1)*JM2m/JM + 1;    // 2-minute cells inside (I,J)
+        int J2M = J*JM2m/JM;
         int const IMAX= (J==1 || J==JM ? 1 : IM);
         for (int I=1; I<=IMAX; ++I) {
-            int I21 = (I-1)*IM2/IM + 1;
-            int I2M = (IMAX == 1 ? IM2 : I*IM2/IM);
+            int I21 = (I-1)*IM2m/IM + 1;
+            int I2M = (IMAX == 1 ? IM2m : I*IM2m/IM);
 
             if (FOCEAN(I,J) != 0) {   // (I,J) is an ocean cell
                 ZATMO(I,J) = 0;
@@ -808,9 +809,9 @@ return;
     auto ZSOLD2(hntrhm2.regrid(in.FGICEH, in.ZSOLDH));
 
     // North of Antarctic area: 60S to 90N
-    blitz::Array<double,2> FCONT2(IM2, JM2, fortranArray);
-    blitz::Array<double,2> ZSOLG2(IM2, JM2, fortranArray);
-    for (int J2=JM2/6+1; J2 <= JM2; ++J2) {
+    blitz::Array<double,2> FCONT2(IM2m, JM2m, fortranArray);
+    blitz::Array<double,2> ZSOLG2(IM2m, JM2m, fortranArray);
+    for (int J2=JM2m/6+1; J2 <= JM2m; ++J2) {
         FCONT2(Range::all(), J2) = 1. - in.FOCEN2(Range::all(), J2);
         FGICE2(Range::all(), J2) = FGICE2(Range::all(), J2) * FCONT2(Range::all(), J2);
         dZGIC2(Range::all(), J2) = dZGIC2(Range::all(), J2) * FCONT2(Range::all(), J2);
@@ -819,8 +820,8 @@ return;
     }
 
     // Antarctic area: 90S to 60S
-    for (int J2=1; J2<=JM2/6; ++J2) {
-    for (int I2=1; I2<=IM2; ++I2) {
+    for (int J2=1; J2<=JM2m/6; ++J2) {
+    for (int I2=1; I2<=IM2m; ++I2) {
         if (in.FOCEN2(I2,J2) == 0) {
             // in.FOCEN2(I2,J2) = 0
             FCONT2(I2,J2) = 1;
@@ -851,7 +852,7 @@ return;
     // FOCEAN: Ocean Surface Fraction (0:1)
     //
     // Fractional ocean cover FOCENF is interpolated from FOAAH2
-    blitz::Array<double, 2> WT2(const_array(shape(IM2, JM2), 1.0, FortranArray<2>()));
+    blitz::Array<double, 2> WT2(const_array(shape(IM2m, JM2m), 1.0, FortranArray<2>()));
     Hntr hntr2mq1(17.17, g1qx1, g2mx2m);
     hntr2mq1.regrid(WT2, in.FOCEN2, out.FOCENF, true);    // Fractional ocean cover
 

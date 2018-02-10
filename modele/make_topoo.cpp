@@ -1,6 +1,6 @@
 #include <iostream>
 #include <tclap/CmdLine.h>
-#include <icebin/modele/z1qx1n_bs1.hpp>
+#include <icebin/modele/make_topoo.hpp>
 #include <ibmisc/memory.hpp>
 #include <everytrace.h>
 
@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     ParseArgs args(argc, argv);
 
     std::string et1mfile("etopo1_ice_g1m.nc");
-    make_topoo(EnvSearchPath("MODELE_FILE_PATH"), {
+    make_topoO(EnvSearchPath("MODELE_FILE_PATH"), {
         "FGICE1m", et1mfile, "FGICE1m",
         "ZICETOP1m", et1mfile, "ZICETOP",
         "ZSOLG1m", et1mfile, "ZSOLG",
