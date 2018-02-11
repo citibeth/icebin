@@ -198,7 +198,7 @@ void cmp_regrid(
     // Regrid with C++
     auto Bc(hntr_array<double>(specB));
     Hntr hntr(17.17, specB, specA, 0);
-    hntr.regrid2(WTAc, Ac, Bc);
+    hntr.regrid(WTAc, Ac, Bc);
 
     // Regrid with Fortran
     auto WTAf(hntr_array<float>(specA));
@@ -480,7 +480,7 @@ TEST_F(HntrTest, regrid)
 
 
     Hntr hntr(17.17, g4, g8);
-    hntr.regrid2(wt8, vals8, vals4);
+    hntr.regrid(wt8, vals8, vals4);
 
     double sum4=0;
     HntrGrid grid_g4(g4);

@@ -122,19 +122,25 @@ public:
                  longitudinal mean.
     Output:  B = horizontally interpolated quantity on B grid
     */
-    void regrid1(
-        blitz::Array<double,1> const &WTA,
-        blitz::Array<double,1> const &A,
-        blitz::Array<double,1> &B,
-        bool mean_polar = false) const;
+    template<class WeightT, class SrcT, class DestT, int RANK>
+    void regrid(
+        blitz::Array<WeightT,RANK> const &_WTA,
+        blitz::Array<SrcT,RANK> const &_A,
+        blitz::Array<DestT,RANK> const &B,
+        bool mean_polar=false) const;
 
-    /** Works with 0-based or 1-based N-dimensional arrays */
+#if 0
     template<int RANK>
     void regrid(
         blitz::Array<double,RANK> const &WTA,
         blitz::Array<double,RANK> const &A,
-        blitz::Array<double,RANK> &B,
-        bool mean_polar = false) const;
+        blitz::Array<double,RANK> const &B,
+        bool mean_polar=false) const
+    {
+        regrid_cast<double,double,double,RANK>(WTA,A,B,mean_polar);
+    }
+#endif
+
 
     template<int RANK>
     blitz::Array<double,RANK> regrid(
@@ -142,29 +148,6 @@ public:
         blitz::Array<double,RANK> const &A,
         bool mean_polar = false) const;
 
-    template<class WeightT, class SrcT, class DestT>
-    void regrid_cast(
-        blitz::Array<WeightT,1> const &WTA,
-        blitz::Array<SrcT,1> const &A,
-        blitz::Array<DestT,1> &B,
-        bool mean_polar) const;
-
-    template<class WeightT, class SrcT, class DestT, int RANK>
-    void regrid2_cast(
-        blitz::Array<WeightT,RANK> const &_WTA,
-        blitz::Array<SrcT,RANK> const &_A,
-        blitz::Array<DestT,RANK> const &B,
-        bool mean_polar) const;
-
-    template<int RANK>
-    void regrid2(
-    blitz::Array<double,RANK> const &WTA,
-    blitz::Array<double,RANK> const &A,
-    blitz::Array<double,RANK> const &B,
-    bool mean_polar=false) const
-    {
-        regrid2_cast<double,double,double,RANK>(WTA,A,B,mean_polar);
-    }
 
 private:
     void partition_east_west();
@@ -212,6 +195,23 @@ public:
 };    // class Hntr
 
 
+
+// --------------------------------------------------------------
+
+/** Helper for Hntr::overlap() */
+class DimClip {
+    SparseSetT const *dim;
+public:
+    DimClip(SparseSetT const *_dim) : dim(_dim) {}
+
+    bool operator()(int ix) const
+        { return dim->in_sparse(ix); }
+};
+
+
+// ----------------------------------------------------------------
+
+// ==================================================================
 template<class MatAccumT, class IncludeT>
 void Hntr::matrix(
     MatAccumT &&mataccum,        // The output (sparse) matrix; 0-based indexing
@@ -250,81 +250,6 @@ void Hntr::matrix(
             }
 
             mataccum.finishB(IJB, JB);
-        }
-    }
-}
-
-template<class WeightT, class SrcT, class DestT>
-void Hntr::regrid_cast(
-    blitz::Array<WeightT,1> const &WTA,
-    blitz::Array<SrcT,1> const &A,
-    blitz::Array<DestT,1> &B,
-    bool mean_polar) const
-{
-    // Check array dimensions
-    if ((WTA.extent(0) != Agrid.spec.size()) ||
-        (A.extent(0) != Agrid.spec.size()) ||
-        (B.extent(0) != Bgrid.spec.size()))
-    {
-        (*icebin_error)(-1, "Error in dimensions: (%d, %d, %d) vs. (%d, %d)\n",
-            WTA.extent(0), A.extent(0), B.extent(0),
-            Agrid.spec.size(), Bgrid.spec.size());
-    }
-
-    // ------------------
-    // Interpolate the A grid onto the B grid
-
-    for (int JB=1; JB <= Bgrid.spec.jm; ++JB) {
-        int JAMIN = JMIN(JB);
-        int JAMAX = JMAX(JB);
-
-        for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
-            int const IJB = IB + Bgrid.spec.im * (JB-1);
-            double WEIGHT= 0;
-            double VALUE = 0;
-            int const IAMIN = IMIN(IB);
-            int const IAMAX = IMAX(IB);
-            for (int JA=JAMIN; JA <= JAMAX; ++JA) {
-                double G = SINA(JA) - SINA(JA-1);
-                if (JA==JAMIN) G -= GMIN(JB);
-                if (JA==JAMAX) G -= GMAX(JB);
-
-                for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
-                    int const IA  = 1 + ((IAREV-1) % Agrid.spec.im);
-                    int const IJA = IA + Agrid.spec.im * (JA-1);
-                    double F = 1;
-                    if (IAREV==IAMIN) F -= FMIN(IB);
-                    if (IAREV==IAMAX) F -= FMAX(IB);
-
-                    double const wt = F*G*WTA(IJA);
-                    WEIGHT += wt;
-                    VALUE  += wt*A(IJA);
-                }
-            }
-            B(IJB) = (WEIGHT == 0 ? DATMIS : VALUE / WEIGHT);
-        }
-    }
-
-    if (mean_polar) {
-        // Replace individual values near the poles by longitudinal mean
-        for (int JB=1; JB <= Bgrid.spec.jm; JB += Bgrid.spec.jm-1) {
-            double BMEAN  = DATMIS;
-            double WEIGHT = 0;
-            double VALUE  = 0;
-            for (int IB=1; ; ++IB) {
-                if (IB > Bgrid.spec.im) {
-                    if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
-                    break;
-                }
-                int IJB = IB + Bgrid.spec.im * (JB-1);
-                if (B(IJB) == DATMIS) break;
-                WEIGHT += 1;
-                VALUE  += B(IJB);
-            }
-            for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
-                int IJB = IB + Bgrid.spec.im * (JB-1);
-                B(IJB) = BMEAN;
-            }
         }
     }
 }
@@ -424,48 +349,9 @@ void Hntr::scaled_regrid_matrix(
         std::move(includeB));
 }
 // ---------------------------------------------------
-
-// --------------------------------------------------------------
-/** Works with 0-based or 1-based N-dimensional arrays */
-template<int RANK>
-void Hntr::regrid(
-    blitz::Array<double,RANK> const &WTA,
-    blitz::Array<double,RANK> const &A,
-    blitz::Array<double,RANK> &B,
-    bool mean_polar) const
-{
-    auto B1(ibmisc::reshape1(B, 1));
-    return regrid1(
-        ibmisc::reshape1(WTA, 1),
-        ibmisc::reshape1(A, 1),
-        B1, mean_polar);
-}
-
-template<int RANK>
-blitz::Array<double,RANK> Hntr::regrid(
-    blitz::Array<double,RANK> const &WTA,
-    blitz::Array<double,RANK> const &A,
-    bool mean_polar) const
-{
-    blitz::Array<double,2> B(hntr_array<double>(Bgrid.spec));
-    regrid(WTA, A, B, mean_polar);
-    return B;
-}
-
-/** Helper for Hntr::overlap() */
-class DimClip {
-    SparseSetT const *dim;
-public:
-    DimClip(SparseSetT const *_dim) : dim(_dim) {}
-
-    bool operator()(int ix) const
-        { return dim->in_sparse(ix); }
-};
-
-
 // ----------------------------------------------------------
 template<class WeightT, class SrcT, class DestT>
-class Regrid2MatAccum {
+class RegridMatAccum {
     blitz::Array<DestT,1> &WTA;
     blitz::Array<SrcT,1> &A;
     blitz::Array<DestT,1> &B;
@@ -475,7 +361,7 @@ class Regrid2MatAccum {
     double VALUE;
 
 public:
-    Regrid2MatAccum(
+    RegridMatAccum(
         blitz::Array<WeightT,1> &_WTA,
         blitz::Array<SrcT,1> &_A,
         blitz::Array<DestT,1> &_B, double _DATMIS)
@@ -492,7 +378,6 @@ public:
         double const wt = FG * WTA(IJA);
         WEIGHT += wt;
         VALUE += wt * A(IJA);
-//printf("r2 XX %d: %g %g\n", IJA, wt, A(IJA));
     }
 
     void finishB(int const IJB, int const JB)
@@ -504,7 +389,7 @@ public:
 
 
 template<class WeightT, class SrcT, class DestT, int RANK>
-void Hntr::regrid2_cast(
+void Hntr::regrid(
     blitz::Array<WeightT,RANK> const &_WTA,
     blitz::Array<SrcT,RANK> const &_A,
     blitz::Array<DestT,RANK> const &_B,
@@ -527,7 +412,7 @@ void Hntr::regrid2_cast(
 
 
     matrix(
-        Regrid2MatAccum<WeightT,SrcT,DestT>(WTA, A, B, DATMIS),
+        RegridMatAccum<WeightT,SrcT,DestT>(WTA, A, B, DATMIS),
         IncludeConst<int,true>());
 
     if (mean_polar) {
@@ -553,6 +438,8 @@ void Hntr::regrid2_cast(
         }
     }
 }
+
+
 
 }}
 

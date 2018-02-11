@@ -60,7 +60,7 @@ if (BUILD_COUPLER)
             icebin/modele/hntr.cpp
             icebin/modele/grids.cpp
             icebin/modele/z1qx1n_bs1.cpp
-#            icebin/modele/make_topoo.cpp
+            icebin/modele/make_topoo.cpp
             icebin/modele/HNTR4.F90
         )
 

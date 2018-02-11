@@ -22,7 +22,7 @@ void store_h(NcIO &ncout, blitz::Array<int16_t,2> val1m, std::string const &vnam
 
     auto val1m_1(reshape1(val1m));
     auto WTA(const_array(val1m_1.shape(), 1.0, blitz::FortranArray<1>()));
-    hntrh.regrid_cast<double, int16_t, double>(WTA, val1m_1, valh_1, true);
+    hntrh.regrid<double, int16_t, double>(WTA, val1m_1, valh_1, true);
     auto dimsh(get_or_add_dims(ncout, {"jmh", "imh"}, {JMH, IMH}));
     ncio_blitz(ncout, valh, vname, "double", dimsh);
 }

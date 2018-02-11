@@ -1,6 +1,7 @@
 #include <cmath>
 #include <icebin/error.hpp>
 #include <icebin/modele/hntr.hpp>
+//#include <icebin/modele/hntr_templates.hpp>
 
 using namespace blitz;
 using namespace spsparse;
@@ -166,83 +167,26 @@ void Hntr::partition_north_south()
 
 }
 
-void Hntr::regrid1(
-    blitz::Array<double,1> const &WTA,
-    blitz::Array<double,1> const &A,
-    blitz::Array<double,1> &B,
-    bool mean_polar) const
-{
-    // Check array dimensions
-    if ((WTA.extent(0) != Agrid.spec.size()) ||
-        (A.extent(0) != Agrid.spec.size()) ||
-        (B.extent(0) != Bgrid.spec.size()))
-    {
-        (*icebin_error)(-1, "Error in dimensions: (%d, %d, %d) vs. (%d, %d)\n",
-            WTA.extent(0), A.extent(0), B.extent(0),
-            Agrid.spec.size(), Bgrid.spec.size());
-    }
+#if 0
+// ========================================================
+// Explicit template instantiation for some regrids
+// https://stackoverflow.com/questions/4933056/how-do-i-explicitly-instantiate-a-template-function
 
-    // ------------------
-    // Interpolate the A grid onto the B grid
+template
+void Hntr::regrid_cast<double,double,double,1>(
+    blitz::Array<double,1> const &_WTA,
+    blitz::Array<double,1> const &_A,
+    blitz::Array<double,1> const &_B,
+    bool mean_polar) const;
 
-    for (int JB=1; JB <= Bgrid.spec.jm; ++JB) {
-        int JAMIN = JMIN(JB);
-        int JAMAX = JMAX(JB);
+template
+void Hntr::regrid_cast<double,double,double,2>(
+    blitz::Array<double,2> const &_WTA,
+    blitz::Array<double,2> const &_A,
+    blitz::Array<double,2> const &_B,
+    bool mean_polar) const;
 
-        for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
-            int const IJB = IB + Bgrid.spec.im * (JB-1);
-            double WEIGHT= 0;
-            double VALUE = 0;
-            int const IAMIN = IMIN(IB);
-            int const IAMAX = IMAX(IB);
-            for (int JA=JAMIN; JA <= JAMAX; ++JA) {
-                double G = SINA(JA) - SINA(JA-1);
-                if (JA==JAMIN) G -= GMIN(JB);
-                if (JA==JAMAX) G -= GMAX(JB);
-
-                for (int IAREV=IAMIN; IAREV <= IAMAX; ++IAREV) {
-                    int const IA  = 1 + ((IAREV-1) % Agrid.spec.im);
-                    int const IJA = IA + Agrid.spec.im * (JA-1);
-                    double F = 1;
-                    if (IAREV==IAMIN) F -= FMIN(IB);
-                    if (IAREV==IAMAX) F -= FMAX(IB);
-
-                    double const wt = F*G*WTA(IJA);
-                    WEIGHT += wt;
-                    VALUE  += wt*A(IJA);
-//printf("r1 %d %d: %g %g\n", IJB, IJA, wt, A(IJA));
-                }
-            }
-            B(IJB) = (WEIGHT == 0 ? DATMIS : VALUE / WEIGHT);
-        }
-    }
-
-    if (mean_polar) {
-        // Replace individual values near the poles by longitudinal mean
-        for (int JB=1; JB <= Bgrid.spec.jm; JB += Bgrid.spec.jm-1) {
-            double BMEAN  = DATMIS;
-            double WEIGHT = 0;
-            double VALUE  = 0;
-            for (int IB=1; ; ++IB) {
-                if (IB > Bgrid.spec.im) {
-                    if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
-                    break;
-                }
-                int IJB = IB + Bgrid.spec.im * (JB-1);
-                if (B(IJB) == DATMIS) break;
-                WEIGHT += 1;
-                VALUE  += B(IJB);
-            }
-            for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
-                int IJB = IB + Bgrid.spec.im * (JB-1);
-                B(IJB) = BMEAN;
-            }
-        }
-    }
-}
-
-
-
+#endif
 
 
 
