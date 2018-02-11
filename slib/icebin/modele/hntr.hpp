@@ -447,6 +447,100 @@ public:
 };
 
 
+// ----------------------------------------------------------
+template<class DestT>
+class Regrid2MatAccum {
+    blitz::Array<SrcT,1> &A;
+    blitz::Array<DestT,1> &B;
+    double WEIGHT;
+    double VALUE;
+
+public:
+    Regrid2MatAccum(
+        blitz::Array<SrcT,1> &_A,
+        blitz::Array<DestT,1> &_B)
+    : A(_A), B(_B) {}
+
+    void clear()
+    {
+        VALUE = 0.;
+        WEIGHT = 0.;
+    }
+
+    void addA(int const IJA, double const FG)
+    {
+        WEIGHT += FG;
+        VALUE += FG * A(IJA);
+    }
+
+    void finishB(int const IJB, int const JB)
+    {
+        B(IJB) = (WEIGHT == 0 ? DATMIS : VALUE / WEIGHT);
+    }
+
+};
+
+
+template<class WeightT, class SrcT, class DestT, int RANK>
+void Hntr::regrid2_cast(
+    blitz::Array<WeightT,RANK> const &_WTA,
+    blitz::Array<SrcT,RANK> const &_A,
+    blitz::Array<DestT,RANK> &B,
+    bool mean_polar) const
+{
+    // Reshape to 1-D
+    auto WTA(reshape1(_WTA));
+    auto A(reshape1(_A));
+    auto B(reshape1(_B));
+
+    // Check array dimensions
+    if ((WTA.extent(0) != Agrid.spec.size()) ||
+        (A.extent(0) != Agrid.spec.size()) ||
+        (B.extent(0) != Bgrid.spec.size()))
+    {
+        (*icebin_error)(-1, "Error in dimensions: (%d, %d, %d) vs. (%d, %d)\n",
+            WTA.extent(0), A.extent(0), B.extent(0),
+            Agrid.spec.size(), Bgrid.spec.size());
+    }
+
+
+    matrix(
+        Regrid2MatAccum(A, B),
+        IncludeT());
+
+    if (mean_polar) {
+        // Replace individual values near the poles by longitudinal mean
+        for (int JB=1; JB <= Bgrid.spec.jm; JB += Bgrid.spec.jm-1) {
+            double BMEAN  = DATMIS;
+            double WEIGHT = 0;
+            double VALUE  = 0;
+            for (int IB=1; ; ++IB) {
+                if (IB > Bgrid.spec.im) {
+                    if (WEIGHT != 0) BMEAN = VALUE / WEIGHT;
+                    break;
+                }
+                int IJB = IB + Bgrid.spec.im * (JB-1);
+                if (B(IJB) == DATMIS) break;
+                WEIGHT += 1;
+                VALUE  += B(IJB);
+            }
+            for (int IB=1; IB <= Bgrid.spec.im; ++IB) {
+                int IJB = IB + Bgrid.spec.im * (JB-1);
+                B(IJB) = BMEAN;
+            }
+        }
+    }
+}
+
+template<int RANK>
+blitz::Array<double,RANK> Hntr::regrid2(
+    blitz::Array<double,RANK> const &WTA,
+    blitz::Array<double,RANK> const &A,
+    bool mean_polar) const
+{
+    regrid2_case<double,double,double,RANK>(WTA,A,B,mean_polar);
+}
+
 }}
 
 #endif    // guard
