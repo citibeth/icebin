@@ -198,7 +198,7 @@ void cmp_regrid(
     // Regrid with C++
     auto Bc(hntr_array<double>(specB));
     Hntr hntr(17.17, specB, specA, 0);
-    hntr.regrid(WTAc, Ac, Bc);
+    hntr.regrid2(WTAc, Ac, Bc);
 
     // Regrid with Fortran
     auto WTAf(hntr_array<float>(specA));
@@ -335,7 +335,6 @@ void test_overlap(std::array<HntrSpec const *,2> specs,
 {
     std::vector<double> Rvals {1.0,2.0};
 
-printf("AA1\n");
     Hntr hntrBvA(17.17, *specs[0], *specs[1], 0);
     auto &specB(*specs[0]);
     auto &specA(*specs[1]);
@@ -345,7 +344,6 @@ printf("AA1\n");
         double const R2 = R*R;
         hntrBvA.overlap(accum::ref(mBvA), R);
 
-printf("AA1\n");
 #if 0
 for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
     int ijB = ii->index(0);
@@ -391,7 +389,6 @@ for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
             EXPECT_NEAR(1., gridA.dxyp(jA+1)*R2 / areaA(ijA), epsilon) << "Grid A(" << iA << ", " << jA << ") R=" << R << " " << msg;
         }
 
-printf("AA1\n");
         // Check total area
         double sumB = 0;
         for (int i=0; i<areaB.extent(0); ++i) sumB += areaB(i);
@@ -401,7 +398,6 @@ printf("AA1\n");
         for (int i=0; i<areaA.extent(0); ++i) sumA += areaA(i);
         EXPECT_NEAR(1., 4.*M_PI*R2 / sumA, epsilon) << msg;
 
-printf("AA1\n");
         // Check for spurious overlaps
         if (check_spurious) {
             for (auto ii=mBvA.begin(); ii != mBvA.end(); ++ii) {
@@ -413,7 +409,6 @@ printf("AA1\n");
             }
         }
     }
-printf("AA1\n");
 
 }
 
@@ -485,7 +480,7 @@ TEST_F(HntrTest, regrid)
 
 
     Hntr hntr(17.17, g4, g8);
-    hntr.regrid(wt8, vals8, vals4);
+    hntr.regrid2(wt8, vals8, vals4);
 
     double sum4=0;
     HntrGrid grid_g4(g4);

@@ -210,6 +210,7 @@ void Hntr::regrid1(
                     double const wt = F*G*WTA(IJA);
                     WEIGHT += wt;
                     VALUE  += wt*A(IJA);
+//printf("r1 %d %d: %g %g\n", IJB, IJA, wt, A(IJA));
                 }
             }
             B(IJB) = (WEIGHT == 0 ? DATMIS : VALUE / WEIGHT);
@@ -239,6 +240,16 @@ void Hntr::regrid1(
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 #if 0
