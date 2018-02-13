@@ -12,6 +12,7 @@ using namespace icebin::modele;
 
 
 const int16_t GREENLAND_VAL = 2;    // Used to mark Greenland in ZNGDC1-SeparateGreenland/FCONT1
+const int16_t MIN_LANDICE_THK = 50;    // Anything under this we call seasonal snow cover
 
 void store_h(NcIO &ncout, blitz::Array<int16_t,2> val1m, std::string const &vname)
 {
@@ -181,30 +182,28 @@ void etopo1_ice(
             for (int j1m=0; j1m < JM1m/2; ++j1m) {
             for (int i1m=0; i1m < IM1m; ++i1m) {
                 if ( (focean1m(j1m,i1m) == 0)
-                    && (zicetop1m(j1m,i1m) != zsolid1m(j1m,i1m)))
+                    && (zicetop1m(j1m,i1m) - zsolid1m(j1m,i1m) >= MIN_LANDICE_THK))
                 {
                     fgice1m(j1m, i1m) = 1;
                 }
             }}
 
-            // (Maybe) use EOTOPO1 for Greenland too
+            // Deal with Greenland
             if (include_greenland) {
+                // Use EOTOPO1 for Greenland too
                 for (int j1m=JM1m/2; j1m < JM1m; ++j1m) {
                 for (int i1m=0; i1m < IM1m; ++i1m) {
                     if ( (focean1m(j1m,i1m) == GREENLAND_VAL)
-                        && (zicetop1m(j1m,i1m) != zsolid1m(j1m,i1m)))
+                        && (zicetop1m(j1m,i1m) - zsolid1m(j1m,i1m) >= MIN_LANDICE_THK))
                     {
                         fgice1m(j1m, i1m) = 1;
                     }
                 }}
-            }
-
-
-            // Remove Greenland from zicetop1m, zsolid1m
-            for (int j1m=JM1m/2; j1m < JM1m; ++j1m) {
-            for (int i1m=0; i1m < IM1m; ++i1m) {
-                if (focean1m(j1m,i1m) == GREENLAND_VAL) {
-                    if (!include_greenland) {
+            } else {
+                // Remove Greenland from zicetop1m, zsolid1m
+                for (int j1m=JM1m/2; j1m < JM1m; ++j1m) {
+                for (int i1m=0; i1m < IM1m; ++i1m) {
+                    if (focean1m(j1m,i1m) == GREENLAND_VAL) {
                         zicetop1m(j1m,i1m) = -300;
                         zsolid1m(j1m,i1m) = -300;
                     }
@@ -289,6 +288,9 @@ printf("j1 i1=%d %d (area = %g %g)\n", j1, i1, snow1, remain1m);
             } else {
                 focean1m(j1m,i1m) = 1;
             }
+
+            // Check: can't have focean1m and fgice1m at the same time
+            if (focean1m(i1m,j1m) == 1) fgice1m(i1m,j1m) = 0;
         }}
     }
 
