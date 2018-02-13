@@ -127,19 +127,8 @@ public:
         blitz::Array<WeightT,RANK> const &_WTA,
         blitz::Array<SrcT,RANK> const &_A,
         blitz::Array<DestT,RANK> const &B,
-        bool mean_polar=false) const;
-
-#if 0
-    template<int RANK>
-    void regrid(
-        blitz::Array<double,RANK> const &WTA,
-        blitz::Array<double,RANK> const &A,
-        blitz::Array<double,RANK> const &B,
-        bool mean_polar=false) const
-    {
-        regrid_cast<double,double,double,RANK>(WTA,A,B,mean_polar);
-    }
-#endif
+        bool mean_polar=false,
+        double wtm=1.0, double wtb=0.0) const;
 
 
     template<int RANK>
@@ -351,21 +340,25 @@ void Hntr::scaled_regrid_matrix(
 // ---------------------------------------------------
 // ----------------------------------------------------------
 template<class WeightT, class SrcT, class DestT>
-class RegridMatAccum {
-    blitz::Array<DestT,1> &WTA;
+class RegridAccum {
+    blitz::Array<WeightT,1> &WTA;
     blitz::Array<SrcT,1> &A;
     blitz::Array<DestT,1> &B;
-
     double const DATMIS;
+    double const wtm;
+    double const wtb;
+
     double WEIGHT;
     double VALUE;
 
 public:
-    RegridMatAccum(
+    RegridAccum(
         blitz::Array<WeightT,1> &_WTA,
         blitz::Array<SrcT,1> &_A,
-        blitz::Array<DestT,1> &_B, double _DATMIS)
-    : WTA(_WTA), A(_A), B(_B), DATMIS(_DATMIS) {}
+        blitz::Array<DestT,1> &_B,
+        double _DATMIS,
+        double _wtm, double _wtb)    // Use wtm * WTA + wtb for weight
+    : WTA(_WTA), A(_A), B(_B), DATMIS(_DATMIS), wtm(_wtm), wtb(_wtb) {}
 
     void clear()
     {
@@ -375,7 +368,8 @@ public:
 
     void addA(int const IJA, double const FG)
     {
-        double const wt = FG * WTA(IJA);
+        double const wta = wtm * WTA(IJA) + wtb;
+        double const wt = FG * wta;
         WEIGHT += wt;
         VALUE += wt * A(IJA);
     }
@@ -393,7 +387,8 @@ void Hntr::regrid(
     blitz::Array<WeightT,RANK> const &_WTA,
     blitz::Array<SrcT,RANK> const &_A,
     blitz::Array<DestT,RANK> const &_B,
-    bool mean_polar) const
+    bool mean_polar,
+    double wtm, double wtb) const
 {
     // Reshape to 1-D
     auto WTA(ibmisc::reshape1(_WTA, 1));
@@ -412,7 +407,7 @@ void Hntr::regrid(
 
 
     matrix(
-        RegridMatAccum<WeightT,SrcT,DestT>(WTA, A, B, DATMIS),
+        RegridAccum<WeightT,SrcT,DestT>(WTA, A, B, DATMIS, wtm, wtb),
         IncludeConst<int,true>());
 
     if (mean_polar) {
