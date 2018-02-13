@@ -1,5 +1,6 @@
 #include <cmath>
 #include <ibmisc/fortranio.hpp>
+#include <ibmisc/ncbulk.hpp>
 #include <icebin/error.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/make_topoo.hpp>
@@ -617,115 +618,6 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
 }
 // ---------------------------------------------------------------
 // ======================================================================
-/** Reads a bunch of blitz::Arrays from a bunch of NetCDF files */
-class BulkNcReader
-{
-    FileLocator const * const files;
-    std::map<std::string, std::array<std::string,2>> varmap;
-
-    // Actions, keyed by filename
-    typedef std::function<netCDF::NcVar (NcIO &ncio)> ActionFn;
-    struct Action {
-        std::string fname;
-        ActionFn fn;
-
-        Action(std::string const &_fname, ActionFn const &_fn)
-            : fname(_fname), fn(_fn) {}
-
-        bool operator<(Action const &other) const
-            { return fname < other.fname; }
-    };
-    std::vector<Action> actions;
-
-public:
-
-    /** @param _vars {varname=interal name, fname=NetCDF filename, vname = NetcDF variable name, ...} */
-    BulkNcReader(
-        FileLocator const *_files,
-        std::vector<std::string> const &_vars)
-    : files(_files)
-    {
-        size_t n = _vars.size();
-        if (3*(n/3) != n) (*icebin_error)(-1,
-            "BulkNcReader initializers must be in triplets: <varname>, <fname>, <vname>");
-
-        for (auto ii = _vars.begin(); ii != _vars.end(); ) {
-            std::string const &var(*ii++);
-            std::string const &fname(*ii++);
-            std::string const &vname(*ii++);
-
-            varmap.insert(std::make_pair(var, make_array(fname, vname)));
-        }
-    }
-
-private:
-
-    template<class TypeT, int RANK>
-    void add_var(
-        blitz::Array<TypeT, RANK> &var,
-        std::string const &fname,
-        std::string const &vname)
-    {
-        ActionFn action(std::bind(
-            &ncio_blitz<TypeT,RANK>, std::placeholders::_1, var, vname,
-            "", std::vector<netCDF::NcDim>{},
-            DimOrderMatch::MEMORY, true, std::vector<std::string>{}
-        ));
-
-        actions.push_back(Action(fname, action));
-
-    }
-
-
-public:
-
-    /** @param varname Internal name for this variable, assigned in constructor */
-    template<class TypeT, int RANK>
-    void add_var(
-        std::string const &varname,
-        blitz::Array<TypeT, RANK> &var)
-    {
-        auto iix(varmap.find(varname));
-        if (iix == varmap.end()) (*icebin_error)(-1,
-            "User failed to include fname and vname for variable %s", varname.c_str());
-
-        std::string const &fname(iix->second[0]);
-        std::string const &vname(iix->second[1]);
-
-        add_var(var, fname, vname);
-        varmap.erase(iix);    // We've added once, can't add again
-    }
-
-
-    void read_bulk()
-    {
-        // Check that every expected variable has been assigned.
-        if (varmap.size() != 0) {
-            for (auto ii=varmap.begin(); ii != varmap.end(); ++ii)
-                fprintf(stderr, "    Unassigned: %s\n", ii->first.c_str());
-            (*icebin_error)(-1, "Unassigned variables");
-        }
-
-
-        // Read variables, grouped by file
-        std::sort(actions.begin(), actions.end());
-        std::unique_ptr<NcIO> ncio;
-        std::string last_fname = "";
-        for (auto ii=actions.begin(); ii != actions.end(); ++ii) {
-            if (ii->fname != last_fname) {
-                std::string located_fname(files->locate(ii->fname));
-//printf("Opening %s -> %s\n", ii->fname.c_str(), located_fname.c_str());
-                ncio.reset(new NcIO(located_fname, 'r'));
-            }
-            ii->fn(*ncio);
-            last_fname = ii->fname;
-        }
-    }
-
-};
-
-
-// ======================================================================
 ibmisc::ArrayBundle<double,2> make_topoO(
     FileLocator const &files,
     std::vector<std::string> const &_varinputs)
@@ -740,13 +632,12 @@ ibmisc::ArrayBundle<double,2> make_topoO(
 
 
     // Read into our variables, from user-specified locations
-    BulkNcReader bulk(&files, _varinputs);
-    bulk.add_var("FGICE1m", FGICE1m);
-    bulk.add_var("ZICETOP1m", ZICETOP1m);
-    bulk.add_var("ZSOLG1m", ZSOLG1m);
-    bulk.add_var("FOCEAN1m", FOCEAN1m);
-    bulk.add_var("FLAKES", FLAKES);
-    bulk.read_bulk();
+    NcBulkReader(&files, _varinputs)
+        ("FGICE1m", FGICE1m)
+        ("ZICETOP1m", ZICETOP1m)
+        ("ZSOLG1m", ZSOLG1m)
+        ("FOCEAN1m", FOCEAN1m)
+        ("FLAKES", FLAKES);
 
 printf("FINISHED READING INPUTS\n");
     return _make_topoO(

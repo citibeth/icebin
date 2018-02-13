@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     ParseArgs args(argc, argv);
 
     std::string et1mfile("etopo1_ice_g1m.nc");
-    make_topoO(EnvSearchPath("MODELE_FILE_PATH"), {
+    auto bundle(make_topoO(EnvSearchPath("MODELE_FILE_PATH"), {
         "FGICE1m", et1mfile, "FGICE1m",
         "ZICETOP1m", et1mfile, "ZICETOP1m",
         "ZSOLG1m", et1mfile, "ZSOLG1m",
