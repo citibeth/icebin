@@ -16,9 +16,9 @@ static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 static void callZ(
     // (IM1m, JM1m)
-    blitz::Array<double,2> &FOCEAN1m,
-    blitz::Array<double,2> &ZICETOP1m,
-    blitz::Array<double,2> &ZSOLG1m,
+    blitz::Array<int16_t,2> const &FOCEAN1m,
+    blitz::Array<int16_t,2> const &ZICETOP1m,
+    blitz::Array<int16_t,2> const &ZSOLG1m,
 
     // (IM, IM)
     blitz::Array<double,2> &FOCEAN,
@@ -69,15 +69,15 @@ static void callZ(
                 ZSGLO(I,J) = 999999;
                 for (int J2=J11; J2 <= J1M; ++J2) {
                 for (int I2=I11; I2 <= I1m; ++I2) {
-                    if (ZSGLO(I,J) > ZICETOP1m(I2,J2) && FOCEAN1m(I2,J2) == 1.) {
+                    if (ZSGLO(I,J) > ZICETOP1m(I2,J2) && FOCEAN1m(I2,J2) == 1) {
                         ZSGLO(I,J) = ZICETOP1m(I2,J2);
                     }
                 }}
 
                 if (ZSGLO(I,J) == 999999) (*icebin_error)(-1,
-                    "Ocean cell (%d,%d) has no ocean area on 2-minute grid; "
+                    "Ocean cell FOCEAN(%d,%d)=%g has no ocean area on 2-minute grid; "
                     "I11,I1m,J11,J1M = %d,%d,%d,%d",
-                    I,J,
+                    I,J,FOCEAN(I,J),
                     I11,I1m,J11,J1M);
             } else {  // (I,J) is a continental cell
                 // Order 2-minute continental cells within (I,J) and sum their area
@@ -203,7 +203,7 @@ static const std::vector<ElevPoints> resets
 
 
 
-static ibmisc::ArrayBundle<double,2> make_topoO(
+static ibmisc::ArrayBundle<double,2> _make_topoO(
     // -------- 1-minute resolution
     blitz::Array<int16_t,2> const &FGICE1m,
     blitz::Array<int16_t,2> const &ZICETOP1m,
@@ -303,69 +303,137 @@ static ibmisc::ArrayBundle<double,2> make_topoO(
     // Fractional ocean cover FOCEANF is interpolated from FOAAH2
     blitz::Array<double, 2> WT1m(const_array(shape(IM1m, JM1m), 1.0, FortranArray<2>()));
     Hntr hntr1q1m(17.17, g1qx1, g1mx1m);
-    hntr1q1m.regrid_cast<double,int16_t,double>(WT1m, FOCEAN1m, FOCEANF, true);    // Fractional ocean cover
+    hntr1q1m.regrid<double,int16_t,double>(WT1m, FOCEAN1m, FOCEANF, true);    // Fractional ocean cover
 
-    // FOCEAN (0 or 1) is rounded from FOCEAN
-    for (int j=1; j<=JM; ++j) {
-    for (int i=1; i<=IM; ++i) {
-        FOCEAN(i,j) = std::round(FOCEANF(i,j));
-    }}
+    // --------- FGICE is interpolated from FGICE1m
+
+    //hntr1q1m.regrid(FOCEAN1m, FGICE1m, FGICE, true, -1.0, 1.0);    // Use FCONT1m = 1-FOCEAN1m for weight
+    // (use WT1m here for weight instead of 1-FOCEAN1m so that FOCEAN+FLAKE+FGICE = 1
+    // (instead of FOCEAN+FLAKE+FGRND=1 and FGICE is a portion of FGRND).
+    hntr1q1m.regrid(WT1m, FGICE1m, FGICE, true);
+
+    // Here, FGRND=1-FOCEAN is implied.
+
+    int8_t const TO_NONE = 0;
+    int8_t const TO_OCEAN = 1;
+    int8_t const TO_LAND = 2;
+
+    blitz::Array<int8_t,2> SET_TO(IM,JM, fortranArray);
+    SET_TO = TO_NONE;
 
     // Set following grid cells to be continent
-    FOCEAN( 84, 18) = 0;
-    FOCEAN( 85, 18) = 0;
-    FOCEAN(236, 82) = 0;
-    FOCEAN(242, 82) = 0;
-    FOCEAN(245, 82) = 0;
-    FOCEAN(224,101) = 0;
-    FOCEAN( 53,119) = 0;
-    FOCEAN(171,125) = 0;  //  Cyprus
-    FOCEAN(164,126) = 0;  //  Crete
-    FOCEAN(158,129) = 0;
-    FOCEAN(158,130) = 0;
-    FOCEAN(242,131) = 0;
-    FOCEAN(263,136) = 0;
-    FOCEAN(258,137) = 0;
-    FOCEAN(258,138) = 0;
-    FOCEAN( 46,139) = 0;
-    FOCEAN(258,139) = 0;
-    FOCEAN(275,152) = 0;
-    FOCEAN(  8,156) = 0;
-    FOCEAN( 10,156) = 0;
-    FOCEAN( 12,157) = 0;
-    FOCEAN(172,157) = 0;
-    FOCEAN(202,157) = 0;
-    FOCEAN( 69,159) = 0;
-    FOCEAN(204,159) = 0;
-    FOCEAN( 62,167) = 0;
-    FOCEAN( 73,171) = 0;
-    FOCEAN( 75,171) = 0;
-    FOCEAN( 78,171) = 0;
+    SET_TO( 84, 18) = TO_LAND;
+    SET_TO( 85, 18) = TO_LAND;
+    SET_TO(236, 82) = TO_LAND;
+    SET_TO(242, 82) = TO_LAND;
+    SET_TO(245, 82) = TO_LAND;
+    SET_TO(224,101) = TO_LAND;
+    SET_TO( 53,119) = TO_LAND;
+    SET_TO(171,125) = TO_LAND;  //  Cyprus
+    SET_TO(164,126) = TO_LAND;  //  Crete
+    SET_TO(158,129) = TO_LAND;
+    SET_TO(158,130) = TO_LAND;
+    SET_TO(242,131) = TO_LAND;
+    SET_TO(263,136) = TO_LAND;
+    SET_TO(258,137) = TO_LAND;
+    SET_TO(258,138) = TO_LAND;
+    SET_TO( 46,139) = TO_LAND;
+    SET_TO(258,139) = TO_LAND;
+    SET_TO(275,152) = TO_LAND;
+    SET_TO(  8,156) = TO_LAND;
+    SET_TO( 10,156) = TO_LAND;
+    SET_TO( 12,157) = TO_LAND;
+    SET_TO(172,157) = TO_LAND;
+    SET_TO(202,157) = TO_LAND;
+    SET_TO( 69,159) = TO_LAND;
+    SET_TO(204,159) = TO_LAND;
+    SET_TO( 62,167) = TO_LAND;
+    SET_TO( 73,171) = TO_LAND;
+    SET_TO( 75,171) = TO_LAND;
+    SET_TO( 78,171) = TO_LAND;
 
     // Set following grid cells to be ocean
-    FOCEAN(179,105) = 1;
-    FOCEAN( 54,119) = 1;
-    FOCEAN(241,131) = 1;
-    FOCEAN(258,143) = 1;
-    FOCEAN(165,150) = 1;
-    FOCEAN(274,152) = 1;
-    FOCEAN( 15,154) = 1;
-    FOCEAN( 92,155) = 1;
-    FOCEAN( 13,157) = 1;
-    FOCEAN(173,157) = 1;
-    FOCEAN(176,157) = 1;
-    FOCEAN(203,157) = 1;
-    FOCEAN( 55,159) = 1;
-    FOCEAN(103,159) = 1;
-    FOCEAN(203,159) = 1;
-    FOCEAN( 67,160) = 1;
-    FOCEAN( 68,160) = 1;
-    FOCEAN( 79,160) = 1;
-    FOCEAN(199,160) = 1;
-    FOCEAN(126,161) = 1;
-    FOCEAN( 68,162) = 1;
-    FOCEAN( 75,165) = 1;
-    FOCEAN(225,169) = 1;
+    SET_TO(179,105) = TO_OCEAN;
+    SET_TO( 54,119) = TO_OCEAN;
+    SET_TO(241,131) = TO_OCEAN;
+    SET_TO(258,143) = TO_OCEAN;
+    SET_TO(165,150) = TO_OCEAN;
+    SET_TO(274,152) = TO_OCEAN;
+    SET_TO( 15,154) = TO_OCEAN;
+    SET_TO( 92,155) = TO_OCEAN;
+    SET_TO( 13,157) = TO_OCEAN;
+    SET_TO(173,157) = TO_OCEAN;
+    SET_TO(176,157) = TO_OCEAN;
+    SET_TO(203,157) = TO_OCEAN;
+    SET_TO( 55,159) = TO_OCEAN;
+    SET_TO(103,159) = TO_OCEAN;
+    SET_TO(203,159) = TO_OCEAN;
+    SET_TO( 67,160) = TO_OCEAN;
+    SET_TO( 68,160) = TO_OCEAN;
+    SET_TO( 79,160) = TO_OCEAN;
+    SET_TO(199,160) = TO_OCEAN;
+    SET_TO(126,161) = TO_OCEAN;
+    SET_TO( 68,162) = TO_OCEAN;
+    SET_TO( 75,165) = TO_OCEAN;
+    SET_TO(225,169) = TO_OCEAN;  
+    SET_TO(179,105) = TO_OCEAN;
+    SET_TO( 54,119) = TO_OCEAN;
+    SET_TO(241,131) = TO_OCEAN;
+    SET_TO(258,143) = TO_OCEAN;
+    SET_TO(165,150) = TO_OCEAN;
+    SET_TO(274,152) = TO_OCEAN;
+    SET_TO( 15,154) = TO_OCEAN;
+    SET_TO( 92,155) = TO_OCEAN;
+    SET_TO( 13,157) = TO_OCEAN;
+    SET_TO(173,157) = TO_OCEAN;
+    SET_TO(176,157) = TO_OCEAN;
+    SET_TO(203,157) = TO_OCEAN;
+    SET_TO( 55,159) = TO_OCEAN;
+    SET_TO(103,159) = TO_OCEAN;
+    SET_TO(203,159) = TO_OCEAN;
+    SET_TO( 67,160) = TO_OCEAN;
+    SET_TO( 68,160) = TO_OCEAN;
+    SET_TO( 79,160) = TO_OCEAN;
+    SET_TO(199,160) = TO_OCEAN;
+    SET_TO(126,161) = TO_OCEAN;
+    SET_TO( 68,162) = TO_OCEAN;
+    SET_TO( 75,165) = TO_OCEAN;
+    SET_TO(225,169) = TO_OCEAN;
+
+
+    // South pole should be all ice; avoid singularities in regridding algo.
+    for (int i=1; i<=IM; ++i) {
+        FOCEAN(i,1) = 0;
+        FGICE(i,1) = 1;
+    }
+
+
+    // FOCEAN (0 or 1) is rounded from FOCEAN
+    for (int j=2; j<=JM; ++j) {
+    for (int i=1; i<=IM; ++i) {
+        auto const foceanf(FOCEANF(i,j));
+        bool to_ocean;
+        switch(SET_TO(i,j)) {
+            case TO_OCEAN :
+                to_ocean = true;
+                break;
+            case TO_LAND :
+                to_ocean = false;
+                break;
+            default:
+                to_ocean = (foceanf >= .5);
+        }
+
+        if (to_ocean) {
+            FOCEAN(i,j) = 1.;
+            FGICE(i,j) = 0;
+        } else {
+            double const fact = 1. / (1. - foceanf);
+//if (fact != 1) fprintf(stderr, "FACT (%d, %d): %g %g sum=%g, fact=%g\n", i,j, FGICE(i,j),  FOCEANF(i,j), FGICE(i,j)+FOCEANF(i,j), fact);
+            FOCEAN(i,j) = 0.;
+            FGICE(i,j) *= fact;
+        }
+    }}
 
 #if 0
     // Average non-fractional and fractional ocean covers over latitude
@@ -425,7 +493,10 @@ static ibmisc::ArrayBundle<double,2> make_topoO(
     // Apportion FLAKE to the nonocean fraction and round to 1/256
     for (int j=1; j<=JM; ++j) {
     for (int i=1; i<=IM; ++i) {
-        FLAKE(i,j) = FLAKE(i,j)*(1.-FOCEAN(i,j)) / (1.-FOCEANF(i,j)+1e-20);
+        double const fcont = 1. - FOCEAN(i,j);
+        double const fcontf = 1. - FOCEANF(i,j);
+
+        FLAKE(i,j) = FLAKE(i,j)*fcont / (fcontf+1e-20);
         // FLAKE(i,j) = round_mantissa_to(FLAKE(i,j), 8);
         FLAKE(i,j) = std::round(FLAKE(i,j)*256.) / 256.;
     }}
@@ -433,8 +504,6 @@ static ibmisc::ArrayBundle<double,2> make_topoO(
     //
     // FGICE: Glacial Ice Surface Fraction (0:1)
     //
-    // FGICE is interpolated from FGICE1m
-    hntr1q1m.regrid(FCONT2, FGICE1m, FGICE, true);
 
     // Check that FGICE is between 0 and 1
     // If FGICE+FLAKE exceeds 1, reduce FLAKE
@@ -461,13 +530,14 @@ static ibmisc::ArrayBundle<double,2> make_topoO(
     //
     // FGRND: Surface Fraction of Ground (0:1)
     //
-    FGRND = 1 - FOCEAN - FLAKE - FGICE;
 
     // Check that FGRND is between 0 and 1
     for (int j=1; j<=JM; ++j) {
     for (int i=1; i<=IM; ++i) {
+        FGRND(i,j) = 1.0 - FOCEAN(i,j) - FLAKE(i,j) - FGICE(i,j);
+        if (std::abs(FGRND(i,j)) < 1.e-14) FGRND(i,j) = 0;
         if (FGRND(i,j) < 0 || FGRND(i,j) > 1) {
-            printf("Error: FGRND(%d,%d) = %g %g %g %g\n", i,j,
+            fprintf(stderr, "Error: FGRND(%d,%d) = %g %g %g %g\n", i,j,
                 FGRND(i,j), FOCEAN(i,j),  FLAKE(i,j), FGICE(i,j));
         }
     }}
@@ -490,9 +560,9 @@ static ibmisc::ArrayBundle<double,2> make_topoO(
     // dZGICE: Glacial Ice Thickness (m)
     //
     blitz::Array<double, 2> zictop(IM,JM, blitz::fortranArray);
-    hntr1q1m.regrid_cast<int16_t,double>(FGICE1m, ZICETOP1m, zictop, true);
+    hntr1q1m.regrid(FGICE1m, ZICETOP1m, zictop, true);
     blitz::Array<double, 2> zsolg(IM,JM, blitz::fortranArray);
-    hntr1q1m.regrid_cast<int16_t,double>(FGICE1m, ZSOLG1m, zsolg, true);
+    hntr1q1m.regrid(FGICE1m, ZSOLG1m, zsolg, true);
 
     for (int J=1; J<=JM; ++J) {
     for (int I=1; I<=IM; ++I) {
@@ -538,7 +608,7 @@ static ibmisc::ArrayBundle<double,2> make_topoO(
     for (int J=1; J <= JM; ++J) {
     for (int I=1; I<=IM; ++I) {
         if (FLAKE(I,J) == 1) {
-            printf("FLAKE(%d,%d) == 1: %g %g %g\n",
+            fprintf(stderr, "FLAKE(%d,%d) == 1: %g %g %g\n",
                 I, J, ZATMO(I,J),dZLAKE(I,J),ZLAKE(I,J));
         }
     }}
@@ -550,32 +620,41 @@ static ibmisc::ArrayBundle<double,2> make_topoO(
 /** Reads a bunch of blitz::Arrays from a bunch of NetCDF files */
 class BulkNcReader
 {
-    FileLocator const &files;
+    FileLocator const * const files;
     std::map<std::string, std::array<std::string,2>> varmap;
 
     // Actions, keyed by filename
-    std::vector<std::tuple<
-        std::string, std::function<void (NcIO &ncio)>
-    >> actions;
+    typedef std::function<netCDF::NcVar (NcIO &ncio)> ActionFn;
+    struct Action {
+        std::string fname;
+        ActionFn fn;
+
+        Action(std::string const &_fname, ActionFn const &_fn)
+            : fname(_fname), fn(_fn) {}
+
+        bool operator<(Action const &other) const
+            { return fname < other.fname; }
+    };
+    std::vector<Action> actions;
 
 public:
 
     /** @param _vars {varname=interal name, fname=NetCDF filename, vname = NetcDF variable name, ...} */
     BulkNcReader(
-        FileLocator const &_files,
+        FileLocator const *_files,
         std::vector<std::string> const &_vars)
     : files(_files)
     {
         size_t n = _vars.size();
-        if (3*(n/3) != n) (*icebin_error(-1,
-            "BulkNcReader initializers must be in triplets: <varname>, <fname>, <vname>"));
+        if (3*(n/3) != n) (*icebin_error)(-1,
+            "BulkNcReader initializers must be in triplets: <varname>, <fname>, <vname>");
 
         for (auto ii = _vars.begin(); ii != _vars.end(); ) {
             std::string const &var(*ii++);
             std::string const &fname(*ii++);
             std::string const &vname(*ii++);
 
-            vars.insert(std::make_pair(var, make_array(fname, vname)));
+            varmap.insert(std::make_pair(var, make_array(fname, vname)));
         }
     }
 
@@ -587,10 +666,13 @@ private:
         std::string const &fname,
         std::string const &vname)
     {
-        actions.push_back(std::make_tuple(
-            fname,
-            std::bind(&ncio_blitz<TypeT,RANK>, _1, var, vname,
-                "", std::vector<netCDF::NcDim>{})));
+        ActionFn action(std::bind(
+            &ncio_blitz<TypeT,RANK>, std::placeholders::_1, var, vname,
+            "", std::vector<netCDF::NcDim>{},
+            DimOrderMatch::MEMORY, true, std::vector<std::string>{}
+        ));
+
+        actions.push_back(Action(fname, action));
 
     }
 
@@ -607,8 +689,8 @@ public:
         if (iix == varmap.end()) (*icebin_error)(-1,
             "User failed to include fname and vname for variable %s", varname.c_str());
 
-        std::string const &fname(iix[0]);
-        std::string connt &vname(iix[1]);
+        std::string const &fname(iix->second[0]);
+        std::string const &vname(iix->second[1]);
 
         add_var(var, fname, vname);
         varmap.erase(iix);    // We've added once, can't add again
@@ -620,7 +702,7 @@ public:
         // Check that every expected variable has been assigned.
         if (varmap.size() != 0) {
             for (auto ii=varmap.begin(); ii != varmap.end(); ++ii)
-                fprintf("    Unassigned: %s\n", ii->first.c_str());
+                fprintf(stderr, "    Unassigned: %s\n", ii->first.c_str());
             (*icebin_error)(-1, "Unassigned variables");
         }
 
@@ -628,13 +710,15 @@ public:
         // Read variables, grouped by file
         std::sort(actions.begin(), actions.end());
         std::unique_ptr<NcIO> ncio;
-        std::string const last_fname = "";
+        std::string last_fname = "";
         for (auto ii=actions.begin(); ii != actions.end(); ++ii) {
-            auto &fname(std::get<0>(*ii));
-            auto &action(std::get<1>(*ii));
-
-            if (fname != last_fname) ncio.reset(new NcIO(files.locate(fname), 'r'));
-            action(*ncio);
+            if (ii->fname != last_fname) {
+                std::string located_fname(files->locate(ii->fname));
+//printf("Opening %s -> %s\n", ii->fname.c_str(), located_fname.c_str());
+                ncio.reset(new NcIO(located_fname, 'r'));
+            }
+            ii->fn(*ncio);
+            last_fname = ii->fname;
         }
     }
 
@@ -647,16 +731,16 @@ ibmisc::ArrayBundle<double,2> make_topoO(
     std::vector<std::string> const &_varinputs)
 {
     // -------- 1-minute resolution
-    blitz::Array<int16_t,2> FGICE1m(IM1m, JM1m, fortranArray),
-    blitz::Array<int16_t,2> ZICETOP1m(IM1m, JM1m, fortranArray),
-    blitz::Array<int16_t,2> ZSOLG1m(IM1m, JM1m, fortranArray),
-    blitz::Array<int16_t,2> FOCEAN1m(IM1m, JM1m, fortranArray),
+    blitz::Array<int16_t,2> FGICE1m(IM1m, JM1m, fortranArray);
+    blitz::Array<int16_t,2> ZICETOP1m(IM1m, JM1m, fortranArray);
+    blitz::Array<int16_t,2> ZSOLG1m(IM1m, JM1m, fortranArray);
+    blitz::Array<int16_t,2> FOCEAN1m(IM1m, JM1m, fortranArray);
     // -------- 10-minute resolution (Z10MX10M.nc)
-    blitz::Array<double,2> FLAKES(IMS, JMS, fortranArray)
+    blitz::Array<double,2> FLAKES(IMS, JMS, fortranArray);
 
 
     // Read into our variables, from user-specified locations
-    BulkNcReader bulk(_varinputs);
+    BulkNcReader bulk(&files, _varinputs);
     bulk.add_var("FGICE1m", FGICE1m);
     bulk.add_var("ZICETOP1m", ZICETOP1m);
     bulk.add_var("ZSOLG1m", ZSOLG1m);
@@ -664,7 +748,8 @@ ibmisc::ArrayBundle<double,2> make_topoO(
     bulk.add_var("FLAKES", FLAKES);
     bulk.read_bulk();
 
-    return make_topoO(
+printf("FINISHED READING INPUTS\n");
+    return _make_topoO(
         FGICE1m, ZICETOP1m, ZSOLG1m, FOCEAN1m,
         FLAKES);
 }

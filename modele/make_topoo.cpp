@@ -58,28 +58,17 @@ int main(int argc, char** argv)
     std::string et1mfile("etopo1_ice_g1m.nc");
     make_topoO(EnvSearchPath("MODELE_FILE_PATH"), {
         "FGICE1m", et1mfile, "FGICE1m",
-        "ZICETOP1m", et1mfile, "ZICETOP",
-        "ZSOLG1m", et1mfile, "ZSOLG",
-        "FOCEAN1m", et1mfile, "FOCEAN",
+        "ZICETOP1m", et1mfile, "ZICETOP1m",
+        "ZSOLG1m", et1mfile, "ZSOLG1m",
+        "FOCEAN1m", et1mfile, "FOCEAN1m",
         "FLAKES", "Z10MX10M.nc", "FLAKES"
-    });
+    }));
 
-
-    // Read the input files
-    printf("============ Reading Input Files\n");
-    TopoInputs topo_inputs(topo_inputs_bundle(true));
-printf("greenland = %d\n", args.greenland);
-    read_raw(topo_inputs, !args.greenland, NULL, EnvSearchPath("MODELE_FILE_PATH"));
-
-    // Do the calculation
-    printf("============ Calculating TOPO\n");
-    TopoOutputs<2> topo_outputs(topo_outputs_bundle2(true));
-    z1qx1n_bs1(topo_inputs, topo_outputs);
 
     printf("============ Writing Output\n");
     {NcIO ncio(args.ofname, 'w');
 
-        topo_outputs.bundle.ncio(ncio, {}, "", "double");
+        bundle.ncio(ncio, {}, "", "double");
 
         ncio.close();
     }
