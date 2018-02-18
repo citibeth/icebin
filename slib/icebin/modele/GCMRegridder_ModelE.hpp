@@ -6,9 +6,6 @@
 namespace icebin {
 namespace modele {
 
-/** Defines the elevation class index as the one with largest stride. */
-extern Indexing indexingHC_modele;
-
 /** This class produces regridding matrices between the grids (AAm,
 EAm, Ip).
 

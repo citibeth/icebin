@@ -679,11 +679,12 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
                     if (FLAKE(I,J) > 0) {
                         FGRND(I,J) += FLAKE(I,J);
                         FLAKE(I,J) = 0;
-                        dZLAKEB(I,J) = 0;
+                        dZLAKE(I,J) = 0;
                     }
                 }
             }
         }
+    }}
 
     // Original code, which operate on the Atmosphere grid.
     // C**** Replace LAKES with GROUND if cell has some OCEAN
