@@ -15,6 +15,9 @@ namespace modele {
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
+/** Within each 1-minute gridcell, it has a hi-res topography and a
+lake fraction.  It determines the elevation of the lake, being at the
+bottom of the gridcell. */
 static void callZ(
     // (IM1m, JM1m)
     blitz::Array<int16_t,2> const &FOCEAN1m,
@@ -323,8 +326,9 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     SET_TO = TO_NONE;
 
     // Set following grid cells to be continent
-    SET_TO( 84, 18) = TO_LAND;
-    SET_TO( 85, 18) = TO_LAND;
+//    SET_TO( 84, 18) = TO_LAND;
+//    SET_TO( 85, 18) = TO_LAND;
+//    SET_TO( 86, 18) = TO_LAND;    // Antarctic Peninsula
     SET_TO(236, 82) = TO_LAND;
     SET_TO(242, 82) = TO_LAND;
     SET_TO(245, 82) = TO_LAND;
@@ -565,15 +569,53 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     blitz::Array<double, 2> zsolg(IM,JM, blitz::fortranArray);
     hntr1q1m.regrid(FGICE1m, ZSOLG1m, zsolg, true);
 
-    for (int J=1; J<=JM; ++J) {
-    for (int I=1; I<=IM; ++I) {
-        double dzgice = zictop(I,J) - zsolg(I,J);
-        if (FGICE(I,J) > 0) {
-            dZGICE(I,J) = std::max(dzgice, 1.);
-        } else {
-            dZGICE(I,J) = 0;
+
+    // RGICE = areal ratio of glacial ice to continent
+    // For smaller ice caps and glaciers, dZGICH = CONSTK * RGICE^.3
+    // Constant is chosen so that average value of dZGICH is 264.7 m
+    // 264.7  =  sum(DXYP*FGIC1H*dZGICH) / sum(DXYP*FGIC1H)  =
+    //        =  CONSTK * sum(DXYP*FGIC1H*RGICE^.3) / sum(DXYP*FGIC1H)
+    dZGICE = 0;
+    HntrGrid grid_g1qx1(g1qx1);
+    {
+        double SUMDFR = 0;
+        double SUMDF = 0;
+        blitz::Array<double,2> RGICE(IM, JM, blitz::fortranArray);
+        for (int J=1; J<=JM; ++J) {
+            double sum_dfr = 0;
+            double sum_df = 0;
+            for (int I=1; I<=IM; ++I) {
+                double dzgice = zictop(I,J) - zsolg(I,J);
+
+                if (dzgice != 0) {
+                    // If this criterion (dzgice!=0) for GrIS+Ant doesn't work, use a mask instead.
+                    // Set GrIS and AIS according to ETOPO1
+                    dZGICE(I,J) = dzgice;
+                } else {
+                    double const fcont = 1. - FOCEAN(I,J);
+                    RGICE(I,J) = FGICE(I,J) / (fcont+1e-20);
+                    sum_dfr += FGICE(I,J) * std::pow(RGICE(I,J),.3);
+                    sum_df += FGICE(I,J);
+                }
+            }
+            SUMDFR += grid_g1qx1.dxyp(J) * sum_dfr;
+            SUMDF += grid_g1qx1.dxyp(J) * sum_df;
         }
-    }}
+
+        double CONSTK = 264.7 * SUMDF / SUMDFR;
+
+        // Replace in.FGICEH and dZGICH away from Greenland
+        for (int J=1; J <= JM; ++J) {
+        for (int I=1; I <= IM; ++I) {
+            if (FGICE(I,J) == 0) {
+                // Clear ice depth where there is no ice
+                dZGICE(I,J) = 0;
+            } else if (dZGICE(I,J) == 0) {
+                // Avoid ice sheets
+                dZGICE(I,J) = CONSTK * std::pow(RGICE(I,J), .3);
+            }
+        }}
+    }
 
     //
     // ZATMO  = Atmospheric topography (m)
@@ -590,9 +632,10 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
         FOCEAN, FLAKE, FGRND, ZATMO,
         dZLAKE,ZSOLDG,ZSGLO,ZLAKE,ZGRND,ZSGHI);
 
+#if 1
     // Reset ZATMO, dZOCEN and ZLAKE by hand if FLAKE(I,J) == 1
-    //
-
+    // This is here due to errors in ETOPO2
+    // (Maybe) not needed for ETOPO1
     for (auto &reset : resets) {
         double elev = reset.elev;
         auto &ijs(reset.points);
@@ -605,6 +648,7 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
             ZLAKE(i,j) = elev;
         }
     }
+#endif
 
     for (int J=1; J <= JM; ++J) {
     for (int I=1; I<=IM; ++I) {
@@ -613,6 +657,44 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
                 I, J, ZATMO(I,J),dZLAKE(I,J),ZLAKE(I,J));
         }
     }}
+
+
+    // -------------------------------------------------
+    // This will eventually be scaled to the Atmosphere (g2hx2) grid.
+    // Adjust it on this grid so that the g2hx2 version is exactly
+    // a regridded g1qx1 version.
+    for (int jb=0; jb<JMB; ++jb) {
+    for (int ib=0; ib<IMB; ++ib) {
+        double foceanb = 0;
+        for (int j=jb*2; j<jb*2+2; ++j) {
+        for (int i=ib*2; i<ib*2+2; ++i) {
+            foceanb += FOCEAN(i+1,j+1);
+        }}
+
+        if (foceanb > 0) {
+            for (int j=jb*2; j<jb*2+2; ++j) {
+                int const J=j+1;
+                for (int i=ib*2; i<ib*2+2; ++i) {
+                    int const I=i+1;
+                    if (FLAKE(I,J) > 0) {
+                        FGRND(I,J) += FLAKE(I,J);
+                        FLAKE(I,J) = 0;
+                        dZLAKEB(I,J) = 0;
+                    }
+                }
+            }
+        }
+
+    // Original code, which operate on the Atmosphere grid.
+    // C**** Replace LAKES with GROUND if cell has some OCEAN
+    // C****
+    //       Do 10 J=1,JMB
+    //       Do 10 I=1,IMB
+    //       If (FOCEANB(I,J) > 0 .and. FLAKEB(I,J) > 0)  Then
+    //            FGRNDB(I,J) = FGRNDB(I,J) + FLAKEB(I,J)
+    //            FLAKEB(I,J) = 0
+    //           dZLAKEB(I,J) = 0  ;  EndIf
+    //    10 Continue
 
     return out;
 }
