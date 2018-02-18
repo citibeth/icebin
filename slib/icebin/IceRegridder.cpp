@@ -92,7 +92,7 @@ void IceRegridder::ncio(NcIO &ncio, std::string const &vname)
 void IceRegridder::init(
     std::string const &name,
     AbbrGrid const &agridA,
-    Grid const &fgridA,
+    Grid const *fgridA,        // Can be nil I grid is spherical
     AbbrGrid const &&_agridI,
     ExchangeGrid const &&_aexgrid,
     InterpStyle _interp_style)
@@ -109,7 +109,7 @@ void IceRegridder::init(
         // Use a projection
         gridA_proj_area.reference(blitz::Array<double,1>(agridA.dim.dense_extent()));
         ibmisc::Proj_LL2XY proj(agridI.sproj);
-        for (auto cell=fgridA.cells.begin(); cell != fgridA.cells.end(); ++cell) {
+        for (auto cell=fgridA->cells.begin(); cell != fgridA->cells.end(); ++cell) {
             int const is = cell->index;    // sparse index
             int const id = agridA.dim.to_dense(is);
             gridA_proj_area(id) = cell->proj_area(&proj);

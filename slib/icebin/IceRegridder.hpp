@@ -85,7 +85,7 @@ public:
     void init(
         std::string const &_name,
         AbbrGrid const &agridA,
-        Grid const &fgridA,
+        Grid const *fgridA,  // Only required if agridI uses a projection
         AbbrGrid const &&_agridI,
         ExchangeGrid const &&_aexgrid,
         InterpStyle _interp_style);
