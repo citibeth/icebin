@@ -17,6 +17,8 @@ unscaled matrices IvA, IvE, AvE
 
 
 #include <string>
+#include <sstream>
+
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -25,15 +27,22 @@ unscaled matrices IvA, IvE, AvE
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/stdio.hpp>
 #include <ibmisc/filesystem.hpp>
+#include <spsparse/SparseSet.hpp>
 
-#include <icebin/Grid.hpp>
-#include <icebin/AbbrGrid.hpp>
+//#include <icebin/Grid.hpp>
+//#include <icebin/AbbrGrid.hpp>
+#include <icebin/GCMRegridder.hpp>
+#include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/grids.hpp>
 #include <icebin/modele/hntr.hpp>
 
+#include <icebin/gridgen/GridGen_LonLat.hpp>
+
+using namespace std;
 using namespace ibmisc;
 using namespace icebin;
 using namespace netCDF;
+using namespace spsparse;
 
 // ==========================================================
 struct ParseArgs {
@@ -41,7 +50,7 @@ struct ParseArgs {
     HntrSpec hspecI;    // Name of Hntr Spec for Ice Grid
 
     std::string nc_fname;
-    std::string maskI_vname;
+    std::string fgiceI_vname;
     std::string elevI_vname;
 
 //    std::string nc foceanI_fname;
@@ -53,6 +62,7 @@ struct ParseArgs {
     std::array<double,2> ec_range;    // Lowest and highest elevation classes [m]
     double ec_skip;                    // Distance between elevation classes [m]
     bool scale;
+    bool const correctA = false;    // Only needed with projected I grids (and then not really)
     std::array<double,3> sigma;
 
     double eq_rad;        // Radius of earth; see ModelE code    
@@ -65,12 +75,12 @@ static std::vector<DestT> parse_csv(std::string scsv_str)
 {
     // Parse to vector of strings
     std::vector<std::string> scsv;
-    boost::algorithm::split(scsv,  scsv_str, boost::is_any_of(","))
+    boost::algorithm::split(scsv,  scsv_str, boost::is_any_of(","));
 
 
     std::vector<DestT> ret;
-    for (std::string s : scsv) {
-        ifastream<basic_formatters, string_reader> myString(&s);
+    for (std::string &s : scsv) {
+        stringstream myString(s);
         DestT val;
         myString >> val;
         ret.push_back(val);
@@ -116,7 +126,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
                 "NetCDF file containing ice mask and elevation (1 where there is ice)",
             true, "etopo1_ice1m.nc", "mask filename", cmd);
 
-        TCLAP::ValueArg<std::string> maskI_vname_a("m", "mask",
+        TCLAP::ValueArg<std::string> fgiceI_vname_a("m", "mask",
             "Name of NetCDF variable containing ice mask (1 where there is ice)",
             false, "FGICE1m", "mask var name", cmd);
 
@@ -132,11 +142,11 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "Output filename (NetCDF) for overlaps",
             true, "FGICE1m", "mask var name", cmd);
 
-        TCLAP::SwitchArg correctA_a("s", "scale",
+        TCLAP::SwitchArg scale_a("s", "scale",
              "Produce scaled matrices?",
-             cmd, false);
+             cmd, true);
 
-        TCLAP::ValueArg<std::string> ssigma_a("s", "sigma",
+        TCLAP::ValueArg<std::string> sigma_a("s", "sigma",
             "Scaling factor: x,y,z",
             true, "0,0,0", "scaling factor", cmd);
 
@@ -157,16 +167,16 @@ ParseArgs::ParseArgs(int argc, char **argv)
         hspecO = *modele::grids.at(shspecO_a.getValue());
         hspecI = *modele::grids.at(shspecI_a.getValue());
         nc_fname = nc_fname_a.getValue();
-        maskI_vname = maskI_vname_a.getValue();
+        fgiceI_vname = fgiceI_vname_a.getValue();
         elevI_vname = elevI_vname_a.getValue();
 
         // Parse elevation classes...
-        auto _ec(parse_csv<double>(ec_a.getValue());
+        auto _ec(parse_csv<double>(ec_a.getValue()));
         if (_ec.size() < 2 || _ec.size() > 3) (*icebin_error)(-1,
             "--ec '%s' must have just two or three values");
         ec_range[0] = _ec[0];
         ec_range[1] = _ec[1];
-        ec_skip = (ec.size() == 3 ? _ec[2] : 1);
+        ec_skip = (_ec.size() == 3 ? _ec[2] : 1);
 
         ofname = ofname_a.getValue();
         scale = scale_a.getValue();
@@ -177,7 +187,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         auto _sigma(parse_csv<double>(sigma_a.getValue()));
         if (sigma.size() != 3) (*icebin_error)(-1,
             "sigma must have exactly three elements");
-        for (int i=0; i<_sigma.size() ++i) sigma[i] = _sigma[i];
+        for (int i=0; i<_sigma.size(); ++i) sigma[i] = _sigma[i];
 
     } catch (TCLAP::ArgException &e) { // catch any exceptions
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
@@ -190,13 +200,15 @@ ParseArgs::ParseArgs(int argc, char **argv)
 class ExchAccum {
     ExchangeGrid &exgrid;
     blitz::Array<double,1> const &elevmaskI;
-    SparseSet<long,int> &_dimO;        // Dimension is created but not used
-    SparseSet<long,int> &_dimI;        // Dimension is created but not used
+    SparseSet<long,int> &dimO;        // Dimension is created but not used
+    SparseSet<long,int> &dimI;        // Dimension is created but not used
 public:
-    ExchAccum(ExchangeGrid &_exgrid, blitz::Array<double,1> const &_elevmaskI,
+    ExchAccum(
+        ExchangeGrid &_exgrid,
+        blitz::Array<double,1> const &_elevmaskI,
         SparseSet<long,int> _dimO,
         SparseSet<long,int> _dimI)
-        : exgrid(_exgrid), elevmaskI(_elevmaskI), dimO(_dimO), dimI(_dimI) {}
+    : exgrid(_exgrid), elevmaskI(_elevmaskI), dimO(_dimO), dimI(_dimI) {}
 
     void add(std::array<int,2> const &index, double area)
     {
@@ -270,34 +282,41 @@ int main(int argc, char **argv)
     }
 
     // Compute overlaps for cells with ice
-    SparseSet<long,int> dimO;    // Only include O grid cells with ice
-    SparseSet<long,int> dimI;    // Only include I grid cells with ice
-    hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), dimO, dimI), args.eq_rad);
+    SparseSet<long,int> _dimO;    // Only include O grid cells with ice
+    SparseSet<long,int> _dimI;    // Only include I grid cells with ice
+    hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), _dimO, _dimI), args.eq_rad);
 #if 0
     {NcIO ncio(args.ofname, 'w');
         aexgrid.ncio(ncio, "aexgrid");
     }
 #endif
 
-    // Realize O grid for relevant gridcells
+    // Turn HntrSpec --> GridSpec
     auto specO(make_grid_spec(hspecO, false, 1, args.eq_rad));
-    auto agridO(make_abbr_grid("Ocean", specO, std::move(dimO)));
+    auto specI(make_grid_spec(hspecI, false, 1, args.eq_rad));
+
+    // Realize O grid for relevant gridcells
+    auto agridO(make_abbr_grid("Ocean", specO, std::move(_dimO)));
 
     // Set up elevation classes    
     std::vector<double> hcdefs;
     for (double elev=args.ec_range[0]; elev <= args.ec_range[1]; elev += args.ec_range[2]) {
         hcdefs.push_back(elev);
+    }
 
     // Create standard GCMRegridder for O <--> I
-    std::shared_ptr<GCMRegridder> gcmO(new GCMRegridder_Standard);
-    Indexing indexingHC({"O", "HC"}, {0,0}, {agridO.ndata(), hcdefs.size()}, {1,0}),
-    gcmO->init(std::move(agridO), std::move(hcdefs), indexingHC, args.correctA);
+    std::unique_ptr<GCMRegridder_Standard> gcmO(new GCMRegridder_Standard);
+    ;
+    gcmO->init(
+        std::move(agridO), std::move(hcdefs),
+        Indexing({"O", "HC"}, {0,0}, {agridO.dim.sparse_extent(), hcdefs.size()}, {1,0}),
+        args.correctA);
 
     // --------------------------------------------------
     // Create IceRegridder for I and add to gcmO
     auto ice(new_ice_regridder(IceRegridder::Type::L0));
-    auto agridI(make_abbr_grid("Ice", specI, std::move(dimI)));
-    ice->init("globalI", gcmO->agridA, nil,
+    auto agridI(make_abbr_grid("Ice", specI, std::move(_dimI)));
+    ice->init("globalI", gcmO->agridA, nullptr,
         std::move(agridI), std::move(aexgrid),
         InterpStyle::Z_INTERP);    // You can use different InterpStyle if you like.
 
@@ -306,8 +325,9 @@ int main(int argc, char **argv)
     // --------------------------------------------------
     // Create a mismatched regridder, to mediate between different ice
     // extent of GCM vs. IceBin
-    GCMRegridder_ModelE gcmA(gcmO);
-    RegridMatrices rm(gcmA.regrid_matrices(0, elevmaskI));
+    modele::GCMRegridder_ModelE gcmA(std::shared_ptr<GCMRegridder>(gcmO.release()));
+
+    RegridMatrices rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
     elevmaskI.free();    // No longer needed, and it is BIG
 
     // Use the mismatched regridder to create desired matrices and save to file
@@ -329,34 +349,33 @@ int main(int argc, char **argv)
     }
 
     SparseSet<long,int> dimA, dimI, dimE;
-    RegridMatrices::Params params(args.scale, args.correctA, args.sigma);
 
     // ---------- Generate and store the matrices
-    {ncio ncio(args.ofname, 'a');
-        auto mat(rm.matrix("EvI", {&dimE, &dimI}, params);
+    {NcIO ncio(args.ofname, 'a');
+        auto mat(rm.matrix("EvI", {&dimE, &dimI}, params));
         mat->ncio(ncio, "EvI", {"dimE", "dimI"});
     }
-    {ncio ncio(args.ofname, 'a');
-        auto mat(rm.matrix("AvI", {&dimA, &dimI}, params);
+    {NcIO ncio(args.ofname, 'a');
+        auto mat(rm.matrix("AvI", {&dimA, &dimI}, params));
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
     }
 
-    {ncio ncio(args.ofname, 'a');
-        auto mat(rm.matrix("IvE", {&dimI, &dimE}, params);
+    {NcIO ncio(args.ofname, 'a');
+        auto mat(rm.matrix("IvE", {&dimI, &dimE}, params));
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
     }
-    {ncio ncio(args.ofname, 'a');
-        auto mat(rm.matrix("IvA", {&dimI, &dimA}, params);
+    {NcIO ncio(args.ofname, 'a');
+        auto mat(rm.matrix("IvA", {&dimI, &dimA}, params));
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
     }
 
-    {ncio ncio(args.ofname, 'a');
-        auto mat(rm.matrix("AvE", {&dimA, &dimE}, params);
+    {NcIO ncio(args.ofname, 'a');
+        auto mat(rm.matrix("AvE", {&dimA, &dimE}, params));
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
     }
 
     // Store the dimensions
-    {ncio ncio(args.ofname, 'a');
+    {NcIO ncio(args.ofname, 'a');
         dimA.ncio(ncio, "dimA");
         dimE.ncio(ncio, "dimE");
         dimI.ncio(ncio, "dimI");
