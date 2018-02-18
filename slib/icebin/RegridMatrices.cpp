@@ -476,7 +476,7 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
     std::string const &vname,
     std::array<std::string,2> dim_names)
 {
-
+    // Matches dimension name created by SparseSet.
     auto ncdims(ibmisc::get_or_add_dims(ncio,
         {dim_names[0] + ".dense_extent", dim_names[1] + ".dense_extent"},
         {dims[0]->dense_extent(), dims[1]->dense_extent()}));

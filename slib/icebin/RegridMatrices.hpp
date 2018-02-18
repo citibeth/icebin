@@ -86,7 +86,7 @@ public:
     /** ice_regridder from which this was constructed */
     IceRegridder const * const ice_regridder;
 
-    ibmisc::TmpAlloc tmp;
+    ibmisc::TmpAlloc tmp;    // Stores local vars for different types.  TODO: Maybe re-do this as simple classmember variables.  At least, see where it used (by removing it and running the compiler)
 
     /** Parameters controlling the generation of regridding matrices */
     struct Params {

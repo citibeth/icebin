@@ -38,6 +38,7 @@ namespace icebin {
 class Grid;
 
 class ExchangeGrid {
+    // Sparse indexing needed by IceRegridder::init()
     std::vector<int> indices;    // Length*2: (ixB, ixA)
     std::vector<double> overlaps;
 

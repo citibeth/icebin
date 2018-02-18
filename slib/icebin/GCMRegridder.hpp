@@ -360,13 +360,18 @@ public:
         ice_regridders().push_back(std::move(regridder));
     }
 
+    /** Convenience method, for when the IceRegridder does not yet
+        have a name. */
     void add_sheet(std::string name, std::unique_ptr<IceRegridder> &&regridder)
     {
         regridder->_name = name;
         add_sheet(std::move(regridder));
     }
 
-    /** Produce regridding matrices for this setup. */
+    /** Produce regridding matrices for this setup.
+    Do not change elevmaskI to dense indexing.  That would require a
+    SparseSet dim variable, plus a dense-indexed elevation.  In the end,
+    too much complication and might not even save RAM. */
     RegridMatrices regrid_matrices(
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI) const;

@@ -6,6 +6,8 @@
 namespace icebin {
 namespace modele {
 
+/** Defines the elevation class index as the one with largest stride. */
+extern Indexing indexingHC_modele;
 
 /** This class produces regridding matrices between the grids (AAm,
 EAm, Ip).
@@ -104,19 +106,22 @@ public:
     std::shared_ptr<icebin::GCMRegridder> const gcmO;
 
     /** ModelE ocean cover, on the Ocean grid, as seen by the ice
-    model.  Ocean grid cells can contain fractional ocean
-    cover.  foceanAOp can change over the course of a ModelE run,
-    as the ice model's ice extent changes.
+    model (sparse indexing).  Ocean grid cells can contain fractional
+    ocean cover.  foceanAOp can change over the course of a ModelE
+    run, as the ice model's ice extent changes.
     @see ModelE FOCEAN or FOCEN */
     blitz::Array<double,1> foceanAOp;
 
-    /** ModelE ocean cover, on the Ocean grid, as seen by ModelE.
-    Cells are either all ocean (==1.0) or all continent (==0.0).
-    foceanAOm does NOT change over the course of a ModelE run,
-    because the ModelE ocean is not able to change shape mid-run. */
+    /** ModelE ocean cover, on the Ocean grid, as seen by ModelE
+    (sparse indexing).  Cells are either all ocean (==1.0) or all
+    continent (==0.0).  foceanAOm does NOT change over the course of a
+    ModelE run, because the ModelE ocean is not able to change shape
+    mid-run. */
     blitz::Array<double,1> foceanAOm;
 
-    /** @param _gcmO Underlying regridder for the Ocean Grid Regime. */
+    /** Constructor used in coupler: create the GCMRegridder first,
+        then fill in foceanAOp and foceanAOm later.
+    @param _gcmO Underlying regridder for the Ocean Grid Regime. */
     GCMRegridder_ModelE(std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
 
     // ------------------------------------------------------------
