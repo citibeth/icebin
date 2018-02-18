@@ -18,6 +18,9 @@ int const IM1 = 360;
 int const JM1 = 180;
 int const IM = 288;
 int const JM = 180;
+int const IMB = 144;     // g2hx2
+int const JMB = 90;
+
 
 extern HntrSpec const g1mx1m;
 extern HntrSpec const g2mx2m;
