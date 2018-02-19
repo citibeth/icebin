@@ -117,7 +117,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
                 "ModelE TOPO file on the Ocean grid.  Need FOCEAN and FOCEANF",
             true, "etopo1_ice_g1m.nc", "focean filename", cmd);
 
-        TCLAP::ValueArg<std::string> foceanI_vname_a("m", "focean",
+        TCLAP::ValueArg<std::string> foceanI_vname_a("n", "focean",
             "Name of NetCDF variable containing ice focean (1 where there is ice)",
             false, "FGICE1m", "focean var name", cmd);
 
@@ -134,7 +134,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "Name of NetCDF variable containing elevation [m]",
             false, "ZICETOP1m", "elevation var name", cmd);
 
-        TCLAP::ValueArg<std::string> ec_a("ec", "elev-classes",
+        TCLAP::ValueArg<std::string> ec_a("E", "elev-classes",
             "Elevations [m] for the elevation classes: lowest,highest,skip",
             false, "-100,3700,200", "elevations", cmd);
 
@@ -142,11 +142,11 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "Output filename (NetCDF) for overlaps",
             true, "FGICE1m", "mask var name", cmd);
 
-        TCLAP::SwitchArg scale_a("s", "scale",
-             "Produce scaled matrices?",
-             cmd, true);
+        TCLAP::SwitchArg raw_a("r", "raw",
+             "Produce raw (unscaled) matrices?",
+             cmd, false);
 
-        TCLAP::ValueArg<std::string> sigma_a("s", "sigma",
+        TCLAP::ValueArg<std::string> sigma_a("g", "sigma",
             "Scaling factor: x,y,z",
             true, "0,0,0", "scaling factor", cmd);
 
@@ -179,7 +179,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         ec_skip = (_ec.size() == 3 ? _ec[2] : 1);
 
         ofname = ofname_a.getValue();
-        scale = scale_a.getValue();
+        scale = !scale_a.getValue();
 
         eq_rad = eq_rad_a.getValue();
 
