@@ -179,7 +179,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         ec_skip = (_ec.size() == 3 ? _ec[2] : 1);
 
         ofname = ofname_a.getValue();
-        scale = !scale_a.getValue();
+        scale = !raw_a.getValue();
 
         eq_rad = eq_rad_a.getValue();
 
