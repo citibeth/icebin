@@ -42,6 +42,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(
     blitz::Array<double,1> const *elevmaskI,
     UrAE const &AE)
 {
+printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correctA);
     std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
     SparseSetT * const dimA(ret->dims[0]);
     SparseSetT * const dimI(ret->dims[1]);
@@ -80,11 +81,32 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(
             AE.sApvA,
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
             {dimA, dimA}, '.').to_eigen());
+
+printf("|wAvAp| = %ld   |dimA|=%d %ld\n", (long)wAvAp.nonZeros(), dimA->dense_extent(), dimA->sparse_extent());
+int n=0;
+for (auto ii(begin(wAvAp)); ii != end(wAvAp); ++ii, ++n) {
+    printf("wAvAp(%d %d) = %g\n", dimA->to_sparse(ii->row()), dimA->to_sparse(ii->col()), ii->value());
+    if (n > 5) break;
+}
+
+
         auto wApvI(sum_to_diagonal(*ApvI, 0, '+'));        // diagonal
+
+n=0;
+for (auto ii(begin(wApvI)); ii != end(wApvI); ++ii, ++n) {
+    printf("wApvI(%d %d) = %g\n", dimA->to_sparse(ii->row()), dimI->to_sparse(ii->col()), ii->value());
+    if (n > 5) break;
+}
+
+
+//printf("wAvAp: [%g %g %g...]\n", wAvAp(0), wAvAp(1), wAvAp(2));
+//printf("wApvI: [%g %g %g...]\n", wApvI(0), wApvI(1), wApvI(2));
         EigenSparseMatrixT wAvI(wAvAp * wApvI);    // diagonal...
 
         // +correctA: Weight matrix in A space
         ret->wM.reference(sum(wAvI, 0, '+'));    // Area of A cells
+printf("wM: [%g %g %g...]\n", ret->wM(0), ret->wM(1), ret->wM(2));
+
 
         // Compute the main matrix
         auto sAvAp(sum_to_diagonal(wAvAp, 0, '-'));
@@ -118,6 +140,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(
         }
     }
 
+printf("END compute_AEvI\n");
     return ret;
 }
 // ---------------------------------------------------------

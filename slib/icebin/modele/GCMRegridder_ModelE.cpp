@@ -68,7 +68,7 @@ static void scaled_AOmvAOp(
 
         if (fcont_m == 0.0) continue;
         if (fcont_m != 1.0) (*icebin_error)(-1,
-            "fcont_m[%d] = %g (%p; %p), must be 0 or 1", iAO_s, fcont_m, foceanAOm.data(), &foceanAOm(iAO_s));
+            "fcont_m[%ld] = %g (%p; %p), must be 0 or 1", iAO_s, fcont_m, foceanAOm.data(), &foceanAOm(iAO_s));
 
         if (fcont_p == 0.0) continue;    // Can't extend ice that's not there
 
@@ -107,6 +107,8 @@ public:
     GCMRegridder_ModelE const *gcmA;
     blitz::Array<double,1> const &wEO_d;
 
+int n=0;
+
     RawEOvEA(
         MakeDenseEigenT::AccumT &&_ret,
         GCMRegridder_ModelE const *_gcmA,
@@ -124,6 +126,7 @@ public:
         long lAO_s = index[0];
         long lAA_s = index[1];
 
+if (n < 15) printf("    RawEOvEA: (%d %d) = %g   nc=%d\n", lAO_s, lAA_s, value, gcmA->nhc());
         // Iterate through all possible elevation classes for this gridcell pair
         for (int ihc=0; ihc<gcmA->nhc(); ++ihc) {
             long const lEO_s = gcmA->gcmO->indexingHC.tuple_to_index(
@@ -133,6 +136,7 @@ public:
             if (!dimEO.in_sparse(lEO_s)) continue;    // wEO==0 here
             int const lEO_d = dimEO.to_dense(lEO_s);
             double const weightEO = wEO_d(lEO_d);
+if (n < 15) printf("      ihc=%d, lEO_s = %ld   lEO_d=%d  weightEO=%g\n", ihc, lEO_s, lEO_d, weightEO);
 
             if (weightEO != 0) {
                 int const lEA_s = gcmA->indexingHC.tuple_to_index(
@@ -140,6 +144,7 @@ public:
                 ret.add({lEO_s,lEA_s}, weightEO);
             }
         }
+++n;
     }
 };
 
@@ -354,8 +359,25 @@ Compute_wAOm::Compute_wAOm(
     paramsO.correctA = true;
 
     // We need AOpvIp for wAOP; used below.
+printf("dimIp.dense_extent() = %d (sparse=%d)\n", dimIp.dense_extent(), dimIp.sparse_extent());
     std::unique_ptr<WeightedSparse> AOpvIp_corrected(rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
+
+
+printf("|AOpvIp_corrected|=%ld\n", (long)AOpvIp_corrected->M->nonZeros());
+int n=0;
+for (auto ii(begin(*AOpvIp_corrected->M)); ii != end(*AOpvIp_corrected->M); ++ii, ++n) {
+    printf("   AOpvIp_corrected(%d %d) = %g\n", dimAOp.to_sparse(ii->row()), dimIp.to_sparse(ii->col()), ii->value());
+    if (n > 15) break;
+}
+
+printf("|wAOp|=%d\n", wAOp.extent(0));
+for (int i=0; i<15; ++i) {
+    printf("    wAOp(%d)=%g\n", i, wAOp(i));
+}
+
+
+
 
     // OmvOp
     EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
@@ -364,6 +386,12 @@ Compute_wAOm::Compute_wAOm(
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
     wAOm_e = sc_AOmvAOp * map_eigen_colvector(wAOp);
+
+printf("|wAOp|=%ld   |wAOm_e|=%ld\n", wAOm_e.rows()*wAOm_e.cols(), wAOp.extent(0));
+for (int i=0; i<15; ++i) {
+    printf("    wAOp(%d)=%g   wAOm_e(%d)=%g\n", i, wAOp(i), i, wAOm_e(i));
+}
+
 }
 // ------------------------------------------------------
 /** Computes AAmvEAM (with scaling)
@@ -523,6 +551,9 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
     HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
 
+printf("hntrO: %dx%d\n", hntrO.im, hntrO.jm);
+printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
+
     dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
     dimIp.set_sparse_extent(rmO->ice_regridder->nI());
 
@@ -550,9 +581,19 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
         std::unique_ptr<WeightedSparse> EOmvAOm(
             rmO->matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
+
+printf("EOmvAOm: %ld  dimEOm=%ld  dimAOm=%ld\n", (long)EOmvAOm->M->nonZeros(), dimEOm.dense_extent(), dimAOm.dense_extent());
+int n=0;
+for (auto ii(begin(*EOmvAOm->M)); ii != end(*EOmvAOm->M); ++ii, ++n) {
+    printf("   EOmvAOm(%d %d) = %g\n", dimEOm.to_sparse(ii->row()), dimAOm.to_sparse(ii->col()), ii->value());
+    if (n > 15) break;
+}
+
         const_universe.reset();        // Check that dims didn't change
         blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
 
+for (int i=0; i < 15; ++i) printf("EOmvAOms(%d) = %g\n", i, EOmvAOms(i));
+for (int i=0; i < 15; ++i) printf("wAOm_e(%d) = %g\n", i, wAOm_e(i));
 
         // wEOm_e
         tmp.take<EigenColVectorT>(wXOm_e,
@@ -564,12 +605,16 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         SparseSetT &dimEAm(dimXAm);
 
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
+printf("wXOm.extent(0) = %d\n", wXOm.extent(0));
+for (int i=0; i < 15; ++i) printf("    wXOm[%d] = %g\n", i, wXOm(i));
+
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
                 hntrO, hntrA,
                 eq_rad, &dimAOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
+printf("XAmvXOm 1: %ld   dimEOm=%ld   dimEAm=%ld\n", (long)XAmvXOm->nonZeros(), dimEOm.dense_extent(), dimEAm.dense_extent());
     } else {    // X == 'A'
         RegridMatrices::Params paramsO(paramsA);
         paramsO.scale = false;
@@ -635,6 +680,8 @@ static std::unique_ptr<WeightedSparse> compute_XAmvIp(
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
 
+printf("XOpvIp: %ld\n", (long)(XOpvIp->M->nonZeros()));
+printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
 
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
@@ -722,7 +769,7 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     :  gcmO(_gcmO)
 {
     // Initialize superclass member
-    agridA = gcmO->agridA;
+    agridA = make_agridA(gcmO->agridA);
 
     _ice_regridders = &gcmO->ice_regridders();
 

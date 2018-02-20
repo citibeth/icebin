@@ -95,7 +95,7 @@ indexing.
 
 */
 class GCMRegridder_ModelE : public GCMRegridder {
-    blitz::Array<double,1> _foceanAOm, _foceanAOp;    // Hold allocated memory here
+//    blitz::Array<double,1> _foceanAOm, _foceanAOp;    // Hold allocated memory here
 
 public:
     /** A GCMRegridder_Standard that regrids between AOp,EOp,Ip.

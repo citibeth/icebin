@@ -40,6 +40,7 @@ IceRegridder::~IceRegridder() {}
 NOTE: wAvAp == sApvA */
 void IceRegridder::sApvA(MakeDenseEigenT::AccumT &&w) const
 {
+printf("BEGIN sApvA(%d)\n", gcm->agridA.dim.dense_extent());
     for (int id=0; id < gcm->agridA.dim.dense_extent(); ++id) {
         auto index = gcm->agridA.dim.to_sparse(id);
         w.add({index, index}, gcm->agridA.native_area(id) / gridA_proj_area(id));

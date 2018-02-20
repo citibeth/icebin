@@ -178,6 +178,8 @@ void etopo1_ice(
             etopo1_atts.insert(std::make_pair("ZSOLID", get_all_atts(
                 ncio_blitz(fin, zsolid1m, "ZSOLID", "short", {}))));
 
+// Use an ice-free Antarctica
+#if 0
             // Use ETOPO1 for Southern Hemisphere Ice
             for (int j1m=0; j1m < JM1m/2; ++j1m) {
             for (int i1m=0; i1m < IM1m; ++i1m) {
@@ -187,6 +189,7 @@ void etopo1_ice(
                     fgice1m(j1m, i1m) = 1;
                 }
             }}
+#endif
 
             // Deal with Greenland
             if (include_greenland) {
@@ -293,6 +296,8 @@ printf("j1 i1=%d %d (area = %g %g)\n", j1, i1, snow1, remain1m);
             if (focean1m(i1m,j1m) == 1) fgice1m(i1m,j1m) = 0;
         }}
     }
+
+
 
     // Store zicetop1m, zsolid1m
     {NcIO ncout(ofname_root + "1m.nc", 'a');

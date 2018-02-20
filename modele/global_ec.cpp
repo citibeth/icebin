@@ -13,6 +13,11 @@ elevations for ECs
 OUTPUT:
 
 unscaled matrices IvA, IvE, AvE
+
+
+Run with:
+    ulimit -v 8000000
+
 */
 
 
@@ -24,6 +29,7 @@ unscaled matrices IvA, IvE, AvE
 
 #include <tclap/CmdLine.h>
 
+#include <prettyprint.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/stdio.hpp>
 #include <ibmisc/filesystem.hpp>
@@ -70,6 +76,20 @@ struct ParseArgs {
     ParseArgs(int argc, char **argv);
 };
 
+
+ostream& operator<<(ostream& os, ParseArgs const &args)
+{  
+    return os << "ParseArgs(" << endl
+        << "    hspecO: " << args.hspecO.im << "x" << args.hspecO.jm << endl
+        << "    hspecI: " << args.hspecI.im << "x" << args.hspecI.jm << endl
+        << "    nc_fname: " << args.nc_fname << " -- " << args.fgiceI_vname << " -- " << args.elevI_vname << endl
+        << "    topoO_fname: " << args.topoO_fname << endl
+        << "    ofname: " << args.ofname << endl
+        << "    ec_range: " << args.ec_range << "  ec_skip=" << args.ec_skip << endl
+        << "    scale: " << (args.scale ? "true" : "false") << endl
+        << "    sigma: " << args.sigma;
+}  
+
 template<class DestT>
 static std::vector<DestT> parse_csv(std::string scsv_str)
 {
@@ -106,25 +126,30 @@ ParseArgs::ParseArgs(int argc, char **argv)
         TCLAP::CmdLine cmd("Command description message", ' ', "<no-version>");
 
         TCLAP::UnlabeledValueArg<std::string> shspecO_a(
-            "gridA", "Name of Ocean grid (eg: g1qx1)",
+            "gridO", "Name of Ocean grid (eg: g1qx1)",
             true, "g1qx1", "atm. grid name", cmd);
+
         TCLAP::UnlabeledValueArg<std::string> shspecI_a(
             "gridI", "Name of Ice grid (eg: g1mx1m)",
             true, "g1mx1m", "ice grid name", cmd);
 
+        TCLAP::UnlabeledValueArg<std::string> nc_fname_a(
+            "elevmaskI-fname",
+                "NetCDF file containing ice mask and elevation (1 where there is ice)",
+            true, "etopo1_ice_g1m.nc", "mask filename", cmd);
+
         TCLAP::UnlabeledValueArg<std::string> topoO_fname_a(
             "topoO-fname",
                 "ModelE TOPO file on the Ocean grid.  Need FOCEAN and FOCEANF",
-            true, "etopo1_ice_g1m.nc", "focean filename", cmd);
+            true, "topoo.nc", "focean filename", cmd);
+
+
+
+
 
         TCLAP::ValueArg<std::string> foceanI_vname_a("n", "focean",
             "Name of NetCDF variable containing ice focean (1 where there is ice)",
             false, "FGICE1m", "focean var name", cmd);
-
-        TCLAP::UnlabeledValueArg<std::string> nc_fname_a(
-            "elevmaskI-fname",
-                "NetCDF file containing ice mask and elevation (1 where there is ice)",
-            true, "etopo1_ice1m.nc", "mask filename", cmd);
 
         TCLAP::ValueArg<std::string> fgiceI_vname_a("m", "mask",
             "Name of NetCDF variable containing ice mask (1 where there is ice)",
@@ -139,8 +164,8 @@ ParseArgs::ParseArgs(int argc, char **argv)
             false, "-100,3700,200", "elevations", cmd);
 
         TCLAP::ValueArg<std::string> ofname_a("o", "output",
-            "Output filename (NetCDF) for overlaps",
-            true, "FGICE1m", "mask var name", cmd);
+            "Output filename (NetCDF) for ECs",
+            false, "global_ec.nc", "mask var name", cmd);
 
         TCLAP::SwitchArg raw_a("r", "raw",
              "Produce raw (unscaled) matrices?",
@@ -148,9 +173,9 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
         TCLAP::ValueArg<std::string> sigma_a("g", "sigma",
             "Scaling factor: x,y,z",
-            true, "0,0,0", "scaling factor", cmd);
+            false, "0,0,0", "scaling factor", cmd);
 
-        TCLAP::ValueArg<double> eq_rad_a("r", "radius",
+        TCLAP::ValueArg<double> eq_rad_a("R", "radius",
             "Radius of the earth",
             false, modele::EQ_RAD, "earth radius", cmd);
 
@@ -169,6 +194,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         nc_fname = nc_fname_a.getValue();
         fgiceI_vname = fgiceI_vname_a.getValue();
         elevI_vname = elevI_vname_a.getValue();
+        topoO_fname = topoO_fname_a.getValue();
 
         // Parse elevation classes...
         auto _ec(parse_csv<double>(ec_a.getValue()));
@@ -206,8 +232,8 @@ public:
     ExchAccum(
         ExchangeGrid &_exgrid,
         blitz::Array<double,1> const &_elevmaskI,
-        SparseSet<long,int> _dimO,
-        SparseSet<long,int> _dimI)
+        SparseSet<long,int> &_dimO,
+        SparseSet<long,int> &_dimI)
     : exgrid(_exgrid), elevmaskI(_elevmaskI), dimO(_dimO), dimI(_dimI) {}
 
     void add(std::array<int,2> const &index, double area)
@@ -230,6 +256,7 @@ int main(int argc, char **argv)
 {
     everytrace_init();
     ParseArgs args(argc, argv);
+    std::cout << args << endl;
     EnvSearchPath files("MODELE_FILE_PATH");
 
     ExchangeGrid aexgrid;    // Put our answer in here
@@ -253,50 +280,57 @@ int main(int argc, char **argv)
         hntr.regrid<double,int16_t,double>(wt1m, foceanI, foceanO, true);
     }
 #endif
-    // Load the fractional ocean mask (based purely on ice extent)
-    blitz::Array<double,2> foceanO(hspecO.jm, hspecO.im);    // called FOCEAN in make_topoo
-    blitz::Array<double,2> foceanfO(hspecO.jm, hspecO.im);    // called FOCEANF in make_topoo
-    {NcIO ncio(files.locate(args.topoO_fname), 'r');
-        ncio_blitz(ncio, foceanO, "FOCEAN", "double", {});
-        ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
-    }
-
 
 
     // Load the ice mask
     blitz::Array<double,2> elevmaskI(hspecI.jm, hspecI.im);
     {
+        auto fname(files.locate(args.nc_fname));
+        printf("---- Reading elevmaskI: %s\n", fname.c_str());
+
         // Read in ice extent and elevation
         blitz::Array<int16_t,2> fgiceI(hspecI.jm, hspecI.im);    // 0 or 1
         blitz::Array<int16_t,2> elevI(hspecI.jm, hspecI.im);
-        {NcIO ncio(files.locate(args.nc_fname), 'r');
+        {NcIO ncio(fname, 'r');
             ncio_blitz(ncio, fgiceI, args.fgiceI_vname, "short", {});
             ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
         }
 
         // Combine into IceBin-standard elevmaskI
+int nice=0;
         for (int j=0; j<hspecI.jm; ++j) {
         for (int i=0; i<hspecI.im; ++i) {
             elevmaskI(j,i) = (fgiceI(j,i) ? elevI(j,i) : NaN);
+if (fgiceI(j,i)) ++nice;
         }}
+printf("nice = %d\n", nice);
     }
+
+    // -------------------------------------------------------------
+    printf("---- Computing overlaps\n");
 
     // Compute overlaps for cells with ice
     SparseSet<long,int> _dimO;    // Only include O grid cells with ice
     SparseSet<long,int> _dimI;    // Only include I grid cells with ice
     hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), _dimO, _dimI), args.eq_rad);
+printf("|dimO|=%d\n", _dimO.dense_extent());
+//return 0;
 #if 0
     {NcIO ncio(args.ofname, 'w');
         aexgrid.ncio(ncio, "aexgrid");
     }
 #endif
 
+    // -------------------------------------------------------------
+    printf("---- Creating gcmO\n");
+
     // Turn HntrSpec --> GridSpec
-    auto specO(make_grid_spec(hspecO, false, 1, args.eq_rad));
-    auto specI(make_grid_spec(hspecI, false, 1, args.eq_rad));
+    GridSpec_LonLat specO(make_grid_spec(hspecO, false, 1, args.eq_rad));
+    GridSpec_LonLat specI(make_grid_spec(hspecI, false, 1, args.eq_rad));
 
     // Realize O grid for relevant gridcells
     auto agridO(make_abbr_grid("Ocean", specO, std::move(_dimO)));
+printf("nO = %ld\n", agridO.dim.sparse_extent());
 
     // Set up elevation classes    
     std::vector<double> hcdefs;
@@ -306,7 +340,6 @@ int main(int argc, char **argv)
 
     // Create standard GCMRegridder for O <--> I
     std::unique_ptr<GCMRegridder_Standard> gcmO(new GCMRegridder_Standard);
-    ;
     gcmO->init(
         std::move(agridO), std::move(hcdefs),
         Indexing({"O", "HC"}, {0,0}, {agridO.dim.sparse_extent(), hcdefs.size()}, {1,0}),
@@ -323,62 +356,90 @@ int main(int argc, char **argv)
     gcmO->add_sheet(std::move(ice));
 
     // --------------------------------------------------
+    printf("---- Creating gcmA\n");
+
     // Create a mismatched regridder, to mediate between different ice
     // extent of GCM vs. IceBin
     modele::GCMRegridder_ModelE gcmA(std::shared_ptr<GCMRegridder>(gcmO.release()));
 
-    RegridMatrices rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
-    elevmaskI.free();    // No longer needed, and it is BIG
+    // Load the fractional ocean mask (based purely on ice extent)
+    {auto fname(files.locate(args.topoO_fname));
 
-    // Use the mismatched regridder to create desired matrices and save to file
-    static std::vector<std::string> const matrix_names {"EvI", "AvI", "AvE", "IvE", "IvA"};
-    RegridMatrices::Params params(args.scale, args.correctA, args.sigma);
-    {NcIO ncio(args.ofname, 'w'); }
-    for (auto const &matrix_name : matrix_names) {
-        std::array<SparseSet<long,int>, 2> dims;    // Must stick around as long as mat
-        auto mat(rm.matrix(matrix_name, {&dims[0], &dims[1]}, params));
+printf("nO = %ld (%d %d)\n", gcmA.gcmO->nA(), hspecO.jm, hspecO.im);
 
-        // Construct dimension names
-        std::array<std::string,2> dim_names {"dimX", "dimX"};   // 'X' to be replaced
-        dim_names[0][3] = matrix_name[0];    // 'B' from "BvA"
-        dim_names[1][3] = matrix_name[2];    // 'A' from "BvA"
+        blitz::Array<double,2> foceanO(hspecO.jm, hspecO.im);    // called FOCEAN in make_topoo
+        blitz::Array<double,2> foceanfO(hspecO.jm, hspecO.im);    // called FOCEANF in make_topoo
 
-        // Store away.  Close the file each time to avoid excess memory use
-        NcIO ncio(args.ofname, 'r');
-        mat->ncio(ncio, matrix_name, dim_names);
+        printf("---- Reading FOCEAN: %s\n", fname.c_str());
+        NcIO ncio(fname, 'r');
+        ncio_blitz(ncio, foceanO, "FOCEAN", "double", {});
+        ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
+
+
+printf("FF1\n");
+    gcmA.foceanAOp = reshape1(foceanfO);        // COPY
+printf("FF2\n");
+    gcmA.foceanAOm = reshape1(foceanO);         // COPY
+printf("FF3\n");
     }
+printf("FF4\n");
 
-    SparseSet<long,int> dimA, dimI, dimE;
+    RegridMatrices rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
+printf("FF5\n");
+    elevmaskI.free();    // No longer needed, and it is BIG
+printf("FF6\n");
 
     // ---------- Generate and store the matrices
-    {NcIO ncio(args.ofname, 'a');
-        auto mat(rm.matrix("EvI", {&dimE, &dimI}, params));
-        mat->ncio(ncio, "EvI", {"dimE", "dimI"});
-    }
-    {NcIO ncio(args.ofname, 'a');
+    // Use the mismatched regridder to create desired matrices and save to file
+    RegridMatrices::Params params(args.scale, args.correctA, args.sigma);
+    SparseSet<long,int> dimA, dimI, dimE;
+
+    {NcIO ncio(args.ofname, 'w');
+        printf("---- Generating AvI\n");
         auto mat(rm.matrix("AvI", {&dimA, &dimI}, params));
+printf("dimA: %ld %ld\n", dimA.dense_extent(), dimA.sparse_extent());
+printf("dimI: %ld %ld\n", dimI.dense_extent(), dimI.sparse_extent());
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
     }
 
+#if 0
     {NcIO ncio(args.ofname, 'a');
+        printf("---- Generating EvI\n");
+        auto mat(rm.matrix("EvI", {&dimE, &dimI}, params));
+printf("dimE: %ld %ld\n", dimE.dense_extent(), dimE.sparse_extent());
+printf("dimI: %ld %ld\n", dimI.dense_extent(), dimI.sparse_extent());
+printf("mat size: %ld\n", (long)(mat->M->nonZeros()));
+        mat->ncio(ncio, "EvI", {"dimE", "dimI"});
+    }
+#endif
+
+#if 0
+    {NcIO ncio(args.ofname, 'a');
+        printf("---- Generating IbE\n");
         auto mat(rm.matrix("IvE", {&dimI, &dimE}, params));
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
     }
     {NcIO ncio(args.ofname, 'a');
+        printf("---- Generating IvA\n");
         auto mat(rm.matrix("IvA", {&dimI, &dimA}, params));
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
     }
 
     {NcIO ncio(args.ofname, 'a');
+        printf("---- Generating AvE\n");
         auto mat(rm.matrix("AvE", {&dimA, &dimE}, params));
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
     }
+#endif
 
     // Store the dimensions
+    printf("---- Storing Dimensions\n");
     {NcIO ncio(args.ofname, 'a');
         dimA.ncio(ncio, "dimA");
         dimE.ncio(ncio, "dimE");
         dimI.ncio(ncio, "dimI");
     }
 
+    printf("Done!\n");
+    return 0;
 }

@@ -58,12 +58,12 @@ GridSpec_LonLat::GridSpec_LonLat(
     bool _north_pole,
     int _points_in_side,
     double _eq_rad,
-    HntrSpec const &hntr)
+    HntrSpec const &_hntr)
 
 : GridSpec(GridType::LONLAT), lonb(std::move(_lonb)), latb(std::move(_latb)),
 indices(_indices),
 south_pole(_south_pole), north_pole(_north_pole),
-points_in_side(_points_in_side), eq_rad(_eq_rad)
+points_in_side(_points_in_side), eq_rad(_eq_rad), hntr(_hntr)
 {
     // Error-check the input parameters
     if (south_pole && latb[0] == -90.0) {

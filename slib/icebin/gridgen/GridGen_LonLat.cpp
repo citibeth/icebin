@@ -240,6 +240,17 @@ AbbrGrid make_abbr_grid(
 {
     Indexing indexing({"lon", "lat"}, {0,0}, {spec.nlon(), spec.nlat()}, spec.indices);
 
+    // Make sure dim has proper sparse_extent()
+    // Normally, the caller will NOT have set this up beforehand
+    long extent = indexing.extent();
+    if (dim.sparse_extent() < 0) {
+        dim.set_sparse_extent(extent);
+    } else if (dim.sparse_extent() != extent) {
+        (*icebin_error)(-1,
+            "sparse_extent %ld conflicts with existing %ld",
+            extent, dim.sparse_extent());
+    }
+
     int const N = dim.dense_extent();
     blitz::Array<int,2> ijk(N,3);
     blitz::Array<double,1> native_area(N);
