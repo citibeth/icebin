@@ -265,23 +265,6 @@ int main(int argc, char **argv)
     auto const &hspecI(args.hspecI);
     modele::Hntr hntr(17.17, hspecO, hspecI);
 
-#if 0
-    // Load the fractional ocean mask (based purely on ice extent)
-    blitz::Array<double,2> foceanO(hspecO.jm, hspecO.im);    // called FOCEANF in make_topoo
-    {
-        blitz::Array<int16_t,2> foceanI(hspecI.jm, hspecI.im);
-        {NcIO ncio(files.locate(args.focean_fname), 'r');
-            ncio_blitz(ncio, foceanI, args.foceanI_vname, "short", {});
-        }
-
-
-        // Regrid O <- I
-        blitz::Array<double, 2> wt1m(const_array(shape(hspecO.jm, hspecO.im), 1.0));
-        hntr.regrid<double,int16_t,double>(wt1m, foceanI, foceanO, true);
-    }
-#endif
-
-
     // Load the ice mask
     blitz::Array<double,2> elevmaskI(hspecI.jm, hspecI.im);
     {
@@ -296,14 +279,12 @@ int main(int argc, char **argv)
             ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
         }
 
+
         // Combine into IceBin-standard elevmaskI
-int nice=0;
         for (int j=0; j<hspecI.jm; ++j) {
         for (int i=0; i<hspecI.im; ++i) {
             elevmaskI(j,i) = (fgiceI(j,i) ? elevI(j,i) : NaN);
-if (fgiceI(j,i)) ++nice;
         }}
-printf("nice = %d\n", nice);
     }
 
     // -------------------------------------------------------------
@@ -313,13 +294,6 @@ printf("nice = %d\n", nice);
     SparseSet<long,int> _dimO;    // Only include O grid cells with ice
     SparseSet<long,int> _dimI;    // Only include I grid cells with ice
     hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), _dimO, _dimI), args.eq_rad);
-printf("|dimO|=%d\n", _dimO.dense_extent());
-//return 0;
-#if 0
-    {NcIO ncio(args.ofname, 'w');
-        aexgrid.ncio(ncio, "aexgrid");
-    }
-#endif
 
     // -------------------------------------------------------------
     printf("---- Creating gcmO\n");
@@ -330,7 +304,6 @@ printf("|dimO|=%d\n", _dimO.dense_extent());
 
     // Realize O grid for relevant gridcells
     auto agridO(make_abbr_grid("Ocean", specO, std::move(_dimO)));
-printf("nO = %ld\n", agridO.dim.sparse_extent());
 
     // Set up elevation classes    
     std::vector<double> hcdefs;
@@ -365,8 +338,6 @@ printf("nO = %ld\n", agridO.dim.sparse_extent());
     // Load the fractional ocean mask (based purely on ice extent)
     {auto fname(files.locate(args.topoO_fname));
 
-printf("nO = %ld (%d %d)\n", gcmA.gcmO->nA(), hspecO.jm, hspecO.im);
-
         blitz::Array<double,2> foceanO(hspecO.jm, hspecO.im);    // called FOCEAN in make_topoo
         blitz::Array<double,2> foceanfO(hspecO.jm, hspecO.im);    // called FOCEANF in make_topoo
 
@@ -376,18 +347,11 @@ printf("nO = %ld (%d %d)\n", gcmA.gcmO->nA(), hspecO.jm, hspecO.im);
         ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
 
 
-printf("FF1\n");
-    gcmA.foceanAOp = reshape1(foceanfO);        // COPY
-printf("FF2\n");
-    gcmA.foceanAOm = reshape1(foceanO);         // COPY
-printf("FF3\n");
+        gcmA.foceanAOp = reshape1(foceanfO);  // COPY
+        gcmA.foceanAOm = reshape1(foceanO);   // COPY
     }
-printf("FF4\n");
 
     RegridMatrices rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
-printf("FF5\n");
-    elevmaskI.free();    // No longer needed, and it is BIG
-printf("FF6\n");
 
     // ---------- Generate and store the matrices
     // Use the mismatched regridder to create desired matrices and save to file
@@ -397,40 +361,36 @@ printf("FF6\n");
     {NcIO ncio(args.ofname, 'w');
         printf("---- Generating AvI\n");
         auto mat(rm.matrix("AvI", {&dimA, &dimI}, params));
-printf("dimA: %ld %ld\n", dimA.dense_extent(), dimA.sparse_extent());
-printf("dimI: %ld %ld\n", dimI.dense_extent(), dimI.sparse_extent());
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
+        ncio.flush();
     }
 
-#if 0
     {NcIO ncio(args.ofname, 'a');
         printf("---- Generating EvI\n");
         auto mat(rm.matrix("EvI", {&dimE, &dimI}, params));
-printf("dimE: %ld %ld\n", dimE.dense_extent(), dimE.sparse_extent());
-printf("dimI: %ld %ld\n", dimI.dense_extent(), dimI.sparse_extent());
-printf("mat size: %ld\n", (long)(mat->M->nonZeros()));
         mat->ncio(ncio, "EvI", {"dimE", "dimI"});
+        ncio.flush();
     }
-#endif
 
-#if 0
     {NcIO ncio(args.ofname, 'a');
-        printf("---- Generating IbE\n");
+        printf("---- Generating IvE\n");
         auto mat(rm.matrix("IvE", {&dimI, &dimE}, params));
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
+        ncio.flush();
     }
     {NcIO ncio(args.ofname, 'a');
         printf("---- Generating IvA\n");
         auto mat(rm.matrix("IvA", {&dimI, &dimA}, params));
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
+        ncio.flush();
     }
 
     {NcIO ncio(args.ofname, 'a');
         printf("---- Generating AvE\n");
         auto mat(rm.matrix("AvE", {&dimA, &dimE}, params));
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
+        ncio.flush();
     }
-#endif
 
     // Store the dimensions
     printf("---- Storing Dimensions\n");
@@ -438,6 +398,7 @@ printf("mat size: %ld\n", (long)(mat->M->nonZeros()));
         dimA.ncio(ncio, "dimA");
         dimE.ncio(ncio, "dimE");
         dimI.ncio(ncio, "dimI");
+        ncio.flush();
     }
 
     printf("Done!\n");

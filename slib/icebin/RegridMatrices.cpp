@@ -82,31 +82,12 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
             {dimA, dimA}, '.').to_eigen());
 
-printf("|wAvAp| = %ld   |dimA|=%d %ld\n", (long)wAvAp.nonZeros(), dimA->dense_extent(), dimA->sparse_extent());
-int n=0;
-for (auto ii(begin(wAvAp)); ii != end(wAvAp); ++ii, ++n) {
-    printf("wAvAp(%d %d) = %g\n", dimA->to_sparse(ii->row()), dimA->to_sparse(ii->col()), ii->value());
-    if (n > 5) break;
-}
-
-
         auto wApvI(sum_to_diagonal(*ApvI, 0, '+'));        // diagonal
 
-n=0;
-for (auto ii(begin(wApvI)); ii != end(wApvI); ++ii, ++n) {
-    printf("wApvI(%d %d) = %g\n", dimA->to_sparse(ii->row()), dimI->to_sparse(ii->col()), ii->value());
-    if (n > 5) break;
-}
-
-
-//printf("wAvAp: [%g %g %g...]\n", wAvAp(0), wAvAp(1), wAvAp(2));
-//printf("wApvI: [%g %g %g...]\n", wApvI(0), wApvI(1), wApvI(2));
         EigenSparseMatrixT wAvI(wAvAp * wApvI);    // diagonal...
 
         // +correctA: Weight matrix in A space
         ret->wM.reference(sum(wAvI, 0, '+'));    // Area of A cells
-printf("wM: [%g %g %g...]\n", ret->wM(0), ret->wM(1), ret->wM(2));
-
 
         // Compute the main matrix
         auto sAvAp(sum_to_diagonal(wAvAp, 0, '-'));
@@ -495,6 +476,100 @@ blitz::Array<double,1> WeightedSparse::apply(
     return ibmisc::reshape<double,2,1>(ret2, {ret2.shape()[1]});
 }
 // -----------------------------------------------------------------------
+
+
+// ================================================================
+template<class _Scalar, int _Options, class _StorageIndex>
+static void nc_write_eigen2(
+    netCDF::NcGroup *nc,
+    Eigen::SparseMatrix<_Scalar,_Options,_StorageIndex> *A,
+    std::string const &vname)
+{
+    netCDF::NcVar indices_v = nc->getVar(vname + ".indices");
+    netCDF::NcVar vals_v = nc->getVar(vname + ".values");
+
+    int const N = A->nonZeros();
+
+
+#if 1
+    {std::vector<int> indices;
+        std::vector<size_t> startp {0, 0};        // SIZE, RANK
+        std::vector<size_t> countp {N, 2};  // Write RANK elements at a time
+
+printf("eigen2 bounds2: (%ld %ld)\n", countp[0], countp[1]);
+        indices.reserve(N*2);
+        for (auto ii = begin(*A); ii != end(*A); ++ii, ++startp[0]) {
+            indices.push_back(ii->row());
+            indices.push_back(ii->col());
+        }
+        indices_v.putVar(&indices[0]);
+//        indices_v.putVar(startp, countp, &indices[0]);
+    }
+#endif
+
+    {std::vector<double> vals;
+        std::vector<size_t> startp {0};
+        std::vector<size_t> countp {N};
+printf("eigen3 bounds2: (%ld)\n", countp[0]);
+
+        vals.reserve(N);
+        for (auto ii = begin(*A); ii != end(*A); ++ii, ++startp[0]) {
+            vals.push_back(ii->value());
+        }
+        vals_v.putVar(&vals[0]);
+//        vals_v.putVar(startp, countp, &vals[0]);
+    }
+
+
+#if 0
+    for (auto ii = begin(*A); ii != end(*A); ++ii, ++startp[0]) {
+        auto index(ii->index());
+        auto &val(ii->value());
+
+        indices_v.putVar(startp, countp, &index[0]);
+        vals_v.putVar(startp, countp, &val);
+    }
+#endif
+}
+
+
+template<class _Scalar, int _Options, class _StorageIndex>
+static void ncio_eigen2(
+    ibmisc::NcIO &ncio,
+    Eigen::SparseMatrix<_Scalar,_Options,_StorageIndex> &A,
+    std::string const &vname)
+{
+    if (ncio.rw == 'r') (*ibmisc::ibmisc_error)(-1,
+        "ncio_eigen() currently does not support reading.");
+
+    std::vector<std::string> const dim_names({vname + ".size", vname + ".rank"});
+    std::vector<netCDF::NcDim> dims;        // Dimensions in NetCDF
+    std::vector<size_t> dim_sizes;          // Length of our two dimensions.
+
+
+    // Count the number of elements in the sparse matrix.
+    // NOTE: This can/does give a diffrent answer from A.nonZeros().
+    //       But it is what we want for dimensioning netCDF arrays.
+//    long count=0;
+//    for (auto ii(begin(A)); ii != end(A); ++ii) ++count;
+    long const count = A.nonZeros();
+    dims = ibmisc::get_or_add_dims(ncio, dim_names, {count, 2});
+
+printf("eigen2 bounds1: (%ld %ld)\n", count, (long)2);
+
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
+    std::array<size_t,2> shape { A.rows(), A.cols() };
+    ibmisc::get_or_put_att(info_v, 'w', "shape", "int64", shape);
+
+    get_or_add_var(ncio, vname + ".indices", "int", dims);
+    get_or_add_var(ncio, vname + ".values", "double", {dims[0]});
+    ncio += std::bind(&nc_write_eigen2<_Scalar, _Options, _StorageIndex>, ncio.nc, &A, vname);
+
+}
+// ================================================================
+
+
+
 void WeightedSparse::ncio(ibmisc::NcIO &ncio,
     std::string const &vname,
     std::array<std::string,2> dim_names)
@@ -504,22 +579,29 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
         {dim_names[0] + ".dense_extent", dim_names[1] + ".dense_extent"},
         {dims[0]->dense_extent(), dims[1]->dense_extent()}));
 
+#if 1
+    // --------- M
+    ncio_eigen2(ncio, *M,
+        vname + ".M");
+#endif
+
+    // ---- Mw
+printf("Mw: [%g %g %g %g...]\n", Mw(0), Mw(1), Mw(2), Mw(3));
+    ncio_blitz_alloc<double,1>(ncio, Mw, vname + ".Mw", get_nc_type<double>(),
+        {ncdims[1]});
+
     // ----------- wM
+printf("wM: [%g %g %g %g...]\n", wM(0), wM(1), wM(2), wM(3));
     std::string matrix_name(dim_names[0] + "v" + dim_names[1]);
     ncio_blitz_alloc<double,1>(ncio, wM, vname+".wM", get_nc_type<double>(),
         {ncdims[0]});
 
-    // --------- M
-    ncio_eigen(ncio, *M,
-        vname + ".M");
-
+#if 1
     netCDF::NcVar ncvar = ncio.nc->getVar(vname + ".M.info");
     get_or_put_att(ncvar, ncio.rw,
         "conservative", get_nc_type<bool>(), &conservative, 1);
+#endif
 
-    // ---- Mw
-    ncio_blitz_alloc<double,1>(ncio, Mw, vname + ".Mw", get_nc_type<double>(),
-        {ncdims[1]});
 }
 
 
