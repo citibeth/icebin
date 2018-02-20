@@ -326,9 +326,15 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     SET_TO = TO_NONE;
 
     // Set following grid cells to be continent
-//    SET_TO( 84, 18) = TO_LAND;
-//    SET_TO( 85, 18) = TO_LAND;
-//    SET_TO( 86, 18) = TO_LAND;    // Antarctic Peninsula
+
+    // Antarctic Peninsula.  Gary Russell said (2018-02-20): "That
+    // hole should be filled with land ice.  It is unclear how it got
+    // there in the first place.  The ETOPO1 ocean fraction is bases
+    // on ZICETOP being below 0 and adjacent to other ocean cells."
+    SET_TO( 84, 18) = TO_LAND;
+    SET_TO( 85, 18) = TO_LAND;
+    SET_TO( 86, 18) = TO_LAND;
+
     SET_TO(236, 82) = TO_LAND;
     SET_TO(242, 82) = TO_LAND;
     SET_TO(245, 82) = TO_LAND;
