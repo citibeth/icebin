@@ -316,7 +316,7 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(
 #endif
 
     RegridMatrices rm(regridder);
-    auto &elevmaskI(rm.tmp.take(_elevmaskI.copy()));
+    auto &elevmaskI(rm.tmp.take(blitz::Array<double,1>(_elevmaskI)));
 
     UrAE urA("UrA", this->nA(),
         std::bind(&IceRegridder::GvAp, regridder, _1, &elevmaskI),

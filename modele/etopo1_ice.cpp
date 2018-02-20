@@ -179,7 +179,7 @@ void etopo1_ice(
                 ncio_blitz(fin, zsolid1m, "ZSOLID", "short", {}))));
 
 // Use an ice-free Antarctica
-#if 0
+#if 1
             // Use ETOPO1 for Southern Hemisphere Ice
             for (int j1m=0; j1m < JM1m/2; ++j1m) {
             for (int i1m=0; i1m < IM1m; ++i1m) {

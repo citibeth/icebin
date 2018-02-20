@@ -18,6 +18,8 @@ unscaled matrices IvA, IvE, AvE
 Run with:
     ulimit -v 8000000
 
+Regular earth has 
+   nice=26064734   ice-covered gridcells
 */
 
 
@@ -47,10 +49,15 @@ Run with:
 using namespace std;
 using namespace ibmisc;
 using namespace icebin;
+using namespace icebin::modele;
 using namespace netCDF;
 using namespace spsparse;
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
+
+// This parameter controls memory use.  Larger = more memory, smaller = more segments
+static int const chunk_size = 6000000;    // Not a hard limit
+
 
 // ==========================================================
 struct ParseArgs {
@@ -245,15 +252,16 @@ public:
         if (!std::isnan(elevmaskI(iI))) {
             // Save as sparse indexing, as required by IceRegridder::init()
             exgrid.add(index, area);
+int sz = exgrid.dense_extent();
+if (sz % 100000 == 0) printf("exgrid size=%d\n", sz);
             dimO.add_dense(iO);
             dimI.add_dense(iI);
         }
     }
 };
 
-void global_ec_section(ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
 {
-    EnvSearchPath files("MODELE_FILE_PATH");
     ExchangeGrid aexgrid;    // Put our answer in here
 
     auto const &hspecO(args.hspecO);
@@ -376,7 +384,6 @@ void global_ec_section(ParseArgs const &args, blitz::Array<double,2> const &elev
     }
 
     printf("Done!\n");
-    return 0;
 }
 
 int main(int argc, char **argv)
@@ -386,65 +393,90 @@ int main(int argc, char **argv)
     std::string ofname(args.ofname);
     std::cout << args << endl;
 
+    EnvSearchPath files("MODELE_FILE_PATH");
+
+    auto &hspecI(args.hspecI);
+    auto &hspecO(args.hspecO);
 
     // Check that I grid fits neatly into O grid
     // (simplifies our overlap "computation")
     int mult_i = hspecI.im / hspecO.im;
     int mult_j = hspecI.jm / hspecO.jm;
+#if 0
     if ((mult_i * hspecO.im != hspecI.im) || (mult_j * hspecO.jm != hspecI.jm)) {
         (*icebin_error)(-1,
             "Hntr grid (%dx%d) must be an even multiple of (%dx%d)",
             hspecI.im, hspecI.jm, hspecO.im, hspecO.jm);
     }
+#endif
 
-    // Allocate arrays
-    blitz::Array<int16_t,2> fgiceI(hspecI.jm, hspecI.im);    // 0 or 1
-    blitz::Array<int16_t,2> elevI(hspecI.jm, hspecI.im);
+    // -----------------------------------------
+    blitz::Array<double,2> fgiceO(hspecO.jm, hspecO.im);
+    {
+        // Allocate arrays
+        blitz::Array<int16_t,2> fgiceI(hspecI.jm, hspecI.im);    // 0 or 1
+        blitz::Array<int16_t,2> elevI(hspecI.jm, hspecI.im);
 
-    // Read in ice extent and elevation
-    {NcIO ncio(fname, 'r');
-        ncio_blitz(ncio, fgiceI, args.fgiceI_vname, "short", {});
-        ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
+        // Read in ice extent and elevation
+        {auto fname(files.locate(args.nc_fname));
+            NcIO ncio(fname, 'r');
+            ncio_blitz(ncio, fgiceI, args.fgiceI_vname, "short", {});
+            ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
+        }
+        // -----------------------------------------
+
+        // Generate fgiceO
+        auto wtI(const_array(fgiceI.shape(), 1.0));
+        Hntr hntr(17.17, args.hspecO, args.hspecI);
+        hntr.regrid(wtI, fgiceI, fgiceO);
     }
 
-    // Generate fgiceO
-    blitz::Array<double,2> fgiceO(hspecO.jm, hspecO.im);
-    auto WTA(const_array(fgiceI.shape(), 1.0));
-    Hntr hntr(17.17, args.hspecO, args.hspecI);
-    hntr.regrid(wtI, fgiceI, fgiceO);
-
     // Loop over chunks
-    int const chunk_size = 3000000;    // Not a hard limit
-
-
-    blitz::Array<double,1> elevmaskI(hspecI.jm, hspecI.im);
+    blitz::Array<double,2> elevmaskI(hspecI.jm, hspecI.im);
     int iO = 0;    // Where we start scanning in fgiceO
     int jO = 0;
     for (int chunkno=0; (jO < hspecO.jm) && (iO < hspecO.im); ++chunkno) {
+        int nice=0;
 
-        // Choose the ice to process on this chunk
-        elevmaskI = 0;
-        for (; jO < hspecO.jm; ++jO) {
-        for (; iO < hspecO.im; ++iO) {
-            if (fgiceO(jO, iO) == 0) continue;
+        {
+            // Allocate arrays
+            blitz::Array<int16_t,2> fgiceI(hspecI.jm, hspecI.im);    // 0 or 1
+            blitz::Array<int16_t,2> elevI(hspecI.jm, hspecI.im);
 
-            // Add these I grid cells to elevmaskI
-            for (int jI=jO*mult_j; jI<(jO+1)*mult_j; ++jI) {
-            for (int iI=iO*mult_i; iI<(iO+1)*mult_i; ++iI) {
-                if (fgiceI(jI,iI)) {
-                    elevmaskI(jI,iI) = elevI(jI,iI);
-                    ++ nice;
-                } else {
-                    elevmaskI(jI,iI) = NaN;
+            // Read in ice extent and elevation
+            auto fname(files.locate(args.nc_fname));
+            NcIO ncio(fname, 'r');
+            ncio_blitz(ncio, fgiceI, args.fgiceI_vname, "short", {});
+            ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
+
+            // Choose the ice to process on this chunk
+            elevmaskI = NaN;
+            for (; jO < hspecO.jm; ++jO) {
+                for (; iO < hspecO.im; ++iO) {
+                    if (fgiceO(jO, iO) == 0) continue;
+printf("fgiceO(%d, %d) == %g\n", jO, iO, fgiceO(jO,iO));
+                    // Add these I grid cells to elevmaskI
+                    for (int jI=jO*mult_j; jI<(jO+1)*mult_j; ++jI) {
+                    for (int iI=iO*mult_i; iI<(iO+1)*mult_i; ++iI) {
+                        if (fgiceI(jI,iI)) {
+                            elevmaskI(jI,iI) = elevI(jI,iI);
+                            ++ nice;
+                        } else {
+                            elevmaskI(jI,iI) = NaN;
+                        }
+                    }}
+                    if (nice >= chunk_size) goto endscan;    // double break
                 }
-            }}
-            if (nice >= chunk_size) goto endscan;    // double break
-        }}
-        endscan: ;
+                iO = 0;
+            }
+            endscan: ;
+        }
+
+        printf("============= Chunk %d, nice=%d\n", chunkno, nice);
 
         // Process the chunk!
         args.ofname = strprintf("%s-%02d", ofname.c_str(), chunkno);
-        global_ec_section(args, chunkno, elevmaskI);
+        global_ec_section(files, args, elevmaskI);
     }
 }
 
