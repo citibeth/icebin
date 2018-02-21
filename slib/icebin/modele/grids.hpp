@@ -7,7 +7,8 @@ namespace icebin {
 namespace modele {
 
 int const IM1m = 21600;
-int const JM1m = 10801;
+int const JM1m = 10800;
+int const JM1m_gridreg = 10801;    // Grid-registered ETOPO1
 int const IM2m = 10800;
 int const JM2m = 5400;
 int const IMS = 2160;        // 10-minute

@@ -56,7 +56,7 @@ using namespace spsparse;
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 // This parameter controls memory use.  Larger = more memory, smaller = more segments
-static int const chunk_size = 6000000;    // Not a hard limit
+static int const chunk_size = 4000000;    // Not a hard limit
 
 
 // ==========================================================
@@ -260,6 +260,15 @@ if (sz % 100000 == 0) printf("exgrid size=%d\n", sz);
     }
 };
 
+void nocompress_configure_var(netCDF::NcVar ncvar)
+{
+//    ncvar.setCompression(true, true, 4);
+
+    // For some reason, this causes an HDF5 error
+    // ncvar.setChecksum(netCDF::NcVar::nc_FLETCHER32);
+}
+
+
 void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
 {
     ExchangeGrid aexgrid;    // Put our answer in here
@@ -316,6 +325,7 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
     // Create a mismatched regridder, to mediate between different ice
     // extent of GCM vs. IceBin
     modele::GCMRegridder_ModelE gcmA(std::shared_ptr<GCMRegridder>(gcmO.release()));
+    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA.agridA.spec).hntr);
 
     // Load the fractional ocean mask (based purely on ice extent)
     {auto fname(files.locate(args.topoO_fname));
@@ -340,34 +350,37 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
     RegridMatrices::Params params(args.scale, args.correctA, args.sigma);
     SparseSet<long,int> dimA, dimI, dimE;
 
-    {NcIO ncio(args.ofname, 'w');
+    auto nocompress(
+            std::bind(nocompress_configure_var, std::placeholders::_1));
+
+    {NcIO ncio(args.ofname, 'w', nocompress);
         printf("---- Generating AvI\n");
         auto mat(rm.matrix("AvI", {&dimA, &dimI}, params));
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
         ncio.flush();
     }
 
-    {NcIO ncio(args.ofname, 'a');
+    {NcIO ncio(args.ofname, 'a', nocompress);
         printf("---- Generating EvI\n");
         auto mat(rm.matrix("EvI", {&dimE, &dimI}, params));
         mat->ncio(ncio, "EvI", {"dimE", "dimI"});
         ncio.flush();
     }
 
-    {NcIO ncio(args.ofname, 'a');
+    {NcIO ncio(args.ofname, 'a', nocompress);
         printf("---- Generating IvE\n");
         auto mat(rm.matrix("IvE", {&dimI, &dimE}, params));
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
         ncio.flush();
     }
-    {NcIO ncio(args.ofname, 'a');
+    {NcIO ncio(args.ofname, 'a', nocompress);
         printf("---- Generating IvA\n");
         auto mat(rm.matrix("IvA", {&dimI, &dimA}, params));
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
         ncio.flush();
     }
 
-    {NcIO ncio(args.ofname, 'a');
+    {NcIO ncio(args.ofname, 'a', nocompress);
         printf("---- Generating AvE\n");
         auto mat(rm.matrix("AvE", {&dimA, &dimE}, params));
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
@@ -376,10 +389,21 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
 
     // Store the dimensions
     printf("---- Storing Dimensions\n");
-    {NcIO ncio(args.ofname, 'a');
-        dimA.ncio(ncio, "dimA");
-        dimE.ncio(ncio, "dimE");
-        dimI.ncio(ncio, "dimI");
+    {NcIO ncio(args.ofname, 'a', nocompress);
+        NcVar ncv;
+
+        ncv = dimA.ncio(ncio, "dimA");
+        get_or_put_att(ncv, 'w', "shape", 
+            &std::vector<int>{hspecA.jm, hspecA.im}[0], 2);
+
+        ncv = dimE.ncio(ncio, "dimE");
+        get_or_put_att(ncv, 'w', "shape", 
+            &std::vector<int>{gcmA.nhc(), hspecA.jm, hspecA.im}[0], 3);
+
+        ncv = dimI.ncio(ncio, "dimI");
+        get_or_put_att(ncv, 'w', "shape", 
+            &std::vector<int>{hspecI.jm, hspecI.im}[0], 2);
+
         ncio.flush();
     }
 
@@ -402,7 +426,7 @@ int main(int argc, char **argv)
     // (simplifies our overlap "computation")
     int mult_i = hspecI.im / hspecO.im;
     int mult_j = hspecI.jm / hspecO.jm;
-#if 0
+#if 1
     if ((mult_i * hspecO.im != hspecI.im) || (mult_j * hspecO.jm != hspecI.jm)) {
         (*icebin_error)(-1,
             "Hntr grid (%dx%d) must be an even multiple of (%dx%d)",

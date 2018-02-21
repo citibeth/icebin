@@ -25,6 +25,7 @@ namespace po = boost::program_options;
 
 std::vector<fortran::Shape<2>> stdshapes {
     fortran::Shape<2>({"im1m", "jm1m"}, {IM1m, JM1m}),
+    fortran::Shape<2>({"im1m", "jm1m_gridreg"}, {IM1m, JM1m_gridreg}),
     fortran::Shape<2>({"im2m", "jm2m"}, {IM2m, JM2m}),
     fortran::Shape<2>({"ims", "jms"}, {IMS, JMS}),
     fortran::Shape<2>({"imh", "jmh"}, {IMH, JMH}),

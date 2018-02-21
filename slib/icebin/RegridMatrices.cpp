@@ -491,7 +491,6 @@ static void nc_write_eigen2(
     int const N = A->nonZeros();
 
 
-#if 1
     {std::vector<int> indices;
         std::vector<size_t> startp {0, 0};        // SIZE, RANK
         std::vector<size_t> countp {N, 2};  // Write RANK elements at a time
@@ -503,9 +502,7 @@ printf("eigen2 bounds2: (%ld %ld)\n", countp[0], countp[1]);
             indices.push_back(ii->col());
         }
         indices_v.putVar(&indices[0]);
-//        indices_v.putVar(startp, countp, &indices[0]);
     }
-#endif
 
     {std::vector<double> vals;
         std::vector<size_t> startp {0};
@@ -516,20 +513,9 @@ printf("eigen3 bounds2: (%ld)\n", countp[0]);
         for (auto ii = begin(*A); ii != end(*A); ++ii, ++startp[0]) {
             vals.push_back(ii->value());
         }
-        vals_v.putVar(&vals[0]);
-//        vals_v.putVar(startp, countp, &vals[0]);
+        vals_v.putVar(&vals[0]);    // Write to entire NetCDF variable directly from RAM
     }
 
-
-#if 0
-    for (auto ii = begin(*A); ii != end(*A); ++ii, ++startp[0]) {
-        auto index(ii->index());
-        auto &val(ii->value());
-
-        indices_v.putVar(startp, countp, &index[0]);
-        vals_v.putVar(startp, countp, &val);
-    }
-#endif
 }
 
 
@@ -579,28 +565,22 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
         {dim_names[0] + ".dense_extent", dim_names[1] + ".dense_extent"},
         {dims[0]->dense_extent(), dims[1]->dense_extent()}));
 
-#if 1
     // --------- M
-    ncio_eigen2(ncio, *M,
-        vname + ".M");
-#endif
+    ncio_eigen2(ncio, *M, vname + ".M");
 
+return;
     // ---- Mw
-printf("Mw: [%g %g %g %g...]\n", Mw(0), Mw(1), Mw(2), Mw(3));
     ncio_blitz_alloc<double,1>(ncio, Mw, vname + ".Mw", get_nc_type<double>(),
         {ncdims[1]});
 
     // ----------- wM
-printf("wM: [%g %g %g %g...]\n", wM(0), wM(1), wM(2), wM(3));
     std::string matrix_name(dim_names[0] + "v" + dim_names[1]);
     ncio_blitz_alloc<double,1>(ncio, wM, vname+".wM", get_nc_type<double>(),
         {ncdims[0]});
 
-#if 1
     netCDF::NcVar ncvar = ncio.nc->getVar(vname + ".M.info");
     get_or_put_att(ncvar, ncio.rw,
         "conservative", get_nc_type<bool>(), &conservative, 1);
-#endif
 
 }
 

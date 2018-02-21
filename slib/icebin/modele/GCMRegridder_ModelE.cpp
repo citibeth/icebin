@@ -126,7 +126,7 @@ int n=0;
         long lAO_s = index[0];
         long lAA_s = index[1];
 
-if (n < 15) printf("    RawEOvEA: (%d %d) = %g   nc=%d\n", lAO_s, lAA_s, value, gcmA->nhc());
+//if (n < 15) printf("    RawEOvEA: (%d %d) = %g   nc=%d\n", lAO_s, lAA_s, value, gcmA->nhc());
         // Iterate through all possible elevation classes for this gridcell pair
         for (int ihc=0; ihc<gcmA->nhc(); ++ihc) {
             long const lEO_s = gcmA->gcmO->indexingHC.tuple_to_index(
@@ -136,7 +136,7 @@ if (n < 15) printf("    RawEOvEA: (%d %d) = %g   nc=%d\n", lAO_s, lAA_s, value, 
             if (!dimEO.in_sparse(lEO_s)) continue;    // wEO==0 here
             int const lEO_d = dimEO.to_dense(lEO_s);
             double const weightEO = wEO_d(lEO_d);
-if (n < 15) printf("      ihc=%d, lEO_s = %ld   lEO_d=%d  weightEO=%g\n", ihc, lEO_s, lEO_d, weightEO);
+//if (n < 15) printf("      ihc=%d, lEO_s = %ld   lEO_d=%d  weightEO=%g\n", ihc, lEO_s, lEO_d, weightEO);
 
             if (weightEO != 0) {
                 int const lEA_s = gcmA->indexingHC.tuple_to_index(
