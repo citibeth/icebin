@@ -25,6 +25,7 @@ Regular earth has
 
 #include <string>
 #include <sstream>
+#include <iostream>
 
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
@@ -81,6 +82,10 @@ struct ParseArgs {
     std::array<double,3> sigma;
 
     double eq_rad;        // Radius of earth; see ModelE code    
+
+    bool run_chunk;        // true if we should compute ice for a chunk; false if we should compute the chunk boundaries
+    int chunk_no=-1;
+    std::array<std::array<int,2>,2> chunk_range;    // {{x0,y0},{x1,y1}}
 
     ParseArgs(int argc, char **argv);
 };
@@ -181,12 +186,16 @@ ParseArgs::ParseArgs(int argc, char **argv)
              cmd, false);
 
         TCLAP::ValueArg<std::string> sigma_a("g", "sigma",
-            "Scaling factor: x,y,z",
-            false, "0,0,0", "scaling factor", cmd);
+            "Sommthing distances: x,y,z",
+            false, "0,0,0", "smoothing distances", cmd);
 
         TCLAP::ValueArg<double> eq_rad_a("R", "radius",
             "Radius of the earth",
             false, modele::EQ_RAD, "earth radius", cmd);
+
+        TCLAP::ValueArg<std::string> runchunk_a("c", "runchunk",
+            "Runs on ice over a segmenet of fgiceO (not for end-user use)",
+            false, "", "O cell range", cmd);
 
 
         // Not needed for spherical grids
@@ -208,7 +217,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         // Parse elevation classes...
         auto _ec(parse_csv<double>(ec_a.getValue()));
         if (_ec.size() < 2 || _ec.size() > 3) (*icebin_error)(-1,
-            "--ec '%s' must have just two or three values");
+            "--ec '%%s' must have just two or three values", ec_a.getValue().c_str());
         ec_range[0] = _ec[0];
         ec_range[1] = _ec[1];
         ec_skip = (_ec.size() == 3 ? _ec[2] : 1);
@@ -217,6 +226,22 @@ ParseArgs::ParseArgs(int argc, char **argv)
         scale = !raw_a.getValue();
 
         eq_rad = eq_rad_a.getValue();
+
+        std::string srunchunk(runchunk_a.getValue());
+        if (srunchunk == "") {
+            run_chunk = false;
+        } else {
+            auto bounds(parse_csv<double>(srunchunk));
+            if (bounds.size() != 5) (*icebin_error)(-1,
+                "--runchunk '%s' must have 5 values", srunchunk.c_str());
+
+            run_chunk = true;
+            chunk_no = bounds[0];
+            chunk_range[0][0] = bounds[1];
+            chunk_range[0][1] = bounds[2];
+            chunk_range[1][0] = bounds[3];
+            chunk_range[1][1] = bounds[4];
+    }
 
         // Parse sigma
         auto _sigma(parse_csv<double>(sigma_a.getValue()));
@@ -262,7 +287,7 @@ if (sz % 100000 == 0) printf("exgrid size=%d\n", sz);
 
 void nocompress_configure_var(netCDF::NcVar ncvar)
 {
-//    ncvar.setCompression(true, true, 4);
+    ncvar.setCompression(true, true, 4);
 
     // For some reason, this causes an HDF5 error
     // ncvar.setChecksum(netCDF::NcVar::nc_FLETCHER32);
@@ -353,34 +378,38 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
     auto nocompress(
             std::bind(nocompress_configure_var, std::placeholders::_1));
 
-    {NcIO ncio(args.ofname, 'w', nocompress);
+
+    std::string ofname(strprintf("%s-%02d", args.ofname.c_str(), args.chunk_no));
+
+
+    {NcIO ncio(ofname, 'w', nocompress);
         printf("---- Generating AvI\n");
         auto mat(rm.matrix("AvI", {&dimA, &dimI}, params));
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
         ncio.flush();
     }
 
-    {NcIO ncio(args.ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating EvI\n");
         auto mat(rm.matrix("EvI", {&dimE, &dimI}, params));
         mat->ncio(ncio, "EvI", {"dimE", "dimI"});
         ncio.flush();
     }
 
-    {NcIO ncio(args.ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvE\n");
         auto mat(rm.matrix("IvE", {&dimI, &dimE}, params));
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
         ncio.flush();
     }
-    {NcIO ncio(args.ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvA\n");
         auto mat(rm.matrix("IvA", {&dimI, &dimA}, params));
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
         ncio.flush();
     }
 
-    {NcIO ncio(args.ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating AvE\n");
         auto mat(rm.matrix("AvE", {&dimA, &dimE}, params));
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
@@ -389,7 +418,7 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
 
     // Store the dimensions
     printf("---- Storing Dimensions\n");
-    {NcIO ncio(args.ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', nocompress);
         NcVar ncv;
 
         ncv = dimA.ncio(ncio, "dimA");
@@ -410,9 +439,54 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
     printf("Done!\n");
 }
 
+void write_chunk_makefile(
+    std::string const &ofname,
+    std::vector<string> const &arg_strings,
+    std::vector<std::array<int,5>> const &chunks)
+{
+    std:;ofstream fout;
+    fout.open(ofname + ".mk", ofstream::out);
+ 
+    fout << ".NOTPARALLEL:" << endl;
+
+    // Name of all chunk files
+    fout << ofname << " : " << ofname << ".mk";
+    for (std::array<int,5> const &chunk : chunks)  {
+        std::string chunkno(strprintf("%02d", chunk[0]));
+        fout << " " << ofname << "-" << chunkno;
+    }
+    fout << endl;
+
+    fout << "\tcombine_global_ec";
+    for (std::array<int,5> const &chunk : chunks)  {
+        std::string chunkno(strprintf("%02d", chunk[0]));
+        fout << " " << ofname << "-" << chunkno;
+    }
+    fout << endl << endl;
+
+
+    for (std::array<int,5> const &chunk : chunks) {
+        std::string chunkno(strprintf("%02d", chunk[0]));
+        fout << ofname << "-" << chunkno << " : " << ofname << ".mk" << endl << "\t";
+        for (auto const &arg : arg_strings) fout << arg << " ";
+        fout << "--runchunk " << chunk[0];
+        for (int i=1; i<5; ++i) fout << "," << chunk[i];
+        fout << "\n";
+    }
+
+    printf("Done writing chunk-generating makefile.  Run with the command:\n    make -f %s.mk\n", ofname.c_str());
+}
+
+
+
 int main(int argc, char **argv)
 {
     everytrace_init();
+
+    // Save args as C++ vector
+    vector<string> arg_strings;
+    for (int i=0; i<argc; ++i) arg_strings.push_back(string(argv[i]));
+
     ParseArgs args(argc, argv);
     std::string ofname(args.ofname);
     std::cout << args << endl;
@@ -426,13 +500,11 @@ int main(int argc, char **argv)
     // (simplifies our overlap "computation")
     int mult_i = hspecI.im / hspecO.im;
     int mult_j = hspecI.jm / hspecO.jm;
-#if 1
     if ((mult_i * hspecO.im != hspecI.im) || (mult_j * hspecO.jm != hspecI.jm)) {
         (*icebin_error)(-1,
             "Hntr grid (%dx%d) must be an even multiple of (%dx%d)",
             hspecI.im, hspecI.jm, hspecO.im, hspecO.jm);
     }
-#endif
 
     // -----------------------------------------
     blitz::Array<double,2> fgiceO(hspecO.jm, hspecO.im);
@@ -455,53 +527,98 @@ int main(int argc, char **argv)
         hntr.regrid(wtI, fgiceI, fgiceO);
     }
 
-    // Loop over chunks
-    blitz::Array<double,2> elevmaskI(hspecI.jm, hspecI.im);
-    int iO = 0;    // Where we start scanning in fgiceO
-    int jO = 0;
-    for (int chunkno=0; (jO < hspecO.jm) && (iO < hspecO.im); ++chunkno) {
-        int nice=0;
 
-        {
-            // Allocate arrays
-            blitz::Array<int16_t,2> fgiceI(hspecI.jm, hspecI.im);    // 0 or 1
-            blitz::Array<int16_t,2> elevI(hspecI.jm, hspecI.im);
+    // Allocate arrays
+    blitz::Array<int16_t,2> fgiceI(hspecI.jm, hspecI.im);    // 0 or 1
+    blitz::Array<int16_t,2> elevI(hspecI.jm, hspecI.im);
 
-            // Read in ice extent and elevation
-            auto fname(files.locate(args.nc_fname));
-            NcIO ncio(fname, 'r');
-            ncio_blitz(ncio, fgiceI, args.fgiceI_vname, "short", {});
-            ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
+    // Read in ice extent and elevation
+    {auto fname(files.locate(args.nc_fname));
+        NcIO ncio(fname, 'r');
+        ncio_blitz(ncio, fgiceI, args.fgiceI_vname, "short", {});
+        ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
+    }
 
-            // Choose the ice to process on this chunk
-            elevmaskI = NaN;
-            for (; jO < hspecO.jm; ++jO) {
-                for (; iO < hspecO.im; ++iO) {
-                    if (fgiceO(jO, iO) == 0) continue;
-printf("fgiceO(%d, %d) == %g\n", jO, iO, fgiceO(jO,iO));
+
+    if (args.run_chunk) {
+        // ============== Run just one chunk
+
+        // Choose the ice to process on this chunk
+        blitz::Array<double,2> elevmaskI(hspecI.jm, hspecI.im);
+        elevmaskI = NaN;
+
+        // Upper bound
+        int const jO1 = args.chunk_range[1][0];
+        int const iO1 = args.chunk_range[1][1];
+        int const ijO1 = jO1 * hspecO.im + iO1;
+
+        // Set up elevmaskI for the specified range of O grid cells
+        int iO = args.chunk_range[0][1];    // Where we start scanning in fgiceO
+        int jO=args.chunk_range[0][0];
+        int ijO = jO * hspecO.im + iO;
+        printf("BEGIN O(%d, %d)\n", jO, iO);
+        for (; jO < args.chunk_range[1][0]; ++jO) {
+            for (; iO < hspecO.im; ++iO, ++ijO) {
+                if (ijO >= ijO1) goto endscan;    // Double break
+
+                if (fgiceO(jO, iO) != 0) {
                     // Add these I grid cells to elevmaskI
                     for (int jI=jO*mult_j; jI<(jO+1)*mult_j; ++jI) {
                     for (int iI=iO*mult_i; iI<(iO+1)*mult_i; ++iI) {
                         if (fgiceI(jI,iI)) {
                             elevmaskI(jI,iI) = elevI(jI,iI);
-                            ++ nice;
-                        } else {
-                            elevmaskI(jI,iI) = NaN;
                         }
                     }}
-                    if (nice >= chunk_size) goto endscan;    // double break
+                }
+            }
+            iO = 0;
+        }
+    endscan: ;
+        printf("END O(%d, %d)\n", jO, iO);
+        fgiceI.free();
+        elevI.free();
+
+        // Process the chunk!
+        global_ec_section(files, args, elevmaskI);
+    } else {
+        // ================== Create chunks to run
+
+        std::vector<std::array<int,5>> chunks;
+
+        // Loop over chunks
+        int iO = 0;    // Where we start scanning in fgiceO
+        int jO = 0;
+        for (int chunkno=0; (jO < hspecO.jm) && (iO < hspecO.im); ++chunkno) {
+            int nice=0;
+            int const jO0 = jO;
+            int const iO0 = iO;
+
+            // Choose the ice to process on this chunk
+            for (; jO < hspecO.jm; ++jO) {
+                for (; iO < hspecO.im; ++iO) {
+                    if (fgiceO(jO, iO) != 0) {
+
+                        // Add these I grid cells to elevmaskI
+                        for (int jI=jO*mult_j; jI<(jO+1)*mult_j; ++jI) {
+                        for (int iI=iO*mult_i; iI<(iO+1)*mult_i; ++iI) {
+                            if (fgiceI(jI,iI)) ++nice;
+                        }}
+                        if (nice >= chunk_size) goto endscan2;    // double break
+                    }
                 }
                 iO = 0;
             }
-            endscan: ;
+        endscan2: ;
+            printf("============= Chunk %d, nice=%d (%d %d) (%d %d)\n", chunkno, nice, jO0, iO0, jO, iO);
+            chunks.push_back({chunkno, jO0, iO0, jO, iO});
         }
 
-        printf("============= Chunk %d, nice=%d\n", chunkno, nice);
 
-        // Process the chunk!
-        args.ofname = strprintf("%s-%02d", ofname.c_str(), chunkno);
-        global_ec_section(files, args, elevmaskI);
+        // Create a makefile
+        write_chunk_makefile(args.ofname, arg_strings, chunks);
     }
+
+    return 0;
 }
 
 

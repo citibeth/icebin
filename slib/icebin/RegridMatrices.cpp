@@ -528,7 +528,7 @@ static void ncio_eigen2(
     if (ncio.rw == 'r') (*ibmisc::ibmisc_error)(-1,
         "ncio_eigen() currently does not support reading.");
 
-    std::vector<std::string> const dim_names({vname + ".size", vname + ".rank"});
+    std::vector<std::string> const dim_names({vname + ".nnz", vname + ".rank"});
     std::vector<netCDF::NcDim> dims;        // Dimensions in NetCDF
     std::vector<size_t> dim_sizes;          // Length of our two dimensions.
 
@@ -568,7 +568,6 @@ void WeightedSparse::ncio(ibmisc::NcIO &ncio,
     // --------- M
     ncio_eigen2(ncio, *M, vname + ".M");
 
-return;
     // ---- Mw
     ncio_blitz_alloc<double,1>(ncio, Mw, vname + ".Mw", get_nc_type<double>(),
         {ncdims[1]});
