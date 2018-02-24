@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <ibmisc/netcdf.hpp>
+#include <ibmisc/runlength.hpp>
 #include <icebin/error.hpp>
 #include <prettyprint.hpp>
 
@@ -79,7 +80,52 @@ void write_reshaped(
         }
 }
 
+void write_weight(
+    NcIO &ncio,
+    blitz::Array<double,1> const &var,
+    std::string const &vname,
+    std::string const &snc_type,
+    std::vector<int> const &_shape,
+    int sparse_extent,
+    std::string const &sdim)
+{
+    std::vector<std::string> sdim_exts;
+    std::vector<int> shape;
+    switch(shape.size()) {
+        case 2:
+            sdim_exts = std::vector<std::string>{".jm", ".im"};
+            shape = _shape;
+        break;
+        case 3:
+            sdim_exts = std::vector<std::string>{".nhc", ".jm", ".im"};
+            shape = _shape;
+        break;
+        default:
+            sdim_exts = std::vector<std::string>{""};
+            shape = std::vector<int>{sparse_extent};
+        break;
+    }
 
+
+
+    auto &enc(ncio.tmp.take(rlencode(var, false, EqualUsingNaN())));
+    auto ncvar(ncio_vector(ncio, enc.ends, false, vname+".ends", snc_type,
+        get_or_add_dims(ncio, {vname+".ends.size"}, {(long)enc.ends.size()})));
+    ncio_vector(ncio, enc.values, false, vname+".values", snc_type,
+        get_or_add_dims(ncio, {vname+".values.size"}, {(long)enc.values.size()}));
+
+    // Fake the dimensions
+    int const RANK = shape.size();
+    std::vector<std::string> dim_names;
+    for (int i=0; i<RANK; ++i) {
+        std::string dim_name = sdim+sdim_exts[i];
+        get_or_add_dim(ncio, dim_name, shape[i]);
+        dim_names.push_back(dim_name);
+    }
+    get_or_put_att(ncvar, 'w', "shape", "", dim_names);
+    std::string rl("runlength");
+    get_or_put_att(ncvar, 'w', "encoding", rl);
+}
 
 void combine_chunks(
     std::vector<std::string> const &ifnames,    // Names of input chunks
@@ -160,12 +206,22 @@ void combine_chunks(
         auto nnz_d(get_or_add_dim(ncio, BvA+".nnz", nnz));
         auto two_d(get_or_add_dim(ncio, "two", 2));
 
-
+#if 0
         // Variables
         write_reshaped(ncio, wM, "w"+BvA, "double", shapes[0], sparse_extents[0], "dim"+sgrids[0]);
         ncio_blitz(ncio, indices, BvA+".indices", "int", {nnz_d, two_d});
         ncio_blitz(ncio, values, BvA+".values", "double", {nnz_d});
         write_reshaped(ncio, Mw, BvA+"w", "double", shapes[1], sparse_extents[1], "dim"+sgrids[1]);
+#else
+        // Variables
+        write_weight(ncio, wM, "w"+BvA, "double", shapes[0], sparse_extents[0], "dim"+sgrids[0]);
+        ncio_blitz(ncio, indices, BvA+".indices", "int", {nnz_d, two_d});
+        ncio_blitz(ncio, values, BvA+".values", "double", {nnz_d});
+        write_weight(ncio, Mw, BvA+"w", "double", shapes[1], sparse_extents[1], "dim"+sgrids[1]);
+
+
+#endif
+
 
         ncio.flush();
     }
