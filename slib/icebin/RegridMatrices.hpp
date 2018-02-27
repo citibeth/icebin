@@ -35,10 +35,9 @@ struct WeightedSparse {
     WeightedSparse(std::array<SparseSetT *,2> _dims, bool _conservative) : dims(_dims), conservative(_conservative) {}
 
     /** Applies a regrid matrix.
-    Nominally computes B{in} = smoothB{ii} * BvA{ij} * A{jn}
+    Nominally computes B{in} = BvA{ij} * A{jn}
     (where BvA is this)
-    In the face of smoothing, it also compensates for non-conservation in
-    smoothB.
+    If the matrix ix non-conservative, it also accounts for that.
 
         |i| = Size of B vector space
         |j| = Size of A vector space
@@ -49,7 +48,7 @@ struct WeightedSparse {
     */
     EigenDenseMatrixT apply_e(
         // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-        blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
+        blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable (_b means dense here)
         double fill = std::numeric_limits<double>::quiet_NaN(),    // Fill value for cells not in BvA matrix
         bool force_conservation=true) const;     // Set if you want apply_e() to conserve, even if !M->conservative
 

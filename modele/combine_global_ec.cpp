@@ -169,7 +169,9 @@ void combine_chunks(
     blitz::Array<double,1> Mw(sparse_extents[1]);
     Mw = NaN;
 
-    // Agreate them together
+    RLWeightedSparse ret;
+
+    // Aggregate them together
     int iM=0;
     for (std::string const &ifname : ifnames) {
         printf("--- Reading %s\n", ifname.c_str());
@@ -179,51 +181,30 @@ void combine_chunks(
         auto dimA(nc_read_blitz<int,1>(ncio.nc, "dim"+sgrids[1]));
 
         auto wM_d(nc_read_blitz<double,1>(ncio.nc, BvA+".wM"));
-        for (int i=0; i<wM_d.extent(0); ++i) wM(dimB(i)) = wM_d(i);
+        for (int i=0; i<wM_d.extent(0); ++i) ret.wM.add({dimB(i)}, wM_d(i));
+
+        auto info_v(get_or_add_var(ncio, BvA+".M.info", "int", {}));
+        get_or_put_att(info_v, 'r', "shape", &ret.conservative);
+        ret.shape[0] = dimB.sparse_extent();
+        ret.shape[1] = dimA.sparse_extent();
 
         auto indices_d(nc_read_blitz<int,2>(ncio.nc, BvA+".M.indices"));
         auto values_d(nc_read_blitz<double,1>(ncio.nc, BvA+".M.values"));
         for (int i=0; i<values_d.extent(0); ++i) {
-            if (iM >= nnz) (*icebin_error)(-1,
-                "iM=%d is too large (nnz=%d)\n", iM, nnz);
-            values(iM) = values_d(i);
-            indices(iM,0) = dimB(indices_d(i,0));
-            indices(iM,1) = dimA(indices_d(i,1));
-            ++iM;
+            ret.M.add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
         }
 
         auto Mw_d(nc_read_blitz<double,1>(ncio.nc, BvA+".Mw"));
-        for (int i=0; i<Mw_d.extent(0); ++i) Mw(dimA(i)) = Mw_d(i);
+        for (int i=0; i<Mw_d.extent(0); ++i) ret.Mw.add({dimA(i)}, Mw_d(i));
     }
 
     // Check
-    if (iM != nnz) (*icebin_error)(-1, "Bad count: %d vs %d", iM, nnz);
+    if (ret.M.nnz() != nnz) (*icebin_error)(-1, "Bad count: %d vs %d", iM, nnz);
 
     // Write it out
     printf("---- Writing output to %s\n", ofname.c_str());
     {NcIO ncio(ofname, ofmode);
-        // Dimensions
-        auto nnz_d(get_or_add_dim(ncio, BvA+".nnz", nnz));
-        auto two_d(get_or_add_dim(ncio, "two", 2));
-
-#if 0
-        // Variables
-        write_reshaped(ncio, wM, "w"+BvA, "double", shapes[0], sparse_extents[0], "dim"+sgrids[0]);
-        ncio_blitz(ncio, indices, BvA+".indices", "int", {nnz_d, two_d});
-        ncio_blitz(ncio, values, BvA+".values", "double", {nnz_d});
-        write_reshaped(ncio, Mw, BvA+"w", "double", shapes[1], sparse_extents[1], "dim"+sgrids[1]);
-#else
-        // Variables
-        write_weight(ncio, wM, "w"+BvA, "double", shapes[0], sparse_extents[0], "dim"+sgrids[0]);
-        ncio_blitz(ncio, indices, BvA+".indices", "int", {nnz_d, two_d});
-        ncio_blitz(ncio, values, BvA+".values", "double", {nnz_d});
-        write_weight(ncio, Mw, BvA+"w", "double", shapes[1], sparse_extents[1], "dim"+sgrids[1]);
-
-
-#endif
-
-
-        ncio.flush();
+        ret.ncio(ncio, BvA);
     }
 
 }
