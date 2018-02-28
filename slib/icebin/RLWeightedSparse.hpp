@@ -1,34 +1,38 @@
 #ifndef ICEBIN_RLWEIGHTEDSPARSE_HPP
 #define ICEBIN_RLWEIGHTEDSPARSE_HPP
 
-#incluce <blitz/array.h>
+#include <blitz/array.h>
+#include <ibmisc/rlarray.hpp>
+#include <ibmisc/netcdf.hpp>
 
+// ------------------------------------------------------
 namespace ibmisc {
     template<class CountT, class IndexT, class ValueT, int RANK>
     class RLSparseArray;
 }
-
+// ------------------------------------------------------
 namespace icebin {
 
-BOOST_ENUM(SparseFillType
-    (ZERO) (0)
-    (NAN) (1)
+BOOST_ENUM_VALUES(SparseFillType, int,
+    (zero) (0)
+    (nan) (1)
 )
 
 struct RLWeightedSparse {
     // All sparse indexing here!
 
-    RLSparseArray<int,int,double,1> const &wM,            // ==0 in M's nullspace
-    RLSparseArray<int,int,double,2> const &M,    // BvA
-    RLSparseArray<int,int,double,1> const &Mw,            // ==0 in M's nullspace
-
-    std::array<int,2> shape {0,0};
+    ibmisc::RLSparseArray<int,int,double,1> wM;            // ==0 in M's nullspace
+    ibmisc::RLSparseArray<int,int,double,2> M;    // BvA
+    ibmisc::RLSparseArray<int,int,double,1> Mw;            // ==0 in M's nullspace
 
     /** True if this regridding matrix is conservative.  Matrices could be
     non-conservative, for example, in the face of smoothing on I.  Or when
     regridding between the IceBin and ModelE ice sheets. */
     bool conservative = false;
 
+
+    RLWeightedSparse(std::array<long,2> shape)
+        : wM({shape[0]}), M(shape), Mw({shape[1]}) {}
 
     /** Applies a regrid matrix.
     ALL INDEXING IS SPARSE!!!
@@ -43,22 +47,14 @@ struct RLWeightedSparse {
 
     @param A The values to regrid, as a series of row vectors
     */
-    RLWeightedSparse::apply(
+    void apply(
         // this = BvA
         blitz::Array<double,2> const &A,      //  IN: A{nj} one row per variable
         blitz::Array<double,2> &B,            // OUT: B{ni} one row per variable
-        SparseFillType fill_type=SparseFillType::ZERO,
-        bool force_conservation=true);
+        SparseFillType fill_type=SparseFillType::zero,
+        bool force_conservation=true) const;
 
-    void ncio(NcIO &ncio, std::string const &vname)
-    {
-        auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
-        get_or_put_att(info_v, ncio.rw, "conservative", conservative);
-
-        wM.ncio(vname + ".wM", "int", "int", "double");
-        M.ncio(vname + ".M", "int", "int", "double");
-        mW.ncio(vname + ".Mw", "int", "int", "double");
-    }
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
 };
 

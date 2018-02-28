@@ -1,8 +1,9 @@
 #include <cstdio>
+#include <prettyprint.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/runlength.hpp>
 #include <icebin/error.hpp>
-#include <prettyprint.hpp>
+#include <icebin/RLWeightedSparse.hpp>
 
 using namespace std;
 using namespace ibmisc;
@@ -41,7 +42,7 @@ void combine_chunks(
 
     // Get total sizes
     int nnz = 0;        // = number non-zero]
-    std::array<size_t,2> sparse_extents;
+    std::array<long,2> sparse_extents;
     std::array<std::vector<int>,2> shapes;
     std::vector<size_t> sizes;    // For printing
     for (std::string const &ifname : ifnames) {
@@ -61,53 +62,43 @@ void combine_chunks(
 
 
     // Allocate
-    blitz::Array<int,2> indices(nnz,2);
-    indices = -1;
-    blitz::Array<double,1> wM(sparse_extents[0]);
-    wM = NaN;
-    blitz::Array<double,1> values(nnz);
-    values = NaN;
-    blitz::Array<double,1> Mw(sparse_extents[1]);
-    Mw = NaN;
+    RLWeightedSparse ret(sparse_extents);
 
-    RLWeightedSparse ret;
+    {auto wM(ret.wM.accum());
+    auto M(ret.M.accum());
+    auto Mw(ret.Mw.accum());
 
-    // Aggregate them together
-    int iM=0;
-    for (std::string const &ifname : ifnames) {
-        printf("--- Reading %s\n", ifname.c_str());
-        NcIO ncio(ifname, 'r');
+        // Aggregate them together
+        int iM=0;
+        for (std::string const &ifname : ifnames) {
+            printf("--- Reading %s\n", ifname.c_str());
+            NcIO ncio(ifname, 'r');
 
-        auto dimB(nc_read_blitz<int,1>(ncio.nc, "dim"+sgrids[0]));
-        auto dimA(nc_read_blitz<int,1>(ncio.nc, "dim"+sgrids[1]));
+            auto dimB(nc_read_blitz<int,1>(ncio.nc, "dim"+sgrids[0]));
+            auto dimA(nc_read_blitz<int,1>(ncio.nc, "dim"+sgrids[1]));
 
-        auto wM_d(nc_read_blitz<double,1>(ncio.nc, BvA+".wM"));
-        for (int i=0; i<wM_d.extent(0); ++i) ret.wM.add({dimB(i)}, wM_d(i));
+            auto wM_d(nc_read_blitz<double,1>(ncio.nc, BvA+".wM"));
+            for (int i=0; i<wM_d.extent(0); ++i) wM.add({dimB(i)}, wM_d(i));
 
-        auto info_v(get_or_add_var(ncio, BvA+".M.info", "int", {}));
-        get_or_put_att(info_v, 'r', "shape", &ret.conservative);
-        ret.shape[0] = dimB.sparse_extent();
-        ret.shape[1] = dimA.sparse_extent();
+            auto indices_d(nc_read_blitz<int,2>(ncio.nc, BvA+".M.indices"));
+            auto values_d(nc_read_blitz<double,1>(ncio.nc, BvA+".M.values"));
+            for (int i=0; i<values_d.extent(0); ++i) {
+                M.add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
+            }
 
-        auto indices_d(nc_read_blitz<int,2>(ncio.nc, BvA+".M.indices"));
-        auto values_d(nc_read_blitz<double,1>(ncio.nc, BvA+".M.values"));
-        for (int i=0; i<values_d.extent(0); ++i) {
-            ret.M.add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
+            auto Mw_d(nc_read_blitz<double,1>(ncio.nc, BvA+".Mw"));
+            for (int i=0; i<Mw_d.extent(0); ++i) Mw.add({dimA(i)}, Mw_d(i));
         }
 
-        auto Mw_d(nc_read_blitz<double,1>(ncio.nc, BvA+".Mw"));
-        for (int i=0; i<Mw_d.extent(0); ++i) ret.Mw.add({dimA(i)}, Mw_d(i));
-    }
-
-    // Check
-    if (ret.M.nnz() != nnz) (*icebin_error)(-1, "Bad count: %d vs %d", iM, nnz);
+        // Check
+        if (ret.M.nnz() != nnz) (*icebin_error)(-1, "Bad count: %d vs %d", iM, nnz);
+    }    // Finish off accumulators
 
     // Write it out
     printf("---- Writing output to %s\n", ofname.c_str());
     {NcIO ncio(ofname, ofmode);
         ret.ncio(ncio, BvA);
     }
-
 }
 
 int main(int argc, char **argv)

@@ -1,18 +1,35 @@
 #include <ibmisc/rlarray.hpp>
+#include <icebin/RLWeightedSparse.hpp>
 
-RLWeightedSparse::apply(
+using namespace ibmisc;
+
+namespace icebin {
+
+
+void RLWeightedSparse::ncio(NcIO &ncio, std::string const &vname)
+{
+    auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
+    get_or_put_att(info_v, ncio.rw, "conservative", conservative);
+
+    wM.ncio(ncio, vname + ".wM", "int", "int", "double");
+    M.ncio(ncio, vname + ".M", "int", "int", "double");
+    Mw.ncio(ncio, vname + ".Mw", "int", "int", "double");
+}
+
+#if 0
+void RLWeightedSparse::apply(
     // this = BvA
     blitz::Array<double,2> const &A,      //  IN: A{nj} one row per variable
     blitz::Array<double,2> &B,            // OUT: B{ni} one row per variable
     SparseFillType fill_type,
-    bool force_conservation)
+    bool force_conservation) const
 {
     // Clear the output
     switch(fill_type) {
-        case SparseFillType::ZERO :
+        case SparseFillType::zero :
             B = 0;
         break;
-        case SparseFillType::NAN :
+        case SparseFillType::nan :
             B = std::numeric_limits<double>::quiet_NaN();
         break;
     }
@@ -25,10 +42,10 @@ RLWeightedSparse::apply(
 
 
         switch(fill_type) {
-            case SparseFillType::ZERO :
+            case SparseFillType::zero :
                 B(iB) += val;
             break;
-            case SparseFillType::NAN :
+            case SparseFillType::nan :
                 if (std::isnan(B(iB))) B(iB) = val;
                 else B(iB) += val;
             break;
@@ -63,3 +80,6 @@ RLWeightedSparse::apply(
         }
     }
 }
+#endif
+
+}    // namespace icebin

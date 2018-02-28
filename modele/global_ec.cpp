@@ -79,7 +79,7 @@ struct ParseArgs {
     double ec_skip;                    // Distance between elevation classes [m]
     bool scale;
     bool const correctA = false;    // Only needed with projected I grids (and then not really)
-    std::array<double,3> sigma;
+    std::array<double,3> sigma;    // NOTE: Smoothing in general does not work when ice is sectioned.  Should be applied later if user wants it.
 
     double eq_rad;        // Radius of earth; see ModelE code    
 
@@ -125,7 +125,9 @@ static std::vector<DestT> parse_csv(std::string scsv_str)
 }
 
 ParseArgs::ParseArgs(int argc, char **argv)
+    : sigma(std::array<double,3>{0,0,0})
 {
+
     // Wrap everything in a try block.  Do this every time, 
     // because exceptions will be thrown for problems.
     try {  
@@ -185,9 +187,10 @@ ParseArgs::ParseArgs(int argc, char **argv)
              "Produce raw (unscaled) matrices?",
              cmd, false);
 
-        TCLAP::ValueArg<std::string> sigma_a("g", "sigma",
-            "Sommthing distances: x,y,z",
-            false, "0,0,0", "smoothing distances", cmd);
+// Smoothing does not work with sectioned ice
+//        TCLAP::ValueArg<std::string> sigma_a("g", "sigma",
+//            "Sommthing distances: x,y,z",
+//            false, "0,0,0", "smoothing distances", cmd);
 
         TCLAP::ValueArg<double> eq_rad_a("R", "radius",
             "Radius of the earth",
@@ -243,11 +246,13 @@ ParseArgs::ParseArgs(int argc, char **argv)
             chunk_range[1][1] = bounds[4];
     }
 
+#if 0
         // Parse sigma
         auto _sigma(parse_csv<double>(sigma_a.getValue()));
         if (sigma.size() != 3) (*icebin_error)(-1,
             "sigma must have exactly three elements");
         for (int i=0; i<_sigma.size(); ++i) sigma[i] = _sigma[i];
+#endif
 
     } catch (TCLAP::ArgException &e) { // catch any exceptions
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
