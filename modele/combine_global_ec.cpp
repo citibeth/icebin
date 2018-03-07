@@ -78,16 +78,16 @@ void combine_chunks(
             auto dimA(nc_read_blitz<int,1>(ncio.nc, "dim"+sgrids[1]));
 
             auto wM_d(nc_read_blitz<double,1>(ncio.nc, BvA+".wM"));
-            for (int i=0; i<wM_d.extent(0); ++i) wM.add({dimB(i)}, wM_d(i));
+            for (int i=0; i<wM_d.extent(0); ++i) wM->add({dimB(i)}, wM_d(i));
 
             auto indices_d(nc_read_blitz<int,2>(ncio.nc, BvA+".M.indices"));
             auto values_d(nc_read_blitz<double,1>(ncio.nc, BvA+".M.values"));
             for (int i=0; i<values_d.extent(0); ++i) {
-                M.add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
+                M->add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
             }
 
             auto Mw_d(nc_read_blitz<double,1>(ncio.nc, BvA+".Mw"));
-            for (int i=0; i<Mw_d.extent(0); ++i) Mw.add({dimA(i)}, Mw_d(i));
+            for (int i=0; i<Mw_d.extent(0); ++i) Mw->add({dimA(i)}, Mw_d(i));
         }
 
         // Check
