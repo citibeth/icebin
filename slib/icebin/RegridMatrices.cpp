@@ -35,15 +35,15 @@ struct UrAE {
 
 
 // ------------------------------------------------------------
-static std::unique_ptr<lintransform::Weighted> compute_AEvI(
+static std::unique_ptr<lintransform::Weighted_Eigen> compute_AEvI(
     IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &params,
+    RegridParams const &params,
     blitz::Array<double,1> const *elevmaskI,
     UrAE const &AE)
 {
 printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correctA);
-    std::unique_ptr<lintransform::Eigen> ret(new lintransform::Eigen(dims, true));
+    std::unique_ptr<lintransform::Weighted_Eigen> ret(new lintransform::Weighted_Eigen(dims, true));
     SparseSetT * const dimA(ret->dims[0]);
     SparseSetT * const dimI(ret->dims[1]);
     SparseSetT _dimG;
@@ -126,15 +126,15 @@ printf("END compute_AEvI\n");
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-std::unique_ptr<lintransform::Weighted> compute_IvAE(
+std::unique_ptr<lintransform::Weighted_Eigen> compute_IvAE(
     IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &params,
+    RegridParams const &params,
     blitz::Array<double,1> const *elevmaskI,
     UrAE const &AE)
 {
 printf("BEGIN compute_IvAE\n");
-    std::unique_ptr<lintransform::Weighted> ret(new lintransform::Eigen(dims, !params.smooth()));
+    std::unique_ptr<lintransform::Weighted_Eigen> ret(new lintransform::Weighted_Eigen(dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
     SparseSetT _dimG;
     SparseSetT * const dimG(&_dimG);
@@ -218,11 +218,11 @@ printf("END compute_IvAE\n");
     return ret;
 }
 
-static std::unique_ptr<lintransform::Weighted> compute_EvA(IceRegridder const *regridder,
+static std::unique_ptr<lintransform::Weighted_Eigen> compute_EvA(IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &params, UrAE const &E, UrAE const &A)
+    RegridParams const &params, UrAE const &E, UrAE const &A)
 {
-    std::unique_ptr<lintransform::Weighted> ret(new lintransform::Eigen(dims, true));
+    std::unique_ptr<lintransform::Weighted_Eigen> ret(new lintransform::Weighted_Eigen(dims, true));
     SparseSetT * const dimE(ret->dims[0]);
     SparseSetT * const dimA(ret->dims[1]);
     SparseSetT _dimG;
@@ -357,14 +357,14 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(
 }
 // -----------------------------------------------------------------------
 // ----------------------------------------------------------------
-void RegridMatrices_Dynamic::add_regrid(std::string const &spec,
+void RegridMatrices::add_regrid(std::string const &spec,
     RegridMatrices::MatrixFunction const &regrid)
 {
     regrids.insert(make_pair(spec, regrid));
 }
 // ----------------------------------------------------------------
 // ----------------------------------------------------------------
-std::unique_ptr<lintransform::Weighted> RegridMatrices_Dynamic::matrix(
+std::unique_ptr<lintransform::Weighted_Eigen> RegridMatrices::matrix_d(
     std::string const &spec_name,
     std::array<SparseSetT *,2> dims,
     Params const &params) const

@@ -1,5 +1,5 @@
-#ifndef ICEBIN_REGRID_MATRICES_DYNAMIC_HPP
-#define ICEBIN_REGRID_MATRICES_DYNAMIC_HPP
+#ifndef ICEBIN_REGRID_MATRICES_HPP
+#define ICEBIN_REGRID_MATRICES_HPP
 
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
@@ -15,15 +15,15 @@ class IceRegridder;
 // -----------------------------------------------------------
 /** Holds the set of "Ur" (original) matrices produced by an
     IceRegridder for a SINGLE ice sheet. */
-class RegridMatrices_Dynamic : public RegridMatrices {
+class RegridMatrices {
 public:
     /** ice_regridder from which this was constructed */
     IceRegridder const * const ice_regridder;
 
     ibmisc::TmpAlloc tmp;    // Stores local vars for different types.  TODO: Maybe re-do this as simple classmember variables.  At least, see where it used (by removing it and running the compiler)
 
-    typedef std::function<std::unique_ptr<ibmisc::lintransform::Weighted>(
-        std::array<SparseSetT *,2> dims, RegridMatrices::Params const &params)> MatrixFunction;
+    typedef std::function<std::unique_ptr<ibmisc::lintransform::Weighted_Eigen>(
+        std::array<SparseSetT *,2> dims, RegridParams const &params)> MatrixFunction;
 
     std::map<std::string, MatrixFunction> regrids;
 
@@ -43,14 +43,52 @@ public:
     @param correctA: Correct for projection error in A or E grids?
     @return The regrid matrix and weights.  All in dense indexing.
     */
-    std::unique_ptr<ibmisc::lintransform::Eigen> matrix_d(
+    std::unique_ptr<ibmisc::lintransform::Weighted_Eigen> matrix_d(
         std::string const &spec_name,
         std::array<SparseSetT *,2> dims,
-        RegridMatrices::Params const &_params) const;
+        RegridParams const &_params) const;
 
     // Virtual function promises a matrix in sparse indexing
 
 };
 // -----------------------------------------------------------------
+/** Used by Python extension to dynamically get regrid matrices in sparse coordinates.  Wraps a RegridMatrices... */
+class RegridSet_RegridMatrices : public RegridSet {
+
+    RegridMatrices rm;
+
+public:
+    RegridSet_RegridMatrices(RegridMatrices &&_rm, RegridParams const &params) : rm(std::move(_rm)), _params(params) {}
+
+
+    // ----------- Implements RegridSet
+    std::unique_ptr<ibmisc::lintransform::Weighted> matrix(
+        std::string const &spec_name,
+        RegridParams const &_params) const
+    {
+        TmpAlloc tmp;
+        auto &dims(tmp.make<std::array<SparseSetT,2>>());
+
+        std::unique_ptr<ibmisc::lintransform::Weighted_Eigen>
+            M(rm.matrix_d(spec_name, {&dims[0], &dims[1]}, _params));
+
+        M->tmp.merge(std::move(tmp));
+        return new std::unique_ptr<ibmisc::lintransform::Weighted>(M.release());
+    }
+
+};
+
+
+std::unique_ptr<ibmisc::lintransform::Weighted>
+RegridSet_RegridMatrices::matrix(
+    std::string const &spec_name,
+    RegridParams const &_params) const
+{
+
+    return std::unique_ptr<ibmisc::lintransform::Weighted>(...);
+}
+
+
+
 }    // namespace
 #endif    // guard

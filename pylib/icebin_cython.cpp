@@ -200,9 +200,9 @@ extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself, std::s
 {
     std::unique_ptr<CythonWeightedSparse> CRM(new CythonWeightedSparse());
 
-    CRM->RM = cself->matrix(spec_name,
+    CRM->RM = cself->matrix_d(spec_name,
         {&CRM->dims[0], &CRM->dims[1]},
-        RegridMatrices::Params(scale, correctA, {sigma_x, sigma_y, sigma_z}));
+        RegridParams(scale, correctA, {sigma_x, sigma_y, sigma_z}));
 
     CythonWeightedSparse *ret = CRM.release();
     return ret;
