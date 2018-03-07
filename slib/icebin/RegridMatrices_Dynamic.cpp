@@ -357,14 +357,14 @@ RegridMatrices GCMRegridder_Standard::regrid_matrices(
 }
 // -----------------------------------------------------------------------
 // ----------------------------------------------------------------
-void RegridMatrices::add_regrid(std::string const &spec,
+void RegridMatrices_Dynamic::add_regrid(std::string const &spec,
     RegridMatrices::MatrixFunction const &regrid)
 {
     regrids.insert(make_pair(spec, regrid));
 }
 // ----------------------------------------------------------------
 // ----------------------------------------------------------------
-std::unique_ptr<lintransform::Weighted> RegridMatrices::matrix(
+std::unique_ptr<lintransform::Weighted> RegridMatrices_Dynamic::matrix(
     std::string const &spec_name,
     std::array<SparseSetT *,2> dims,
     Params const &params) const

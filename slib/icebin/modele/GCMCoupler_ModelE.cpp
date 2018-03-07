@@ -633,7 +633,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices::Params paramsO;
             paramsO.scale = false;
             paramsO.correctA = false;
-        auto OvI(rmO.matrix("AvI", {&dimO, &dimI}, paramsO));
+        auto OvI(rmO.matrix_d("AvI", {&dimO, &dimI}, paramsO));
 
         // Don't need to set up the mask on I ourselves; this is already
         // built into the OvI matrix.  The mask, taken from PISM, includes
@@ -729,7 +729,7 @@ blitz::Array<char,1> &changedO)    // OUT
         RegridMatrices::Params paramsO;
             paramsO.scale = true;
             paramsO.correctA = false;
-        auto OvI(rmO.matrix("AvI", {&dimO, &dimI}, paramsO));
+        auto OvI(rmO.matrix_d("AvI", {&dimO, &dimI}, paramsO));
 
         // Don't need to set up the mask on I ourselves; this is already
         // built into the OvI matrix.  The mask, taken from PISM, includes
@@ -955,9 +955,9 @@ void update_topo(
             params.scale = true;
             params.correctA = false;
             params.sigma = sigmas[sheet_index];    // TODO: Set smoothing!
-        auto AvI(rmA.matrix("AvI", {&dimA, &dimI}, params));
-        auto EvI(rmA.matrix("EvI", {&dimE, &dimI}, params));
-        auto AvE(rmA.matrix("AvE", {&dimA, &dimE}, params));
+        auto AvI(rmA.matrix_d("AvI", {&dimA, &dimI}, params));
+        auto EvI(rmA.matrix_d("EvI", {&dimE, &dimI}, params));
+        auto AvE(rmA.matrix_d("AvE", {&dimA, &dimE}, params));
 
         // Merge local and global AvE
         spsparse::spcopy(

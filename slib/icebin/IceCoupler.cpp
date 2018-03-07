@@ -336,7 +336,7 @@ bool run_ice)
     elevmaskI = out_elevmaskI;    // Copy
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
-    RegridMatrices rm(gcmr->regrid_matrices(sheet_index, elevmaskI));
+    RegridMatrices_Dynamic rm(gcmr->regrid_matrices(sheet_index, elevmaskI));
     RegridMatrices::Params regrid_params(true, true, {0,0,0});
     RegridMatrices::Params regrid_params_nc(true, false, {0,0,0});    // correctA=False
 
@@ -348,7 +348,7 @@ bool run_ice)
     // ---- Update AvE1 matrix and weights (global for all ice sheets)
 
     // Adds to dimA1 and dimE1
-    auto AvE1(rm.matrix("AvE", {&dimA1, &dimE1}, regrid_params));
+    auto AvE1(rm.matrix_d("AvE", {&dimA1, &dimE1}, regrid_params));
 
     spcopy(
         accum::to_sparse(AvE1->dims,
@@ -364,7 +364,7 @@ bool run_ice)
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
-    auto E1vI_nc(rm.matrix("EvI", {&dimE1, &dimI}, regrid_params_nc));
+    auto E1vI_nc(rm.matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
 
     // Don't do this on the first round, since we don't yet have an IvE0
     if (run_ice) {
@@ -379,7 +379,7 @@ bool run_ice)
 
     // ========= Compute gcm_ivalsE
 
-    auto A1vI(rm.matrix("AvI", {&dimA1, &dimI}, regrid_params));
+    auto A1vI(rm.matrix_d("AvI", {&dimA1, &dimI}, regrid_params));
 
     // Do it once for _E variables and once for _A variables.
     std::array<WeightedSparse * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI_nc};
@@ -459,7 +459,7 @@ bool run_ice)
 
     // Compute IvE (for next timestep)
     std::unique_ptr<WeightedSparse> IvE1(
-        rm.matrix("IvE", {&dimI, &dimE1}, regrid_params));
+        rm.matrix_d("IvE", {&dimI, &dimE1}, regrid_params));
 
     // wIvE0.reference(IvE1->wM);
 
