@@ -35,7 +35,7 @@ struct UrAE {
 
 
 // ------------------------------------------------------------
-static std::unique_ptr<WeightedSparse> compute_AEvI(
+static std::unique_ptr<lintransform::Weighted> compute_AEvI(
     IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params,
@@ -43,7 +43,7 @@ static std::unique_ptr<WeightedSparse> compute_AEvI(
     UrAE const &AE)
 {
 printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correctA);
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
+    std::unique_ptr<lintransform::Eigen> ret(new lintransform::Eigen(dims, true));
     SparseSetT * const dimA(ret->dims[0]);
     SparseSetT * const dimI(ret->dims[1]);
     SparseSetT _dimG;
@@ -126,7 +126,7 @@ printf("END compute_AEvI\n");
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-std::unique_ptr<WeightedSparse> compute_IvAE(
+std::unique_ptr<lintransform::Weighted> compute_IvAE(
     IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params,
@@ -134,7 +134,7 @@ std::unique_ptr<WeightedSparse> compute_IvAE(
     UrAE const &AE)
 {
 printf("BEGIN compute_IvAE\n");
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, !params.smooth()));
+    std::unique_ptr<lintransform::Weighted> ret(new lintransform::Eigen(dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
     SparseSetT _dimG;
     SparseSetT * const dimG(&_dimG);
@@ -218,11 +218,11 @@ printf("END compute_IvAE\n");
     return ret;
 }
 
-static std::unique_ptr<WeightedSparse> compute_EvA(IceRegridder const *regridder,
+static std::unique_ptr<lintransform::Weighted> compute_EvA(IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridMatrices::Params const &params, UrAE const &E, UrAE const &A)
 {
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));
+    std::unique_ptr<lintransform::Weighted> ret(new lintransform::Eigen(dims, true));
     SparseSetT * const dimE(ret->dims[0]);
     SparseSetT * const dimA(ret->dims[1]);
     SparseSetT _dimG;
@@ -364,7 +364,7 @@ void RegridMatrices::add_regrid(std::string const &spec,
 }
 // ----------------------------------------------------------------
 // ----------------------------------------------------------------
-std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
+std::unique_ptr<lintransform::Weighted> RegridMatrices::matrix(
     std::string const &spec_name,
     std::array<SparseSetT *,2> dims,
     Params const &params) const
@@ -374,214 +374,8 @@ std::unique_ptr<WeightedSparse> RegridMatrices::matrix(
     return BvA;
 }
 // ----------------------------------------------------------------
-static void mask_result(EigenDenseMatrixT &ret, blitz::Array<double,1> const &wB_b, double fill)
-{
-    int nB = ret.rows();    // == wB_b.extent(0)
-    int nvar = ret.cols();
-
-    // Mask out cells that slipped into the output because they were
-    // in the SparseSet; but don't actually get any contribution.
-    for (int i=0; i<nB; ++i) {
-        if (wB_b(i) != 0.) continue;
-        for (int n=0; n<nvar; ++n) ret(i,n) = fill;
-    }
-
-}
-// -----------------------------------------------------------------------
-EigenDenseMatrixT WeightedSparse::apply_e(
-    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-    blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-    double fill,     // Fill value for cells not in BvA matrix
-    bool force_conservation) const
-{
-    auto &BvA(*this);
-
-    // A{jn}   One col per variable
-    int nvar = A_b.extent(0);
-    int nA = A_b.extent(1);
-
-    Eigen::Map<EigenDenseMatrixT> const A(
-        const_cast<double *>(A_b.data()), nA, nvar);
-
-    // |i| = size of output vector space (B)
-    // |j| = size of input vector space (A)
-    // |n| = number of variables being processed together
-
-
-    if (BvA.M->cols() != A.rows()) (*icebin_error)(-1,
-        "BvA.cols=%d does not match A.rows=%d", BvA.M->cols(), A.rows());
-
-    // Apply initial regridding.
-    EigenDenseMatrixT B0(*BvA.M * A);        // B0{in}
-
-    // Only apply conservation correction if all of:
-    //   a) Matrix is smoothed, so it needs a conservation correction
-    //   b) User requested conservation be maintained
-    if (BvA.conservative || !force_conservation) {
-        // Remove cells not in the sparse matrix
-        mask_result(B0, BvA.wM, fill);
-        return B0;
-    }
-    // -------------- Apply the Conservation Correction
-    // Integrate each variable of input (A) over full domain
-    auto &wA_b(BvA.Mw);
-    Eigen::Map<EigenRowVectorT> const wA(const_cast<double *>(wA_b.data()), 1, wA_b.extent(0));
-    typedef Eigen::Array<double,Eigen::Dynamic,Eigen::Dynamic> EigenArrayT;
-    EigenArrayT TA((wA * A).array());        // TA{n} row array
-
-    // Integrate each variable of output (B) over full domain
-    auto &wB_b(BvA.wM);
-    int nB = wB_b.extent(0);
-    Eigen::Map<EigenRowVectorT> const wB(const_cast<double *>(wB_b.data()), 1, wB_b.extent(0));
-    EigenArrayT TB((wB * B0).array());
-    EigenArrayT TB_inv(1. / TB);    // TB_inv{n} row array
-
-    // Factor{nn}: Conservation correction for each variable.
-
-    auto Factor(TA * TB_inv);    // Factor{n} row array
-
-    std::cout << "-------- WeightedSparse::apply() conservation" << std::endl;
-    std::cout << "    |input|    = " << TA << std::endl;
-    std::cout << "    |output|   = " << TB << std::endl;
-    std::cout << "    correction = " << Factor << std::endl;
-
-    EigenDenseMatrixT ret(B0 * Factor.matrix().asDiagonal());    // ret{in}
-    // Remove cells not in the sparse matrix
-    mask_result(B0, BvA.wM, fill);
-
-    return ret;
-}
-
-blitz::Array<double,2> WeightedSparse::apply(
-    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-    blitz::Array<double,2> const &A_b,       // A_b{nj} One row per variable
-    double fill,    // Fill value for cells not in BvA matrix
-    bool force_conservation,
-    ibmisc::TmpAlloc &tmp) const
-{
-    return spsparse::to_blitz<double>(apply_e(A_b, fill), tmp);
-}
-
-
-/** Apply to a single variable */
-blitz::Array<double,1> WeightedSparse::apply(
-    // WeightedSparse const &BvA,            // BvA_s{ij} smoothed regrid matrix
-    blitz::Array<double,1> const &A_b,       // A_b{j} One variable
-    double fill,    // Fill value for cells not in BvA matrix
-    bool force_conservation,
-    ibmisc::TmpAlloc &tmp) const
-{
-    auto A_b2(ibmisc::reshape<double,1,2>(A_b, {1, A_b.shape()[0]}));
-    auto ret2(spsparse::to_blitz(apply_e(A_b2, fill), tmp));
-    return ibmisc::reshape<double,2,1>(ret2, {ret2.shape()[1]});
-}
 // -----------------------------------------------------------------------
 
-
-// ================================================================
-template<class _Scalar, int _Options, class _StorageIndex>
-static void nc_write_eigen2(
-    netCDF::NcGroup *nc,
-    Eigen::SparseMatrix<_Scalar,_Options,_StorageIndex> *A,
-    std::string const &vname)
-{
-    netCDF::NcVar indices_v = nc->getVar(vname + ".indices");
-    netCDF::NcVar vals_v = nc->getVar(vname + ".values");
-
-    int const N = A->nonZeros();
-
-
-    {std::vector<int> indices;
-        std::vector<size_t> startp {0, 0};        // SIZE, RANK
-        std::vector<size_t> countp {N, 2};  // Write RANK elements at a time
-
-printf("eigen2 bounds2: (%ld %ld)\n", countp[0], countp[1]);
-        indices.reserve(N*2);
-        for (auto ii = begin(*A); ii != end(*A); ++ii, ++startp[0]) {
-            indices.push_back(ii->row());
-            indices.push_back(ii->col());
-        }
-        indices_v.putVar(&indices[0]);
-    }
-
-    {std::vector<double> vals;
-        std::vector<size_t> startp {0};
-        std::vector<size_t> countp {N};
-printf("eigen3 bounds2: (%ld)\n", countp[0]);
-
-        vals.reserve(N);
-        for (auto ii = begin(*A); ii != end(*A); ++ii, ++startp[0]) {
-            vals.push_back(ii->value());
-        }
-        vals_v.putVar(&vals[0]);    // Write to entire NetCDF variable directly from RAM
-    }
-
-}
-
-
-template<class _Scalar, int _Options, class _StorageIndex>
-static void ncio_eigen2(
-    ibmisc::NcIO &ncio,
-    Eigen::SparseMatrix<_Scalar,_Options,_StorageIndex> &A,
-    std::string const &vname)
-{
-    if (ncio.rw == 'r') (*ibmisc::ibmisc_error)(-1,
-        "ncio_eigen() currently does not support reading.");
-
-    std::vector<std::string> const dim_names({vname + ".nnz", vname + ".rank"});
-    std::vector<netCDF::NcDim> dims;        // Dimensions in NetCDF
-    std::vector<size_t> dim_sizes;          // Length of our two dimensions.
-
-
-    // Count the number of elements in the sparse matrix.
-    // NOTE: This can/does give a diffrent answer from A.nonZeros().
-    //       But it is what we want for dimensioning netCDF arrays.
-//    long count=0;
-//    for (auto ii(begin(A)); ii != end(A); ++ii) ++count;
-    long const count = A.nonZeros();
-    dims = ibmisc::get_or_add_dims(ncio, dim_names, {count, 2});
-
-printf("eigen2 bounds1: (%ld %ld)\n", count, (long)2);
-
-    auto info_v = get_or_add_var(ncio, vname + ".info", "int64", {});
-    std::array<size_t,2> shape { A.rows(), A.cols() };
-    ibmisc::get_or_put_att(info_v, 'w', "shape", "int64", shape);
-
-    get_or_add_var(ncio, vname + ".indices", "int", dims);
-    get_or_add_var(ncio, vname + ".values", "double", {dims[0]});
-    ncio += std::bind(&nc_write_eigen2<_Scalar, _Options, _StorageIndex>, ncio.nc, &A, vname);
-
-}
-// ================================================================
-
-
-
-void WeightedSparse::ncio(ibmisc::NcIO &ncio,
-    std::string const &vname,
-    std::array<std::string,2> dim_names)
-{
-    // Matches dimension name created by SparseSet.
-    auto ncdims(ibmisc::get_or_add_dims(ncio,
-        {dim_names[0] + ".dense_extent", dim_names[1] + ".dense_extent"},
-        {dims[0]->dense_extent(), dims[1]->dense_extent()}));
-
-    // --------- M
-    ncio_eigen2(ncio, *M, vname + ".M");
-
-    // ---- Mw
-    ncio_blitz_alloc<double,1>(ncio, Mw, vname + ".Mw", get_nc_type<double>(),
-        {ncdims[1]});
-
-    // ----------- wM
-    std::string matrix_name(dim_names[0] + "v" + dim_names[1]);
-    ncio_blitz_alloc<double,1>(ncio, wM, vname+".wM", get_nc_type<double>(),
-        {ncdims[0]});
-
-    netCDF::NcVar ncvar = ncio.nc->getVar(vname + ".M.info");
-    get_or_put_att(ncvar, ncio.rw,
-        "conservative", get_nc_type<bool>(), &conservative, 1);
-
-}
 
 
 // -----------------------------------------------------------------
