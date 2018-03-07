@@ -2,15 +2,9 @@
 #define ICEBIN_RLWEIGHTEDSPARSE_HPP
 
 #include <blitz/array.h>
-#include <ibmisc/rlarray.hpp>
+#include <ibmisc/zsparsearray.hpp>
 #include <ibmisc/netcdf.hpp>
 
-// ------------------------------------------------------
-namespace ibmisc {
-    template<class CountT, class IndexT, class ValueT, int RANK>
-    class RLSparseArray;
-}
-// ------------------------------------------------------
 namespace icebin {
 
 BOOST_ENUM_VALUES(SparseFillType, int,
@@ -21,9 +15,9 @@ BOOST_ENUM_VALUES(SparseFillType, int,
 struct RLWeightedSparse {
     // All sparse indexing here!
 
-    ibmisc::RLSparseArray<int,int,double,1> wM;            // ==0 in M's nullspace
-    ibmisc::RLSparseArray<int,int,double,2> M;    // BvA
-    ibmisc::RLSparseArray<int,int,double,1> Mw;            // ==0 in M's nullspace
+    ibmisc::ZSparseArray<int,double,1> wM;            // ==0 in M's nullspace
+    ibmisc::ZSparseArray<int,double,2> M;    // BvA
+    ibmisc::ZSparseArray<int,double,1> Mw;            // ==0 in M's nullspace
 
     /** True if this regridding matrix is conservative.  Matrices could be
     non-conservative, for example, in the face of smoothing on I.  Or when

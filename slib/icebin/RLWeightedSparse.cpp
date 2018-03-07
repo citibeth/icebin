@@ -1,4 +1,4 @@
-#include <ibmisc/rlarray.hpp>
+#include <ibmisc/zsparsearray.hpp>
 #include <icebin/RLWeightedSparse.hpp>
 
 using namespace ibmisc;
@@ -11,9 +11,9 @@ void RLWeightedSparse::ncio(NcIO &ncio, std::string const &vname)
     auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     get_or_put_att(info_v, ncio.rw, "conservative", conservative);
 
-    wM.ncio(ncio, vname + ".wM", "int", "int", "double");
-    M.ncio(ncio, vname + ".M", "int", "int", "double");
-    Mw.ncio(ncio, vname + ".Mw", "int", "int", "double");
+    wM.ncio(ncio, vname + ".wM");
+    M.ncio(ncio, vname + ".M");
+    Mw.ncio(ncio, vname + ".Mw");
 }
 
 #if 0
