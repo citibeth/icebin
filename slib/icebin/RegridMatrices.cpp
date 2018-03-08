@@ -68,10 +68,10 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
     // ----- Convert to Eigen and multiply
     auto ApvG(ApvG_m.to_eigen());
     auto GvI(GvI_m.to_eigen());
-    auto sGvI(sum_to_diagonal(GvI, 0, '-'));
+    auto sGvI(sum(GvI, 0, '-'));
 
     std::unique_ptr<EigenSparseMatrixT> ApvI(
-        new EigenSparseMatrixT(ApvG * sGvI * GvI));
+        new EigenSparseMatrixT(ApvG * map_eigen_diagonal(sGvI) * GvI));
     ret->Mw.reference(sum(*ApvI, 1, '+'));    // Area of I cells
 
     // ----- Apply final scaling, and convert back to sparse dimension
@@ -82,21 +82,21 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
             {dimA, dimA}, '.').to_eigen());
 
-        auto wApvI(sum_to_diagonal(*ApvI, 0, '+'));        // diagonal
+        auto wApvI(sum(*ApvI, 0, '+'));        // diagonal
 
-        EigenSparseMatrixT wAvI(wAvAp * wApvI);    // diagonal...
+        EigenSparseMatrixT wAvI(wAvAp * map_eigen_diagonal(wApvI));    // diagonal...
 
         // +correctA: Weight matrix in A space
         ret->wM.reference(sum(wAvI, 0, '+'));    // Area of A cells
 
         // Compute the main matrix
-        auto sAvAp(sum_to_diagonal(wAvAp, 0, '-'));
+        blitz::Array<double,1> sAvAp(1. / wAvAp);
         if (params.scale) {
             // Get two diagonal Eigen scale matrices
-            auto sApvI(sum_to_diagonal(wApvI, 0, '-'));
+            blitz::Array<double,1> sApvI(1. / wApvI);
 
             ret->M.reset(new EigenSparseMatrixT(
-                sAvAp * sApvI * *ApvI));    // AvI_scaled
+                sAvAp * map_eigen_diagonal(sApvI) * *ApvI));    // AvI_scaled
         } else {
             // Should be like this for test_conserv.py
             // Note that sAvAp * sApvI = [size (weight) of grid cells in A]
@@ -112,10 +112,10 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
 
         if (params.scale) {
             // Get two diagonal Eigen scale matrices
-            auto sApvI(diag_matrix(wApvI_b, '-'));
+            auto sApvI(1. / wApvI_b);
 
             ret->M.reset(new EigenSparseMatrixT(
-                sApvI * *ApvI));    // ApvI_scaled
+                map_eigen_diagonal(sApvI) * *ApvI));    // ApvI_scaled
         } else {
             ret->M = std::move(ApvI);
         }
@@ -159,11 +159,11 @@ printf("AA3\n");
     // ----- Convert to Eigen
     auto GvAp(GvAp_m.to_eigen());
     auto IvG(IvG_m.to_eigen());
-    auto sGvAp(sum_to_diagonal(GvAp, 0, '-'));
+    auto sGvAp(sum(GvAp, 0, '-'));
 
     // Unscaled matrix
     std::unique_ptr<EigenSparseMatrixT> IvAp(
-        new EigenSparseMatrixT(IvG * sGvAp * GvAp));
+        new EigenSparseMatrixT(IvG * map_eigen_diagonal(sGvAp) * GvAp));
 
     // Get weight vector from IvAp_e
     ret->wM.reference(sum(*IvAp, 0, '+'));
@@ -177,15 +177,15 @@ printf("AA3\n");
             {dimA, dimA}, '.').to_eigen());
 
         // Compute area of A grid cells
-        auto IvApw(sum_to_diagonal(*IvAp, 1, '+'));    // Area of A cells
+        auto IvApw(sum(*IvAp, 1, '+'));    // Area of A cells
         auto &wAvAp(sApvA);    // Symmetry: wAvAp == sApvA
-        EigenSparseMatrixT Aw(wAvAp * IvApw);
+        EigenSparseMatrixT Aw(wAvAp * map_eigen_diagonal(IvApw));
         ret->Mw.reference(sum(Aw,0,'+'));
 
         if (params.scale) {
-            auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
+            auto sIvAp(sum(*IvAp, 0, '-'));
             ret->M.reset(new EigenSparseMatrixT(
-                sIvAp * *IvAp * sApvA));
+                map_eigen_diagonal(sIvAp) * *IvAp * sApvA));
         } else {
             ret->M.reset(new EigenSparseMatrixT(
                 *IvAp * sApvA));
@@ -193,9 +193,9 @@ printf("AA3\n");
     } else {
         ret->Mw.reference(sum(*IvAp, 1, '+'));    // Area of A cells
         if (params.scale) {
-            auto sIvAp(sum_to_diagonal(*IvAp, 0, '-'));
+            auto sIvAp(sum(*IvAp, 0, '-'));
             ret->M.reset(new EigenSparseMatrixT(
-                sIvAp * *IvAp));
+                map_eigen_diagonal(sIvAp) * *IvAp));
         } else {
             ret->M = std::move(IvAp);
         }
@@ -247,14 +247,14 @@ static std::unique_ptr<lintransform::Weighted_Eigen> compute_EvA(IceRegridder co
     auto GvAp(GvAp_m.to_eigen());
     auto EpvG(EpvG_m.to_eigen());
 
-    auto sGvAp(sum_to_diagonal(GvAp, 0, '-'));
+    auto sGvAp(sum(GvAp, 0, '-'));
 
     // Unweighted matrix
     std::unique_ptr<EigenSparseMatrixT> EpvAp(
-        new EigenSparseMatrixT(EpvG * sGvAp * GvAp));
+        new EigenSparseMatrixT(EpvG * map_eigen_diagonal(sGvAp) * GvAp));
 
     // ----- Apply final scaling, and convert back to sparse dimension
-    auto wEpvAp(sum_to_diagonal(*EpvAp,0,'+'));
+    auto wEpvAp(sum(*EpvAp,0,'+'));
     if (params.correctA) {
         auto sApvA(MakeDenseEigenT(
             A.sApvA,
@@ -267,30 +267,29 @@ static std::unique_ptr<lintransform::Weighted_Eigen> compute_EvA(IceRegridder co
             {dimE, dimE}, '.').to_eigen());
 
         // +correctA: Weight matrix in E space
-        EigenSparseMatrixT wEvAp(wEvEp * wEpvAp);
+        EigenSparseMatrixT wEvAp(wEvEp * map_eigen_diagonal(wEpvAp));
         ret->wM.reference(sum(wEvAp,0,'+'));
 
         // Compute area of A cells
-        auto EpvApw(sum_to_diagonal(*EpvAp,1,'+'));
+        auto EpvApw(sum(*EpvAp,1,'+'));
         auto &wAvAp(sApvA);    // Symmetry: wAvAp == sApvA
-        EigenSparseMatrixT Aw(wAvAp * EpvApw);
+        EigenSparseMatrixT Aw(wAvAp * map_eigen_diagonal(EpvApw));
         ret->Mw.reference(sum(Aw,0,'+'));
 
         if (params.scale) {
-            auto sEvAp(sum_to_diagonal(wEvAp,0,'-'));
+            auto sEvAp(sum(wEvAp,0,'-'));
             ret->M.reset(new EigenSparseMatrixT(
-                sEvAp * *EpvAp * sApvA));    // EvA
+                map_eigen_diagonal(sEvAp) * *EpvAp * sApvA));    // EvA
         } else {
             ret->M.reset(new EigenSparseMatrixT(*EpvAp * sApvA));
         }
     } else {    // ~correctA
         // ~correctA: Weight matrix in Ep space
-        ret->wM.reference(sum(wEpvAp,0,'+'));
+        ret->wM.reference(wEpvAp);
         ret->Mw.reference(sum(*EpvAp,1,'+'));
         if (params.scale) {
-            auto sEpvAp(sum_to_diagonal(wEpvAp,0,'-'));
-
-            ret->M.reset(new EigenSparseMatrixT(sEpvAp * *EpvAp));
+            blitz::Array<double,1> sEpvAp(1. / wEpvAp);
+            ret->M.reset(new EigenSparseMatrixT(map_eigen_diagonal(sEpvAp) * *EpvAp));
         } else {
             ret->M = std::move(EpvAp);
         }
