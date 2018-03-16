@@ -628,12 +628,12 @@ blitz::Array<char,1> &changedO)    // OUT
         }
 
         // Get OvI for continental cells
-        RegridMatrices rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
+        std::unique_ptr<RegridMatrices_Dynamic> rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
         SparseSetT dimO, dimI;
-        RegridMatrices::Params paramsO;
+        RegridParams paramsO;
             paramsO.scale = false;
             paramsO.correctA = false;
-        auto OvI(rmO.matrix_d("AvI", {&dimO, &dimI}, paramsO));
+        auto OvI(rmO->matrix_d("AvI", {&dimO, &dimI}, paramsO));
 
         // Don't need to set up the mask on I ourselves; this is already
         // built into the OvI matrix.  The mask, taken from PISM, includes
@@ -724,12 +724,12 @@ blitz::Array<char,1> &changedO)    // OUT
         }
 
         // Get OvI for ice cells
-        RegridMatrices rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
+        std::unique_ptr<RegridMatrices_Dynamic> rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
         SparseSetT dimO, dimI;
-        RegridMatrices::Params paramsO;
+        RegridParams paramsO;
             paramsO.scale = true;
             paramsO.correctA = false;
-        auto OvI(rmO.matrix_d("AvI", {&dimO, &dimI}, paramsO));
+        auto OvI(rmO->matrix_d("AvI", {&dimO, &dimI}, paramsO));
 
         // Don't need to set up the mask on I ourselves; this is already
         // built into the OvI matrix.  The mask, taken from PISM, includes
@@ -949,15 +949,15 @@ void update_topo(
         }
 
         // Get regrid matrice needed to compute global stuff
-        RegridMatrices rmA(gcmA->regrid_matrices(sheet_index, elevmaskI));
-        SparseSetT dimA, dimE, dimI;
-        RegridMatrices::Params params;
+        RegridParams params;
             params.scale = true;
             params.correctA = false;
             params.sigma = sigmas[sheet_index];    // TODO: Set smoothing!
-        auto AvI(rmA.matrix_d("AvI", {&dimA, &dimI}, params));
-        auto EvI(rmA.matrix_d("EvI", {&dimE, &dimI}, params));
-        auto AvE(rmA.matrix_d("AvE", {&dimA, &dimE}, params));
+        std::unique_ptr<RegridMatrices_Dynamic> rmA(gcmA->regrid_matrices(sheet_index, elevmaskI, params));
+        SparseSetT dimA, dimE, dimI;
+        auto AvI(rmA->matrix_d("AvI", {&dimA, &dimI}, params));
+        auto EvI(rmA->matrix_d("EvI", {&dimE, &dimI}, params));
+        auto AvE(rmA->matrix_d("AvE", {&dimA, &dimE}, params));
 
         // Merge local and global AvE
         spsparse::spcopy(

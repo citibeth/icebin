@@ -134,7 +134,7 @@ public:
     std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params) const;
+        RegridParams const &params = RegridParams()) const;
 };
 
 /** Casts to a Grid_Lonlat, which is what we know is used by ModelE */

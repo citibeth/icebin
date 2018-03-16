@@ -1,9 +1,10 @@
-#ifndef ICEBIN_REGRID_SET_HPP
-#define ICEBIN_REGRID_SET_HPP
+#ifndef ICEBIN_REGRID_MATRICES_HPP
+#define ICEBIN_REGRID_MATRICES_HPP
 
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/memory.hpp>
+#include <ibmisc/linear/linear.hpp>
 
 #include <icebin/eigen_types.hpp>
 
@@ -44,7 +45,7 @@ public:
     RegridMatrices(RegridParams const &params) : _params(params) {}
     virtual ~RegridMatrices() {}
 
-    RegridParams const &params() { return _params; }
+    RegridParams const &params() const { return _params; }
 
     /** Retrieves a regrid matrix, and weights (area) of the input and
         output grid cells.
@@ -56,7 +57,7 @@ public:
     @param correctA: Correct for projection error in A or E grids?
     @return The regrid matrix and weights
     */
-    virtual std::unique_ptr<ibmisc::lintransform::Weighted> matrix(
+    virtual std::unique_ptr<ibmisc::linear::Weighted> matrix(
         std::string const &spec_name) const = 0;
 };
 // -----------------------------------------------------------------

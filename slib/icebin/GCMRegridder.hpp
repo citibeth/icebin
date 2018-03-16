@@ -29,6 +29,7 @@
 
 #include <icebin/IceRegridder.hpp>
 #include <icebin/RegridMatrices.hpp>
+#include <icebin/RegridMatrices_Dynamic.hpp>
 
 /** 
 

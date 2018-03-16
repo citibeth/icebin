@@ -1,4 +1,5 @@
 #include <spsparse/eigen.hpp>
+#include <ibmisc/stdio.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/gridgen/GridGen_LonLat.hpp>
@@ -7,8 +8,6 @@ using namespace icebin;
 using namespace ibmisc;
 using namespace spsparse;
 using namespace std::placeholders;
-
-
 
 namespace icebin {
 namespace modele {
@@ -295,9 +294,9 @@ inline AbbrGrid make_agridA(AbbrGrid &agridO)
 This is not a regridding matrix ModelE needs directly (it is a component of such).
 It exists here as a top-level subroutine so we can test it easily from Python.
 @param transpose 'T' if this matrix should be transposed, '.' if not. */
-static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
+static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &paramsA,
+    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     char transpose)
 {
@@ -311,7 +310,8 @@ static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
 
     Hntr hntr_XOmvXAm(17.17, specO.hntr, specA.hntr);
 
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, true));    // conservative
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
+        {"dimAO", "dimAA"}, dims, true));    // conservative
     reset_ptr(ret->M, MakeDenseEigenT(
         std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
             &hntr_XOmvXAm, _1, specA.eq_rad, DimClip(&dimAOm)),
@@ -333,7 +333,7 @@ static std::unique_ptr<WeightedSparse> compute_AOmvAAm(
     top-level regrid generator.  Computes some other values along with wAOm as well. */
 class Compute_wAOm {
 public:
-    RegridMatrices::Params paramsO;   // Parameters used with rmO
+    RegridParams paramsO;   // Parameters used with rmO
     SparseSetT dimAOp; // Includes only AO grid cells that interact with an ice sheet.
     SparseSetT &dimAOm;
     EigenColVectorT wAOm_e;
@@ -341,16 +341,16 @@ public:
     /** Parameters come from top-level regridding subroutine */
     Compute_wAOm(
         SparseSetT &dimIp,
-        RegridMatrices::Params const &paramsA,
+        RegridParams const &paramsA,
         GCMRegridder_ModelE const *gcmA,
-        RegridMatrices const *rmO);
+        RegridMatrices_Dynamic const *rmO);
 };
 
 Compute_wAOm::Compute_wAOm(
     SparseSetT &dimIp,
-    RegridMatrices::Params const &paramsA,
+    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
-    RegridMatrices const *rmO)
+    RegridMatrices_Dynamic const *rmO)
 : paramsO(paramsA),
     dimAOm(dimAOp)        // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
 {
@@ -360,7 +360,8 @@ Compute_wAOm::Compute_wAOm(
 
     // We need AOpvIp for wAOP; used below.
 printf("dimIp.dense_extent() = %d (sparse=%d)\n", dimIp.dense_extent(), dimIp.sparse_extent());
-    std::unique_ptr<WeightedSparse> AOpvIp_corrected(rmO->matrix_d("AvI", {&dimAOp, &dimIp}, paramsO));
+    std::unique_ptr<linear::Weighted_Eigen> AOpvIp_corrected(rmO->matrix_d(
+        "AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
 
@@ -402,12 +403,12 @@ for (int i=0; i<15; ++i) {
 @param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
        NOTE: rmO knows these grids as (A, E, I).
 */
-static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
+static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm(
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &paramsA,
+    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     double const eq_rad,    // Radius of the earth
-    RegridMatrices const *rmO)
+    RegridMatrices_Dynamic const *rmO)
 {
     SparseSetT &dimAAm(*dims[0]);
     SparseSetT &dimEAm(*dims[1]);
@@ -417,7 +418,8 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     dimAAm.set_sparse_extent(gcmA->nA());
     dimEAm.set_sparse_extent(gcmA->nE());
 
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
+        {"dimAA", "dimEA"}, dims, false));    // not conservative
 
     // ------------- Compute wAOm and related quantities
     Compute_wAOm c1(dimIp, paramsA, gcmA, rmO);
@@ -448,7 +450,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
 
     // ------------ Compute AOmvEOm
     SparseSetT dimEOm;
-    std::unique_ptr<WeightedSparse> AOmvEOm(
+    std::unique_ptr<linear::Weighted_Eigen> AOmvEOm(
         rmO->matrix_d("AvE", {&dimAOm, &dimEOm}, paramsO));
     auto sAOmvEOm(sum(*AOmvEOm->M, 0, '-'));
 
@@ -505,7 +507,7 @@ struct ComputeXAmvIp_Helper {
 
     /** Allocated stuff that must remain allocated for the duration of
     the temporary values.  This should be transferred to a
-    RegridMatrices object being returned by the top-level regrid generator. */
+    RegridMatrices_Dynamic object being returned by the top-level regrid generator. */
     TmpAlloc tmp;
 
     // Intermediate regridded values
@@ -517,7 +519,7 @@ struct ComputeXAmvIp_Helper {
     std::unique_ptr<EigenSparseMatrixT> XAmvXOm;    // Unscaled matrix
 
     EigenColVectorT *wXOm_e;
-    WeightedSparse *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
+    linear::Weighted_Eigen *XOpvIp;    // TODO: Make this unique_ptr and forgoe the tmp.take() below.
     EigenColVectorT *wXAm_e;
 
     blitz::Array<double,1> XAmvXOms;
@@ -525,20 +527,20 @@ struct ComputeXAmvIp_Helper {
     /** Parameters come from top-level regridding subroutine */
     ComputeXAmvIp_Helper(
         std::array<SparseSetT *,2> dims,
-        RegridMatrices::Params const &paramsA,
+        RegridParams const &paramsA,
         GCMRegridder_ModelE const *gcmA,
         char X,    // Either 'A' or 'E', determines the destination matrix.
         double const eq_rad,    // Radius of the earth
-        RegridMatrices const *rmO);
+        RegridMatrices_Dynamic const *rmO);
 };    // class ComputeXAmvIp_Helper
 
 ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &paramsA,
+    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     char X,    // Either 'A' or 'E', determines the destination matrix.
     double const eq_rad,    // Radius of the earth
-    RegridMatrices const *rmO)
+    RegridMatrices_Dynamic const *rmO)
 {
     SparseSetT &dimXAm(*dims[0]);
     SparseSetT &dimIp(*dims[1]);
@@ -561,14 +563,14 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
     std::unique_ptr<ConstUniverse> const_universe;
 
     if (X == 'E') {
-        RegridMatrices::Params paramsO(paramsA);
+        RegridParams paramsO(paramsA);
         paramsO.scale = false;
         paramsO.correctA = false;
 
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
-        WeightedSparse &EOpvIp(tmp.take(rmO->matrix_d("EvI", {&dimEOp, &dimIp}, paramsO)));
+        linear::Weighted_Eigen &EOpvIp(tmp.take(rmO->matrix_d("EvI", {&dimEOp, &dimIp}, paramsO)));
 
         XOpvIp = &EOpvIp;
 
@@ -579,7 +581,7 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
 
         // EOmvAOm: Repeat A values in E
         const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
-        std::unique_ptr<WeightedSparse> EOmvAOm(
+        std::unique_ptr<linear::Weighted_Eigen> EOmvAOm(
             rmO->matrix_d("EvA", {&dimEOm, &dimAOm}, paramsO));
 
 printf("EOmvAOm: %ld  dimEOm=%ld  dimAOm=%ld\n", (long)EOmvAOm->M->nonZeros(), dimEOm.dense_extent(), dimAOm.dense_extent());
@@ -616,11 +618,11 @@ for (int i=0; i < 15; ++i) printf("    wXOm[%d] = %g\n", i, wXOm(i));
             {&dimEOm, &dimEAm}, 'T').to_eigen());
 printf("XAmvXOm 1: %ld   dimEOm=%ld   dimEAm=%ld\n", (long)XAmvXOm->nonZeros(), dimEOm.dense_extent(), dimEAm.dense_extent());
     } else {    // X == 'A'
-        RegridMatrices::Params paramsO(paramsA);
+        RegridParams paramsO(paramsA);
         paramsO.scale = false;
         paramsO.correctA = false;
 
-        auto &AOpvIp(tmp.take<std::unique_ptr<WeightedSparse>>(
+        auto &AOpvIp(tmp.take<std::unique_ptr<linear::Weighted_Eigen>>(
             rmO->matrix_d("AvI", {&dimAOp, &dimIp}, paramsO)));
 
         XOpvIp = &*AOpvIp;
@@ -662,16 +664,18 @@ printf("XAmvXOm 1: %ld   dimEOm=%ld   dimEAm=%ld\n", (long)XAmvXOm->nonZeros(), 
 @param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
        NOTE: rmO knows these grids as (A, E, I).
 */
-static std::unique_ptr<WeightedSparse> compute_XAmvIp(
+static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &paramsA,
+    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     char X,    // Either 'A' or 'E', determines the destination matrix.
     double const eq_rad,    // Radius of the earth
-    RegridMatrices const *rmO)
+    RegridMatrices_Dynamic const *rmO)
 {
 
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
+    std::string dimXA(strprintf("dim%cA", X));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
+        {dimXA, "dimIp"}, dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
     ComputeXAmvIp_Helper hh(dims, paramsA, gcmA, X, eq_rad, rmO);
@@ -709,16 +713,18 @@ printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
 @param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
        NOTE: rmO knows these grids as (A, E, I).
 */
-static std::unique_ptr<WeightedSparse> compute_IpvXAm(
+static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     std::array<SparseSetT *,2> dims,
-    RegridMatrices::Params const &paramsA,
+    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     char X,    // Either 'A' or 'E', determines the destination matrix.
     double const eq_rad,    // Radius of the earth
-    RegridMatrices const *rmO)
+    RegridMatrices_Dynamic const *rmO)
 {
 
-    std::unique_ptr<WeightedSparse> ret(new WeightedSparse(dims, false));    // not conservative
+    std::string dimXA(strprintf("dim%cA", X));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
+        {"dimIp", dimXA}, dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
     ComputeXAmvIp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, X, eq_rad, rmO);
@@ -730,7 +736,7 @@ static std::unique_ptr<WeightedSparse> compute_IpvXAm(
 
     std::string const &matname(X=='A' ? "IvA" : "IvE");
     SparseSetT *dimIp(dims[0]);
-    RegridMatrices::Params paramsO(paramsA);
+    RegridParams paramsO(paramsA);
         paramsO.scale = false;
         paramsO.correctA = false;
     auto IpvXOp(
@@ -801,7 +807,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     std::unique_ptr<RegridMatrices_Dynamic> _rmO(
         gcmO->regrid_matrices(sheet_index, elevmaskI));
     std::unique_ptr<RegridMatrices_Dynamic> rm(
-        new RegridMatrices_Dynamic(_rmO.ice_regridder, params));
+        new RegridMatrices_Dynamic(_rmO->ice_regridder, params));
     auto &rmO(rm->tmp.take(std::move(*_rmO)));
 
     rm->add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,

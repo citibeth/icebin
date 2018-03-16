@@ -3,7 +3,7 @@
 
 #include <functional>
 
-#include <icebin/RegridMatrices.hpp>
+#include <icebin/RegridMatrices_Dynamic.hpp>
 #include <icebin/IceRegridder.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/smoother.hpp>
@@ -15,26 +15,39 @@ using namespace ibmisc;
 
 namespace icebin {
 
+
+static blitz::Array<double,1> invert1(blitz::Array<double,1> const &A)
+{
+    blitz::Array<double,1> B(A.shape());
+    for (int i=0; i<A.extent(0); ++i) B(i) = 1. / A(i);
+    return B;
+}
+
+
 // =======================================================================
 // Regrid Matrix Generation
 
 /** Used to generate Ur matrices for Atm or Elevation grids.
 This allows us to exploit an algebraic symmetry between A and E. */
 struct UrAE {
-    std::string name;    // For deugging
+    std::string const dim_name;
+    std::string const name;    // For deugging
     const long nfull;
 
-    typedef std::function<void(MakeDenseEigenT::AccumT &&)> matrix_fn;
-    const matrix_fn GvAp;
-    const matrix_fn sApvA;
+    typedef std::function<void(MakeDenseEigenT::AccumT &&)> ur_matrix_fn;
+    const ur_matrix_fn GvAp;
+    const ur_matrix_fn sApvA;
 
-    UrAE(std::string const &_name, long _nfull, matrix_fn _GvAp, matrix_fn _sApvA) : name(_name), nfull(_nfull), GvAp(_GvAp), sApvA(_sApvA) {}
+    UrAE(std::string const &_dim_name, long _nfull, ur_matrix_fn _GvAp, ur_matrix_fn _sApvA)
+        : dim_name(_dim_name),
+        name("Ur"+dim_name),
+        nfull(_nfull), GvAp(_GvAp), sApvA(_sApvA) {}
 };
 
 
 
 // ------------------------------------------------------------
-static std::unique_ptr<lintransform::Weighted_Eigen> compute_AEvI(
+static std::unique_ptr<linear::Weighted_Eigen> compute_AEvI(
     IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridParams const &params,
@@ -42,7 +55,8 @@ static std::unique_ptr<lintransform::Weighted_Eigen> compute_AEvI(
     UrAE const &AE)
 {
 printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correctA);
-    std::unique_ptr<lintransform::Weighted_Eigen> ret(new lintransform::Weighted_Eigen(dims, true));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
+        {"dim"+AE.dim_name, "dimI"}, dims, true));
     SparseSetT * const dimA(ret->dims[0]);
     SparseSetT * const dimI(ret->dims[1]);
     SparseSetT _dimG;
@@ -89,13 +103,13 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
         ret->wM.reference(sum(wAvI, 0, '+'));    // Area of A cells
 
         // Compute the main matrix
-        blitz::Array<double,1> sAvAp(1. / wAvAp);
+        blitz::Array<double,1> sAvAp(sum(wAvAp, 0, '-'));
         if (params.scale) {
             // Get two diagonal Eigen scale matrices
-            blitz::Array<double,1> sApvI(1. / wApvI);
-
+            blitz::Array<double,1> sApvI(invert1(wApvI));
+            blitz::Array<double,1> mul(sAvAp * sApvI);
             ret->M.reset(new EigenSparseMatrixT(
-                sAvAp * map_eigen_diagonal(sApvI) * *ApvI));    // AvI_scaled
+                map_eigen_diagonal(mul) * *ApvI));    // AvI_scaled
         } else {
             // Should be like this for test_conserv.py
             // Note that sAvAp * sApvI = [size (weight) of grid cells in A]
@@ -111,7 +125,7 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
 
         if (params.scale) {
             // Get two diagonal Eigen scale matrices
-            auto sApvI(1. / wApvI_b);
+            auto sApvI((wApvI_b));
 
             ret->M.reset(new EigenSparseMatrixT(
                 map_eigen_diagonal(sApvI) * *ApvI));    // ApvI_scaled
@@ -125,7 +139,7 @@ printf("END compute_AEvI\n");
 }
 // ---------------------------------------------------------
 // ---------------------------------------------------------
-std::unique_ptr<lintransform::Weighted_Eigen> compute_IvAE(
+std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
     IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridParams const &params,
@@ -133,7 +147,8 @@ std::unique_ptr<lintransform::Weighted_Eigen> compute_IvAE(
     UrAE const &AE)
 {
 //printf("BEGIN compute_IvAE\n");
-    std::unique_ptr<lintransform::Weighted_Eigen> ret(new lintransform::Weighted_Eigen(dims, !params.smooth()));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
+        {"dimI", "dim"+AE.dim_name}, dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
     SparseSetT _dimG;
     SparseSetT * const dimG(&_dimG);
@@ -204,7 +219,8 @@ std::unique_ptr<lintransform::Weighted_Eigen> compute_IvAE(
         TupleListT<2> smoothI_t({dimI->dense_extent(), dimI->dense_extent()});
         smoothing_matrix(smoothI_t, regridder->agridI,
             *dimI, *elevmaskI, ret->wM, params.sigma);
-        auto smoothI(to_eigen_sparsematrix(smoothI_t));
+        EigenSparseMatrixT smoothI(smoothI_t.shape(0), smoothI_t.shape(1));
+        smoothI.setFromTriplets(smoothI_t.begin(), smoothI_t.end());
 
         // Smooth the underlying unsmoothed regridding transformation
         ret->M.reset(new EigenSparseMatrixT(smoothI * *ret->M));
@@ -214,11 +230,12 @@ std::unique_ptr<lintransform::Weighted_Eigen> compute_IvAE(
     return ret;
 }
 
-static std::unique_ptr<lintransform::Weighted_Eigen> compute_EvA(IceRegridder const *regridder,
+static std::unique_ptr<linear::Weighted_Eigen> compute_EvA(IceRegridder const *regridder,
     std::array<SparseSetT *,2> dims,
     RegridParams const &params, UrAE const &E, UrAE const &A)
 {
-    std::unique_ptr<lintransform::Weighted_Eigen> ret(new lintransform::Weighted_Eigen(dims, true));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
+        {"dim"+E.dim_name, "dim"+A.dim_name}, dims, true));
     SparseSetT * const dimE(ret->dims[0]);
     SparseSetT * const dimA(ret->dims[1]);
     SparseSetT _dimG;
@@ -284,7 +301,7 @@ static std::unique_ptr<lintransform::Weighted_Eigen> compute_EvA(IceRegridder co
         ret->wM.reference(wEpvAp);
         ret->Mw.reference(sum(*EpvAp,1,'+'));
         if (params.scale) {
-            blitz::Array<double,1> sEpvAp(1. / wEpvAp);
+            blitz::Array<double,1> sEpvAp(invert1(wEpvAp));
             ret->M.reset(new EigenSparseMatrixT(map_eigen_diagonal(sEpvAp) * *EpvAp));
         } else {
             ret->M = std::move(EpvAp);
@@ -298,7 +315,7 @@ static std::unique_ptr<lintransform::Weighted_Eigen> compute_EvA(IceRegridder co
 std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
     int sheet_index,
     blitz::Array<double,1> const &_elevmaskI,
-    RegridParams const &params) const = 0;
+    RegridParams const &params) const
 {
     IceRegridder const *regridder = &*ice_regridders()[sheet_index];
 
@@ -315,11 +332,11 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
         new RegridMatrices_Dynamic(regridder, params));
     auto &elevmaskI(rm->tmp.take(blitz::Array<double,1>(_elevmaskI)));
 
-    UrAE urA("UrA", this->nA(),
+    UrAE urA("A", this->nA(),
         std::bind(&IceRegridder::GvAp, regridder, _1, &elevmaskI),
         std::bind(&IceRegridder::sApvA, regridder, _1));
 
-    UrAE urE("UrE", this->nE(),
+    UrAE urE("E", this->nE(),
         std::bind(&IceRegridder::GvEp, regridder, _1, &elevmaskI),
         std::bind(&IceRegridder::sEpvE, regridder, _1));
 
@@ -354,35 +371,36 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
 }
 // -----------------------------------------------------------------------
 // ----------------------------------------------------------------
-void RegridMatrices::add_regrid(std::string const &spec,
-    RegridMatrices::MatrixFunction const &regrid)
+void RegridMatrices_Dynamic::add_regrid(std::string const &spec,
+    RegridMatrices_Dynamic::MatrixFunction const &regrid)
 {
     regrids.insert(make_pair(spec, regrid));
 }
 // ----------------------------------------------------------------
 // ----------------------------------------------------------------
-std::unique_ptr<lintransform::Weighted_Eigen> RegridMatrices::matrix_d(
+std::unique_ptr<linear::Weighted_Eigen> RegridMatrices_Dynamic::matrix_d(
     std::string const &spec_name,
     std::array<SparseSetT *,2> dims,
     RegridParams const &params) const
 {
-    auto &matrix_fn(regrids.at(spec_name));
-    std::unique_ptr<lintransform::Weighted_Eigen> BvA(
-        new lintransform::Weighted_Eigen(matrix_fn(dims, params)));
+    // typedef std::function<std::unique_ptr<ibmisc::linear::Weighted_Eigen>(
+    //    std::array<SparseSetT *,2> dims, RegridParams const &params)> MatrixFunction;
+    MatrixFunction const &matrix_fn(regrids.at(spec_name));
+    std::unique_ptr<linear::Weighted_Eigen> BvA(matrix_fn(dims, params));
     return BvA;
 }
 // ----------------------------------------------------------------
-std::unique_ptr<ibmisc::lintransform::Weighted> RegridMatrices::matrix(
+std::unique_ptr<ibmisc::linear::Weighted> RegridMatrices_Dynamic::matrix(
     std::string const &spec_name) const
 {
     TmpAlloc tmp;
     auto &dims(tmp.make<std::array<SparseSetT,2>>());
 
-    std::unique_ptr<ibmisc::lintransform::Weighted_Eigen>
+    std::unique_ptr<ibmisc::linear::Weighted_Eigen>
         M(matrix_d(spec_name, {&dims[0], &dims[1]}, params()));
 
     M->tmp.merge(std::move(tmp));
-    return new std::unique_ptr<ibmisc::lintransform::Weighted>(M.release());
+    return std::unique_ptr<ibmisc::linear::Weighted>(M.release());
 }
 // -----------------------------------------------------------------------
 

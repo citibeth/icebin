@@ -373,11 +373,11 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
         gcmA.foceanAOm = reshape1(foceanO);   // COPY
     }
 
-    RegridMatrices rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
+    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
 
     // ---------- Generate and store the matrices
     // Use the mismatched regridder to create desired matrices and save to file
-    RegridMatrices::Params params(args.scale, args.correctA, args.sigma);
+    RegridParams params(args.scale, args.correctA, args.sigma);
     SparseSet<long,int> dimA, dimI, dimE;
 
     auto nocompress(
@@ -389,34 +389,34 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
 
     {NcIO ncio(ofname, 'w', nocompress);
         printf("---- Generating AvI\n");
-        auto mat(rm.matrix("AvI", {&dimA, &dimI}, params));
+        auto mat(rm->matrix_d("AvI", {&dimA, &dimI}, params));
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
         ncio.flush();
     }
 
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating EvI\n");
-        auto mat(rm.matrix("EvI", {&dimE, &dimI}, params));
+        auto mat(rm->matrix_d("EvI", {&dimE, &dimI}, params));
         mat->ncio(ncio, "EvI", {"dimE", "dimI"});
         ncio.flush();
     }
 
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvE\n");
-        auto mat(rm.matrix("IvE", {&dimI, &dimE}, params));
+        auto mat(rm->matrix_d("IvE", {&dimI, &dimE}, params));
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
         ncio.flush();
     }
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvA\n");
-        auto mat(rm.matrix("IvA", {&dimI, &dimA}, params));
+        auto mat(rm->matrix_d("IvA", {&dimI, &dimA}, params));
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
         ncio.flush();
     }
 
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating AvE\n");
-        auto mat(rm.matrix("AvE", {&dimA, &dimE}, params));
+        auto mat(rm->matrix_d("AvE", {&dimA, &dimE}, params));
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
         ncio.flush();
     }

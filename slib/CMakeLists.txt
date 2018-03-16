@@ -39,8 +39,7 @@ set(icebin_SOURCES
     icebin/smoother.cpp
     icebin/GCMRegridder.cpp
     icebin/IceRegridder_L0.cpp
-    icebin/RegridMatrices.cpp
-    icebin/RLWeightedSparse.cpp
+    icebin/RegridMatrices_Dynamic.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
 )
 
