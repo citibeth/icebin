@@ -1,5 +1,5 @@
-#ifndef ICEBIN_REGRID_MATRICES_HPP
-#define ICEBIN_REGRID_MATRICES_HPP
+#ifndef ICEBIN_REGRID_SET_HPP
+#define ICEBIN_REGRID_SET_HPP
 
 #include <unordered_set>
 #include <ibmisc/netcdf.hpp>
@@ -12,26 +12,39 @@ namespace icebin {
 class IceRegridder;
 
 
+/** Parameters controlling the generation of regridding matrices */
+struct RegridParams {
+    /** Produce a scaled vs. unscaled matrix (Scaled means divide
+    by the weights vector).  Used for all matrices. */
+    bool scale;
+
+    /** Correct for changes in area due to projections?  Used for
+    all matrices. */
+    bool correctA;
+
+    /** If non-zero, smooth the resulting matrix, with sigma as the
+    scale length of the smoothing.  Used for IvA and IvE. */
+    std::array<double,3> sigma;
+
+    /** Tells if these parameters are asking us to smooth */
+    bool smooth() const { return sigma[0] != 0; }
+
+    RegridParams() : scale(true), correctA(false), sigma({0.,0.,0.}) {}
+
+    RegridParams(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
+        scale(_scale), correctA(_correctA), sigma(_sigma) {}
+};
 // -----------------------------------------------------------
-/** Holds the set of "Ur" (original) matrices produced by an
-    IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices {
+
+    /** All matrices in the RegridMatrices share these params */
+    RegridParams _params;
+
 public:
-    /** ice_regridder from which this was constructed */
-    IceRegridder const * const ice_regridder;
+    RegridMatrices(RegridParams const &params) : _params(params) {}
+    virtual ~RegridMatrices() {}
 
-    ibmisc::TmpAlloc tmp;    // Stores local vars for different types.  TODO: Maybe re-do this as simple classmember variables.  At least, see where it used (by removing it and running the compiler)
-
-    typedef std::function<std::unique_ptr<ibmisc::lintransform::Weighted_Eigen>(
-        std::array<SparseSetT *,2> dims, RegridParams const &params)> MatrixFunction;
-
-    std::map<std::string, MatrixFunction> regrids;
-
-    RegridMatrices(IceRegridder const * const _ice_regridder) : ice_regridder(_ice_regridder) {}
-
-    void add_regrid(std::string const &spec,
-        MatrixFunction const &regrid);
-
+    RegridParams const &params() { return _params; }
 
     /** Retrieves a regrid matrix, and weights (area) of the input and
         output grid cells.
@@ -41,54 +54,11 @@ public:
         true  --> [kg m-2]
         false --> [kg]
     @param correctA: Correct for projection error in A or E grids?
-    @return The regrid matrix and weights.  All in dense indexing.
+    @return The regrid matrix and weights
     */
-    std::unique_ptr<ibmisc::lintransform::Weighted_Eigen> matrix_d(
-        std::string const &spec_name,
-        std::array<SparseSetT *,2> dims,
-        RegridParams const &_params) const;
-
-    // Virtual function promises a matrix in sparse indexing
-
+    virtual std::unique_ptr<ibmisc::lintransform::Weighted> matrix(
+        std::string const &spec_name) const = 0;
 };
 // -----------------------------------------------------------------
-/** Used by Python extension to dynamically get regrid matrices in sparse coordinates.  Wraps a RegridMatrices... */
-class RegridSet_RegridMatrices : public RegridSet {
-
-    RegridMatrices rm;
-
-public:
-    RegridSet_RegridMatrices(RegridMatrices &&_rm, RegridParams const &params) : rm(std::move(_rm)), _params(params) {}
-
-
-    // ----------- Implements RegridSet
-    std::unique_ptr<ibmisc::lintransform::Weighted> matrix(
-        std::string const &spec_name,
-        RegridParams const &_params) const
-    {
-        TmpAlloc tmp;
-        auto &dims(tmp.make<std::array<SparseSetT,2>>());
-
-        std::unique_ptr<ibmisc::lintransform::Weighted_Eigen>
-            M(rm.matrix_d(spec_name, {&dims[0], &dims[1]}, _params));
-
-        M->tmp.merge(std::move(tmp));
-        return new std::unique_ptr<ibmisc::lintransform::Weighted>(M.release());
-    }
-
-};
-
-
-std::unique_ptr<ibmisc::lintransform::Weighted>
-RegridSet_RegridMatrices::matrix(
-    std::string const &spec_name,
-    RegridParams const &_params) const
-{
-
-    return std::unique_ptr<ibmisc::lintransform::Weighted>(...);
-}
-
-
-
 }    // namespace
 #endif    // guard

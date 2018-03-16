@@ -131,9 +131,10 @@ public:
        1. Grid names here are ModelE_specific, not the simple A,E,I generated
           by GCMRegridder_Standard.
        2. It can also generate AOmvAAm and AAmvAOm, for testing purposes. */
-    RegridMatrices regrid_matrices(
+    std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
-        blitz::Array<double,1> const &elevmaskI) const;
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params) const;
 };
 
 /** Casts to a Grid_Lonlat, which is what we know is used by ModelE */

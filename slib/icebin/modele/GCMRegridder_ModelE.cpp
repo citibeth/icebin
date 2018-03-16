@@ -360,7 +360,7 @@ Compute_wAOm::Compute_wAOm(
 
     // We need AOpvIp for wAOP; used below.
 printf("dimIp.dense_extent() = %d (sparse=%d)\n", dimIp.dense_extent(), dimIp.sparse_extent());
-    std::unique_ptr<WeightedSparse> AOpvIp_corrected(rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO));
+    std::unique_ptr<WeightedSparse> AOpvIp_corrected(rmO->matrix_d("AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
 
@@ -449,7 +449,7 @@ static std::unique_ptr<WeightedSparse> compute_AAmvEAm(
     // ------------ Compute AOmvEOm
     SparseSetT dimEOm;
     std::unique_ptr<WeightedSparse> AOmvEOm(
-        rmO->matrix("AvE", {&dimAOm, &dimEOm}, paramsO));
+        rmO->matrix_d("AvE", {&dimAOm, &dimEOm}, paramsO));
     auto sAOmvEOm(sum(*AOmvEOm->M, 0, '-'));
 
 
@@ -568,7 +568,7 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
         // Get the universe for EOp / EOm
         SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
-        WeightedSparse &EOpvIp(tmp.take(rmO->matrix("EvI", {&dimEOp, &dimIp}, paramsO)));
+        WeightedSparse &EOpvIp(tmp.take(rmO->matrix_d("EvI", {&dimEOp, &dimIp}, paramsO)));
 
         XOpvIp = &EOpvIp;
 
@@ -580,7 +580,7 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
         // EOmvAOm: Repeat A values in E
         const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
         std::unique_ptr<WeightedSparse> EOmvAOm(
-            rmO->matrix("EvA", {&dimEOm, &dimAOm}, paramsO));
+            rmO->matrix_d("EvA", {&dimEOm, &dimAOm}, paramsO));
 
 printf("EOmvAOm: %ld  dimEOm=%ld  dimAOm=%ld\n", (long)EOmvAOm->M->nonZeros(), dimEOm.dense_extent(), dimAOm.dense_extent());
 int n=0;
@@ -621,7 +621,7 @@ printf("XAmvXOm 1: %ld   dimEOm=%ld   dimEAm=%ld\n", (long)XAmvXOm->nonZeros(), 
         paramsO.correctA = false;
 
         auto &AOpvIp(tmp.take<std::unique_ptr<WeightedSparse>>(
-            rmO->matrix("AvI", {&dimAOp, &dimIp}, paramsO)));
+            rmO->matrix_d("AvI", {&dimAOp, &dimIp}, paramsO)));
 
         XOpvIp = &*AOpvIp;
         wXOm_e = &wAOm_e;
@@ -734,7 +734,7 @@ static std::unique_ptr<WeightedSparse> compute_IpvXAm(
         paramsO.scale = false;
         paramsO.correctA = false;
     auto IpvXOp(
-        rmO->matrix(matname,
+        rmO->matrix_d(matname,
             {dimIp, X == 'A' ? &hh.c1->dimAOp : &hh.dimEOp}, paramsO));
 
     // ----------- Put it all together (XAmvIp)
@@ -788,58 +788,63 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 }
 
 
-RegridMatrices GCMRegridder_ModelE::regrid_matrices(
-    int sheet_index, blitz::Array<double,1> const &elevmaskI) const
+
+std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
+    int sheet_index,
+    blitz::Array<double,1> const &elevmaskI,
+    RegridParams const &params) const
 {
 //    AbbrGrid const &gridO(gcmO->agridA);
     GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
 
     // Delicate construction of rmO
-    RegridMatrices _rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
-    RegridMatrices rm(_rmO.ice_regridder);
-    RegridMatrices &rmO(rm.tmp.take<RegridMatrices>(std::move(_rmO)));
+    std::unique_ptr<RegridMatrices_Dynamic> _rmO(
+        gcmO->regrid_matrices(sheet_index, elevmaskI));
+    std::unique_ptr<RegridMatrices_Dynamic> rm(
+        new RegridMatrices_Dynamic(_rmO.ice_regridder, params));
+    auto &rmO(rm->tmp.take(std::move(*_rmO)));
 
-    rm.add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
         this, 'E', specO.eq_rad, &rmO));
-    rm.add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
         this, 'A', specO.eq_rad, &rmO));
 
 
-    rm.add_regrid("AAmvEAm", std::bind(*compute_AAmvEAm, _1, _2,
+    rm->add_regrid("AAmvEAm", std::bind(*compute_AAmvEAm, _1, _2,
         this, specO.eq_rad, &rmO));
 
 
-    rm.add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
         this, 'E', specO.eq_rad, &rmO));
-    rm.add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
         this, 'A', specO.eq_rad, &rmO));
 
 
     // --------------- Simply-named aliases
-    rm.add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
         this, 'E', specO.eq_rad, &rmO));
-    rm.add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
         this, 'A', specO.eq_rad, &rmO));
 
 
-    rm.add_regrid("AvE", std::bind(*compute_AAmvEAm, _1, _2,
+    rm->add_regrid("AvE", std::bind(*compute_AAmvEAm, _1, _2,
         this, specO.eq_rad, &rmO));
 
 
-    rm.add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
         this, 'E', specO.eq_rad, &rmO));
-    rm.add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
         this, 'A', specO.eq_rad, &rmO));
 
 
 
     // For testing
-    rm.add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,
+    rm->add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,
         this, '.'));
-    rm.add_regrid("AAmvAOm", std::bind(&compute_AOmvAAm, _1, _2,
+    rm->add_regrid("AAmvAOm", std::bind(&compute_AOmvAAm, _1, _2,
         this, 'T'));
 
-    return std::move(rm);
+    return rm;
 }
 
 }}    // namespace

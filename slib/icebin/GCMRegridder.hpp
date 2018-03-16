@@ -273,13 +273,16 @@ public:
     void wA(AccumT &&accum, std::string const &ice_sheet_name, bool native);
 
     /** Produce regridding matrices for this setup. */
-    virtual RegridMatrices regrid_matrices(
+    virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
-        blitz::Array<double,1> const &elevmaskI) const = 0;
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params = RegridParams()) const = 0;
 
-    inline RegridMatrices regrid_matrices(
+
+    inline std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         std::string const &sheet,
-        blitz::Array<double,1> const &elevmaskI) const
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params) const
     {
         auto sheet_ix = ice_regridders().index.at(sheet);
         return regrid_matrices(sheet_ix, elevmaskI);
@@ -372,9 +375,10 @@ public:
     Do not change elevmaskI to dense indexing.  That would require a
     SparseSet dim variable, plus a dense-indexed elevation.  In the end,
     too much complication and might not even save RAM. */
-    RegridMatrices regrid_matrices(
+    std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
-        blitz::Array<double,1> const &elevmaskI) const;
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params) const;
 
     /** Removes unnecessary cells from the A grid
     @param keepA(iA):

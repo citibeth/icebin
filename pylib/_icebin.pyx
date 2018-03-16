@@ -47,51 +47,6 @@ cdef split_shape(ashape, alen):
         functools.reduce(operator.mul, ashape[icut:], 1))
 
 
-cdef class WeightedSparse:
-    """The result of RegridMatrices.matrix()"""
-    cdef cicebin.CythonWeightedSparse *cself
-
-    def __dealloc__(self):
-        del self.cself
-
-    @property
-    def shape(self):
-        return self.cself.shape()
-
-    def __call__(self):
-        """Obtain the matrix and weight vectors as Python structures.
-        returns: (wM, M, Mw)
-            wM: np.array
-                Weight vector ("area" of output grid cells)
-            M: scipy.sparse.coo_matrix
-               Regridding Matrix
-            Mw: np.array
-                Weight vector ("area" of input grid cells)
-       """
-
-        wM, (data,shape), Mw = cicebin.CythonWeightedSparse_to_tuple(self.cself)
-        return wM, scipy.sparse.coo_matrix(data, shape), Mw
-
-    def apply(self, A_s, double fill=np.nan, force_conservation=True):
-        """Applies the regrid matrix to A_s.  Smoothes and conserves, if those
-        options were specified in RegridMatrices.matrix().
-        A_s: Either:
-            - A single vector (1-D array) to be transformed.
-            - A 2-D array of row vectors to be transformed.
-        fill:
-            Un-set indices in output array will get this value."""
-
-        # Number of elements in sparse in put vector
-        _,alen = cicebin.CythonWeightedSparse_sparse_extent(self.cself)
-
-        leading_shape, new_shape = split_shape(A_s.shape, alen)
-        A_s = A_s.reshape(new_shape)
-        B_s = cicebin.CythonWeightedSparse_apply(self.cself, <PyObject *>A_s, fill, force_conservation)
-
-        B_s = B_s.reshape( leading_shape + (B_s.shape[1],) )
-
-        return B_s
-
 cdef class RegridMatrices:
     cdef cicebin.RegridMatrices *cself
 
