@@ -53,8 +53,7 @@ cdef class RegridMatrices:
     def __dealloc__(self):
         del self.cself
 
-    def matrix(self, str spec_name, bool scale=True, bool correctA=True,
-        sigma=(0,0,0), conserve=True):
+    def matrix(self, str spec_name):
         """Compute a regrid matrix.
         spec_name:
             Type of regrid matrix to obtain.  Choice are:
@@ -68,12 +67,11 @@ cdef class RegridMatrices:
             for the output grid).
         returns: WeightedSparse
         """
-        cdef cicebin.CythonWeightedSparse *crm
-        crm = cicebin.RegridMatrices_matrix(
-            self.cself, spec_name.encode(), scale, correctA,
-            sigma[0], sigma[1], sigma[2], conserve)
-        ret = WeightedSparse()
-        ret.cself = crm
+        cdef cibmisc.linear_Weighted *lw
+        lw = cicebin.RegridMatrices_matrix(self.cself, spec_name.encode())
+        cdef ibmisc.linear_Weighted ret
+        ret = ibmisc.linear_Weighted()
+        ret.cself = lw
         return ret
 
 cdef class GCMRegridder:
@@ -167,32 +165,18 @@ cdef class GCMRegridder:
             exgrid_fname.encode(), exgrid_vname.encode(),
             interp_style.encode())
 
-    def regrid_matrices(self, str sheet_name, elevmaskI):
+    def regrid_matrices(self, str sheet_name, elevmaskI,
+        bool scale=True, bool correctA=True,
+        sigma=(0,0,0), conserve=True):
+
         elevmaskI = elevmaskI.reshape(-1)
         cdef cicebin.RegridMatrices *crm = \
             cicebin.new_regrid_matrices(self.cself.get(), sheet_name.encode(),
-            <PyObject *>elevmaskI)   # PyObject=Borrowed reference, object = owned reference
+            <PyObject *>elevmaskI,   # PyObject=Borrowed reference, object = owned reference
+            scale, correctA, sigma[0], sigma[1], sigma[2], conserve)
         rm = RegridMatrices()
         rm.cself = crm
         return rm
-
-def coo_multiply(M, xx, double fill=np.nan, ignore_nan=False):
-    """M:
-        SciPy sparse matrix"""
-
-    warnings.warn(
-        "coo_multiply is deprecated; use WeightedSparse.apply() instead.",
-        DeprecationWarning)
-
-    xx = xx.reshape(-1)
-    yy = np.zeros(M._shape[0])
-    yy[:] = fill
-
-    cicebin.coo_matvec(<PyObject *>yy, <PyObject *>xx, ignore_nan,
-        M._shape[0], M._shape[1],
-        <PyObject *>M.row, <PyObject *>M.col, <PyObject *>M.data)
-
-    return yy
 
 # ============================================================
 

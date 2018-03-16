@@ -475,10 +475,10 @@ bool run_ice)
         dimA1.ncio(ncio, "dimA");
         dimE1.ncio(ncio, "dimE");
 
-        AvE1->ncio_nodim(ncio, "AvE");
-        E1vI_nc->ncio_nodim(ncio, "EvI_nc");
-        A1vI->ncio_nodim(ncio, "AvI");
-        IvE1->ncio_nodim(ncio, "IvE");
+        AvE1->ncio(ncio, "AvE", {"dimA", "dimE"});
+        E1vI_nc->ncio(ncio, "EvI_nc", {"dimE", "dimI"});
+        A1vI->ncio(ncio, "AvI", {"dimA", "dimI"});
+        IvE1->ncio(ncio, "IvE", {"dimI", "dimE"});
     }
 
     // Save stuff for next time around

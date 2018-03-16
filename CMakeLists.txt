@@ -102,6 +102,10 @@ find_package(Ibmisc REQUIRED)
 list(APPEND EXTERNAL_LIBS ${IBMISC_LIBRARY})
 include_directories(${IBMISC_INCLUDE_DIR})
 
+find_package(ZLIB REQUIRED)
+list(APPEND EXTERNAL_LIBS ${ZLIB_LIBRARIES})
+include_directories(${ZLIB_INCLUDE_DIRS})
+
 
 # --- Proj.4
 find_package(PROJ4 REQUIRED)

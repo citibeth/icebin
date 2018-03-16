@@ -310,8 +310,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 
     Hntr hntr_XOmvXAm(17.17, specO.hntr, specA.hntr);
 
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
-        {"dimAO", "dimAA"}, dims, true));    // conservative
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, true));    // conservative
     reset_ptr(ret->M, MakeDenseEigenT(
         std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
             &hntr_XOmvXAm, _1, specA.eq_rad, DimClip(&dimAOm)),
@@ -418,8 +417,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm(
     dimAAm.set_sparse_extent(gcmA->nA());
     dimEAm.set_sparse_extent(gcmA->nE());
 
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
-        {"dimAA", "dimEA"}, dims, false));    // not conservative
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // ------------- Compute wAOm and related quantities
     Compute_wAOm c1(dimIp, paramsA, gcmA, rmO);
@@ -674,8 +672,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
 {
 
     std::string dimXA(strprintf("dim%cA", X));
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
-        {dimXA, "dimIp"}, dims, false));    // not conservative
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
     ComputeXAmvIp_Helper hh(dims, paramsA, gcmA, X, eq_rad, rmO);
@@ -723,8 +720,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
 {
 
     std::string dimXA(strprintf("dim%cA", X));
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
-        {"dimIp", dimXA}, dims, false));    // not conservative
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
     ComputeXAmvIp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, X, eq_rad, rmO);

@@ -3,7 +3,8 @@
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/runlength.hpp>
 #include <icebin/error.hpp>
-#include <icebin/RLWeightedSparse.hpp>
+#include <ibmisc/linear/linear.hpp>
+#include <ibmisc/linear/compressed.hpp>
 
 using namespace std;
 using namespace ibmisc;
@@ -62,11 +63,11 @@ void combine_chunks(
 
 
     // Allocate
-    RLWeightedSparse ret(sparse_extents);
+    linear::Weighted_Compressed ret;
 
-    {auto wM(ret.wM.accum());
+    {auto wM(ret.weights[0].accum());
     auto M(ret.M.accum());
-    auto Mw(ret.Mw.accum());
+    auto Mw(ret.weights[1].accum());
 
         // Aggregate them together
         int iM=0;
@@ -78,16 +79,16 @@ void combine_chunks(
             auto dimA(nc_read_blitz<int,1>(ncio.nc, "dim"+sgrids[1]));
 
             auto wM_d(nc_read_blitz<double,1>(ncio.nc, BvA+".wM"));
-            for (int i=0; i<wM_d.extent(0); ++i) wM->add({dimB(i)}, wM_d(i));
+            for (int i=0; i<wM_d.extent(0); ++i) wM.add({dimB(i)}, wM_d(i));
 
             auto indices_d(nc_read_blitz<int,2>(ncio.nc, BvA+".M.indices"));
             auto values_d(nc_read_blitz<double,1>(ncio.nc, BvA+".M.values"));
             for (int i=0; i<values_d.extent(0); ++i) {
-                M->add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
+                M.add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
             }
 
             auto Mw_d(nc_read_blitz<double,1>(ncio.nc, BvA+".Mw"));
-            for (int i=0; i<Mw_d.extent(0); ++i) Mw->add({dimA(i)}, Mw_d(i));
+            for (int i=0; i<Mw_d.extent(0); ++i) Mw.add({dimA(i)}, Mw_d(i));
         }
 
         // Check

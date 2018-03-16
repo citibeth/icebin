@@ -65,39 +65,24 @@ extern void GCMRegridder_add_sheet(GCMRegridder *cself,
     std::string const &sinterp_style);
 
 
-/** Wraps WeightedSparse to keep around the dense/sparse dimension
-    translators */
-struct CythonWeightedSparse {
-    std::array<SparseSetT,2> dims;
-    std::unique_ptr<WeightedSparse> RM;
+extern ibmisc::linear::Weighted *RegridMatrices_matrix(RegridMatrices *cself,
+    std::string const &spec_name);
 
-    /** @return 2-D shape of the stored matrix */
-    PyObject *shape();
-};
-
-
-extern CythonWeightedSparse *RegridMatrices_matrix(RegridMatrices *cself,
-    std::string const &spec_name, bool scale, bool correctA,
-    double sigma_x, double sigma_y, double sigma_z, bool conserve);
-
-extern PyObject *CythonWeightedSparse_apply(
-    CythonWeightedSparse *BvA,
-    PyObject *A_s_py,
-    double fill, bool force_conservation);            // A_b{nj_s} One row per variable
-
-
-PyObject *CythonWeightedSparse_dense_extent(CythonWeightedSparse const *cself);
-PyObject *CythonWeightedSparse_sparse_extent(CythonWeightedSparse const *cself);
-
-PyObject *CythonWeightedSparse_to_tuple(CythonWeightedSparse *cself);
-
-void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
-    size_t M_nrow, size_t M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py);
 
 PyObject *Hntr_regrid(modele::Hntr const *hntr, PyObject *WTA_py, PyObject *A_py, bool mean_polar);
 
 
-RegridMatrices *new_regrid_matrices(GCMRegridder const *gcm, std::string const &sheet_name, PyObject *elevmaskI_py);
+RegridMatrices *new_regrid_matrices(
+    GCMRegridder const *gcm,
+    std::string const &sheet_name,
+    PyObject *elevmaskI_py,
+    // --------- Params
+    bool scale,
+    bool correctA,
+    double sigma_x,
+    double sigma_y,
+    double sigma_z,
+    bool conserve);
 
 /** Allows Python users access to GCMCoupler_Modele::update_topo().
 Starting from output of Gary's program (on the Ocean grid), this subroutine

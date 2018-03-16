@@ -55,8 +55,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AEvI(
     UrAE const &AE)
 {
 printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correctA);
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
-        {"dim"+AE.dim_name, "dimI"}, dims, true));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, true));
     SparseSetT * const dimA(ret->dims[0]);
     SparseSetT * const dimI(ret->dims[1]);
     SparseSetT _dimG;
@@ -147,8 +146,7 @@ std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
     UrAE const &AE)
 {
 //printf("BEGIN compute_IvAE\n");
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
-        {"dimI", "dim"+AE.dim_name}, dims, !params.smooth()));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
     SparseSetT _dimG;
     SparseSetT * const dimG(&_dimG);
@@ -234,8 +232,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_EvA(IceRegridder const *r
     std::array<SparseSetT *,2> dims,
     RegridParams const &params, UrAE const &E, UrAE const &A)
 {
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(
-        {"dim"+E.dim_name, "dim"+A.dim_name}, dims, true));
+    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, true));
     SparseSetT * const dimE(ret->dims[0]);
     SparseSetT * const dimA(ret->dims[1]);
     SparseSetT _dimG;

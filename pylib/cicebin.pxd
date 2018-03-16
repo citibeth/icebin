@@ -74,9 +74,6 @@ cdef extern from "icebin/GCMRegridder.hpp" namespace "icebin":
         GCMRegridder_Standard() except +
 
 cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
-    cdef cppclass CythonWeightedSparse:
-        object shape() except +
-
     cdef void read_fgrid(
         cibmisc.unique_ptr[Grid] &fgridA,
         string &gridA_fname,
@@ -108,22 +105,14 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         string &exgrid_fname, string &exgrid_vname,
         string &sinterp_style) except +
 
-    cdef CythonWeightedSparse *RegridMatrices_matrix(
-        RegridMatrices *self, string spec_name, bool scale, bool correctA,
-        double sigma_x, double sigma_y, double sigma_z, bool conserve) except +
-
-    cdef object CythonWeightedSparse_dense_extent(CythonWeightedSparse *self) except +
-    cdef object CythonWeightedSparse_sparse_extent(CythonWeightedSparse *self) except +
-    cdef object CythonWeightedSparse_to_tuple(CythonWeightedSparse *self) except +
-
-    cdef object CythonWeightedSparse_apply(CythonWeightedSparse *BvA, PyObject *A, double fill, bool force_conservationlmake) except +
-
-    cdef void coo_matvec(PyObject *yy_py, PyObject *xx_py, bool ignore_nan,
-        int M_nrow, int M_ncol, PyObject *M_row_py, PyObject *M_col_py, PyObject *M_data_py) except +
+    cdef cibmisc.linear_Weighted *RegridMatrices_matrix(
+        RegridMatrices *self, string spec_name) except +
 
     cdef Hntr_regrid(Hntr *hntr, object WTA_py, object A_py, bool mean_polar) except +
 
-    cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name, PyObject *elevmaskI_py) except +
+    cdef RegridMatrices *new_regrid_matrices(GCMRegridder *gcm, string &sheet_name, PyObject *elevmaskI_py,
+        bool scale, bool correctA,
+        double sigma_x, double sigma_y, double sigma_z, bool conserve) except +
 
     cdef void update_topo(GCMRegridder *_gcmA, string &topoO_fname,
         PyObject *elev_sigmas_py, bool initial_timestep, string &segments_py, string &primary_segment_py,
