@@ -112,12 +112,21 @@ int main(int argc, char **argv)
     char *dash = rindex(argv[1], '-');
     std::string ofname(argv[1], dash);
 
+#if 1
     vector<array<string,2>> sgridss {
         {"I","E"}, {"E","I"},
         {"I","A"}, {"A","I"},
-        {"A","E"}};
+        {"A","E"},
+        {"I2", "A"}, {"I2", "E"}};
 
     char ofmode = 'w';
+#else
+    vector<array<string,2>> sgridss {
+        {"I2", "A"}, {"I2", "E"}};
+
+    char ofmode = 'a';
+#endif
+
     for (auto const &sgrids : sgridss) {
         combine_chunks(ifnames, ofname, ofmode, sgrids);
         ofmode = 'a';

@@ -64,6 +64,7 @@ static int const chunk_size = 4000000;    // Not a hard limit
 struct ParseArgs {
     HntrSpec hspecO;    // Name of Hntr Spec for Ocean grid
     HntrSpec hspecI;    // Name of Hntr Spec for Ice Grid
+    HntrSpec hspecI2;
 
     std::string nc_fname;
     std::string fgiceI_vname;
@@ -149,6 +150,10 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "gridI", "Name of Ice grid (eg: g1mx1m)",
             true, "g1mx1m", "ice grid name", cmd);
 
+        TCLAP::UnlabeledValueArg<std::string> shspecI2_a(
+            "gridI2", "Name of Display Ice grid (eg: ghxh)",
+            true, "ghxh", "display ice grid name", cmd);
+
         TCLAP::UnlabeledValueArg<std::string> nc_fname_a(
             "elevmaskI-fname",
                 "NetCDF file containing ice mask and elevation (1 where there is ice)",
@@ -212,6 +217,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         // Get the value parsed by each arg.
         hspecO = *modele::grids.at(shspecO_a.getValue());
         hspecI = *modele::grids.at(shspecI_a.getValue());
+        hspecI2 = *modele::grids.at(shspecI2_a.getValue());
         nc_fname = nc_fname_a.getValue();
         fgiceI_vname = fgiceI_vname_a.getValue();
         elevI_vname = elevI_vname_a.getValue();
@@ -299,6 +305,44 @@ void nocompress_configure_var(netCDF::NcVar ncvar)
 }
 
 
+linear::Weighted_Eigen make_I2vX(
+    linear::Weighted_Eigen const &IvX,
+    ParseArgs const &args,
+    SparseSet<long,int> &dimI2,
+    SparseSet<long,int> &dimI,
+    SparseSet<long,int> &dimX,
+    RegridParams const &params)
+{
+    // I2vI: Convert to plottable global ice grid
+    Hntr hntr_IvI2(17.17, args.hspecI, args.hspecI2);
+    EigenSparseMatrixT I2vI(MakeDenseEigenT(
+        std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
+            &hntr_IvI2, std::placeholders::_1, args.eq_rad, DimClip(&dimI)),
+        {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
+        {&dimI, &dimI2}, 'T').to_eigen());
+
+    auto sI2vI(sum(I2vI,0,'-'));
+    auto I2vIs(sum(I2vI,1,'-'));
+    linear::Weighted_Eigen I2vX(
+        std::array<SparseSet<long, int>*, 2>{&dimI2, &dimX},
+        IvX.conservative);
+    auto &wI2vX_e(I2vX.tmp.make<EigenColVectorT>(
+        I2vI * map_eigen_diagonal(I2vIs) * map_eigen_colvector(IvX.wM)));
+    I2vX.wM.reference(to_blitz(wI2vX_e));
+    I2vX.Mw.reference(IvX.Mw.copy());
+    if (params.scale) {
+        I2vX.M.reset(new EigenSparseMatrixT(
+            map_eigen_diagonal(sI2vI) * I2vI * *IvX.M));
+    } else {
+        blitz::Array<double,1> sIvX(1. / IvX.wM);
+        I2vX.M.reset(new EigenSparseMatrixT(
+            I2vI * map_eigen_diagonal(sIvX) * *IvX.M));
+    }
+
+    return I2vX;
+}
+
+
 void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
 {
     ExchangeGrid aexgrid;    // Put our answer in here
@@ -379,6 +423,7 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
     // Use the mismatched regridder to create desired matrices and save to file
     RegridParams params(args.scale, args.correctA, args.sigma);
     SparseSet<long,int> dimA, dimI, dimE;
+    SparseSet<long,int> dimI2;
 
     auto nocompress(
             std::bind(nocompress_configure_var, std::placeholders::_1));
@@ -406,11 +451,24 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
         auto mat(rm->matrix_d("IvE", {&dimI, &dimE}, params));
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
         ncio.flush();
+
+        // Save smaller / more wieldly display version of the matrix
+        auto mat2(make_I2vX(*mat, args, dimI2, dimI, dimE, params));
+        mat.release();
+        mat2.ncio(ncio, "I2vE", {"dimI2", "dimE"});
+        ncio.flush();
     }
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvA\n");
-        auto mat(rm->matrix_d("IvA", {&dimI, &dimA}, params));
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> mat(
+            rm->matrix_d("IvA", {&dimI, &dimA}, params));
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
+        ncio.flush();
+
+        // Save smaller / more wieldly display version of the matrix
+        auto mat2(make_I2vX(*mat, args, dimI2, dimI, dimA, params));
+        mat.release();
+        mat2.ncio(ncio, "I2vA", {"dimI2", "dimA"});
         ncio.flush();
     }
 
@@ -429,14 +487,22 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
         ncv = dimA.ncio(ncio, "dimA");
         get_or_put_att(ncv, 'w', "shape", 
             &std::vector<int>{hspecA.jm, hspecA.im}[0], 2);
+        ncv.putAtt("description", "GCM ('Atmosphere') Grid");
 
         ncv = dimE.ncio(ncio, "dimE");
         get_or_put_att(ncv, 'w', "shape", 
             &std::vector<int>{gcmA.nhc(), hspecA.jm, hspecA.im}[0], 3);
+        ncv.putAtt("description", "Elevation Grid");
 
         ncv = dimI.ncio(ncio, "dimI");
         get_or_put_att(ncv, 'w', "shape", 
             &std::vector<int>{hspecI.jm, hspecI.im}[0], 2);
+        ncv.putAtt("description", "Fine-scale ('Ice') Grid");
+
+        ncv = dimI2.ncio(ncio, "dimI2");
+        get_or_put_att(ncv, 'w', "shape", 
+            &std::vector<int>{args.hspecI2.jm, args.hspecI2.im}[0], 2);
+        ncv.putAtt("description", "Recuction of Fine-scale Grid, for easy plotting");
 
         ncio.flush();
     }
@@ -452,7 +518,7 @@ void write_chunk_makefile(
     std:;ofstream fout;
     fout.open(ofname + ".mk", ofstream::out);
  
-    fout << ".NOTPARALLEL:" << endl;
+    fout << ".NOTPARALLEL:" << endl;    // Avoid memory blow-out
 
     // Name of all chunk files
     fout << ofname << " : " << ofname << ".mk";

@@ -441,7 +441,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm(
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
         {&dimAOm, &dimAAm}, 'T').to_eigen());
 
-    blitz::Array<double,1> AAmvAOms(sum(AAmvAOm, 1, '-'));    // Not unusual way we weight/scale here
+    blitz::Array<double,1> AAmvAOms(sum(AAmvAOm, 1, '-'));    // Note unusual way we weight/scale here
     auto &wAAm_e(ret->tmp.make<EigenColVectorT>(
         AAmvAOm * map_eigen_diagonal(AAmvAOms) * wAOm_e));
 
