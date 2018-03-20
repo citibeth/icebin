@@ -313,6 +313,7 @@ linear::Weighted_Eigen make_I2vX(
     SparseSet<long,int> &dimX,
     RegridParams const &params)
 {
+
     // I2vI: Convert to plottable global ice grid
     Hntr hntr_IvI2(17.17, args.hspecI, args.hspecI2);
     EigenSparseMatrixT I2vI(MakeDenseEigenT(
@@ -343,32 +344,33 @@ linear::Weighted_Eigen make_I2vX(
 }
 
 
-void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+std::unique_ptr<GCMRegridder> new_gcmA_standard(
+    HntrSpec &hspecA, std::string const &grid_name,
+    ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
 {
     ExchangeGrid aexgrid;    // Put our answer in here
 
-    auto const &hspecO(args.hspecO);
     auto const &hspecI(args.hspecI);
-    modele::Hntr hntr(17.17, hspecO, hspecI);
+    modele::Hntr hntr(17.17, hspecA, hspecI);
 
 
     // -------------------------------------------------------------
     printf("---- Computing overlaps\n");
 
     // Compute overlaps for cells with ice
-    SparseSet<long,int> _dimO;    // Only include O grid cells with ice
+    SparseSet<long,int> _dimA;    // Only include A grid cells with ice
     SparseSet<long,int> _dimI;    // Only include I grid cells with ice
-    hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), _dimO, _dimI), args.eq_rad);
+    hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), _dimA, _dimI), args.eq_rad);
 
     // -------------------------------------------------------------
-    printf("---- Creating gcmO\n");
+    printf("---- Creating gcmA for %s\n", grid_name.c_str());
 
     // Turn HntrSpec --> GridSpec
-    GridSpec_LonLat specO(make_grid_spec(hspecO, false, 1, args.eq_rad));
+    GridSpec_LonLat specA(make_grid_spec(hspecA, false, 1, args.eq_rad));
     GridSpec_LonLat specI(make_grid_spec(hspecI, false, 1, args.eq_rad));
 
-    // Realize O grid for relevant gridcells
-    auto agridO(make_abbr_grid("Ocean", specO, std::move(_dimO)));
+    // Realize A grid for relevant gridcells
+    auto agridA(make_abbr_grid(grid_name, specA, std::move(_dimA)));
 
     // Set up elevation classes    
     std::vector<double> hcdefs;
@@ -376,29 +378,45 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
         hcdefs.push_back(elev);
     }
 
-    // Create standard GCMRegridder for O <--> I
-    std::unique_ptr<GCMRegridder_Standard> gcmO(new GCMRegridder_Standard);
-    gcmO->init(
-        std::move(agridO), std::move(hcdefs),
-        Indexing({"O", "HC"}, {0,0}, {agridO.dim.sparse_extent(), hcdefs.size()}, {1,0}),
+    // Create standard GCMRegridder for A <--> I
+    std::unique_ptr<GCMRegridder_Standard> gcmA(new GCMRegridder_Standard);
+    gcmA->init(
+        std::move(agridA), std::move(hcdefs),
+        Indexing({"A", "HC"}, {0,0}, {agridA.dim.sparse_extent(), hcdefs.size()}, {1,0}),
         args.correctA);
 
+
     // --------------------------------------------------
-    // Create IceRegridder for I and add to gcmO
+    // Create IceRegridder for I and add to gcmA
     auto ice(new_ice_regridder(IceRegridder::Type::L0));
     auto agridI(make_abbr_grid("Ice", specI, std::move(_dimI)));
-    ice->init("globalI", gcmO->agridA, nullptr,
+    ice->init("globalI", gcmA->agridA, nullptr,
         std::move(agridI), std::move(aexgrid),
         InterpStyle::Z_INTERP);    // You can use different InterpStyle if you like.
 
-    gcmO->add_sheet(std::move(ice));
+    gcmA->add_sheet(std::move(ice));
+
+    return std::unique_ptr<GCMRegridder>(gcmA.release());
+}
+
+std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
+    FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+{
+    auto const &hspecO(args.hspecO);
+    auto const &hspecI(args.hspecI);
+
+    auto gcmO(new_gcmA_standard(hspecO, "Ocean", args, elevmaskI));
+
 
     // --------------------------------------------------
     printf("---- Creating gcmA\n");
 
     // Create a mismatched regridder, to mediate between different ice
     // extent of GCM vs. IceBin
-    modele::GCMRegridder_ModelE gcmA(std::shared_ptr<GCMRegridder>(gcmO.release()));
+    std::unique_ptr<modele::GCMRegridder_ModelE> gcmA(
+        new modele::GCMRegridder_ModelE(
+            std::shared_ptr<GCMRegridder>(gcmO.release())));
+
     HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA.agridA.spec).hntr);
 
     // Load the fractional ocean mask (based purely on ice extent)
@@ -413,11 +431,19 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
         ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
 
 
-        gcmA.foceanAOp = reshape1(foceanfO);  // COPY
-        gcmA.foceanAOm = reshape1(foceanO);   // COPY
+        gcmA->foceanAOp = reshape1(foceanfO);  // COPY
+        gcmA->foceanAOm = reshape1(foceanO);   // COPY
     }
 
-    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
+    return std::unique_ptr<GCMRegridder>(gcmA.release());
+}
+
+
+
+void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+{
+
+    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA->regrid_matrices(0, reshape1(elevmaskI)));
 
     // ---------- Generate and store the matrices
     // Use the mismatched regridder to create desired matrices and save to file
@@ -429,7 +455,7 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
             std::bind(nocompress_configure_var, std::placeholders::_1));
 
 
-    std::string ofname(strprintf("%s-%02d", args.ofname.c_str(), args.chunk_no));
+    std::string ofname(strprintf("%s-%s-%02d", args.ofname.c_str(), runtype.c_str(), args.chunk_no));
 
 
     {NcIO ncio(ofname, 'w', nocompress);
@@ -491,7 +517,7 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
 
         ncv = dimE.ncio(ncio, "dimE");
         get_or_put_att(ncv, 'w', "shape", 
-            &std::vector<int>{gcmA.nhc(), hspecA.jm, hspecA.im}[0], 3);
+            &std::vector<int>{gcmA->nhc(), hspecA.jm, hspecA.im}[0], 3);
         ncv.putAtt("description", "Elevation Grid");
 
         ncv = dimI.ncio(ncio, "dimI");
@@ -510,12 +536,30 @@ void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::A
     printf("Done!\n");
 }
 
+void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+{
+    // Mismatched grids
+    {
+        auto gcmA(new_gcmA_mismatched(files, args, elevmaskI));
+        global_ec_section(*gcmA, "mismatched", args, elevmaskI);
+    }
+
+    // Regular grids
+    {
+        HntrSpec const hspecA(make_hntrA(args.hspecO));
+        auto gcmA(new_gcmA_standard(hspecA, "Atmosphere", args, elevmaskI));
+        global_ec_section(*gcmA, "standard", args, elevmaskI);
+    }
+}
+
+
+
 void write_chunk_makefile(
     std::string const &ofname,
     std::vector<string> const &arg_strings,
     std::vector<std::array<int,5>> const &chunks)
 {
-    std:;ofstream fout;
+    ofstream fout;
     fout.open(ofname + ".mk", ofstream::out);
  
     fout << ".NOTPARALLEL:" << endl;    // Avoid memory blow-out
@@ -594,8 +638,18 @@ int main(int argc, char **argv)
 
         // Generate fgiceO
         auto wtI(const_array(fgiceI.shape(), 1.0));
-        Hntr hntr(17.17, args.hspecO, args.hspecI);
-        hntr.regrid(wtI, fgiceI, fgiceO);
+        Hntr hntrOvI(17.17, args.hspecO, args.hspecI);
+        hntrOvI.regrid(wtI, fgiceI, fgiceO);
+
+#if 0
+        // Generate elevA
+        // (This is a shortcut, compared to creating a GCMRegridder for A).
+        HntrSpec const hspecA(make_hntrA(args.hspecO));
+        blitz::Array<double,2> elevA(
+        Hntr hntrAvI(17.17, hspecA, args.hspecI);
+        hntrAvI.regrid(fgiceI, elevI, elevA);
+#endif
+
     }
 
 

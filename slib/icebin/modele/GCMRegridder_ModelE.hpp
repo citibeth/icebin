@@ -140,5 +140,8 @@ public:
 /** Casts to a Grid_Lonlat, which is what we know is used by ModelE */
 GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO);
 
+extern HntrSpec make_hntrA(HntrSpec const &hntrO);
+
+
 }}    // namespace
 #endif

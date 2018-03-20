@@ -239,7 +239,7 @@ GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO)
 }
 
 
-static HntrSpec make_hntrA(HntrSpec const &hntrO)
+HntrSpec make_hntrA(HntrSpec const &hntrO)
 {
     if ((hntrO.im % 2 != 0) || (hntrO.jm % 2 != 0)) (*icebin_error)(-1,
         "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
