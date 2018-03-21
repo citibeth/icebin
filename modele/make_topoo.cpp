@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     ParseArgs args(argc, argv);
 
     std::string et1mfile("etopo1_ice_g1m.nc");
-    auto bundle(make_topoO(EnvSearchPath("MODELE_FILE_PATH"), {
+    auto mto(MakeTopoO(EnvSearchPath("MODELE_FILE_PATH"), {
         "FGICE1m", et1mfile, "FGICE1m",
         "ZICETOP1m", et1mfile, "ZICETOP1m",
         "ZSOLG1m", et1mfile, "ZSOLG1m",
@@ -65,10 +65,11 @@ int main(int argc, char** argv)
     }));
 
 
+
     printf("============ Writing Output\n");
     {NcIO ncio(args.ofname, 'w');
-
-        bundle.ncio(ncio, {}, "", "double");
+        mto.hspec.ncio(ncio, "hspec");
+        mto.bundle.ncio(ncio, {}, "", "double");
 
         ncio.close();
     }

@@ -457,8 +457,25 @@ void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, Par
 
     std::string ofname(strprintf("%s-%s-%02d", args.ofname.c_str(), runtype.c_str(), args.chunk_no));
 
-
     {NcIO ncio(ofname, 'w', nocompress);
+        printf("---- Saving metadat\n");
+
+        HntrSpec const &hspecA(cast_GridSpec_LonLat(
+            *gcmA.agridA.spec).hntr);
+        HntrSpec const &hspecI(cast_GridSpec_LonLat(
+            *gcmA.ice_regridders()[0]->agridI.spec).hntr);
+
+        hspecA.ncio(ncio, "hspecA");
+        hspecI.ncio(ncio, "hspecI");
+
+        gcmA.ice_regridders()[0]->agridI.indexing.ncio(ncio, "indexingI");
+        gcmA.indexing(GridAE::A).ncio(ncio, "indexingA");
+        gcmA.indexingHC.ncio(ncio, "indexingHC");
+        gcmA.indexing(GridAE::E).ncio(ncio, "indexingE");
+
+
+
+
         printf("---- Generating AvI\n");
         auto mat(rm->matrix_d("AvI", {&dimA, &dimI}, params));
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});

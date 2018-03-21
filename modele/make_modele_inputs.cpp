@@ -72,7 +72,7 @@ void add_fhc_legacy(NcIO &ncout, std::string const &global_ec_nc, std::string co
 void add_fhc_sealand()
 {
 
-TODO: Read hspecA, hspecO, hspecI from global_ec file
+TODO: Read hspecA, hspecO, hspecI from global_ec file  Also indexingHC
 
     blitz::Array<double,1> elevA(hspecA.jm * hspecA.im);
     {
@@ -104,8 +104,40 @@ TODO: Read hspecA, hspecO, hspecI from global_ec file
     underice(ec_base, all, all) = UI_NOTHING;
 }
 
+
+
 void add_fhc_globalec()
 {
+
+    {NcIO ncio(files.locate("global_ec-mismatched.nc"), 'r');
+        auto AvE(nc_read_weighted(ncio.nc, "AvE"));
+
+        // Uncompress
+        std::array<blitz::Array<int,1>,2> indices;
+        blitz::Array<double,2> values;
+        AvE->to_coo(indices[0], indices[1], values);
+
+        // Scan...
+        int const nnz(AvE->nnz());
+        std::array<int,2> iTuple;
+            int &iA2(iTuple[0]);
+            int &ihc(iTuple[1]);
+        for (int i=0; i<nnz; ++i) {
+            auto const iA(indices[0](i));
+            auto const iE(indices[0](i));
+
+            // iE must be contained within cell iA (local propety of matrix)
+            indexingHC.index_to_tuple(&iTuple[0], iE);
+
+            if (iA2 != iA) (*icebin_error)(-1,
+                "Matrix is non-local: iA=%ld, iE=%ld, iA2=%ld",
+                (long)iA, (long)iE, (long)iA2);
+
+            fhcE2(ec_base+ihc,iA) = values(i);
+            undericeE2(ec_base+ihc,iA) = UI_ICEBIN;
+
+        }
+    }
 }    
 
 

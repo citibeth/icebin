@@ -707,9 +707,20 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
 }
 // ---------------------------------------------------------------
 // ======================================================================
-ibmisc::ArrayBundle<double,2> make_topoO(
+struct MakeTopoO {
+    HntrSpec hspec;    // Describes the grid the variables use
+    ibmisc::ArrayBundle<double,2> bundle;
+
+    MakeTopoO::MakeTopoO(
+        FileLocator const &files,
+        std::vector<std::string> const &_varinputs);
+};
+
+
+MakeTopoO::MakeTopoO(
     FileLocator const &files,
     std::vector<std::string> const &_varinputs)
+: hspec(*modele::grids.at("g1qx1"))
 {
     // -------- 1-minute resolution
     blitz::Array<int16_t,2> FGICE1m(IM1m, JM1m, fortranArray);
@@ -729,7 +740,8 @@ ibmisc::ArrayBundle<double,2> make_topoO(
         ("FLAKES", FLAKES);
 
 printf("FINISHED READING INPUTS\n");
-    return _make_topoO(
+
+    bundle = _make_topoO(
         FGICE1m, ZICETOP1m, ZSOLG1m, FOCEAN1m,
         FLAKES);
 }
