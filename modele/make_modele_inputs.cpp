@@ -33,6 +33,7 @@ void topoo_to_topoa(NcIO &ncout, std::string const &TOPOO_nc, std::string const 
     EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
     AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
 
+    // Regrid TOPOO variables and save to TOPOA
     for (int i=0; i<itopo_vars.size(); ++i) {
         // Read on O grid
         blitz::Array<double,2> valO2(hspecO.jm, hspecO.im);

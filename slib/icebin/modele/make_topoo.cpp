@@ -711,7 +711,7 @@ struct MakeTopoO {
     HntrSpec hspec;    // Describes the grid the variables use
     ibmisc::ArrayBundle<double,2> bundle;
 
-    MakeTopoO::MakeTopoO(
+    MakeTopoO(
         FileLocator const &files,
         std::vector<std::string> const &_varinputs);
 };

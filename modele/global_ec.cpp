@@ -345,7 +345,8 @@ linear::Weighted_Eigen make_I2vX(
 
 
 std::unique_ptr<GCMRegridder> new_gcmA_standard(
-    HntrSpec &hspecA, std::string const &grid_name,
+    HntrSpec const &hspecA,
+    std::string const &grid_name,
     ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
 {
     ExchangeGrid aexgrid;    // Put our answer in here
@@ -417,7 +418,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
         new modele::GCMRegridder_ModelE(
             std::shared_ptr<GCMRegridder>(gcmO.release())));
 
-    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA.agridA.spec).hntr);
+    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
 
     // Load the fractional ocean mask (based purely on ice extent)
     {auto fname(files.locate(args.topoO_fname));
@@ -443,7 +444,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
 void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
 {
 
-    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA->regrid_matrices(0, reshape1(elevmaskI)));
+    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
 
     // ---------- Generate and store the matrices
     // Use the mismatched regridder to create desired matrices and save to file
@@ -460,9 +461,9 @@ void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, Par
     {NcIO ncio(ofname, 'w', nocompress);
         printf("---- Saving metadat\n");
 
-        HntrSpec const &hspecA(cast_GridSpec_LonLat(
+        HntrSpec hspecA(cast_GridSpec_LonLat(
             *gcmA.agridA.spec).hntr);
-        HntrSpec const &hspecI(cast_GridSpec_LonLat(
+        HntrSpec hspecI(cast_GridSpec_LonLat(
             *gcmA.ice_regridders()[0]->agridI.spec).hntr);
 
         hspecA.ncio(ncio, "hspecA");
