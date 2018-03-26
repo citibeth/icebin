@@ -88,6 +88,8 @@ struct ParseArgs {
     int chunk_no=-1;
     std::array<std::array<int,2>,2> chunk_range;    // {{x0,y0},{x1,y1}}
 
+    bool mismatched = true;    // Generate matrices for "mismatched" or standard regridding?
+
     ParseArgs(int argc, char **argv);
 };
 
@@ -192,6 +194,10 @@ ParseArgs::ParseArgs(int argc, char **argv)
              "Produce raw (unscaled) matrices?",
              cmd, false);
 
+        TCLAP::SwitchArg mismatched_a("x", "mismatched",
+             "Produce mismatched (ocean-different) matrices?",
+             cmd, false);
+
 // Smoothing does not work with sectioned ice
 //        TCLAP::ValueArg<std::string> sigma_a("g", "sigma",
 //            "Sommthing distances: x,y,z",
@@ -233,6 +239,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
         ofname = ofname_a.getValue();
         scale = !raw_a.getValue();
+        mismatched = mismatched_a.getValue();
 
         eq_rad = eq_rad_a.getValue();
 
@@ -441,7 +448,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
 
 
 
-void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,2> const &elevmaskI)
 {
 
     std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
@@ -456,23 +463,25 @@ void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, Par
             std::bind(nocompress_configure_var, std::placeholders::_1));
 
 
-    std::string ofname(strprintf("%s-%s-%02d", args.ofname.c_str(), runtype.c_str(), args.chunk_no));
+    std::string ofname(strprintf("%s-%02d", args.ofname.c_str(), args.chunk_no));
+
+    HntrSpec hspecA(cast_GridSpec_LonLat(
+        *gcmA.agridA.spec).hntr);
+    HntrSpec hspecI(cast_GridSpec_LonLat(
+        *gcmA.ice_regridders()[0]->agridI.spec).hntr);
+
 
     {NcIO ncio(ofname, 'w', nocompress);
-        printf("---- Saving metadat\n");
-
-        HntrSpec hspecA(cast_GridSpec_LonLat(
-            *gcmA.agridA.spec).hntr);
-        HntrSpec hspecI(cast_GridSpec_LonLat(
-            *gcmA.ice_regridders()[0]->agridI.spec).hntr);
+        printf("---- Saving metadata\n");
+        get_or_put_att(*ncio.nc, ncio.rw, "mismatched", args.mismatched);
 
         hspecA.ncio(ncio, "hspecA");
         hspecI.ncio(ncio, "hspecI");
 
         gcmA.ice_regridders()[0]->agridI.indexing.ncio(ncio, "indexingI");
-        gcmA.indexing(GridAE::A).ncio(ncio, "indexingA");
+        gcmA.agridA.indexing.ncio(ncio, "indexingA");
         gcmA.indexingHC.ncio(ncio, "indexingHC");
-        gcmA.indexing(GridAE::E).ncio(ncio, "indexingE");
+        gcmA.indexingE.ncio(ncio, "indexingE");
 
 
 
@@ -535,7 +544,7 @@ void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, Par
 
         ncv = dimE.ncio(ncio, "dimE");
         get_or_put_att(ncv, 'w', "shape", 
-            &std::vector<int>{gcmA->nhc(), hspecA.jm, hspecA.im}[0], 3);
+            &std::vector<int>{gcmA.nhc(), hspecA.jm, hspecA.im}[0], 3);
         ncv.putAtt("description", "Elevation Grid");
 
         ncv = dimI.ncio(ncio, "dimI");
@@ -554,19 +563,17 @@ void global_ec_section(GCMRegridder const &gcmA, std::string const &runtype, Par
     printf("Done!\n");
 }
 
-void global_ec_section(FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+void global_ec_section(FileLocator const &files, ParseArgs &args, blitz::Array<double,2> const &elevmaskI)
 {
-    // Mismatched grids
-    {
+    if (args.mismatched) {
+        // Mismatched grids
         auto gcmA(new_gcmA_mismatched(files, args, elevmaskI));
-        global_ec_section(*gcmA, "mismatched", args, elevmaskI);
-    }
-
-    // Regular grids
-    {
+        global_ec_section(*gcmA, args, elevmaskI);
+    } else {
+        // Regular grids
         HntrSpec const hspecA(make_hntrA(args.hspecO));
         auto gcmA(new_gcmA_standard(hspecA, "Atmosphere", args, elevmaskI));
-        global_ec_section(*gcmA, "standard", args, elevmaskI);
+        global_ec_section(*gcmA, args, elevmaskI);
     }
 }
 

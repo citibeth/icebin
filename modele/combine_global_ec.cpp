@@ -5,11 +5,13 @@
 #include <icebin/error.hpp>
 #include <ibmisc/linear/linear.hpp>
 #include <ibmisc/linear/compressed.hpp>
+#include <icebin/modele/hntr.hpp>
 
 using namespace std;
 using namespace ibmisc;
 using namespace netCDF;
 using namespace icebin;
+using namespace icebin::modele;
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
@@ -30,6 +32,29 @@ blitz::TinyVector<T, len> vector_to_tiny(std::vector<T> const &vec)
 }
 
 
+
+/** Metadata read from the file, which we transfer the the output */
+class Metadata {
+    bool mismatched;
+    HntrSpec hspecA, hspecI;
+    ibmisc::Indexing indexingI, indexingA, indexingHC, indexingE;
+public:
+    void ncio(NcIO &ncio);
+};
+void Metadata::ncio(NcIO &ncio)
+{
+    get_or_put_att(*ncio.nc, ncio.rw, "mismatched", mismatched);
+
+    hspecA.ncio(ncio, "hspecA");
+    hspecI.ncio(ncio, "hspecI");
+
+    indexingI.ncio(ncio, "indexingI");
+    indexingA.ncio(ncio, "indexingA");
+    indexingHC.ncio(ncio, "indexingHC");
+    indexingE.ncio(ncio, "indexingE");
+}
+
+
 void combine_chunks(
     std::vector<std::string> const &ifnames,    // Names of input chunks
     std::string const &ofname,
@@ -46,8 +71,14 @@ void combine_chunks(
     std::array<long,2> sparse_extents;
     std::array<std::vector<int>,2> shapes;
     std::vector<size_t> sizes;    // For printing
-    for (std::string const &ifname : ifnames) {
+
+    Metadata meta;
+    for (size_t i=0; i<ifnames.size(); ++i) {
+        std::string const &ifname(ifnames[i]);
+
         NcIO ncio(ifname, 'r');
+        if (i == 0) meta.ncio(ncio);
+
         size_t sz = ncio.nc->getDim(BvA+".M.nnz").getSize();
         nnz += sz;
         sizes.push_back(sz);
@@ -98,6 +129,7 @@ void combine_chunks(
     // Write it out
     printf("---- Writing output to %s\n", ofname.c_str());
     {NcIO ncio(ofname, ofmode);
+        meta.ncio(ncio);
         ret.ncio(ncio, BvA);
     }
 }

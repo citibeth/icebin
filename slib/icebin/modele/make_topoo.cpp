@@ -2,7 +2,6 @@
 #include <ibmisc/fortranio.hpp>
 #include <ibmisc/ncbulk.hpp>
 #include <icebin/error.hpp>
-#include <icebin/modele/hntr.hpp>
 #include <icebin/modele/make_topoo.hpp>
 #include <icebin/modele/grids.hpp>
 
@@ -707,16 +706,6 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
 }
 // ---------------------------------------------------------------
 // ======================================================================
-struct MakeTopoO {
-    HntrSpec hspec;    // Describes the grid the variables use
-    ibmisc::ArrayBundle<double,2> bundle;
-
-    MakeTopoO(
-        FileLocator const &files,
-        std::vector<std::string> const &_varinputs);
-};
-
-
 MakeTopoO::MakeTopoO(
     FileLocator const &files,
     std::vector<std::string> const &_varinputs)
