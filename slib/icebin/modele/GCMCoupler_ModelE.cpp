@@ -25,6 +25,7 @@
 #include <ibmisc/f90blitz.hpp>
 #include <ibmisc/math.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
+#include <icebin/modele/grids.hpp>
 #include <icebin/contracts/contracts.hpp>
 #include <icebin/domain_splitter.hpp>
 #include <boost/filesystem.hpp>
@@ -51,11 +52,6 @@ using namespace std;
 using namespace ibmisc;
 using namespace netCDF;
 using namespace spsparse;
-
-// See LIGrid.F90
-const int UI_ICEBIN = 1;
-const int UI_NOTHING= 2;
-
 
 #if 0
 std::ostream &operator<<(std::ostream &os, icebin::modele::ModelEParams const &params)

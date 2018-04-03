@@ -37,6 +37,12 @@ extern std::map<std::string, HntrSpec const *> const grids;
 
 const double EQ_RAD = 6.371e6; /// Radius of the Earth (same as in ModelE)
 
+// See LIGrid.F90
+const int UI_UNUSED = 0;
+const int UI_ICEBIN = 1;
+const int UI_NOTHING= 2;
+
+
 }}    // namespace icebin::modele
 
 #endif    // guard
