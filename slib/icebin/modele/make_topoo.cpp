@@ -19,6 +19,7 @@ lake fraction.  It determines the elevation of the lake, being at the
 bottom of the gridcell. */
 static void callZ(
     // (IM1m, JM1m)
+    blitz::Array<int16_t,2> const &FGICE1m,
     blitz::Array<int16_t,2> const &FOCEAN1m,
     blitz::Array<int16_t,2> const &ZICETOP1m,
     blitz::Array<int16_t,2> const &ZSOLG1m,
@@ -32,6 +33,7 @@ static void callZ(
     blitz::Array<double,2> &ZATMO,
     blitz::Array<double,2> &dZLAKE,
     blitz::Array<double,2> &ZSOLDG,
+    blitz::Array<double,2> &ZICETOP,
     blitz::Array<double,2> &ZSGLO,
     blitz::Array<double,2> &ZLAKE,
     blitz::Array<double,2> &ZGRND,
@@ -46,6 +48,7 @@ static void callZ(
     // Output: ZATMO  = atmospheric topography (m)
     //         dZLAKE = mean lake thickness (m)
     //         ZSOLDG = solid ground topography (m)
+    //         ZICETOP = atmospheric topography of JUST ice-covered region (m)
     //         ZSGLO  = lowest value of ZICETOP1m in model cell (m)
     //         ZLAKE  = surface lake topography (m)
     //         ZGRND  = altitude break between ground and land ice (m)
@@ -60,7 +63,7 @@ static void callZ(
         int const IMAX= (J==1 || J==JM ? 1 : IM);
         for (int I=1; I<=IMAX; ++I) {
             int I11 = (I-1)*IM1m/IM + 1;
-            int I1m = (IMAX == 1 ? IM1m : I*IM1m/IM);
+            int I1M = (IMAX == 1 ? IM1m : I*IM1m/IM);
 
             if (FOCEAN(I,J) != 0) {   // (I,J) is an ocean cell
                 ZATMO(I,J) = 0;
@@ -70,8 +73,9 @@ static void callZ(
                 ZGRND(I,J) = 0;
                 ZSGHI(I,J) = 0;
                 ZSGLO(I,J) = 999999;
+                ZICETOP(I,J) = 0;
                 for (int J2=J11; J2 <= J1M; ++J2) {
-                for (int I2=I11; I2 <= I1m; ++I2) {
+                for (int I2=I11; I2 <= I1M; ++I2) {
                     if (ZSGLO(I,J) > ZICETOP1m(I2,J2) && FOCEAN1m(I2,J2) == 1) {
                         ZSGLO(I,J) = ZICETOP1m(I2,J2);
                     }
@@ -79,10 +83,10 @@ static void callZ(
 
                 if (ZSGLO(I,J) == 999999) (*icebin_error)(-1,
                     "Ocean cell FOCEAN(%d,%d)=%g has no ocean area on 2-minute grid; "
-                    "I11,I1m,J11,J1M = %d,%d,%d,%d",
+                    "I11,I1M,J11,J1M = %d,%d,%d,%d",
                     I,J,FOCEAN(I,J),
-                    I11,I1m,J11,J1M);
-            } else {  // (I,J) is a continental cell
+                    I11,I1M,J11,J1M);
+            } else {  // (I,J) is acontinent cell
                 // Order 2-minute continental cells within (I,J) and sum their area
                 struct AreaDepth {
                     double area;
@@ -94,26 +98,38 @@ static void callZ(
                 };
 
                 std::vector<AreaDepth> cells2;
-                double SAREA = 0;
+                double SAREA = 0;    // Entire gridcell...
                 double SAZSG = 0;
+                double SAREA_li = 0;    // Landice portions only
+                double SAZSG_li = 0;
                 int NM = 0;
                 for (int J1m=J11; J1m <= J1M; ++J1m) {
-                for (int I2m=I11; I2m <= I1m; ++I2m) {
-                    if (FOCEAN1m(I2m,J1m) == 1) continue;
+                for (int I1m=I11; I1m <= I1M; ++I1m) {
+                    if (FOCEAN1m(I1m,J1m) == 1) continue;
                     double area = grid_g1mx1m.dxyp(J1m);
-                    cells2.push_back(AreaDepth(area, ZICETOP1m(I2m,J1m)));
+                    cells2.push_back(AreaDepth(area, ZICETOP1m(I1m,J1m)));
 
                     SAREA += area;
-                    SAZSG += area*ZSOLG1m(I2m,J1m);
+                    SAZSG += area*ZSOLG1m(I1m,J1m);
+
+                    if (FGICE1m(I1m,J1m) != 0) {
+                        SAREA_li += area;
+                        SAZSG_li += area*ZICETOP1m(I1m,J1m);
+                    }
                 }}
                 std::sort(cells2.begin(), cells2.end());
 
                 if (SAREA == 0) (*icebin_error)(-1,
                     "Continental cell (%d,%d) has no continental area on 2-minute grid. (%d-%d, %d-%d)",
-                    I,J,I11,I1m,J11,J1M);
+                    I,J,I11,I1M,J11,J1M);
 
                 // Determine ZSOLDG
                 ZSOLDG(I,J) = SAZSG / SAREA;
+                if (SAREA_li > 0) {
+                    ZICETOP(I,J) = SAZSG_li / SAREA_li;
+                } else {
+                    ZICETOP(I,J) = 0;
+                }
                 // Determine ZSGLO
                 ZSGLO(I,J) = cells2[0].depth;
                 // Determine ZLAKE and dZLAKE
@@ -169,6 +185,7 @@ static void callZ(
              ZATMO (Range(2,IM),J) = ZATMO (1,J);
              dZLAKE(Range(2,IM),J) = dZLAKE(1,J);
              ZSOLDG(Range(2,IM),J) = ZSOLDG(1,J);
+             ZICETOP(Range(2,IM),J) = ZICETOP(1,J);
              ZSGLO (Range(2,IM),J) = ZSGLO (1,J);
              ZLAKE (Range(2,IM),J) = ZLAKE (1,J);
              ZGRND (Range(2,IM),J) = ZGRND (1,J);
@@ -265,6 +282,11 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     }));
     auto &ZSOLDG(out.add("ZSOLDG", {
         "description", "Solid Ground Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    auto &ZICETOP(out.add("ZICETOP", {
+        "description", "Atmospheric Topography (Ice-Covered Regions Only)",
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
@@ -626,16 +648,31 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     // ZATMO  = Atmospheric topography (m)
     // dZLAKE = Mean lake thickness (m)
     // ZSOLDG = Solid ground topography (m)
+    // ZICETOP = Atmospheric topography, Ice covered regions (m)
     // ZSGLO  = Lowest value of ZICETOP1m in model cell (m)
     // ZLAKE  = Surface lake topography (m)
     // ZGRND  = Altitude break between ground and land ice (m)
     // ZSGHI  = Highest value of ZICETOP1m in model cell (m)
     //
     ZSOLDG = - dZOCEN;  //  solid ground topography of ocean
+    ZICETOP = 0;
     callZ(
-        FOCEAN1m, ZICETOP1m, ZSOLG1m,
+        FGICE1m, FOCEAN1m, ZICETOP1m, ZSOLG1m,
         FOCEAN, FLAKE, FGRND, ZATMO,
-        dZLAKE,ZSOLDG,ZSGLO,ZLAKE,ZGRND,ZSGHI);
+        dZLAKE,ZSOLDG,ZICETOP,ZSGLO,ZLAKE,ZGRND,ZSGHI);
+
+#if 0
+This is ineffective: FOCEAN will be 0 or 1 already.
+
+    // Adjust ZATMO so it's based on ENITRE gridcell,
+    // not just land portion.
+    for (int J=1; J <= JM; ++J) {
+    for (int I=1; I<=IM; ++I) {
+        ZATMO(I,J) = ZATMO(I,J) * (1 - FOCEAN(I,J));
+//ZICETOP(I,J) -= ZATMO(I,J);
+    }}
+#endif
+
 
 #if 1
     // Reset ZATMO, dZOCEN and ZLAKE by hand if FLAKE(I,J) == 1

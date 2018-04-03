@@ -71,7 +71,7 @@ struct ParseArgs {
     std::string elevI_vname;
 
 //    std::string nc foceanI_fname;
-    std::string topoO_fname;
+    std::string topoo_fname;
 //    std::string foceanI_vname;
 //    std::string 
 
@@ -100,7 +100,7 @@ ostream& operator<<(ostream& os, ParseArgs const &args)
         << "    hspecO: " << args.hspecO.im << "x" << args.hspecO.jm << endl
         << "    hspecI: " << args.hspecI.im << "x" << args.hspecI.jm << endl
         << "    nc_fname: " << args.nc_fname << " -- " << args.fgiceI_vname << " -- " << args.elevI_vname << endl
-        << "    topoO_fname: " << args.topoO_fname << endl
+        << "    topoo_fname: " << args.topoo_fname << endl
         << "    ofname: " << args.ofname << endl
         << "    ec_range: " << args.ec_range << "  ec_skip=" << args.ec_skip << endl
         << "    scale: " << (args.scale ? "true" : "false") << endl
@@ -161,8 +161,8 @@ ParseArgs::ParseArgs(int argc, char **argv)
                 "NetCDF file containing ice mask and elevation (1 where there is ice)",
             true, "etopo1_ice_g1m.nc", "mask filename", cmd);
 
-        TCLAP::UnlabeledValueArg<std::string> topoO_fname_a(
-            "topoO-fname",
+        TCLAP::UnlabeledValueArg<std::string> topoo_fname_a(
+            "topoo-fname",
                 "ModelE TOPO file on the Ocean grid.  Need FOCEAN and FOCEANF",
             true, "topoo.nc", "focean filename", cmd);
 
@@ -227,7 +227,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         nc_fname = nc_fname_a.getValue();
         fgiceI_vname = fgiceI_vname_a.getValue();
         elevI_vname = elevI_vname_a.getValue();
-        topoO_fname = topoO_fname_a.getValue();
+        topoo_fname = topoo_fname_a.getValue();
 
         // Parse elevation classes...
         auto _ec(parse_csv<double>(ec_a.getValue()));
@@ -428,7 +428,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
     HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
 
     // Load the fractional ocean mask (based purely on ice extent)
-    {auto fname(files.locate(args.topoO_fname));
+    {auto fname(files.locate(args.topoo_fname));
 
         blitz::Array<double,2> foceanO(hspecO.jm, hspecO.im);    // called FOCEAN in make_topoo
         blitz::Array<double,2> foceanfO(hspecO.jm, hspecO.im);    // called FOCEANF in make_topoo
@@ -483,8 +483,8 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         gcmA.indexingHC.ncio(ncio, "indexingHC");
         gcmA.indexingE.ncio(ncio, "indexingE");
 
-
-
+        ncio_vector(ncio, gcmA.hcdefs, false, "hcdefs", "double",
+            get_or_add_dims(ncio, {"nhc"}, {gcmA.hcdefs.size()}));
 
         printf("---- Generating AvI\n");
         auto mat(rm->matrix_d("AvI", {&dimA, &dimI}, params));

@@ -1,11 +1,10 @@
 #include <cstdio>
 #include <prettyprint.hpp>
-#include <ibmisc/netcdf.hpp>
 #include <ibmisc/runlength.hpp>
 #include <icebin/error.hpp>
 #include <ibmisc/linear/linear.hpp>
 #include <ibmisc/linear/compressed.hpp>
-#include <icebin/modele/hntr.hpp>
+#include <icebin/modele/global_ec.hpp>
 
 using namespace std;
 using namespace ibmisc;
@@ -31,30 +30,6 @@ blitz::TinyVector<T, len> vector_to_tiny(std::vector<T> const &vec)
     return ret;
 }
 
-
-
-/** Metadata read from the file, which we transfer the the output */
-class Metadata {
-    bool mismatched;
-    HntrSpec hspecA, hspecI;
-    ibmisc::Indexing indexingI, indexingA, indexingHC, indexingE;
-public:
-    void ncio(NcIO &ncio);
-};
-void Metadata::ncio(NcIO &ncio)
-{
-    get_or_put_att(*ncio.nc, ncio.rw, "mismatched", mismatched);
-
-    hspecA.ncio(ncio, "hspecA");
-    hspecI.ncio(ncio, "hspecI");
-
-    indexingI.ncio(ncio, "indexingI");
-    indexingA.ncio(ncio, "indexingA");
-    indexingHC.ncio(ncio, "indexingHC");
-    indexingE.ncio(ncio, "indexingE");
-}
-
-
 void combine_chunks(
     std::vector<std::string> const &ifnames,    // Names of input chunks
     std::string const &ofname,
@@ -72,7 +47,7 @@ void combine_chunks(
     std::array<std::vector<int>,2> shapes;
     std::vector<size_t> sizes;    // For printing
 
-    Metadata meta;
+    global_ec::Metadata meta;
     for (size_t i=0; i<ifnames.size(); ++i) {
         std::string const &ifname(ifnames[i]);
 
