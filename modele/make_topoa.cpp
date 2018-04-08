@@ -116,9 +116,8 @@ int main(int argc, char **argv)
 
 printf("AA1\n");
     // ============= Convert TOPOO to TOPOA
-    blitz::Array<double,2> foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA;
-    std::vector<blitz::Array<double,2> *> const varsA
-        {&foceanA, &flakeA, &fgrndA, &fgiceA, &zatmoA, &hlakeA, &zicetopA};
+    std::map<std::string, std::unique_ptr<blitz::Array<double,2>>> varsA;
+
     {NcIO topoo_nc(args.topoo_fname, 'r');
 
         // Set up weight vectors for each regrid
@@ -129,16 +128,10 @@ printf("AA1\n");
             {&WTO, &WTO, &WTO, &WTO, &WTO, &WTO, &fgiceO};
 
         // Define output variables
-        auto adims(get_or_add_dims(topoa_nc, {"jm", "im"}, {meta.hspecA.jm, meta.hspecA.im}));
+        auto dimsA(get_or_add_dims(topoa_nc, {"jm", "im"}, {meta.hspecA.jm, meta.hspecA.im}));
 
         // Create the AvO matrix (Eigen format)
         Hntr hntr_AvO(17.17, meta.hspecA, hspecO);
-#if 0
-        TupleListT<2> AvO_tp;
-        hntr_AvO.scaled_regrid_matrix(spsparse::accum::ref(AvO_tp));
-        EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
-        AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
-#endif
 
         // Regrid TOPOO variables and save to TOPOA
         for (int i=0; i<itopo_vars.size(); ++i) {
@@ -146,32 +139,17 @@ printf("AA1\n");
 
             // Read on O grid
             blitz::Array<double,2> valO2(hspecO.jm, hspecO.im);
-//            std::vector<std::pair<std::string, NcAttValue>> atts;
             NcVar ncv(ncio_blitz(topoo_nc, valO2, itopo_vars[i], "", {}));
-//            get_or_put_all_atts(ncv, topoo_nc.rw, atts);
-//            blitz::Array<double,1> valO(reshape1(valO2));
+
+            // Allocate variable to hold it
+            std::unique_ptr<blitz::Array<double,2>> varAp(
+                new blitz::Array<double,2>(meta.hspecA.jm, meta.hspecA.im));
+            auto &varA(*varAp);
+            varsA.insert(std::make_pair(otopo_vars[i], std::move(varAp)));
 
             // Regrid to A grid
-            auto &valA2(topoa_nc.tmp.make<blitz::Array<double,2>>(meta.hspecA.jm, meta.hspecA.im));
-//            blitz::Array<double,1> valA(reshape1(valA2));
-            if (otopo_vars[i] == "zicetop") {
-                hntr_AvO.regrid(*weightsO[i], valO2, valA2);
-            }
-//                map_eigen_colvector(valA) = AvO_e * map_eigen_colvector(valO);
-
-            // Save for other computations
-            varsA[i]->reference(valA2);
+            hntr_AvO.regrid(*weightsO[i], valO2, varA);
         }
-
-        // ZICETOP only exists in ice-covered regions, so it must be weighted differently.
-        // (This is a cheap trick; we really should use hntr.regrid(), with
-        // WT=FGICE.  But as long as ZICETOP=0 over non-ice, this trick will work
-        for (int jj=0; jj<zicetopA.extent(0); ++jj) {
-        for (int ii=0; ii<zicetopA.extent(1); ++ii) {
-            if (fgiceA(jj,ii) > 1.e-8) {
-                zicetopA(jj,ii) = zicetopA(jj,ii) / fgiceA(jj,ii);
-            }
-        }}
 
         for (int i=0; i<itopo_vars.size(); ++i) {
             printf("Writing %s (A)\n", otopo_vars[i].c_str());
@@ -182,18 +160,18 @@ printf("AA1\n");
 
 
             // Write it out, transferring attributes from ori ginal variable
-            NcVar ncv_out(ncio_blitz(topoa_nc, *varsA[i], otopo_vars[i], "double", adims));
+            auto &varA(*varsA.at(otopo_vars[i]));
+            NcVar ncv_out(ncio_blitz(topoa_nc, varA, otopo_vars[i], "double", dimsA));
             get_or_put_all_atts(ncv_out, topoa_nc.rw, atts);
         }
     }
-topoa_nc.flush();
-topoa_nc.close();
-return 0;
-printf("AA2\n");
 
     // ================= Create fhc, elevE and underice
     int const nhc_icebin = meta.indexingE[2].extent;
     int const nhc_gcm = 1 + 1 + nhc_icebin;
+    auto dimsE(get_or_add_dims(topoa_nc,
+        {"nhc", "jm", "im"},
+        {nhc_gcm, meta.hspecA.jm, meta.hspecA.im}));
     blitz::TinyVector<int,3> shapeE(nhc_gcm, meta.indexingE[1].extent, meta.indexingE[0].extent);
     blitz::TinyVector<int,2> shapeE2(shapeE(0), shapeE(1)*shapeE(2));
 
@@ -216,6 +194,9 @@ printf("shapeE2 = (%d, %d)\n", shapeE2(0), shapeE2(1));
 
     // ------------ Segment 0: Legacy
     printf("Segment 0: Legacy\n");
+    auto &fgiceA(*varsA.at("fgice"));
+    auto &zatmoA(*varsA.at("zatmo"));
+    auto &zicetopA(*varsA.at("zicetop"));
 printf("%p %p %p\n", fgiceA.data(), elevE.data(), underice.data());
 printf("extent: (%d, %d, %d)\n", fhc.extent(0), fhc.extent(1), fhc.extent(2));
     for (int j=0; j<meta.hspecA.jm; ++j) {
@@ -274,6 +255,10 @@ printf("extent: (%d, %d, %d)\n", fhc.extent(0), fhc.extent(1), fhc.extent(2));
 
             if (iA < 0 || iA >= shapeE2(1)) (*icebin_error)(-1,
                 "iA out of range [0,%d): %d", shapeE2(1), iA);
+
+if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, values(i));
+
+
             fhcE2(ec_base+ihc,iA) = values(i);
             undericeE2(ec_base+ihc,iA) = UI_ICEBIN;
             elevE2(ec_base+ihc,iA) = meta.hcdefs[ihc];
@@ -284,8 +269,13 @@ printf("BB4\n");
 
     // --------------- Write it out
     NcVar info(get_or_add_var(topoa_nc, "info", "int", {}));
-    std::string sval = "legacy,sealand,ec";
+    std::string sval = "legacy,land,ec";
     get_or_put_att(info, topoa_nc.rw, "segments", sval);
+
+    NcVar ncv;
+    ncio_blitz(topoa_nc, fhc, "fhc", "double", dimsE);
+    ncio_blitz(topoa_nc, elevE, "elevE", "double", dimsE);
+    ncio_blitz(topoa_nc, underice, "underice", "double", dimsE);
 
 
 printf("BB5\n");
