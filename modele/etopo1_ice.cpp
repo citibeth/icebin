@@ -110,6 +110,7 @@ void etopo1_ice(
             // Use ETOPO1 for Southern Hemisphere Ice
             for (int j1m=0; j1m < JM1m/2; ++j1m) {
             for (int i1m=0; i1m < IM1m; ++i1m) {
+//if (j1m == 0) printf("south pole: %d %d %d\n", focean1m(j1m,i1m), zicetop1m(j1m,i1m), zsolid1m(j1m,i1m));
                 if ( (focean1m(j1m,i1m) == 0)
                     && (zicetop1m(j1m,i1m) - zsolid1m(j1m,i1m) >= MIN_LANDICE_THK))
                 {

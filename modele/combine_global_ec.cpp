@@ -76,6 +76,7 @@ void combine_chunks(
     auto Mw(ret.weights[1].accum());
 
         // Aggregate them together
+int iGlobal = 0;
         int iM=0;
         for (std::string const &ifname : ifnames) {
             printf("--- Reading %s\n", ifname.c_str());
@@ -92,6 +93,23 @@ void combine_chunks(
             for (int i=0; i<values_d.extent(0); ++i) {
                 M.add({dimB(indices_d(i,0)), dimA(indices_d(i,1))}, values_d(i));
             }
+
+/** Check that AvE is local */
+if (BvA == "AvE") {
+    for (int i=0; i<values_d.extent(0); ++i) {
+        int const iAd = indices_d(i,0);
+        int const iA = dimB(iAd);
+        int const iEd = indices_d(i,1);
+        int const iE = dimA(iEd);
+
+        int const iA2 = iE % 12960;
+
+        if (iA != iA2) printf("%d: iA=%d, iA2=%d, iE=%d\n", iGlobal, iA, iA2, iE);
+        ++ iGlobal;
+
+    }
+}
+
 
             auto Mw_d(nc_read_blitz<double,1>(ncio.nc, BvA+".Mw"));
             for (int i=0; i<Mw_d.extent(0); ++i) Mw.add({dimA(i)}, Mw_d(i));
@@ -121,10 +139,15 @@ int main(int argc, char **argv)
 
 #if 1
     vector<array<string,2>> sgridss {
+#if 0
+        {"A","E"},
+#else
         {"I","E"}, {"E","I"},
         {"I","A"}, {"A","I"},
         {"A","E"},
-        {"I2", "A"}, {"I2", "E"}};
+        {"I2", "A"}, {"I2", "E"}
+#endif
+    };
 
     char ofmode = 'w';
 #else

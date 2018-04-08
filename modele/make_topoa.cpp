@@ -114,7 +114,7 @@ int main(int argc, char **argv)
         hspecO.ncio(ncio, "hspec");
     }
 
-
+printf("AA1\n");
     // ============= Convert TOPOO to TOPOA
     blitz::Array<double,2> foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA;
     std::vector<blitz::Array<double,2> *> const varsA
@@ -142,6 +142,8 @@ int main(int argc, char **argv)
 
         // Regrid TOPOO variables and save to TOPOA
         for (int i=0; i<itopo_vars.size(); ++i) {
+            printf("Reading %s (O)\n", itopo_vars[i].c_str());
+
             // Read on O grid
             blitz::Array<double,2> valO2(hspecO.jm, hspecO.im);
 //            std::vector<std::pair<std::string, NcAttValue>> atts;
@@ -172,6 +174,7 @@ int main(int argc, char **argv)
         }}
 
         for (int i=0; i<itopo_vars.size(); ++i) {
+            printf("Writing %s (A)\n", otopo_vars[i].c_str());
 
             std::vector<std::pair<std::string, NcAttValue>> atts;
             NcVar ncv_in(topoo_nc.nc->getVar(itopo_vars[i]));
@@ -182,14 +185,20 @@ int main(int argc, char **argv)
             NcVar ncv_out(ncio_blitz(topoa_nc, *varsA[i], otopo_vars[i], "double", adims));
             get_or_put_all_atts(ncv_out, topoa_nc.rw, atts);
         }
-
     }
+topoa_nc.flush();
+topoa_nc.close();
+return 0;
+printf("AA2\n");
 
     // ================= Create fhc, elevE and underice
     int const nhc_icebin = meta.indexingE[2].extent;
     int const nhc_gcm = 1 + 1 + nhc_icebin;
-    blitz::TinyVector<int,3> shapeE(meta.indexingE[2].extent, meta.indexingE[1].extent, meta.indexingE[0].extent);
+    blitz::TinyVector<int,3> shapeE(nhc_gcm, meta.indexingE[1].extent, meta.indexingE[0].extent);
     blitz::TinyVector<int,2> shapeE2(shapeE(0), shapeE(1)*shapeE(2));
+
+printf("shapeE = (%d, %d, %d)\n", shapeE(0), shapeE(1), shapeE(2));
+printf("shapeE2 = (%d, %d)\n", shapeE2(0), shapeE2(1));
 
 
     blitz::Array<double,3> fhc(shapeE);
@@ -206,6 +215,9 @@ int main(int argc, char **argv)
 
 
     // ------------ Segment 0: Legacy
+    printf("Segment 0: Legacy\n");
+printf("%p %p %p\n", fgiceA.data(), elevE.data(), underice.data());
+printf("extent: (%d, %d, %d)\n", fhc.extent(0), fhc.extent(1), fhc.extent(2));
     for (int j=0; j<meta.hspecA.jm; ++j) {
     for (int i=0; i<meta.hspecA.im; ++i) {
         if (fgiceA(j,i) > 0) {
@@ -213,10 +225,11 @@ int main(int argc, char **argv)
             elevE(ec_base, j,i) = zatmoA(j,i);
             underice(ec_base, j,i) = UI_NOTHING;
         }
-        ec_base += 1;
     }}
+    ec_base += 1;
 
     // ------------ Segment 1: land part of sealand
+    printf("Segment 1: seaLAND\n");
     for (int j=0; j<meta.hspecA.jm; ++j) {
     for (int i=0; i<meta.hspecA.im; ++i) {
         if (fgiceA(j,i) > 0) {
@@ -224,13 +237,14 @@ int main(int argc, char **argv)
             elevE(ec_base, j,i) = zicetopA(j,i);
             underice(ec_base, j,i) = UI_NOTHING;
         }
-        ec_base += 1;
     }}
-
+    ec_base += 1;
 
     // ------------ Segment 2: Elevation Classes
+    printf("Segment 2: Elevation Classes\n");
     auto fhcE2(reshape<double,3,2>(fhc, shapeE2));
     auto elevE2(reshape<double,3,2>(elevE, shapeE2));
+    auto undericeE2(reshape<uint16_t,3,2>(underice, shapeE2));
     {NcIO ncio(files.locate(args.global_ec_mm_fname), 'r');
         auto AvE(linear::nc_read_weighted(ncio.nc, "AvE"));
 
@@ -246,7 +260,7 @@ int main(int argc, char **argv)
             int &ihc(iTuple[1]);
         for (int i=0; i<nnz; ++i) {
             auto const iA(indices[0](i));
-            auto const iE(indices[0](i));
+            auto const iE(indices[1](i));
 
             // iE must be contained within cell iA (local propety of matrix)
             meta.indexingHC.index_to_tuple(&iTuple[0], iE);
@@ -255,22 +269,28 @@ int main(int argc, char **argv)
                 "Matrix is non-local: iA=%ld, iE=%ld, iA2=%ld",
                 (long)iA, (long)iE, (long)iA2);
 
+            if (ihc < 0 || ihc >= nhc_icebin) (*icebin_error)(-1,
+                "ihc out of range [0,%d): %d", nhc_icebin, ihc);
+
+            if (iA < 0 || iA >= shapeE2(1)) (*icebin_error)(-1,
+                "iA out of range [0,%d): %d", shapeE2(1), iA);
             fhcE2(ec_base+ihc,iA) = values(i);
-            underice(ec_base+ihc,iA) = UI_ICEBIN;
+            undericeE2(ec_base+ihc,iA) = UI_ICEBIN;
             elevE2(ec_base+ihc,iA) = meta.hcdefs[ihc];
-            underice(ec_base, all, all) = UI_NOTHING;
         }
     }
 
+printf("BB4\n");
+
     // --------------- Write it out
-    {NcIO ncio(args.topoa_fname, 'w');
-        NcVar info(get_or_add_var(ncio, "info", "int", {}));
-        std::string sval = "legacy,sealand,ec";
-        get_or_put_att(info, ncio.rw, "segments", sval);
+    NcVar info(get_or_add_var(topoa_nc, "info", "int", {}));
+    std::string sval = "legacy,sealand,ec";
+    get_or_put_att(info, topoa_nc.rw, "segments", sval);
 
 
-
-    }
+printf("BB5\n");
+    topoa_nc.flush();
+    topoa_nc.close();
 
     return 0;
 }

@@ -118,10 +118,15 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
                     long ihps[2];
                     double whps[2];
                     linterp_1d_b(gcm->hcdefs, elevation, ihps, whps);
-                    ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[0]})},
+                    auto const iE0 = gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[0]});
+                    ret.add({iG, iE0},
                         aexgrid.native_area(id) * whps[0]);
-                    ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[1]})},
+                    auto const iE1 = gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[1]});
+                    ret.add({iG, iE1},
                         aexgrid.native_area(id) * whps[1]);
+
+//printf("grid: iA=%ld %ld %ld %ld iE=(%d %d -> %ld %ld)\n", iA, iI, iX, iG, ihps[0], ihps[1], iE0, iE1);
+
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {
                     int ihps0 = nearest_1d(gcm->hcdefs, elevation);

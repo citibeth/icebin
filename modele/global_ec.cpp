@@ -297,6 +297,7 @@ public:
             exgrid.add(index, area);
 int sz = exgrid.dense_extent();
 if (sz % 100000 == 0) printf("exgrid size=%d\n", sz);
+//printf("   Exch OI(%d, %d) = %g\n", (int)iO, (int)iI, area);
             dimO.add_dense(iO);
             dimI.add_dense(iI);
         }
@@ -491,13 +492,14 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
         ncio.flush();
     }
-
+#if 1
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating EvI\n");
         auto mat(rm->matrix_d("EvI", {&dimE, &dimI}, params));
         mat->ncio(ncio, "EvI", {"dimE", "dimI"});
         ncio.flush();
     }
+#endif
 
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvE\n");
@@ -511,6 +513,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         mat2.ncio(ncio, "I2vE", {"dimI2", "dimE"});
         ncio.flush();
     }
+#if 1
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvA\n");
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> mat(
@@ -531,6 +534,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
         ncio.flush();
     }
+#endif
 
     // Store the dimensions
     printf("---- Storing Dimensions\n");
@@ -706,6 +710,7 @@ int main(int argc, char **argv)
         int iO = args.chunk_range[0][1];    // Where we start scanning in fgiceO
         int jO=args.chunk_range[0][0];
         int ijO = jO * hspecO.im + iO;
+//printf("elevmaskI: iO=%d, jO=%d, ijO=%d\n", iO, jO, ijO);
         printf("BEGIN O(%d, %d)\n", jO, iO);
         for (; jO < args.chunk_range[1][0]; ++jO) {
             for (; iO < hspecO.im; ++iO, ++ijO) {
@@ -715,6 +720,7 @@ int main(int argc, char **argv)
                     // Add these I grid cells to elevmaskI
                     for (int jI=jO*mult_j; jI<(jO+1)*mult_j; ++jI) {
                     for (int iI=iO*mult_i; iI<(iO+1)*mult_i; ++iI) {
+//printf("elevmaskI(%d,%d) = %d %d\n", jI, iI, fgiceI(jI,iI), elevI(jI,iI));
                         if (fgiceI(jI,iI)) {
                             elevmaskI(jI,iI) = elevI(jI,iI);
                         }
