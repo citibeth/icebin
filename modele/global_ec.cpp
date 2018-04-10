@@ -57,6 +57,39 @@ using namespace spsparse;
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
+
+
+// https://stackoverflow.com/questions/8136974/c-functions-for-integer-division-with-well-defined-rounding-strategy?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+static int div_down(int n, int d) {
+  if (n < 0) {
+    return -((d - n - 1) / d);
+  } else {
+    return n / d;
+  }
+}
+
+static int div_up(int n, int d) {
+  if (n < 0) {
+    return -(-n / d);
+  } else {
+    return (n + d - 1) / d;
+  }
+}
+
+static int div_to_zero(int n, int d) {
+  return n / d;
+}
+
+static int div_to_nearest(int n, int d) {
+  if (n < 0) {
+    return (n - d/2 + 1) / d;
+  } else {
+    return (n + d/2) / d;
+  }
+}
+// ----------------------------------------------------------------
+
+
 // This parameter controls memory use.  Larger = more memory, smaller = more segments
 static int const chunk_size = 4000000;    // Not a hard limit
 
@@ -236,7 +269,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "--ec '%%s' must have just two or three values", ec_a.getValue().c_str());
         ec_range[0] = _ec[0];
         ec_range[1] = _ec[1];
-        ec_skip = (_ec.size() == 3 ? _ec[2] : 1);
+        ec_skip = (_ec.size() == 3 ? _ec[2] : 200);
 
         ofname = ofname_a.getValue();
         scale = !raw_a.getValue();
@@ -384,7 +417,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_standard(
 
     // Set up elevation classes    
     std::vector<double> hcdefs;
-    for (double elev=args.ec_range[0]; elev <= args.ec_range[1]; elev += args.ec_range[2]) {
+    for (double elev=args.ec_range[0]; elev <= args.ec_range[1]; elev += args.ec_skip) {
         hcdefs.push_back(elev);
     }
 
@@ -613,6 +646,7 @@ void global_ec_section(FileLocator const &files, ParseArgs &args, blitz::Array<d
 void write_chunk_makefile(
     std::string const &ofname,
     std::vector<string> const &arg_strings,
+    ParseArgs const &args,
     std::vector<std::array<int,5>> const &chunks)
 {
     ofstream fout;
@@ -640,8 +674,12 @@ void write_chunk_makefile(
         std::string chunkno(strprintf("%02d", chunk[0]));
         fout << ofname << "-" << chunkno << " : " << ofname << ".mk" << endl << "\t";
         for (auto const &arg : arg_strings) fout << arg << " ";
+
         fout << "--runchunk " << chunk[0];
         for (int i=1; i<5; ++i) fout << "," << chunk[i];
+
+        fout << " --elev-classes " << args.ec_range[0] << "," << args.ec_range[1] << "," << args.ec_skip;
+
         fout << "\n";
     }
 
@@ -720,6 +758,18 @@ int main(int argc, char **argv)
         ncio_blitz(ncio, elevI, args.elevI_vname, "short", {});
     }
 
+    // Get max. and min. elevation for ice
+    std::array<int16_t,2> elevI_range {10000.,-10000.};
+    for (int j=0; j<hspecI.jm; ++j) {
+    for (int i=0; i<hspecI.im; ++i) {
+        if (fgiceI(j,i)) {
+            elevI_range[0] = std::min(elevI_range[0], elevI(j,i));
+            elevI_range[1] = std::max(elevI_range[1], elevI(j,i));
+        }
+    }}
+    // C++11 standard rounds toward 0
+    args.ec_range[0] = args.ec_skip*std::floor((double)elevI_range[0] / args.ec_skip);
+    args.ec_range[1] = args.ec_skip*std::ceil((double)elevI_range[1] / args.ec_skip);
 
     if (args.run_chunk) {
         // ============== Run just one chunk
@@ -798,7 +848,7 @@ int main(int argc, char **argv)
 
 
         // Create a makefile
-        write_chunk_makefile(args.ofname, arg_strings, chunks);
+        write_chunk_makefile(args.ofname, arg_strings, args, chunks);
     }
 
     return 0;
