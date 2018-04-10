@@ -155,7 +155,7 @@ void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 
 // ---------------------------------------------------------------------
 // RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &sheet_name) const
-//        ---> see RegridMatrices.cpp
+//        ---> see RegridMatrices_Dynamic.cpp
 // ---------------------------------------------------------------------
 
 

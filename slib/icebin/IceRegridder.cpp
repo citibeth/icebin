@@ -199,12 +199,6 @@ extern void linterp_1d(
     indices[1] = i1;
     double ratio = (xx - xpoints[i0]) / (xpoints[i1] - xpoints[i0]);
 
-if (ratio < 0.0 || ratio > 1.0) {
-    printf("BAD WEIGHTS: %g [%d]", xx, n);
-    for (int i=0; i<n; ++i) printf(" %f", xpoints[i]);
-    printf("\n");
-}
-
     weights[0] = (1.0 - ratio);
     weights[1] = ratio;
 }

@@ -71,7 +71,8 @@ extern void linterp_1d_b(
     int i1 = lower_bound(xpoints.begin(), xpoints.end(), xx) - xpoints.begin();
 
     if (i1 <= 0) i1 = 1;
-    if (i1 >= n) i1 = n-1;
+    if (i1 >= n) (*icebin_error)(-1,
+        "Elevation %g out of bounds (%g, %g)", xx, xpoints[0], xpoints[xpoints.size()-1]);
 
     int i0 = i1-1;
     indices[0] = i0;
@@ -124,8 +125,6 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
                     auto const iE1 = gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[1]});
                     ret.add({iG, iE1},
                         aexgrid.native_area(id) * whps[1]);
-
-//printf("grid: iA=%ld %ld %ld %ld iE=(%d %d -> %ld %ld)\n", iA, iI, iX, iG, ihps[0], ihps[1], iE0, iE1);
 
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {

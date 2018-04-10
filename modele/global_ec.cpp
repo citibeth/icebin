@@ -36,6 +36,7 @@ Regular earth has
 #include <ibmisc/netcdf.hpp>
 #include <ibmisc/stdio.hpp>
 #include <ibmisc/filesystem.hpp>
+#include <spsparse/eigen.hpp>
 #include <spsparse/SparseSet.hpp>
 
 //#include <icebin/Grid.hpp>
@@ -184,7 +185,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
         TCLAP::ValueArg<std::string> ec_a("E", "elev-classes",
             "Elevations [m] for the elevation classes: lowest,highest,skip",
-            false, "-100,3700,200", "elevations", cmd);
+            false, "-100,4500,200", "elevations", cmd);
 
         TCLAP::ValueArg<std::string> ofname_a("o", "output",
             "Output filename (NetCDF) for ECs",
@@ -407,7 +408,32 @@ std::unique_ptr<GCMRegridder> new_gcmA_standard(
 
     return std::unique_ptr<GCMRegridder>(gcmA.release());
 }
+// -------------------------------------------------
+void check_negative(linear::Weighted_Eigen const &mat, std::string const &name)
+{
+    bool neg=false;
+    std::array<blitz::Array<double,1> const *, 2> const weights {&mat.wM, &mat.Mw};
+    for (int j=0; j<2; ++j) {
+        auto &wt(*weights[j]);
+        for (int i=0; i<wt.extent(0); ++i) {
+            if (wt(i) < 0) {
+                printf("wt[%d](%d) = %g\n", j,i,wt(i));
+                neg = true;
+            }
+        }
+    }
 
+    for (auto ii(begin(*mat.M)); ii != end(*mat.M); ++ii) {
+        if (ii->value() < 0) {
+            printf("%s(%d,%d)=%g\n", name.c_str(), ii->index(0), ii->index(1), ii->value());
+            neg = true;
+        }
+    }
+
+    if (neg) (*icebin_error)(-1, "Negative values found in matrix or weights for %s", name.c_str());
+
+}
+// -------------------------------------------------
 std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
     FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
 {
@@ -492,18 +518,18 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
         ncio.flush();
     }
-#if 1
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating EvI\n");
         auto mat(rm->matrix_d("EvI", {&dimE, &dimI}, params));
+        check_negative(*mat, "EvI");
         mat->ncio(ncio, "EvI", {"dimE", "dimI"});
         ncio.flush();
     }
-#endif
 
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvE\n");
         auto mat(rm->matrix_d("IvE", {&dimI, &dimE}, params));
+        check_negative(*mat, "IvE");
         mat->ncio(ncio, "IvE", {"dimI", "dimE"});
         ncio.flush();
 
@@ -513,11 +539,12 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         mat2.ncio(ncio, "I2vE", {"dimI2", "dimE"});
         ncio.flush();
     }
-#if 1
+
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating IvA\n");
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> mat(
             rm->matrix_d("IvA", {&dimI, &dimA}, params));
+        check_negative(*mat, "IvA");
         mat->ncio(ncio, "IvA", {"dimI", "dimA"});
         ncio.flush();
 
@@ -531,10 +558,10 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
     {NcIO ncio(ofname, 'a', nocompress);
         printf("---- Generating AvE\n");
         auto mat(rm->matrix_d("AvE", {&dimA, &dimE}, params));
+        check_negative(*mat, "AvE");
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
         ncio.flush();
     }
-#endif
 
     // Store the dimensions
     printf("---- Storing Dimensions\n");
