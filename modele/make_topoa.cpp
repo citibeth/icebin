@@ -18,7 +18,7 @@ static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 struct ParseArgs {
     std::string topoo_fname;
-    std::string global_ec_fname;
+//    std::string global_ec_fname;
     std::string global_ec_mm_fname;
     std::string elevmask_fname;
         std::string elevI_vname, fgiceI_vname;
@@ -45,9 +45,11 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "TOPOO file, writen by make_topoo",
             false, "topoo.nc", "topoo file", cmd);
 
+#if 0
         TCLAP::ValueArg<std::string> global_ec_a("b", "global_ec",
             "Elevation Class Matrix file (NOT mismatched)",
             false, "global_ec.nc", "topoo file", cmd);
+#endif
 
         TCLAP::ValueArg<std::string> global_ec_mm_a("c", "global_ec_mm",
             "Elevation Class Matrix file (mismatched)",
@@ -73,7 +75,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         cmd.parse( argc, argv );
 
         topoo_fname = topoo_a.getValue();
-        global_ec_fname = global_ec_a.getValue();
+//        global_ec_fname = global_ec_a.getValue();
         global_ec_mm_fname = global_ec_mm_a.getValue();
         elevmask_fname = elevmask_a.getValue();
             elevI_vname = elevI_vname_a.getValue();

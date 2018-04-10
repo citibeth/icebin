@@ -185,7 +185,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
         TCLAP::ValueArg<std::string> ec_a("E", "elev-classes",
             "Elevations [m] for the elevation classes: lowest,highest,skip",
-            false, "-100,4500,200", "elevations", cmd);
+            false, "-100,5100,200", "elevations", cmd);
 
         TCLAP::ValueArg<std::string> ofname_a("o", "output",
             "Output filename (NetCDF) for ECs",
