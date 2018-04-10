@@ -262,7 +262,7 @@ if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, 
 
 
             fhcE2(ec_base+ihc,iA) = values(i);
-            undericeE2(ec_base+ihc,iA) = UI_ICEBIN;
+            undericeE2(ec_base+ihc,iA) = UI_NOTHING;    // No IceBin coupling here
             elevE2(ec_base+ihc,iA) = meta.hcdefs[ihc];
         }
     }

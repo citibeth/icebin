@@ -535,10 +535,14 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         printf("---- Saving metadata\n");
         get_or_put_att(*ncio.nc, ncio.rw, "mismatched", args.mismatched);
 
-        hspecA.ncio(ncio, "hspecA");
         hspecI.ncio(ncio, "hspecI");
+        hspecI2.ncio(ncio, "hspecI2");
+        hspecA.ncio(ncio, "hspecA");
 
         gcmA.ice_regridders()[0]->agridI.indexing.ncio(ncio, "indexingI");
+        {HntrGrid hgridI2(hspecI2);
+            hgridI2.indexing.ncio(ncio, "indexingI2");
+        }
         gcmA.agridA.indexing.ncio(ncio, "indexingA");
         gcmA.indexingHC.ncio(ncio, "indexingHC");
         gcmA.indexingE.ncio(ncio, "indexingE");
