@@ -508,7 +508,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
 
 
 
-void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,2> const &elevmaskI)
+void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,2> const &elevmaskI, HntrSpec &hspecI2)
 {
 
     std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
@@ -524,6 +524,8 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
 
 
     std::string ofname(strprintf("%s-%02d", args.ofname.c_str(), args.chunk_no));
+
+    dimI2.set_sparse_extent(hspecI2.size());
 
     HntrSpec hspecA(cast_GridSpec_LonLat(
         *gcmA.agridA.spec).hntr);
@@ -636,12 +638,12 @@ void global_ec_section(FileLocator const &files, ParseArgs &args, blitz::Array<d
     if (args.mismatched) {
         // Mismatched grids
         auto gcmA(new_gcmA_mismatched(files, args, elevmaskI));
-        global_ec_section(*gcmA, args, elevmaskI);
+        global_ec_section(*gcmA, args, elevmaskI, args.hspecI2);
     } else {
         // Regular grids
         HntrSpec const hspecA(make_hntrA(args.hspecO));
         auto gcmA(new_gcmA_standard(hspecA, "Atmosphere", args, elevmaskI));
-        global_ec_section(*gcmA, args, elevmaskI);
+        global_ec_section(*gcmA, args, elevmaskI, args.hspecI2);
     }
 }
 
@@ -789,11 +791,12 @@ int main(int argc, char **argv)
 
         // Set up elevmaskI for the specified range of O grid cells
         int iO = args.chunk_range[0][1];    // Where we start scanning in fgiceO
-        int jO=args.chunk_range[0][0];
+        int jO = args.chunk_range[0][0];
         int ijO = jO * hspecO.im + iO;
 //printf("elevmaskI: iO=%d, jO=%d, ijO=%d\n", iO, jO, ijO);
+printf("Range: [%d %d] - [%d %d]\n", jO, iO, jO1, iO1);
         printf("BEGIN O(%d, %d)\n", jO, iO);
-        for (; jO < args.chunk_range[1][0]; ++jO) {
+        for (; ; ++jO) {
             for (; iO < hspecO.im; ++iO, ++ijO) {
                 if (ijO >= ijO1) goto endscan;    // Double break
 

@@ -88,6 +88,20 @@ int iGlobal = 0;
             auto wM_d(nc_read_blitz<double,1>(ncio.nc, BvA+".wM"));
             for (int i=0; i<wM_d.extent(0); ++i) wM.add({dimB(i)}, wM_d(i));
 
+
+            std::array<long,2> shape;
+            auto _dimB(ncio.nc->getVar("dim"+sgrids[0]));
+            get_or_put_att(_dimB, 'r', "sparse_extent", "long", &shape[0], 1);
+            auto _dimA(ncio.nc->getVar("dim"+sgrids[1]));
+            get_or_put_att(_dimA, 'r', "sparse_extent", "long", &shape[1], 1);
+
+            // Transfer full matrix shape meta-data
+            M.set_shape(shape);
+            wM.set_shape({shape[0]});
+            Mw.set_shape({shape[1]});
+            
+//                std::array<long,2>{dimB.sparse_extent(), dimA.sparse_extent()});
+
             auto indices_d(nc_read_blitz<int,2>(ncio.nc, BvA+".M.indices"));
             auto values_d(nc_read_blitz<double,1>(ncio.nc, BvA+".M.values"));
             for (int i=0; i<values_d.extent(0); ++i) {
