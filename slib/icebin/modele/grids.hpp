@@ -26,6 +26,7 @@ int const JMB = 90;
 extern HntrSpec const g1mx1m;
 extern HntrSpec const g2mx2m;
 extern HntrSpec const g10mx10m;
+extern HntrSpec const gqxq;
 extern HntrSpec const ghxh;
 extern HntrSpec const g1x1;
 double const dLATM = 180.*60./JM;  //  latitude spacing (minutes)

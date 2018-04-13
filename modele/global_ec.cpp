@@ -112,7 +112,6 @@ struct ParseArgs {
     std::string ofname;
     std::array<double,2> ec_range;    // Lowest and highest elevation classes [m]
     double ec_skip;                    // Distance between elevation classes [m]
-    bool scale;
     bool const correctA = false;    // Only needed with projected I grids (and then not really)
     std::array<double,3> sigma;    // NOTE: Smoothing in general does not work when ice is sectioned.  Should be applied later if user wants it.
 
@@ -137,7 +136,6 @@ ostream& operator<<(ostream& os, ParseArgs const &args)
         << "    topoo_fname: " << args.topoo_fname << endl
         << "    ofname: " << args.ofname << endl
         << "    ec_range: " << args.ec_range << "  ec_skip=" << args.ec_skip << endl
-        << "    scale: " << (args.scale ? "true" : "false") << endl
         << "    sigma: " << args.sigma;
 }  
 
@@ -187,8 +185,8 @@ ParseArgs::ParseArgs(int argc, char **argv)
             true, "g1mx1m", "ice grid name", cmd);
 
         TCLAP::UnlabeledValueArg<std::string> shspecI2_a(
-            "gridI2", "Name of Display Ice grid (eg: ghxh)",
-            true, "ghxh", "display ice grid name", cmd);
+            "gridI2", "Name of Display Ice grid (eg: gqxq).  gridI must divide evenly into gridI2; and gridI2 must divide evenly into gridO",
+            true, "gqxq", "display ice grid name", cmd);
 
         TCLAP::UnlabeledValueArg<std::string> nc_fname_a(
             "elevmaskI-fname",
@@ -223,10 +221,6 @@ ParseArgs::ParseArgs(int argc, char **argv)
         TCLAP::ValueArg<std::string> ofname_a("o", "output",
             "Output filename (NetCDF) for ECs",
             false, "global_ec.nc", "mask var name", cmd);
-
-        TCLAP::SwitchArg raw_a("r", "raw",
-             "Produce raw (unscaled) matrices?",
-             cmd, false);
 
         TCLAP::SwitchArg mismatched_a("x", "mismatched",
              "Produce mismatched (ocean-different) matrices?",
@@ -272,7 +266,6 @@ ParseArgs::ParseArgs(int argc, char **argv)
         ec_skip = (_ec.size() == 3 ? _ec[2] : 200);
 
         ofname = ofname_a.getValue();
-        scale = !raw_a.getValue();
         mismatched = mismatched_a.getValue();
 
         eq_rad = eq_rad_a.getValue();
@@ -347,9 +340,21 @@ void nocompress_configure_var(netCDF::NcVar ncvar)
 }
 
 
+/** Helper for Hntr::overlap() */
+class ElevMaskClip {
+    blitz::Array<double,1> const elevmaskI;
+public:
+    ElevMaskClip(blitz::Array<double,1> const &_elevmaskI) : elevmaskI(_elevmaskI) {}
+
+    bool operator()(int ix) const
+        { return !std::isnan(elevmaskI(ix)); }
+};
+
+
 linear::Weighted_Eigen make_I2vX(
     linear::Weighted_Eigen const &IvX,
     ParseArgs const &args,
+    blitz::Array<double,1> const &elevmaskI,
     SparseSet<long,int> &dimI2,
     SparseSet<long,int> &dimI,
     SparseSet<long,int> &dimX,
@@ -359,8 +364,8 @@ linear::Weighted_Eigen make_I2vX(
     // I2vI: Convert to plottable global ice grid
     Hntr hntr_IvI2(17.17, args.hspecI, args.hspecI2);
     EigenSparseMatrixT I2vI(MakeDenseEigenT(
-        std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
-            &hntr_IvI2, std::placeholders::_1, args.eq_rad, DimClip(&dimI)),
+        std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,ElevMaskClip>,
+            &hntr_IvI2, std::placeholders::_1, args.eq_rad, ElevMaskClip(elevmaskI)),
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
         {&dimI, &dimI2}, 'T').to_eigen());
 
@@ -373,14 +378,11 @@ linear::Weighted_Eigen make_I2vX(
         I2vI * map_eigen_diagonal(I2vIs) * map_eigen_colvector(IvX.wM)));
     I2vX.wM.reference(to_blitz(wI2vX_e));
     I2vX.Mw.reference(IvX.Mw.copy());
-    if (params.scale) {
-        I2vX.M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sI2vI) * I2vI * *IvX.M));
-    } else {
-        blitz::Array<double,1> sIvX(1. / IvX.wM);
-        I2vX.M.reset(new EigenSparseMatrixT(
-            I2vI * map_eigen_diagonal(sIvX) * *IvX.M));
-    }
+
+    // Unscaled matrix
+    blitz::Array<double,1> sIvX(1. / IvX.wM);
+    I2vX.M.reset(new EigenSparseMatrixT(
+        I2vI * map_eigen_diagonal(sIvX) * *IvX.M));
 
     return I2vX;
 }
@@ -515,7 +517,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
 
     // ---------- Generate and store the matrices
     // Use the mismatched regridder to create desired matrices and save to file
-    RegridParams params(args.scale, args.correctA, args.sigma);
+    RegridParams params(false, args.correctA, args.sigma);
     SparseSet<long,int> dimA, dimI, dimE;
     SparseSet<long,int> dimI2;
 
@@ -573,7 +575,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         ncio.flush();
 
         // Save smaller / more wieldly display version of the matrix
-        auto mat2(make_I2vX(*mat, args, dimI2, dimI, dimE, params));
+        auto mat2(make_I2vX(*mat, args, reshape1(elevmaskI), dimI2, dimI, dimE, params));
         mat.release();
         mat2.ncio(ncio, "I2vE", {"dimI2", "dimE"});
         ncio.flush();
@@ -588,7 +590,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         ncio.flush();
 
         // Save smaller / more wieldly display version of the matrix
-        auto mat2(make_I2vX(*mat, args, dimI2, dimI, dimA, params));
+        auto mat2(make_I2vX(*mat, args, reshape1(elevmaskI), dimI2, dimI, dimA, params));
         mat.release();
         mat2.ncio(ncio, "I2vA", {"dimI2", "dimA"});
         ncio.flush();
@@ -801,6 +803,7 @@ printf("Range: [%d %d] - [%d %d]\n", jO, iO, jO1, iO1);
                 if (ijO >= ijO1) goto endscan;    // Double break
 
                 if (fgiceO(jO, iO) != 0) {
+//printf("fgiceO(%d,%d)\n", jO, iO);
                     // Add these I grid cells to elevmaskI
                     for (int jI=jO*mult_j; jI<(jO+1)*mult_j; ++jI) {
                     for (int iI=iO*mult_i; iI<(iO+1)*mult_i; ++iI) {
