@@ -1,6 +1,5 @@
 #include <cstdio>
 #include <prettyprint.hpp>
-#include <ibmisc/runlength.hpp>
 #include <icebin/error.hpp>
 #include <ibmisc/linear/linear.hpp>
 #include <ibmisc/linear/compressed.hpp>

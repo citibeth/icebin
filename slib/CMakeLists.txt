@@ -24,7 +24,7 @@ add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
         ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.h
     COMMAND
-    python ${IBMISC_INCLUDE_DIR}/ibmisc/f90blitz_f.py icebin_f90blitz
+    python2 ${IBMISC_INCLUDE_DIR}/ibmisc/f90blitz_f.py icebin_f90blitz
         ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
         ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.h)
 
