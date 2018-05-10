@@ -202,10 +202,6 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
 
 
-        TCLAP::ValueArg<std::string> foceanI_vname_a("n", "focean",
-            "Name of NetCDF variable containing ice focean (1 where there is ice)",
-            false, "FGICE1m", "focean var name", cmd);
-
         TCLAP::ValueArg<std::string> fgiceI_vname_a("m", "mask",
             "Name of NetCDF variable containing ice mask (1 where there is ice)",
             false, "FGICE1m", "mask var name", cmd);

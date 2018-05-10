@@ -56,7 +56,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
             false, "global_ec_mm.nc", "topoo file", cmd);
 
         TCLAP::ValueArg<std::string> elevmask_a("d", "elevmask",
-            "Source for FGICE1m and ZICETOP1m",
+            "Source file for FGICE1m and ZICETOP1m",
             false, "FGICE1m", "focean var name", cmd);
 
             TCLAP::ValueArg<std::string> elevI_vname_a("e", "elev",
