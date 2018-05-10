@@ -241,6 +241,11 @@ printf("extent: (%d, %d, %d)\n", fhc.extent(0), fhc.extent(1), fhc.extent(2));
         std::array<int,2> iTuple;
             int &iA2(iTuple[0]);
             int &ihc(iTuple[1]);
+
+        for (int ihc=0; ihc<meta.hcdefs.size(); ++ihc) {
+            printf("elevE[ihc=%d] = %g\n", ec_base+ihc, meta.hcdefs[ihc]);
+        }
+
         for (int i=0; i<nnz; ++i) {
             auto const iA(indices[0](i));
             auto const iE(indices[1](i));
