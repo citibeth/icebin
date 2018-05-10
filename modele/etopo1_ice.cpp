@@ -52,13 +52,11 @@ void etopo1_ice(
     fgice1m = 0;
 
     // Read in ZNGDC1 (1-degree resolution)
-    // Read hand-modified FCONT1 (formerly from "ZNGDC1")
     blitz::Array<double,2> fgice1(JM1,IM1);
-    {NcIO ncio(files.locate("ZNGDC1-SeparateGreenland.nc"), 'r');
+    {NcIO ncio(files.locate("ZNGDC1.nc"), 'r');
         // ------- Ice Fractions
         ncio_blitz(ncio, fgice1, "FGICE1", "double", {});
     }
-
 
     NcIO nch(ofname_root + "h.nc", 'w');
 
@@ -234,7 +232,7 @@ printf("j1 i1=%d %d (area = %g %g)\n", j1, i1, snow1, remain1m);
         NcVar ncvar;
         ncvar = ncio_blitz(ncout, focean1m, "FOCEAN1m", "short", dims);
         get_or_put_all_atts(ncvar, 'w', etopo1_atts.at("FOCEAN"));
-        ncvar.putAtt("units", "m");
+        ncvar.putAtt("units", "1");
         ncvar.putAtt("source", include_greenland ? "ETOPO1" : "ETOPO1, Greenland removed");
 
         ncvar = ncio_blitz(ncout, fgice1m, "FGICE1m", "short", dims);

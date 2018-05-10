@@ -174,7 +174,7 @@ int main(int argc, char **argv)
 	        ("output-file", po::value<string>(), "output file")
             ("endian", po::value<Endian>()->default_value(Endian::LITTLE), "[big | little]")
             ("type", po::value<string>()->default_value("float-double"),
-                "Data type of (a) Fortran input, (b) NetCDF output [float-double | int16_t]")
+                "Data type of (a) Fortran input, (b) NetCDF output [float-double | int16]")
             ("names", po::value<string>()->default_value(""), "(OPTIONAL) comma-separated variable names")
 	    ;
 
