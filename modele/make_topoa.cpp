@@ -103,7 +103,7 @@ int main(int argc, char **argv)
     EnvSearchPath files("MODELE_FILE_PATH");
 
     // Open output file
-    NcIO topoa_nc(args.topoa_fname, 'w', "classic");
+    NcIO topoa_nc(args.topoa_fname, 'w');
 
     // =========== Read grids, etc.
     global_ec::Metadata meta;
