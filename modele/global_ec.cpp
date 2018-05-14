@@ -531,7 +531,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         *gcmA.ice_regridders()[0]->agridI.spec).hntr);
 
 
-    {NcIO ncio(ofname, 'w', nocompress);
+    {NcIO ncio(ofname, 'w', "nc4", nocompress);
         printf("---- Saving metadata\n");
         get_or_put_att(*ncio.nc, ncio.rw, "mismatched", args.mismatched);
 
@@ -555,7 +555,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
         ncio.flush();
     }
-    {NcIO ncio(ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating EvI\n");
         auto mat(rm->matrix_d("EvI", {&dimE, &dimI}, params));
         check_negative(*mat, "EvI");
@@ -563,7 +563,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         ncio.flush();
     }
 
-    {NcIO ncio(ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating IvE\n");
         auto mat(rm->matrix_d("IvE", {&dimI, &dimE}, params));
         check_negative(*mat, "IvE");
@@ -577,7 +577,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         ncio.flush();
     }
 
-    {NcIO ncio(ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating IvA\n");
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> mat(
             rm->matrix_d("IvA", {&dimI, &dimA}, params));
@@ -592,7 +592,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
         ncio.flush();
     }
 
-    {NcIO ncio(ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating AvE\n");
         auto mat(rm->matrix_d("AvE", {&dimA, &dimE}, params));
         check_negative(*mat, "AvE");
@@ -602,7 +602,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,
 
     // Store the dimensions
     printf("---- Storing Dimensions\n");
-    {NcIO ncio(ofname, 'a', nocompress);
+    {NcIO ncio(ofname, 'a', "nc4", nocompress);
         NcVar ncv;
 
         ncv = dimA.ncio(ncio, "dimA");
