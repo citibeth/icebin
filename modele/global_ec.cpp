@@ -763,7 +763,7 @@ int main(int argc, char **argv)
     }
 
     // Get max. and min. elevation for ice
-    std::array<int16_t,2> elevI_range {10000.,-10000.};
+    std::array<int16_t,2> elevI_range {10000,-10000};
     for (int j=0; j<hspecI.jm; ++j) {
     for (int i=0; i<hspecI.im; ++i) {
         if (fgiceI(j,i)) {
