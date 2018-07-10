@@ -33,6 +33,12 @@ ModelE-specific command line utilities included with IceBin.
    icebin_regridding
    mismatched_regridding
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Running ModelE
+
+   landice_modes
+
 
 .. toctree::
    :maxdepth: 2
