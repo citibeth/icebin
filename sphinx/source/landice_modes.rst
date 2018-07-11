@@ -45,14 +45,13 @@ Stieglitz Snow/Firn Model
 The Stieglitz snow/firn model may be enabled by making the following
 changes to the ModelE rundeck:
 
-#. Add ``#define LIPLUGGABLE`` to the *defines* section.
+#. Add ``lipluggable`` to the *Components* section of the rundeck.
 
 #. Build with `modele_control
-   <https://github.com/citibeth/modele-control>`.  This is required
-   for:
+   <https://github.com/citibeth/modele-control>`.  If not, one must also:
 
-   #. Adding the ``lipluggable`` code derectory when ``LIPLUGGABLE``
-      is defined.
+   #. Add ``#define LIPLUGGABLE`` to the ``Preprocessor Options`` section of the rundeck.
+
 
 #. The following rundeck parameters are now enabled.  See
    ``LISnowParams.F90`` for documentation:
