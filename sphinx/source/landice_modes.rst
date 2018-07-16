@@ -37,6 +37,29 @@ with or without elevation classes.
    ``modele_control`` is required for:
    #. Code generation to dump constants
 
+File Format: TOPO
+`````````````````
+
+The ``TOPO`` file provides land surface fraction and elevation class
+information to ModelE; see `here
+<http://twoway.readthedocs.io/en/latest/topo.html>` for more
+information.  The number of elevation classes is picked up
+automatically; if a classic ``TOPO`` file without elevation class
+information is used, then ModelE will rever to running without
+elevation classes.
+
+
+File Format: GIC
+````````````````
+
+Variables ``snowli`` and ``tlandi`` in the ``GIC`` file may have an
+extra ``nhc`` (elevation class) dimension, but they don't have to.  If
+they do, the ``nhc`` from ``GIC`` must match that from ``TOPO``.
+Otherwise, the values of ``snowli`` and ``tlandi`` are repeated for
+every elevation class within each grid cell.
+
+
+
 Stieglitz Snow/Firn Model
 -------------------------
 
@@ -65,6 +88,36 @@ changes to the ModelE rundeck:
    * ``lisnow_min_fract_cover``
    * ``lisnow_dump_forcing``
    * ``lisnow_percolate_nl``
+
+File Format: TOPO
+`````````````````
+
+The ``TOPO`` file is the same for Stieglitz vs. Classic ice model.  As
+with Classic, ModelE infers elevation classes for a run from the
+``TOPO`` file.
+
+
+File Format: GIC
+````````````````
+
+Stieglitz has a different internal state from the classic ice model.  Therefore, the variables it reads form ``GIC`` are different.  The variables ``snowli`` and ``tlandi`` are no longer needed.  They are replaced by (NetCDF index ordering):
+
+* ``dz(nhc,j,i,nlice)`` [*m*]: Depth of each layer
+* ``wsn(nhc,j,i,nlice)`` [*kg m-2*]: Mass of each layer
+* ``hsn(nhc,j,i,nlice)`` [*J m-2*]: Enthalpy of each layer
+* ``trsn(nhc,j,i,nlice,ntm)`` (OPTIONAL) Tracer state
+
+.. note::
+
+   #. Specific enthalpy [*J kg-1*] for ``hsn`` would have been more
+      convenient than enthalpy because it corresponds directly to
+      temperature.  That change might happen in the future.
+
+   #. As with the Classic model, the ``nhc`` (elevation class)
+      dimension is optional.  If it is missing, values for these
+      variables provided by ``GIC`` are read into all elevation
+      classes.
+
 
 Coupled Mode
 ------------
