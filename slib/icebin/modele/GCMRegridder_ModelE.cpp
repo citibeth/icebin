@@ -434,6 +434,12 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm(
     if (!hntrA.is_set()) (*icebin_error)(-1, "hntrA must be set");
     if (!hntrO.is_set()) (*icebin_error)(-1, "hntrO must be set");
 
+/*
+AOmvAAm
+The problem is.... on A gridcells where SOME of the O grid cells are used and SOME are not, weighting is not being taken into account properly.  This de-weights fhc (AvE) by a fraction within that gridcell.
+
+DimClip here needs dimAOm.  Instead, it is being given dimAOp, which is a superset of dimAOm (see comment in Compute_wAOm).  The result is hntr is being scaled as if AOp, but with values for AOm.  Thus the under-scaling of A grid cells containing P grid cells that have been zeroed out.
+*/
     Hntr hntr_AOmvAAm(17.17, hntrO, hntrA);
     EigenSparseMatrixT AAmvAOm(MakeDenseEigenT(
         std::bind(&Hntr::overlap<MakeDenseEigenT::AccumT,DimClip>,
