@@ -132,7 +132,7 @@ printf("AA1\n");
         // Define output variables
         auto dimsA(get_or_add_dims(topoa_nc, {"jm", "im"}, {meta.hspecA.jm, meta.hspecA.im}));
 
-        // Create the AvO matrix (Eigen format)
+        // Create the AvO regridder (but not matrix)
         Hntr hntr_AvO(17.17, meta.hspecA, hspecO);
 
         // Regrid TOPOO variables and save to TOPOA
@@ -266,13 +266,11 @@ printf("extent: (%d, %d, %d)\n", fhc.extent(0), fhc.extent(1), fhc.extent(2));
 if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, values(i));
 
 
-            fhcE2(ec_base+ihc,iA) = values(i);
+            fhcE2(ec_base+ihc,iA) += values(i);
             undericeE2(ec_base+ihc,iA) = UI_NOTHING;    // No IceBin coupling here
             elevE2(ec_base+ihc,iA) = meta.hcdefs[ihc];
         }
     }
-
-printf("BB4\n");
 
     // --------------- Write it out
     NcVar info(get_or_add_var(topoa_nc, "info", "int", {}));
@@ -284,8 +282,6 @@ printf("BB4\n");
     ncio_blitz(topoa_nc, elevE, "elevE", "double", dimsE);
     ncio_blitz(topoa_nc, underice, "underice", "double", dimsE);
 
-
-printf("BB5\n");
     topoa_nc.flush();
     topoa_nc.close();
 
