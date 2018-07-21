@@ -334,7 +334,7 @@ class Compute_wAOm {
 public:
     RegridParams paramsO;   // Parameters used with rmO
     SparseSetT dimAOp; // Includes only AO grid cells that interact with an ice sheet.
-    SparseSetT &dimAOm;
+    SparseSetT dimAOm; // Includes only AO grid cells that interact with an ice sheet AND are not rounded to ocean
     EigenColVectorT wAOm_e;
 
     /** Parameters come from top-level regridding subroutine */
@@ -353,6 +353,21 @@ Compute_wAOm::Compute_wAOm(
 : paramsO(paramsA),
     dimAOm(dimAOp)        // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
 {
+    // ----------- Compute dimAOm properly
+    // dimAOm is a subset of dimAOp.  Remove points in dimAOp that are ocean.
+    for (int iAOp_d=0; iAOp_d < dimAOp.dense_extent(); ++iAOp_d) {
+        auto const iAO_s(dimAOp.to_sparse(iAOp_d));
+        if (foceanAOp(iAO_s) == 0) dimAOm.add_dense(iAO_s);
+    }
+#if 0
+    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+    HntrSpec const &hspecO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
+    blitz::Array<double, 1> WTO(const_array(blitz::shape(hspecO.jm * hspecO.im), 1.0));
+    Hntr hntr_AAmvAOm(17.17, hspecA, hspecO);
+    blitz::Array<double,1> foceanAAm(hntr_AAmvAOm.regrid(WTO, foceanAOm));
+#endif
+
+
     // ------------ Params for generating sub-matrices
     paramsO.scale = false;
     paramsO.correctA = true;
