@@ -350,14 +350,13 @@ Compute_wAOm::Compute_wAOm(
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     RegridMatrices_Dynamic const *rmO)
-: paramsO(paramsA),
-    dimAOm(dimAOp)        // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
+: paramsO(paramsA)
 {
     // ----------- Compute dimAOm properly
     // dimAOm is a subset of dimAOp.  Remove points in dimAOp that are ocean.
     for (int iAOp_d=0; iAOp_d < dimAOp.dense_extent(); ++iAOp_d) {
         auto const iAO_s(dimAOp.to_sparse(iAOp_d));
-        if (foceanAOp(iAO_s) == 0) dimAOm.add_dense(iAO_s);
+        if (gcmA->foceanAOm(iAO_s) == 0) dimAOm.add_dense(iAO_s);
     }
 #if 0
     HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
@@ -397,7 +396,7 @@ for (int i=0; i<15; ++i) {
     // OmvOp
     EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
         std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '+'),
-        {SparsifyTransform::TO_DENSE},
+        {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
     wAOm_e = sc_AOmvAOp * map_eigen_colvector(wAOp);
