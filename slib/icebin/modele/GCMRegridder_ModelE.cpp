@@ -9,6 +9,30 @@ using namespace ibmisc;
 using namespace spsparse;
 using namespace std::placeholders;
 
+namespace spsparse {
+namespace accum {
+
+template<class IndexT, int RANK>
+class Null {
+{
+public:
+    static const int rank = RANK;
+    typedef IndexT index_type;
+
+    void set_shape(std::array<long, rank> const &_shape)
+        { }
+
+    template<class ValueT>
+    void add(
+        std::array<index_type, rank> const &index,
+        ValueT const &val)
+        {  }
+};
+
+}}    // namespace
+
+
+
 namespace icebin {
 namespace modele {
 
@@ -352,21 +376,6 @@ Compute_wAOm::Compute_wAOm(
     RegridMatrices_Dynamic const *rmO)
 : paramsO(paramsA)
 {
-    // ----------- Compute dimAOm properly
-    // dimAOm is a subset of dimAOp.  Remove points in dimAOp that are ocean.
-    for (int iAOp_d=0; iAOp_d < dimAOp.dense_extent(); ++iAOp_d) {
-        auto const iAO_s(dimAOp.to_sparse(iAOp_d));
-        if (gcmA->foceanAOm(iAO_s) == 0) dimAOm.add_dense(iAO_s);
-    }
-#if 0
-    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
-    HntrSpec const &hspecO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
-    blitz::Array<double, 1> WTO(const_array(blitz::shape(hspecO.jm * hspecO.im), 1.0));
-    Hntr hntr_AAmvAOm(17.17, hspecA, hspecO);
-    blitz::Array<double,1> foceanAAm(hntr_AAmvAOm.regrid(WTO, foceanAOm));
-#endif
-
-
     // ------------ Params for generating sub-matrices
     paramsO.scale = false;
     paramsO.correctA = true;
@@ -376,6 +385,7 @@ printf("dimIp.dense_extent() = %d (sparse=%d)\n", dimIp.dense_extent(), dimIp.sp
     std::unique_ptr<linear::Weighted_Eigen> AOpvIp_corrected(rmO->matrix_d(
         "AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
+printf("dimIp.dense_extent() = %d (sparse=%d)\n", dimIp.dense_extent(), dimIp.sparse_extent());
 
 
 printf("|AOpvIp_corrected|=%ld\n", (long)AOpvIp_corrected->M->nonZeros());
@@ -385,12 +395,27 @@ for (auto ii(begin(*AOpvIp_corrected->M)); ii != end(*AOpvIp_corrected->M); ++ii
     if (n > 15) break;
 }
 
-printf("|wAOp|=%d\n", wAOp.extent(0));
+printf("|wAOp|1=%d\n", wAOp.extent(0));
 for (int i=0; i<15; ++i) {
     printf("    wAOp(%d)=%g\n", i, wAOp(i));
 }
 
 
+    // ----------- Compute dimAOm properly
+    // dimAOm is a subset of dimAOp.  Remove points in dimAOp that are ocean.
+    for (int iAOp_d=0; iAOp_d < dimAOp.dense_extent(); ++iAOp_d) {
+        auto const iAO_s(dimAOp.to_sparse(iAOp_d));
+        if (gcmA->foceanAOm(iAO_s) == 0) dimAOm.add_dense(iAO_s);
+    }
+    printf("|dimAOm|=%ld\n", (long)dimAOm.dense_extent());
+    printf("|dimAOp|=%ld\n", (long)dimAOp.dense_extent());
+#if 0
+    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+    HntrSpec const &hspecO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
+    blitz::Array<double, 1> WTO(const_array(blitz::shape(hspecO.jm * hspecO.im), 1.0));
+    Hntr hntr_AAmvAOm(17.17, hspecA, hspecO);
+    blitz::Array<double,1> foceanAAm(hntr_AAmvAOm.regrid(WTO, foceanAOm));
+#endif
 
 
     // OmvOp
@@ -401,7 +426,7 @@ for (int i=0; i<15; ++i) {
 
     wAOm_e = sc_AOmvAOp * map_eigen_colvector(wAOp);
 
-printf("|wAOp|=%ld   |wAOm_e|=%ld\n", wAOm_e.rows()*wAOm_e.cols(), wAOp.extent(0));
+printf("|wAOm_e|=%ld   |wAOp|=%ld\n", wAOm_e.rows()*wAOm_e.cols(), wAOp.extent(0));
 for (int i=0; i<15; ++i) {
     printf("    wAOp(%d)=%g   wAOm_e(%d)=%g\n", i, wAOp(i), i, wAOm_e(i));
 }
@@ -518,6 +543,8 @@ DimClip here needs dimAOm.  Instead, it is being given dimAOp, which is a supers
 }
 // ========================================================================
 
+
+
 // -----------------------------------------------------------
 /** Computes some intermediate values used by more than one top-level
     regrid generator */
@@ -594,22 +621,55 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
 
         const_universe.reset();        // Check that dimIp hasn't changed
 
-        // dimEOm is a subset of dimEOp
-        SparseSetT &dimEOm(dimEOp);
+        // ------------------------------------
 
-        // EOmvAOm: Repeat A values in E
-        const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
-        std::unique_ptr<linear::Weighted_Eigen> EOmvAOm(
-            rmO->matrix_d("EvA", {&dimEOm, &dimAOm}, paramsO));
-
-printf("EOmvAOm: %ld  dimEOm=%ld  dimAOm=%ld\n", (long)EOmvAOm->M->nonZeros(), dimEOm.dense_extent(), dimAOm.dense_extent());
-int n=0;
-for (auto ii(begin(*EOmvAOm->M)); ii != end(*EOmvAOm->M); ++ii, ++n) {
-    printf("   EOmvAOm(%d %d) = %g\n", dimEOm.to_sparse(ii->row()), dimAOm.to_sparse(ii->col()), ii->value());
-    if (n > 15) break;
-}
+        // EOpvAOp: Repeat A values in E
+        const_universe.reset(new ConstUniverse({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp}));
+        std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
+            rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
 
         const_universe.reset();        // Check that dims didn't change
+
+        // Convert to EOmvAOm by removing cells not in dimAOm
+        // EOmvAOm: Repeat A values in E
+        for (auto ii=EOpvAOp->M->begin(); ii != EOpvAOp->M->end(); ++ii) {
+            auto const iAOp_d = ii->index(1);
+            auto const iAOp_s = dimAOp.to_sparse(iAOp_d);
+            int iAOm_d;
+            if (dimAOm.to_dense_ignore_missing(iAOp_s, iAOm_d)) {
+                auto const iEOp_d = ii->index(1);
+                auto const iEOp_s = dimEOp.to_sparse(iEOp_d);
+                auto const iEOm_d = dimEOp.add_dense(iEOp_s);  // add to dimEOp
+                EOmvAOm_tl.add({iEOm_d, iAOm_d}, ii->value()); // add to EOmvAOm
+                EOmvAOmw(iAOm_d) = 1. / EOpvAOp->Mw(iAOp_d);   // add to EOmvAOmw
+            }
+        }
+
+
+        EigenSparseMatrixT EOmvAOm(crop_mvp(dimAOm, dimAOp, 1, *EOpvAOp->M));
+no... croping must SIMULTANEOUSLY create dimEOm
+
+        // Construct dimEOm based on contents of EOmvAOm
+        for (auto ii=EOmvAOm.begin(); ii != EOmvAOm.end(); ++ii) {
+            dimEOm.add_
+        spcopy(
+            accum::to_dense_ignore_missing({nullptr,&dimAOm},
+            accum::to_sparse({nullptr,&dimAOp},
+            accum::Null<int,2>(),
+            EOmvAOm)));
+
+        // Convert EOpvAOpw to EOmvAOmw by translating indices
+        for (int iAOp_d=0; iAOp_d<EOpvAOp->Mw.extent(0); ++iAOp_d) {
+            auto const iAO_s = dimAOp.to_sparse(iAOp_d);
+            auto const iAOm_d;
+            if (dimAOm.to_dense_ignore_missing(iAO_s, iAOm_d))
+                EOmvAOmw(iAOm_d) = 1. / EOpvAOp->Mw(iAOp_d);
+        }
+
+
+
+        // -----------------------------------
+
         blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
 
 for (int i=0; i < 15; ++i) printf("EOmvAOms(%d) = %g\n", i, EOmvAOms(i));
@@ -673,6 +733,32 @@ printf("XAmvXOm 1: %ld   dimEOm=%ld   dimEAm=%ld\n", (long)XAmvXOm->nonZeros(), 
 
 }
 // -----------------------------------------------------------
+/** Given a matrix with one dimension expressed in dense Ap (or WLOG
+Op) space...  re-does that dimension to dense Am space.  Assumes that
+dimAm is a subset of dimAp.  Dimenions not found will be droped. */
+static EigenSparseMatrixT crop_mvp(
+    SparseSetT &dimAm, SparseSetT &dimAp,    // (const)
+    int index_Apdim,
+    EigenSparseMatrixT const &Ap)
+{
+    std::array<SparseSetT *,2> dimAm_array, dimAp_array;
+    for (int i=0; i<2; ++i) dimAm_array[i] = nullptr;
+    for (int i=0; i<2; ++i) dimAp_array[i] = nullptr;    // --> Don't change
+    dimAm_array[index_Apdim] = &dimAm;      // Change the given index
+    dimAp_array[index_Apdim] = &dimAp;
+    TupleListT<2> Am_tl;
+    spcopy(
+        accum::to_dense_ignore_missing(dimAm_array,
+        accum::to_sparse(dimAp_array,
+        accum::ref(Am_tl))),
+        Ap);
+    std::array<int,2> shape {Ap.rows(), Ap.cols()};
+    shape[index_Apdim] = dimAm.dense_extent();
+    EigenSparseMatrixT Am(shape[0], shape[1]);
+    Am.setFromTriplets(Am_tl.begin(), Am_tl.end());
+    return Am;
+}
+// -----------------------------------------------------------
 /** Computes XAmvIp (with scaling)
 @param dims {dimXAm, dimIp} User-supplied dimension maps, which will be added to.
 @param paramsA Regridding parameters.  NOTE: correctA is ignored.
@@ -690,7 +776,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
-
+printf("BEGIN compute_XAmvIp\n");
     std::string dimXA(strprintf("dim%cA", X));
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
@@ -705,21 +791,38 @@ printf("XOpvIp: %ld\n", (long)(XOpvIp->M->nonZeros()));
 printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
 
     // ----------- Put it all together (XAmvIp)
+printf("BB1\n");
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
+printf("BB2 |sXOpvIp|=%d %p\n", sXOpvIp.extent(0), sXOpvIp.data());
     ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
+printf("BB3\n");
     if (paramsA.scale) {
+printf("AA1\n");
         auto sXAm(sum(*XAmvXOm, 0, '-'));
+printf("AA2\n");
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sXAm) *  *XAmvXOm *
-            map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
+            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 0,
+                map_eigen_diagonal(sXOpvIp) * *XOpvIp->M)));
+printf("AA3\n");
     } else {
+printf("CC1 %p %p %p\n", &*ret, &*XAmvXOm, &*XOpvIp->M);
         ret->M.reset(new EigenSparseMatrixT(
-            *XAmvXOm * map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
+            *XAmvXOm *
+            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 0,
+                map_eigen_diagonal(sXOpvIp) * *XOpvIp->M)));
+printf("CC4\n");
     }
+printf("BB4\n");
     ret->Mw.reference(XOpvIp->Mw);
 
+printf("END compute_XAmvIp\n");
     return ret;
 }
+// -----------------------------------------------------------
+
+
+
 // -----------------------------------------------------------
 /** Computes IpvXAm (with scaling)
 @param dims {dimIp, dimXAm} User-supplied dimension maps, which will be added to.
@@ -768,13 +871,14 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     ret->wM.reference(XOpvIp->Mw);
     if (paramsA.scale) {
         ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sIpvXOp) * *IpvXOp->M *
+            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 1,
+                map_eigen_diagonal(sIpvXOp) * *IpvXOp->M) *
             map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     } else {
         ret->M.reset(new EigenSparseMatrixT(
-            *IpvXOp->M *
-            map_eigen_diagonal(sXOmvXAm) * XOmvXAm
+            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 1, *IpvXOp->M)
+            * map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     }
     ret->Mw.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
