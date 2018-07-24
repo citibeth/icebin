@@ -493,10 +493,10 @@ DimClip here needs dimAOm.  Instead, it is being given dimAOp, which is a supers
 
     // ------------ Compute AOmvEOm
     SparseSetT dimEOm;
-    std::unique_ptr<linear::Weighted_Eigen> AOmvEOm(
+    std::unique_ptr<linear::Weighted_Eigen> AOmvEOm(    // unscaled
         rmO->matrix_d("AvE", {&dimAOm, &dimEOm}, paramsO));
     auto sAOmvEOm(sum(*AOmvEOm->M, 0, '-'));
-
+===> Why not just compute EvA here?  (Because we also need AvE below...)
 
     auto EOmvAOm(AOmvEOm->M->transpose());
     auto &EOmvAOms(sAOmvEOm);
@@ -542,7 +542,51 @@ DimClip here needs dimAOm.  Instead, it is being given dimAOp, which is a supers
     return ret;
 }
 // ========================================================================
+static std::unique_ptr<linear::Weighted_Eigen> compute_EOmvAOm_unscaled(
+    SparseSetT *dimAOm_ptr,        // const; pre-computed, should not change
+    SparseSetT &dimEOp,
+    SparseSetT &dimAOp,
+//    std::array<SparseSetT *,2> dims,  // dimEOm to be computed; dimAOm is given
+    RegridMatrices_Dynamic const *rmO,
+    RegridParams paramsO)   // copy
+{
+    paramsO.scaled = false;
 
+    std::unique_ptr<linear::Weighted_Eigen> ret(
+        new linear::Weighted_Eigen(true));    // conservative
+    ret->dims[0] = ret->tmp.newptr<SparseSetT>();
+    ret->dims[1] = dimAOm_ptr;
+
+    // EOpvAOp: Repeat A values in E
+    const_universe.reset(new ConstUniverse({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp}));
+    std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
+        rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
+
+    const_universe.reset();        // Check that dims didn't change
+
+    // Convert to EOmvAOm by removing cells not in dimAOm
+    blitz::Array<double,1> EOmvAOms(dimAOm.dense_extent());
+    for (auto ii=EOpvAOp->M->begin(); ii != EOpvAOp->M->end(); ++ii) {
+        auto const iAOp_d = ii->index(1);
+        auto const iAOp_s = dimAOp.to_sparse(iAOp_d);
+        int iAOm_d;
+        if (dimAOm.to_dense_ignore_missing(iAOp_s, iAOm_d)) {
+            auto const iEOp_d = ii->index(1);
+            auto const iEO_s = dimEOp.to_sparse(iEOp_d);
+            auto const iEOm_d = dimEOm.add_dense(iEO_s);  // add to dimEOp
+            EOmvAOm_tl.add({iEOm_d, iAOm_d}, ii->value()); // add to EOmvAOm
+        }
+    }
+
+    EOmvAOm_tl.set_shape(std::array<long,2>{});
+    ret->M.reset(new EigenSparseMatrixT(dimEOm.dense_extent(), dimAOm.dense_extent()));
+    ret->M->setFromTriplets(EOmvAOm_tl.begin(), EOmvAOm_tl.end());
+
+    ret->wM.reference(sum(*ret->M, 0, '+'));
+    ret->Mw.reference(sum(*ret->M, 1, '+'));
+
+    return ret;
+}
 
 
 // -----------------------------------------------------------
@@ -632,6 +676,7 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
 
         // Convert to EOmvAOm by removing cells not in dimAOm
         // EOmvAOm: Repeat A values in E
+        blitz::Array<double,1> EOmvAOms(dimAOm.dense_extent());
         for (auto ii=EOpvAOp->M->begin(); ii != EOpvAOp->M->end(); ++ii) {
             auto const iAOp_d = ii->index(1);
             auto const iAOp_s = dimAOp.to_sparse(iAOp_d);
@@ -641,36 +686,11 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
                 auto const iEOp_s = dimEOp.to_sparse(iEOp_d);
                 auto const iEOm_d = dimEOp.add_dense(iEOp_s);  // add to dimEOp
                 EOmvAOm_tl.add({iEOm_d, iAOm_d}, ii->value()); // add to EOmvAOm
-                EOmvAOmw(iAOm_d) = 1. / EOpvAOp->Mw(iAOp_d);   // add to EOmvAOmw
+                EOmvAOms(iAOm_d) = 1. / EOpvAOp->Mw(iAOp_d);   // add to EOmvAOmw
             }
         }
 
 
-        EigenSparseMatrixT EOmvAOm(crop_mvp(dimAOm, dimAOp, 1, *EOpvAOp->M));
-no... croping must SIMULTANEOUSLY create dimEOm
-
-        // Construct dimEOm based on contents of EOmvAOm
-        for (auto ii=EOmvAOm.begin(); ii != EOmvAOm.end(); ++ii) {
-            dimEOm.add_
-        spcopy(
-            accum::to_dense_ignore_missing({nullptr,&dimAOm},
-            accum::to_sparse({nullptr,&dimAOp},
-            accum::Null<int,2>(),
-            EOmvAOm)));
-
-        // Convert EOpvAOpw to EOmvAOmw by translating indices
-        for (int iAOp_d=0; iAOp_d<EOpvAOp->Mw.extent(0); ++iAOp_d) {
-            auto const iAO_s = dimAOp.to_sparse(iAOp_d);
-            auto const iAOm_d;
-            if (dimAOm.to_dense_ignore_missing(iAO_s, iAOm_d))
-                EOmvAOmw(iAOm_d) = 1. / EOpvAOp->Mw(iAOp_d);
-        }
-
-
-
-        // -----------------------------------
-
-        blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
 
 for (int i=0; i < 15; ++i) printf("EOmvAOms(%d) = %g\n", i, EOmvAOms(i));
 for (int i=0; i < 15; ++i) printf("wAOm_e(%d) = %g\n", i, wAOm_e(i));
