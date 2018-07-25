@@ -9,34 +9,8 @@ using namespace ibmisc;
 using namespace spsparse;
 using namespace std::placeholders;
 
-namespace spsparse {
-namespace accum {
-
-template<class IndexT, int RANK>
-class Null {
-{
-public:
-    static const int rank = RANK;
-    typedef IndexT index_type;
-
-    void set_shape(std::array<long, rank> const &_shape)
-        { }
-
-    template<class ValueT>
-    void add(
-        std::array<index_type, rank> const &index,
-        ValueT const &val)
-        {  }
-};
-
-}}    // namespace
-
-
-
 namespace icebin {
 namespace modele {
-
-
 
 // ----------------------------------------------------------------
 // ----------------------------------------------------------------
@@ -432,6 +406,60 @@ for (int i=0; i<15; ++i) {
 }
 
 }
+// ========================================================================
+class EOmvAOm_Unscaled {
+public:
+    SparseSetT dimEOm;
+    std::unique_ptr<EigenSparseMatrixT> M;
+
+    EOmvAOm_Unscaled(
+        SparseSetT &dimAOm,        // const; pre-computed, should not change
+        SparseSetT &dimEOp,
+        SparseSetT &dimAOp,
+        RegridMatrices_Dynamic const *rmO,
+        RegridParams paramsO);   // copy
+};
+
+EOmvAOm_Unscaled::EOmvAOm_Unscaled(
+    SparseSetT &dimAOm,        // const; pre-computed, should not change
+    SparseSetT &dimEOp,
+    SparseSetT &dimAOp,
+    RegridMatrices_Dynamic const *rmO,
+    RegridParams paramsO)   // copy
+{
+    std::unique_ptr<ConstUniverse> const_universe;
+    paramsO.scale = false;
+
+    // EOpvAOp: Repeat A values in E
+    const_universe.reset(new ConstUniverse({"dimAOp"}, {&dimAOp}));
+    std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
+        rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
+
+    const_universe.reset();        // Check that dims didn't change
+
+    // Convert to EOmvAOm by removing cells not in dimAOm
+    TupleListT<2> EOmvAOm_tl;
+    for (auto ii(begin(*EOpvAOp->M)); ii != end(*EOpvAOp->M); ++ii) {
+        auto const iAOp_d = ii->index(1);
+        auto const iAOp_s = dimAOp.to_sparse(iAOp_d);
+        int iAOm_d;
+        if (dimAOm.to_dense_ignore_missing(iAOp_s, iAOm_d)) {
+            auto const iEOp_d = ii->index(1);
+            auto const iEO_s = dimEOp.to_sparse(iEOp_d);
+            auto const iEOm_d = dimEOm.add_dense(iEO_s);  // add to dimEOp
+            EOmvAOm_tl.add({iEOm_d, iAOm_d}, ii->value()); // add to EOmvAOm
+        }
+    }
+
+    EOmvAOm_tl.set_shape(std::array<long,2>{});
+    M.reset(new EigenSparseMatrixT(
+        dimEOm.dense_extent(), dimAOm.dense_extent()));
+    M->setFromTriplets(EOmvAOm_tl.begin(), EOmvAOm_tl.end());
+
+//      ret->wM.reference(sum(*EOmvAOm, 0, '+'));
+//      EOmvAOmw.reference(sum(*EOmvAOm, 1, '+'));
+}
+
 // ------------------------------------------------------
 /** Computes AAmvEAM (with scaling)
 @param dims {dimAAm, dimEAm} User-supplied dimension maps, which will be added to.
@@ -492,17 +520,16 @@ DimClip here needs dimAOm.  Instead, it is being given dimAOp, which is a supers
 
 
     // ------------ Compute AOmvEOm
-    SparseSetT dimEOm;
-    std::unique_ptr<linear::Weighted_Eigen> AOmvEOm(    // unscaled
-        rmO->matrix_d("AvE", {&dimAOm, &dimEOm}, paramsO));
-    auto sAOmvEOm(sum(*AOmvEOm->M, 0, '-'));
-===> Why not just compute EvA here?  (Because we also need AvE below...)
+    SparseSetT dimEOp;
+    EOmvAOm_Unscaled EOmvAOm(dimAOm, dimEOp, dimAOp, rmO, paramsO);
+    auto &dimEOm(EOmvAOm.dimEOm);
+    auto EOmvAOms(sum(*EOmvAOm.M, 1, '-'));
+    auto AOmvEOm(EOmvAOm.M->transpose());
+    auto &sAOmvEOm(EOmvAOms);
 
-    auto EOmvAOm(AOmvEOm->M->transpose());
-    auto &EOmvAOms(sAOmvEOm);
-    EigenColVectorT wEOm_e(EOmvAOm * map_eigen_diagonal(EOmvAOms) * wAOm_e);
+    // ------------- Compute wEOm
+    EigenColVectorT wEOm_e(*EOmvAOm.M * map_eigen_diagonal(EOmvAOms) * wAOm_e);
     auto wEOm(to_blitz(wEOm_e));
-
 
     // ------------ Compute EOmvEAm
     EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
@@ -525,70 +552,39 @@ DimClip here needs dimAOm.  Instead, it is being given dimAOp, which is a supers
     ret->wM.reference(to_blitz(wAAm_e));
     blitz::Array<double,1> sAAmvAOm(sum(AAmvAOm, 0, '-'));
     if (paramsA.scale) {
+#if 0
+        EigenSparseMatrixT M1(
+            map_eigen_diagonal(sAAmvAOm) * AAmvAOm *   // Works on whole cells, not
+            map_eigen_diagonal(sAOmvEOm));
+
+#endif
+
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sAAmvAOm) * AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
-            map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
+            map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
+
+
+
+
+#if 0
+        ret->M.reset(new EigenSparseMatrixT(
+            map_eigen_diagonal(sAAmvAOm) * AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
+            map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
+            map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
+#endif
     } else {
         blitz::Array<double,1> scale(ret->wM * sAAmvAOm);
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(scale) *
             AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
-            map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
+            map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
     }
     ret->Mw.reference(to_blitz(wEAm_e));
 
     return ret;
 }
-// ========================================================================
-static std::unique_ptr<linear::Weighted_Eigen> compute_EOmvAOm_unscaled(
-    SparseSetT *dimAOm_ptr,        // const; pre-computed, should not change
-    SparseSetT &dimEOp,
-    SparseSetT &dimAOp,
-//    std::array<SparseSetT *,2> dims,  // dimEOm to be computed; dimAOm is given
-    RegridMatrices_Dynamic const *rmO,
-    RegridParams paramsO)   // copy
-{
-    paramsO.scaled = false;
-
-    std::unique_ptr<linear::Weighted_Eigen> ret(
-        new linear::Weighted_Eigen(true));    // conservative
-    ret->dims[0] = ret->tmp.newptr<SparseSetT>();
-    ret->dims[1] = dimAOm_ptr;
-
-    // EOpvAOp: Repeat A values in E
-    const_universe.reset(new ConstUniverse({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp}));
-    std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
-        rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
-
-    const_universe.reset();        // Check that dims didn't change
-
-    // Convert to EOmvAOm by removing cells not in dimAOm
-    blitz::Array<double,1> EOmvAOms(dimAOm.dense_extent());
-    for (auto ii=EOpvAOp->M->begin(); ii != EOpvAOp->M->end(); ++ii) {
-        auto const iAOp_d = ii->index(1);
-        auto const iAOp_s = dimAOp.to_sparse(iAOp_d);
-        int iAOm_d;
-        if (dimAOm.to_dense_ignore_missing(iAOp_s, iAOm_d)) {
-            auto const iEOp_d = ii->index(1);
-            auto const iEO_s = dimEOp.to_sparse(iEOp_d);
-            auto const iEOm_d = dimEOm.add_dense(iEO_s);  // add to dimEOp
-            EOmvAOm_tl.add({iEOm_d, iAOm_d}, ii->value()); // add to EOmvAOm
-        }
-    }
-
-    EOmvAOm_tl.set_shape(std::array<long,2>{});
-    ret->M.reset(new EigenSparseMatrixT(dimEOm.dense_extent(), dimAOm.dense_extent()));
-    ret->M->setFromTriplets(EOmvAOm_tl.begin(), EOmvAOm_tl.end());
-
-    ret->wM.reference(sum(*ret->M, 0, '+'));
-    ret->Mw.reference(sum(*ret->M, 1, '+'));
-
-    return ret;
-}
-
-
 // -----------------------------------------------------------
 /** Computes some intermediate values used by more than one top-level
     regrid generator */
@@ -666,38 +662,18 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
         const_universe.reset();        // Check that dimIp hasn't changed
 
         // ------------------------------------
-
-        // EOpvAOp: Repeat A values in E
-        const_universe.reset(new ConstUniverse({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp}));
-        std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
-            rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
-
+        const_universe.reset(new ConstUniverse({"dimEOp"}, {&dimEOp}));
+        EOmvAOm_Unscaled EOmvAOm(dimAOm, dimEOp, dimEOp, rmO, paramsO);
         const_universe.reset();        // Check that dims didn't change
 
-        // Convert to EOmvAOm by removing cells not in dimAOm
-        // EOmvAOm: Repeat A values in E
-        blitz::Array<double,1> EOmvAOms(dimAOm.dense_extent());
-        for (auto ii=EOpvAOp->M->begin(); ii != EOpvAOp->M->end(); ++ii) {
-            auto const iAOp_d = ii->index(1);
-            auto const iAOp_s = dimAOp.to_sparse(iAOp_d);
-            int iAOm_d;
-            if (dimAOm.to_dense_ignore_missing(iAOp_s, iAOm_d)) {
-                auto const iEOp_d = ii->index(1);
-                auto const iEOp_s = dimEOp.to_sparse(iEOp_d);
-                auto const iEOm_d = dimEOp.add_dense(iEOp_s);  // add to dimEOp
-                EOmvAOm_tl.add({iEOm_d, iAOm_d}, ii->value()); // add to EOmvAOm
-                EOmvAOms(iAOm_d) = 1. / EOpvAOp->Mw(iAOp_d);   // add to EOmvAOmw
-            }
-        }
-
-
+        // wEOm_e
+        auto EOmvAOms(sum(*EOmvAOm.M, 1, '-'));
+        tmp.take<EigenColVectorT>(wXOm_e,
+            EigenColVectorT(*EOmvAOm.M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
 
 for (int i=0; i < 15; ++i) printf("EOmvAOms(%d) = %g\n", i, EOmvAOms(i));
 for (int i=0; i < 15; ++i) printf("wAOm_e(%d) = %g\n", i, wAOm_e(i));
 
-        // wEOm_e
-        tmp.take<EigenColVectorT>(wXOm_e,
-            EigenColVectorT(*EOmvAOm->M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
 
         // ---------------- Compute the main matrix
         // ---------------- XAmvIp = XAmvXOm * XOpvIp
