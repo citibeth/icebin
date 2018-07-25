@@ -596,7 +596,7 @@ struct ComputeXAmvIp_Helper {
     TmpAlloc tmp;
 
     // Intermediate regridded values
-    SparseSetT dimEOm, dimEOp, dimOm;
+    SparseSetT dimEOm, dimEOp;
 
     // Intermediate values
     std::unique_ptr<Compute_wAOm> c1;
@@ -653,7 +653,7 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
         paramsO.correctA = false;
 
         // Get the universe for EOp / EOm
-        SparseSetT dimEOp;
+//        SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
         linear::Weighted_Eigen &EOpvIp(tmp.take(rmO->matrix_d("EvI", {&dimEOp, &dimIp}, paramsO)));
 
@@ -663,7 +663,7 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
 
         // ------------------------------------
         const_universe.reset(new ConstUniverse({"dimEOp"}, {&dimEOp}));
-        EOmvAOm_Unscaled EOmvAOm(dimAOm, dimEOp, dimEOp, rmO, paramsO);
+        EOmvAOm_Unscaled EOmvAOm(dimAOm, dimEOp, dimAOp, rmO, paramsO);
         const_universe.reset();        // Check that dims didn't change
 
         // wEOm_e
@@ -737,21 +737,26 @@ static EigenSparseMatrixT crop_mvp(
     int index_Apdim,
     EigenSparseMatrixT const &Ap)
 {
-    std::array<SparseSetT *,2> dimAm_array, dimAp_array;
-    for (int i=0; i<2; ++i) dimAm_array[i] = nullptr;
-    for (int i=0; i<2; ++i) dimAp_array[i] = nullptr;    // --> Don't change
-    dimAm_array[index_Apdim] = &dimAm;      // Change the given index
-    dimAp_array[index_Apdim] = &dimAp;
+printf("BEGIN crop_mvp\n");
     TupleListT<2> Am_tl;
-    spcopy(
-        accum::to_dense_ignore_missing(dimAm_array,
-        accum::to_sparse(dimAp_array,
-        accum::ref(Am_tl))),
-        Ap);
+    for (auto ii(begin(Ap)); ii != end(Ap); ++ii) {
+        auto index(ii->index());
+        auto const iAp_d = index[index_Apdim];
+        auto const iA_s = dimAp.to_sparse(iAp_d);
+        int iAm_d;
+        if (dimAm.to_dense_ignore_missing(iA_s, iAm_d)) {
+            index[index_Apdim] = iAm_d;
+            Am_tl.add(index, ii->value());
+        }
+    }
+
     std::array<int,2> shape {Ap.rows(), Ap.cols()};
+printf("Shape0 = [%d %d] index_Apdim=%d\n", shape[0], shape[1], index_Apdim);
     shape[index_Apdim] = dimAm.dense_extent();
     EigenSparseMatrixT Am(shape[0], shape[1]);
+printf("Shape1 = [%d %d] index_Apdim=%d\n", shape[0], shape[1], index_Apdim);
     Am.setFromTriplets(Am_tl.begin(), Am_tl.end());
+printf("END crop_mvp\n");
     return Am;
 }
 // -----------------------------------------------------------
@@ -783,30 +788,36 @@ printf("BEGIN compute_XAmvIp\n");
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
 
+    auto &dimXOm(X=='E' ? hh.dimEOm : hh.c1->dimAOm);
+    auto &dimXOp(X=='E' ? hh.dimEOp : hh.c1->dimAOp);
+
 printf("XOpvIp: %ld\n", (long)(XOpvIp->M->nonZeros()));
 printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
 
     // ----------- Put it all together (XAmvIp)
-printf("BB1\n");
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
-printf("BB2 |sXOpvIp|=%d %p\n", sXOpvIp.extent(0), sXOpvIp.data());
     ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
-printf("BB3\n");
     if (paramsA.scale) {
-printf("AA1\n");
         auto sXAm(sum(*XAmvXOm, 0, '-'));
-printf("AA2\n");
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sXAm) *  *XAmvXOm *
-            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 0,
+            crop_mvp(dimXOm, dimXOp, 0,
                 map_eigen_diagonal(sXOpvIp) * *XOpvIp->M)));
-printf("AA3\n");
     } else {
 printf("CC1 %p %p %p\n", &*ret, &*XAmvXOm, &*XOpvIp->M);
+        EigenSparseMatrixT M1(map_eigen_diagonal(sXOpvIp) * *XOpvIp->M);
+printf("CC2 c1 sizes = %ld %ld M1=[%d %d] X=%c\n", dimXOm.dense_extent(), dimXOp.dense_extent(), M1.rows(), M1.cols(), X);
+        EigenSparseMatrixT M2(crop_mvp(dimXOm, dimXOp, 0, M1));
+printf("CC3\n");
+        EigenSparseMatrixT M3(*XAmvXOm * M2);
+printf("CC4a\n");
+        ret->M.reset(new EigenSparseMatrixT(*XAmvXOm * M2));
+#if 0
         ret->M.reset(new EigenSparseMatrixT(
             *XAmvXOm *
-            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 0,
+            crop_mvp(dimXOm, dimXOp, 0,
                 map_eigen_diagonal(sXOpvIp) * *XOpvIp->M)));
+#endif
 printf("CC4\n");
     }
 printf("BB4\n");
@@ -847,7 +858,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
-
+    auto &dimXOm(X=='E' ? hh.dimEOm : hh.c1->dimAOm);
+    auto &dimXOp(X=='E' ? hh.dimEOp : hh.c1->dimAOp);
 
     std::string const &matname(X=='A' ? "IvA" : "IvE");
     SparseSetT *dimIp(dims[0]);
@@ -856,7 +868,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
         paramsO.correctA = false;
     auto IpvXOp(
         rmO->matrix_d(matname,
-            {dimIp, X == 'A' ? &hh.c1->dimAOp : &hh.dimEOp}, paramsO));
+            {dimIp, &dimXOp}, paramsO));
 
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
@@ -867,13 +879,13 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     ret->wM.reference(XOpvIp->Mw);
     if (paramsA.scale) {
         ret->M.reset(new EigenSparseMatrixT(
-            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 1,
+            crop_mvp(dimXOm, dimXOp, 1,
                 map_eigen_diagonal(sIpvXOp) * *IpvXOp->M) *
             map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     } else {
         ret->M.reset(new EigenSparseMatrixT(
-            crop_mvp(hh.c1->dimAOm, hh.c1->dimAOp, 1, *IpvXOp->M)
+            crop_mvp(dimXOm, dimXOp, 1, *IpvXOp->M)
             * map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     }

@@ -238,7 +238,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_EvA(IceRegridder const *r
     SparseSetT _dimG;
     SparseSetT * const dimG(&_dimG);
 
-printf("Sparse Extent %A=%ld, E=%ld, G=%ld\n", (long)A.nfull, (long)E.nfull, (long)regridder->nG());
+printf("Sparse Extent A=%ld, E=%ld, G=%ld\n", (long)A.nfull, (long)E.nfull, (long)regridder->nG());
     if (dimA) dimA->set_sparse_extent(A.nfull);
     if (dimE) dimE->set_sparse_extent(E.nfull);
     dimG->set_sparse_extent(regridder->nG());
