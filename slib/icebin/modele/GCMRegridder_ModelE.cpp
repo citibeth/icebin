@@ -334,7 +334,7 @@ class Compute_wAOm {
 public:
     RegridParams paramsO;   // Parameters used with rmO
     SparseSetT dimAOp; // Includes only AO grid cells that interact with an ice sheet.
-    SparseSetT &dimAOm;
+    SparseSetT dimAOm; // Includes only AO grid cells that interact with an ice sheet AND are not rounded to ocean
     EigenColVectorT wAOm_e;
 
     /** Parameters come from top-level regridding subroutine */
@@ -350,49 +350,87 @@ Compute_wAOm::Compute_wAOm(
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     RegridMatrices_Dynamic const *rmO)
-: paramsO(paramsA),
-    dimAOm(dimAOp)        // dimAOm is a subset of dimAOp; we will use dimAOp to be sure.
+: paramsO(paramsA)
 {
     // ------------ Params for generating sub-matrices
     paramsO.scale = false;
     paramsO.correctA = true;
 
     // We need AOpvIp for wAOP; used below.
-printf("dimIp.dense_extent() = %d (sparse=%d)\n", dimIp.dense_extent(), dimIp.sparse_extent());
     std::unique_ptr<linear::Weighted_Eigen> AOpvIp_corrected(rmO->matrix_d(
         "AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
-
-printf("|AOpvIp_corrected|=%ld\n", (long)AOpvIp_corrected->M->nonZeros());
-int n=0;
-for (auto ii(begin(*AOpvIp_corrected->M)); ii != end(*AOpvIp_corrected->M); ++ii, ++n) {
-    printf("   AOpvIp_corrected(%d %d) = %g\n", dimAOp.to_sparse(ii->row()), dimIp.to_sparse(ii->col()), ii->value());
-    if (n > 15) break;
-}
-
-printf("|wAOp|=%d\n", wAOp.extent(0));
-for (int i=0; i<15; ++i) {
-    printf("    wAOp(%d)=%g\n", i, wAOp(i));
-}
-
-
-
+    // ----------- Compute dimAOm properly
+    // dimAOm is a subset of dimAOp.  Remove points in dimAOp that are ocean.
+    for (int iAOp_d=0; iAOp_d < dimAOp.dense_extent(); ++iAOp_d) {
+        auto const iAO_s(dimAOp.to_sparse(iAOp_d));
+        if (gcmA->foceanAOm(iAO_s) == 0) dimAOm.add_dense(iAO_s);
+    }
 
     // OmvOp
     EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
         std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '+'),
-        {SparsifyTransform::TO_DENSE},
+        {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
     wAOm_e = sc_AOmvAOp * map_eigen_colvector(wAOp);
+}
+// ========================================================================
+class EOmvAOm_Unscaled {
+public:
+    SparseSetT dimEOm;
+    std::unique_ptr<EigenSparseMatrixT> M;   // EOmvAOm matrix
 
-printf("|wAOp|=%ld   |wAOm_e|=%ld\n", wAOm_e.rows()*wAOm_e.cols(), wAOp.extent(0));
-for (int i=0; i<15; ++i) {
-    printf("    wAOp(%d)=%g   wAOm_e(%d)=%g\n", i, wAOp(i), i, wAOm_e(i));
+    EOmvAOm_Unscaled(
+        SparseSetT &dimAOm,        // const; pre-computed, should not change
+        SparseSetT &dimEOp,
+        SparseSetT &dimAOp,
+        RegridMatrices_Dynamic const *rmO,
+        RegridParams paramsO);   // copy
+};
+
+/** Computes EOmvAOm, based on EOpvAOp.  EOpvAOp is converted to EOmvAOm by
+removing elements that refer to non-existent grid cells in AOm.
+This ultimately provides us with dimEOm as well. */
+EOmvAOm_Unscaled::EOmvAOm_Unscaled(
+    SparseSetT &dimAOm,        // const; pre-computed, should not change
+    SparseSetT &dimEOp,
+    SparseSetT &dimAOp,
+    RegridMatrices_Dynamic const *rmO,
+    RegridParams paramsO)   // copy
+{
+    std::unique_ptr<ConstUniverse> const_universe;
+    paramsO.scale = false;
+
+    // EOpvAOp: Repeat A values in E
+    const_universe.reset(new ConstUniverse({"dimAOp"}, {&dimAOp}));
+    std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
+        rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
+
+    const_universe.reset();        // Check that dims didn't change
+
+    // Convert to EOmvAOm by removing cells not in dimAOm
+    TupleListT<2> EOmvAOm_tl;
+    for (auto ii(begin(*EOpvAOp->M)); ii != end(*EOpvAOp->M); ++ii) {
+        auto const iAOp_d = ii->index(1);
+        auto const iAOp_s = dimAOp.to_sparse(iAOp_d);
+        int iAOm_d;
+        if (dimAOm.to_dense_ignore_missing(iAOp_s, iAOm_d)) {
+            auto const iEOp_d = ii->index(0);
+            auto const iEO_s = dimEOp.to_sparse(iEOp_d);
+            auto const iEOm_d = dimEOm.add_dense(iEO_s);  // add to dimEOp
+            EOmvAOm_tl.add({iEOm_d, iAOm_d}, ii->value()); // add to EOmvAOm
+        }
+    }
+
+    // Create the matrix from the TupleList
+    EOmvAOm_tl.set_shape(std::array<long,2>{});
+    M.reset(new EigenSparseMatrixT(
+        dimEOm.dense_extent(), dimAOm.dense_extent()));
+    M->setFromTriplets(EOmvAOm_tl.begin(), EOmvAOm_tl.end());
 }
 
-}
 // ------------------------------------------------------
 /** Computes AAmvEAM (with scaling)
 @param dims {dimAAm, dimEAm} User-supplied dimension maps, which will be added to.
@@ -447,17 +485,16 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm(
 
 
     // ------------ Compute AOmvEOm
-    SparseSetT dimEOm;
-    std::unique_ptr<linear::Weighted_Eigen> AOmvEOm(
-        rmO->matrix_d("AvE", {&dimAOm, &dimEOm}, paramsO));
-    auto sAOmvEOm(sum(*AOmvEOm->M, 0, '-'));
+    SparseSetT dimEOp;
+    EOmvAOm_Unscaled EOmvAOm(dimAOm, dimEOp, dimAOp, rmO, paramsO);
+    auto &dimEOm(EOmvAOm.dimEOm);
+    auto EOmvAOms(sum(*EOmvAOm.M, 1, '-'));
+    auto AOmvEOm(EOmvAOm.M->transpose());
+    auto &sAOmvEOm(EOmvAOms);
 
-
-    auto EOmvAOm(AOmvEOm->M->transpose());
-    auto &EOmvAOms(sAOmvEOm);
-    EigenColVectorT wEOm_e(EOmvAOm * map_eigen_diagonal(EOmvAOms) * wAOm_e);
+    // ------------- Compute wEOm
+    EigenColVectorT wEOm_e(*EOmvAOm.M * map_eigen_diagonal(EOmvAOms) * wAOm_e);
     auto wEOm(to_blitz(wEOm_e));
-
 
     // ------------ Compute EOmvEAm
     EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
@@ -482,22 +519,20 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm(
     if (paramsA.scale) {
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sAAmvAOm) * AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
-            map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
+            map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
     } else {
         blitz::Array<double,1> scale(ret->wM * sAAmvAOm);
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(scale) *
             AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
-            map_eigen_diagonal(sAOmvEOm) * *AOmvEOm->M *
+            map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
     }
     ret->Mw.reference(to_blitz(wEAm_e));
 
     return ret;
 }
-// ========================================================================
-
 // -----------------------------------------------------------
 /** Computes some intermediate values used by more than one top-level
     regrid generator */
@@ -509,7 +544,7 @@ struct ComputeXAmvIp_Helper {
     TmpAlloc tmp;
 
     // Intermediate regridded values
-    SparseSetT dimEOm, dimEOp, dimOm;
+    SparseSetT dimEOm, dimEOp;
 
     // Intermediate values
     std::unique_ptr<Compute_wAOm> c1;
@@ -551,9 +586,6 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
     HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
 
-printf("hntrO: %dx%d\n", hntrO.im, hntrO.jm);
-printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
-
     dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
     dimIp.set_sparse_extent(rmO->ice_regridder->nI());
 
@@ -566,7 +598,6 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
         paramsO.correctA = false;
 
         // Get the universe for EOp / EOm
-        SparseSetT dimEOp;
         const_universe.reset(new ConstUniverse({"dimIp"}, {&dimIp}));
         linear::Weighted_Eigen &EOpvIp(tmp.take(rmO->matrix_d("EvI", {&dimEOp, &dimIp}, paramsO)));
 
@@ -574,30 +605,17 @@ printf("hntrA: %dx%d\n", hntrA.im, hntrA.jm);
 
         const_universe.reset();        // Check that dimIp hasn't changed
 
-        // dimEOm is a subset of dimEOp
-        SparseSetT &dimEOm(dimEOp);
-
-        // EOmvAOm: Repeat A values in E
-        const_universe.reset(new ConstUniverse({"dimEOm", "dimAOm"}, {&dimEOm, &dimAOm}));
-        std::unique_ptr<linear::Weighted_Eigen> EOmvAOm(
-            rmO->matrix_d("EvA", {&dimEOm, &dimAOm}, paramsO));
-
-printf("EOmvAOm: %ld  dimEOm=%ld  dimAOm=%ld\n", (long)EOmvAOm->M->nonZeros(), dimEOm.dense_extent(), dimAOm.dense_extent());
-int n=0;
-for (auto ii(begin(*EOmvAOm->M)); ii != end(*EOmvAOm->M); ++ii, ++n) {
-    printf("   EOmvAOm(%d %d) = %g\n", dimEOm.to_sparse(ii->row()), dimAOm.to_sparse(ii->col()), ii->value());
-    if (n > 15) break;
-}
-
+        // ------------------------------------
+        const_universe.reset(new ConstUniverse({"dimEOp"}, {&dimEOp}));
+        EOmvAOm_Unscaled EOmvAOm(dimAOm, dimEOp, dimAOp, rmO, paramsO);
         const_universe.reset();        // Check that dims didn't change
-        blitz::Array<double,1> EOmvAOms(1. / EOmvAOm->Mw);
-
-for (int i=0; i < 15; ++i) printf("EOmvAOms(%d) = %g\n", i, EOmvAOms(i));
-for (int i=0; i < 15; ++i) printf("wAOm_e(%d) = %g\n", i, wAOm_e(i));
+        dimEOm = std::move(EOmvAOm.dimEOm);
 
         // wEOm_e
+        auto EOmvAOms(sum(*EOmvAOm.M, 1, '-'));
         tmp.take<EigenColVectorT>(wXOm_e,
-            EigenColVectorT(*EOmvAOm->M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
+            EigenColVectorT(*EOmvAOm.M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
+
 
         // ---------------- Compute the main matrix
         // ---------------- XAmvIp = XAmvXOm * XOpvIp
@@ -605,16 +623,12 @@ for (int i=0; i < 15; ++i) printf("wAOm_e(%d) = %g\n", i, wAOm_e(i));
         SparseSetT &dimEAm(dimXAm);
 
         blitz::Array<double,1> wXOm(to_blitz(*wXOm_e));
-printf("wXOm.extent(0) = %d\n", wXOm.extent(0));
-for (int i=0; i < 15; ++i) printf("    wXOm[%d] = %g\n", i, wXOm(i));
-
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
                 hntrO, hntrA,
                 eq_rad, &dimAOm, gcmA, wXOm),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
-printf("XAmvXOm 1: %ld   dimEOm=%ld   dimEAm=%ld\n", (long)XAmvXOm->nonZeros(), dimEOm.dense_extent(), dimEAm.dense_extent());
     } else {    // X == 'A'
         RegridParams paramsO(paramsA);
         paramsO.scale = false;
@@ -653,6 +667,33 @@ printf("XAmvXOm 1: %ld   dimEOm=%ld   dimEAm=%ld\n", (long)XAmvXOm->nonZeros(), 
 
 }
 // -----------------------------------------------------------
+/** Given a matrix with one dimension expressed in dense Ap (or WLOG
+Op) space...  re-does that dimension to dense Am space.  Assumes that
+dimAm is a subset of dimAp.  Dimenions not found will be droped. */
+static EigenSparseMatrixT crop_mvp(
+    SparseSetT &dimAm, SparseSetT &dimAp,    // (const)
+    int index_Apdim,
+    EigenSparseMatrixT const &Ap)
+{
+    TupleListT<2> Am_tl;
+    for (auto ii(begin(Ap)); ii != end(Ap); ++ii) {
+        auto index(ii->index());
+        auto const iAp_d = index[index_Apdim];
+        auto const iA_s = dimAp.to_sparse(iAp_d);
+        int iAm_d;
+        if (dimAm.to_dense_ignore_missing(iA_s, iAm_d)) {
+            index[index_Apdim] = iAm_d;
+            Am_tl.add(index, ii->value());
+        }
+    }
+
+    std::array<int,2> shape {Ap.rows(), Ap.cols()};
+    shape[index_Apdim] = dimAm.dense_extent();
+    EigenSparseMatrixT Am(shape[0], shape[1]);
+    Am.setFromTriplets(Am_tl.begin(), Am_tl.end());
+    return Am;
+}
+// -----------------------------------------------------------
 /** Computes XAmvIp (with scaling)
 @param dims {dimXAm, dimIp} User-supplied dimension maps, which will be added to.
 @param paramsA Regridding parameters.  NOTE: correctA is ignored.
@@ -670,7 +711,6 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
-
     std::string dimXA(strprintf("dim%cA", X));
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
@@ -680,6 +720,9 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
+
+    auto &dimXOm(X=='E' ? hh.dimEOm : hh.c1->dimAOm);
+    auto &dimXOp(X=='E' ? hh.dimEOp : hh.c1->dimAOp);
 
 printf("XOpvIp: %ld\n", (long)(XOpvIp->M->nonZeros()));
 printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
@@ -691,10 +734,13 @@ printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
         auto sXAm(sum(*XAmvXOm, 0, '-'));
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sXAm) *  *XAmvXOm *
-            map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
+            crop_mvp(dimXOm, dimXOp, 0,
+                map_eigen_diagonal(sXOpvIp) * *XOpvIp->M)));
     } else {
-        ret->M.reset(new EigenSparseMatrixT(
-            *XAmvXOm * map_eigen_diagonal(sXOpvIp) * *XOpvIp->M));
+        EigenSparseMatrixT M1(map_eigen_diagonal(sXOpvIp) * *XOpvIp->M);
+        EigenSparseMatrixT M2(crop_mvp(dimXOm, dimXOp, 0, M1));
+        EigenSparseMatrixT M3(*XAmvXOm * M2);
+        ret->M.reset(new EigenSparseMatrixT(*XAmvXOm * M2));
     }
     ret->Mw.reference(XOpvIp->Mw);
 
@@ -718,7 +764,6 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
-
     std::string dimXA(strprintf("dim%cA", X));
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
@@ -728,7 +773,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
-
+    auto &dimXOm(X=='E' ? hh.dimEOm : hh.c1->dimAOm);
+    auto &dimXOp(X=='E' ? hh.dimEOp : hh.c1->dimAOp);
 
     std::string const &matname(X=='A' ? "IvA" : "IvE");
     SparseSetT *dimIp(dims[0]);
@@ -737,7 +783,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
         paramsO.correctA = false;
     auto IpvXOp(
         rmO->matrix_d(matname,
-            {dimIp, X == 'A' ? &hh.c1->dimAOp : &hh.dimEOp}, paramsO));
+            {dimIp, &dimXOp}, paramsO));
 
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
@@ -748,12 +794,13 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     ret->wM.reference(XOpvIp->Mw);
     if (paramsA.scale) {
         ret->M.reset(new EigenSparseMatrixT(
-            map_eigen_diagonal(sIpvXOp) * *IpvXOp->M *
+            crop_mvp(dimXOm, dimXOp, 1,
+                map_eigen_diagonal(sIpvXOp) * *IpvXOp->M) *
             map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     } else {
         ret->M.reset(new EigenSparseMatrixT(
-            *IpvXOp->M *
+            crop_mvp(dimXOm, dimXOp, 1, *IpvXOp->M) *
             map_eigen_diagonal(sXOmvXAm) * XOmvXAm
         ));
     }
