@@ -147,6 +147,8 @@ void combine_chunks(
                 M.add({iB_s, iA_s}, values_d(i) * sM_s(iB_s));
             }
 
+#if 0
+// Temporarily comment out so we can debug.
             /** Check that AvE is local */
             if (BvA == "AvE") {
                 for (int i=0; i<values_d.extent(0); ++i) {
@@ -164,6 +166,7 @@ void combine_chunks(
 
                 }
             }
+#endif
 
             // ------------------ Mw
             auto Mw_d(nc_read_blitz<double,1>(ncio.nc, BvA+".Mw"));

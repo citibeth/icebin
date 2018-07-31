@@ -252,11 +252,12 @@ printf("extent: (%d, %d, %d)\n", fhc.extent(0), fhc.extent(1), fhc.extent(2));
 
             // iE must be contained within cell iA (local propety of matrix)
             meta.indexingHC.index_to_tuple(&iTuple[0], iE);
-
+#if 0
+// Temporarily 
             if (iA2 != iA) (*icebin_error)(-1,
                 "Matrix is non-local: iA=%ld, iE=%ld, iA2=%ld",
                 (long)iA, (long)iE, (long)iA2);
-
+#endif
             if (ihc < 0 || ihc >= nhc_icebin) (*icebin_error)(-1,
                 "ihc out of range [0,%d): %d", nhc_icebin, ihc);
 

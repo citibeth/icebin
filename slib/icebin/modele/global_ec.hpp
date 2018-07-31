@@ -12,8 +12,8 @@ namespace global_ec {
 /** Metadata read from the file, which we transfer the the output */
 struct Metadata {
     bool mismatched;
-    icebin::HntrSpec hspecA, hspecI;
-    ibmisc::Indexing indexingI, indexingA, indexingHC, indexingE;
+    icebin::HntrSpec hspecA, hspecI, hspecI2;
+    ibmisc::Indexing indexingI, indexingI2, indexingA, indexingHC, indexingE;
     std::vector<double> hcdefs;
 
     void ncio(ibmisc::NcIO &ncio);
@@ -25,8 +25,10 @@ inline void Metadata::ncio(ibmisc::NcIO &ncio)
 
     hspecA.ncio(ncio, "hspecA");
     hspecI.ncio(ncio, "hspecI");
+    hspecI2.ncio(ncio, "hspecI2");
 
     indexingI.ncio(ncio, "indexingI");
+    indexingI2.ncio(ncio, "indexingI2");
     indexingA.ncio(ncio, "indexingA");
     indexingHC.ncio(ncio, "indexingHC");
     indexingE.ncio(ncio, "indexingE");
