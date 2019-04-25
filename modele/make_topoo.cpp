@@ -9,6 +9,7 @@ using namespace icebin::modele;
 
 struct ParseArgs {
     std::string ofname;
+    std::string et1mfile;
 
     ParseArgs(int argc, char **argv);
 };
@@ -28,15 +29,18 @@ ParseArgs::ParseArgs(int argc, char **argv)
         // that it contains. 
         TCLAP::CmdLine cmd("Command description message", ' ', "<no-version>");
 
+        TCLAP::UnlabeledValueArg<std::string> et1mfile_a(
+            "et1mfile", "IN: Name of ETOPO1 file", true, "", "ETOPO1 filename", cmd);
+
         TCLAP::UnlabeledValueArg<std::string> ofname_a(
-            "ofname", "Name of output file", true, "", "output filename", cmd);
+            "ofname", "OUT: Name of output file", true, "", "output filename", cmd);
 
         // Parse the argv array.
         cmd.parse( argc, argv );
 
         // Get the value parsed by each arg.
+        et1mfile = et1mfile_a.getValue();
         ofname = ofname_a.getValue();
-
     } catch (TCLAP::ArgException &e) { // catch any exceptions
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
         exit(1);
@@ -52,12 +56,12 @@ int main(int argc, char** argv)
     everytrace_init();
     ParseArgs args(argc, argv);
 
-    std::string et1mfile("etopo1_ice_g1m.nc");
+//    std::string et1mfile("etopo1_ice_g1m.nc");
     auto mto(MakeTopoO(EnvSearchPath("MODELE_FILE_PATH"), {
-        "FGICE1m", et1mfile, "FGICE1m",
-        "ZICETOP1m", et1mfile, "ZICETOP1m",
-        "ZSOLG1m", et1mfile, "ZSOLG1m",
-        "FOCEAN1m", et1mfile, "FOCEAN1m",
+        "FGICE1m", args.et1mfile, "FGICE1m",
+        "ZICETOP1m", args.et1mfile, "ZICETOP1m",
+        "ZSOLG1m", args.et1mfile, "ZSOLG1m",
+        "FOCEAN1m", args.et1mfile, "FOCEAN1m",
         "FLAKES", "Z10MX10M.nc", "FLAKES"
     }));
 
