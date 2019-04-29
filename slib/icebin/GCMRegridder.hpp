@@ -185,8 +185,6 @@ structure.
 namespace icebin {
 
 class GCMRegridder;
-class IceModel;
-
 
 
 // ----------------------------------------------------
@@ -246,7 +244,7 @@ public:
         { return (iAE == GridAE::A ? agridA.indexing : indexingE); }
 
     /** Position of height points in elevation space (same for all GCM
-    grid cells) */
+    grid cells and all ice sheets) */
     std::vector<double> hcdefs; // [nhc]
 
 protected:

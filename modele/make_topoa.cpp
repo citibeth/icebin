@@ -20,8 +20,9 @@ struct ParseArgs {
     std::string topoo_fname;
 //    std::string global_ec_fname;
     std::string global_ec_mm_fname;
-    std::string elevmask_fname;
-        std::string elevI_vname, fgiceI_vname;
+// These variables are vestigal
+//    std::string elevmask_fname;
+//        std::string elevI_vname, fgiceI_vname;
 
     std::string topoa_fname;
 
@@ -199,8 +200,7 @@ printf("shapeE2 = (%d, %d)\n", shapeE2(0), shapeE2(1));
     auto &fgiceA(*varsA.at("fgice"));
     auto &zatmoA(*varsA.at("zatmo"));
     auto &zicetopA(*varsA.at("zicetop"));
-printf("%p %p %p\n", fgiceA.data(), elevE.data(), underice.data());
-printf("extent: (%d, %d, %d)\n", fhc.extent(0), fhc.extent(1), fhc.extent(2));
+
     for (int j=0; j<meta.hspecA.jm; ++j) {
     for (int i=0; i<meta.hspecA.im; ++i) {
         if (fgiceA(j,i) > 0) {

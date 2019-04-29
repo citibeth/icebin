@@ -87,7 +87,7 @@ static void callZ(
                     I,J,FOCEAN(I,J),
                     I11,I1M,J11,J1M);
             } else {  // (I,J) is acontinent cell
-                // Order 2-minute continental cells within (I,J) and sum their area
+                // Order 1-minute continental cells within (I,J) and sum their area
                 struct AreaDepth {
                     double area;
                     double depth;
