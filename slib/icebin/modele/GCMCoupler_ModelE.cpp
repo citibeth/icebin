@@ -739,7 +739,7 @@ blitz::Array<char,1> &changedO)    // OUT
         // Compute fgiceO (for this ice sheet only)
         blitz::Array<double,1> fgiceO_d(OvI->apply(fgiceI_d, 0., true, tmp));    // force_conservation set to true by default, and it probably doesn't matter; but I think it should be false here.
 
-        // Interpolate into foceanOp_s
+        // Interpolate into global FGICE
         for (int iO_d=0; iO_d<fgiceO_d.extent(0); ++iO_d) {
             auto const iO_s = dimO.to_sparse(iO_d);
             fgiceO(iO_s) += fgiceO_d(iO_d);        // Will have some rounding error on #s that should ==1.0
@@ -751,6 +751,41 @@ blitz::Array<char,1> &changedO)    // OUT
 
 
 // ======================================================================
+
+THE PROBLEM:
+   Re-running make_topoa requires re-building AvE mismatched matrix for 1-minute ice cover, which is slow and memory intensive.  Ways around this problem:
+
+1. make_topoa only needs mismatched AvE, which can be generated from non-mismatched matrices on ocean grid.  Inspection of GCMRegridder_ModelE indicates that computing AvE on atmosphere grid (compute_AAmvEAm) requires EvA from ocean grid (EOpvAOp) in EOmvAOm_Unscaled().  It also requires wAOm (PISM view of ocean grid), whose calculation nominally requires AvI on ocean grid.  HOWEVER... this is just used to compute wAOp (ice model view on ocean grid), which can be pre-computed and stored, without further requiring large ice-size vectors.
+
+wAOp from global ice can be merged with wAOp from ice sheets (add them together), resulting in a global wAOp including ice sheets.  Which can then be used to make TOPOA.  (NOTE: wAOp might be really similar to FOCEANp from TOPOO file; in which case, maybe it is already stored.)
+
+So... the general approach is to:
+
+A. Load pre-computed global ice stuff on ocean grid:
+ 1. Load TOPOO
+ 2. load global_ecO.nc files (global EC matrices on ocean grid), which contains OAvOE.
+ 3. Load wOp (wAOp) from global_ecA_mm.nc (of which it is a byproduce).  Or decide it can be recomputed from foceanOp (generated in make_topoo.cpp)
+
+B. Internally generate TOPO and regrid matrix stuff for the ice sheets.
+
+C. Merge (B) into (A)
+
+D. Re-run make_topoa to finish the job.  It will be supplied our own (merged) wOp and AvE, rather than computing it from global_ecA_mm.
+
+
+
+Overall merge procedure will require:
+  * topoo.nc
+  * topoa.nc
+
+Should we re-run (essentially) make_topoa with a merge involved?  Or should we do something similar but different in code here?  Probably the latter, since we are ADDING to the result of make_topoa.nc
+ANSWER: We should re-run (code factored out of) make_topoa.cpp.  This will ensure:
+  a) Changes to TOPOO propagate through correctly.
+  b) A single codebase is used for dynamic (internal) vs. static production of TOPO files.
+For this, make_topoa will need to be augmented to accept per-ice sheet inputs.
+  (i.e. accept a merged AvE for all the ice sheets, and merge that into the global AvE).
+
+HOWEVER... global_ec_mm requires etopo1 and TOPOO, so it is a real bear.  And it is needed for make_topoa.cpp.  So 
 
 void update_topo(
     // ====== INPUT parameters
@@ -900,6 +935,13 @@ void update_topo(
 }
 #endif
 
+
+====================== Up to here should be pretty straightforward.
+Put it into a merge_topoo, whose output can be directly comparable to make_topoo
+Output is a merged TOPOO (no FHC)
+
+
+
     // ----------------------------------------------------------
     // ----------------------------------------------------------
     // Now we are ready to use regrid matrices
@@ -926,6 +968,11 @@ void update_topo(
     TupleListT<2> AvE_global_tp;
     blitz::Array<double,1> elevE_global(nE);
 
+
+Before merging in AvE from ice sheets, we need to start with AvE from topoa.nc
+
+------------------------------
+This code is just for ice sheets, not global ice (which has super-big EvI that never changes; so we might as well use the pre-computed fhc):
     // Compute elevE and AvE (aka fhc)
     SparseSetT dimA_global;
     for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
@@ -953,10 +1000,10 @@ void update_topo(
         std::unique_ptr<RegridMatrices_Dynamic> rmA(gcmA->regrid_matrices(sheet_index, elevmaskI, params));
         SparseSetT dimA, dimE, dimI;
         auto AvI(rmA->matrix_d("AvI", {&dimA, &dimI}, params));
-        auto EvI(rmA->matrix_d("EvI", {&dimE, &dimI}, params));
+//        auto EvI(rmA->matrix_d("EvI", {&dimE, &dimI}, params));
         auto AvE(rmA->matrix_d("AvE", {&dimA, &dimE}, params));
 
-        // Merge local and global AvE
+        // Merge local (per-ice sheet) into global AvE
         spsparse::spcopy(
             spsparse::accum::to_sparse(std::array<SparseSetT *,2>{&dimA, &dimE},
             spsparse::accum::ref(AvE_global_tp)),
@@ -968,7 +1015,13 @@ void update_topo(
         for (int i_d=0; i_d<dimI.dense_extent(); ++i_d) {
             elevmaskI_d(i_d) = elevmaskI(dimI.to_sparse(i_d));
         }
+
+        // elevE is the mean elevation of each elevation class's actualy ice.
+        // It will be used to create elevA (global), which is used for ZATMO, etc.
         auto elevE_d(EvI->apply(elevmaskI_d, nan, true, tmp));
+
+There is no point in this elevE variable.  elevE -> elevE_global -> elevA_global.  So we might as well just compute elevA_global directly, using AvI instead of EvI.  We need elevA for ZATMO, etc.  THe elevE array should be set to the hcdefs points, which are known beforehand.  AvI is smaller than EvI.
+
 
         // Merge local and global elevE
         spsparse::spcopy(
@@ -982,6 +1035,9 @@ void update_topo(
             dimA_global.add_dense(iA_s);
         }
     }
+------------------------------
+
+
     // Create matrix that works directly on sparse-indexed vectors
     EigenSparseMatrixT AvE_global_e(nA, nE);
     AvE_global_e.setFromTriplets(AvE_global_tp.begin(), AvE_global_tp.end());
@@ -993,6 +1049,20 @@ void update_topo(
 
     // =======================================================
     // ----------- Set up elevation class structure
+
+Here we need to rearrange how legacy is computed, based on make_topoa.cpp.
+And we need to add separate EC segments for global ECs and per-ice-sheet ECs.
+(Yes we can compress in the future if we decide we have too many ECs)
+
+So segments are: legacy,sealand,global,icesheets
+
+In summary, which matrices does ModelE+PISM need?
+EvA: trivial
+AvE: ---> fhc
+EvI,IvE: Only for ice sheets
+AvI,IvA: Do we need this?  If so, it is only for ice sheets
+
+This code should be analogous to make_topoa.cpp; exepct it adds ice sheets to what it otherwise computers (fhc,elevE,undericeE).
 
     // Set up elevation class segments: fhc, underice, elevmaskI
     fhcE2 = 0;
@@ -1018,6 +1088,8 @@ void update_topo(
         // overlay...
         for (int iA_d=0; iA_d<dimA_global.dense_extent(); ++iA_d) {
             int iA_s = dimA_global.to_sparse(iA_d);
+
+This is wrong for elevE2.  It must be elevA_global(iA_s) * fhc
             elevE2(ihc,iA_s) = elevA_global(iA_s);
             fhcE2(ihc,iA_s) = legacy_mult;    // Legacy ice for Greenland and Antarctica.
         }

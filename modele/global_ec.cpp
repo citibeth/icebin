@@ -497,8 +497,8 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
         ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
 
 
-        gcmA->foceanAOp = reshape1(foceanfO);  // COPY
-        gcmA->foceanAOm = reshape1(foceanO);   // COPY
+        gcmA->foceanAOp = reshape1(foceanfO);  // COPY: FOCEANF 
+        gcmA->foceanAOm = reshape1(foceanO);   // COPY: FOCEAN
     }
 
     return std::unique_ptr<GCMRegridder>(gcmA.release());
@@ -643,6 +643,9 @@ void global_ec_section(FileLocator const &files, ParseArgs &args, blitz::Array<d
         auto gcmA(new_gcmA_standard(hspecA, "Atmosphere", args, elevmaskI));
         global_ec_section(*gcmA, args, elevmaskI, args.hspecI2);
     }
+TODO: Generate non-mismatched matrices for ocean grid
+TODO: Generate just a subset of the six matrices.  All six can get tedious...
+
 }
 
 

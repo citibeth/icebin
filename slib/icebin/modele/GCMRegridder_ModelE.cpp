@@ -360,6 +360,10 @@ Compute_wAOm::Compute_wAOm(
     std::unique_ptr<linear::Weighted_Eigen> AOpvIp_corrected(rmO->matrix_d(
         "AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
+.... This intermediate result needs to be stored in global_ec.nc (on ocean grid)
+
+QUESTION: What is the difference between wAOp and gcmA->foceanAOp * axyp???
+answer.... nothing really, but we should double-check!!!  (Actually, paramsO might make it a bit different; but I do not think this will matter for the global EC, where there are no projection corrections).
 
     // ----------- Compute dimAOm properly
     // dimAOm is a subset of dimAOp.  Remove points in dimAOp that are ocean.
@@ -459,6 +463,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm(
 
     // ------------- Compute wAOm and related quantities
     Compute_wAOm c1(dimIp, paramsA, gcmA, rmO);
+
     auto &paramsO(c1.paramsO);
     auto &dimAOp(c1.dimAOp);
     auto &dimAOm(c1.dimAOm);
