@@ -406,6 +406,10 @@ static std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
+    // Compute wAOm (from wAOp)
+    SparseSetT dimAOm;
+    EigenColVectorT wAOm_e(compute_wAOm(gcmA, wAOp, dimAOp, dimAOm));
+
     // ------------- Compute wAAm and AAmvAOm
     // Obtain hntrA and hntrO for process below.
     HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
@@ -413,10 +417,6 @@ static std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
     if (!hntrA.is_set()) (*icebin_error)(-1, "hntrA must be set");
     if (!hntrO.is_set()) (*icebin_error)(-1, "hntrO must be set");
-
-    // Compute wAOm (from wAOp)
-    SparseSetT dimAOm;
-    EigenColVectorT wAOm_e(compute_wAOm(gcmA, wAOp, dimAOp, dimAOm));
 
     Hntr hntr_AOmvAAm(17.17, hntrO, hntrA);
     EigenSparseMatrixT AAmvAOm(MakeDenseEigenT(
@@ -513,10 +513,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     double const eq_rad,    // Radius of the earth
-    std::vector<ElevMask<1>> const &elevmasks)    // elevation and ice cover of each ice sheet
+    std::vector<ElevMask<1>> const elevmasks)    // elevation and ice cover of each ice sheet
 {
-//    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, true));    // conservative
-
     // ======================= Create a merged EOpvAOp of base ice and ice sheets
     // (and then call through to _compute_AAmvEAm)
 
@@ -525,6 +523,11 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
     MakeDenseEigenT EOpvAOp_m(
         {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
         {&dimEOp, &dimAOp}, '.');
+
+    // Regrid params for ice sheet regrid matrices
+    RegridParams paramsO(paramsA);
+        paramsO.scale = false;
+        paramsO.correctA = true;
 
     // Merge in local matrices
     std::array<long,2> EOpvAOp_sheet_shape;
@@ -542,11 +545,6 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
                 elevmaskI(iI) = nan;
             }
         }
-
-        // Regrid params for ice sheet regrid matrices
-        RegridParams paramsO(paramsA);
-            paramsO.scale = false;
-            paramsO.correctA = true;
 
         // Get local EOpvAOp matrix
         std::unique_ptr<RegridMatrices_Dynamic> rmO(
@@ -600,20 +598,24 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
         }
     }
 
+    if ((EOpvAOp_sheet_shape[0] != EOpvAOp_base_shape[0]) ||
+        (EOpvAOp_sheet_shape[1] != EOpvAOp_base_shape[1])) {
+
+        (*icebin_error)(-1, "Shape of on-disk and local EOpvAOp differs (%ld,%ld) vs (%ld,%ld)!",
+            EOpv_AOp_base_shape[0], EOpv_AOp_base_shape[1],
+            EOpv_AOp_sheet_shape[0], EOpv_AOp_sheet_shape[1]);
+    }
+
     // Set overall size
-    dimEO.set_sparse_extent(EOpvAOp_base_shape[0] + EOpvAOp_sheet_shape[0]);
+    dimEO.set_sparse_extent(EOpvAOp_base_shape[0]);
     dimAO.set_sparse_extent(EOpvAOp_base_shape[1]);
 
     // Compute EOpvAOp and wAOp
-    EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen);
+    EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
     auto wAOp(sum(EOpvAOp, 1, '+'));
 
     return _compute_AAmvEAm(dims, paramsA, gcmA, eq_rad,
         EOpvAOp, dimEOp, dimAOp, wAOp);
-
-//    reset_ptr(ret->M, EOpvAOp_m.to_eigen());
-//    ret->wM.reference(sum(*ret->M, 0, '+'));
-//    ret->Mw.reference(sum(*ret->M, 1, '+'));
 }
 
 // -----------------------------------------------------------
@@ -700,7 +702,6 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         const_universe.reset();        // Check that dimIp hasn't changed
 
         // ------------------------------------
-
         SparseSetT dimEOp, dimAOp;
         std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
             rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
@@ -943,67 +944,55 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     std::unique_ptr<RegridMatrices_Dynamic> rm(new RegridMatrices_Dynamic(params));
     GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
 
-    if (sheet_index >= 0) {
-        // Per-ice sheet matrix, makes sense either for:
-        //    (a) A matrix involving ice sheet (eg AvI,IvA,EvI,IvE)
-        //    (b) Generating global EC's for non-twoway-coupled case, where
-        //        the IceRegridder IS the global ice cover
-        //        (or at least a shard of it).
+    // Per-ice sheet matrix, makes sense either for:
+    //    (a) A matrix involving ice sheet (eg AvI,IvA,EvI,IvE)
+    //    (b) Generating global EC's for non-twoway-coupled case, where
+    //        the IceRegridder IS the global ice cover
+    //        (or at least a shard of it).
 
 
-        // Delicate construction of rmO
-        std::unique_ptr<RegridMatrices_Dynamic> _rmO(
-            gcmO->regrid_matrices(sheet_index, elevmaskI));
-        auto &rmO(rm->tmp.take(std::move(*_rmO)));
+    // Delicate construction of rmO
+    std::unique_ptr<RegridMatrices_Dynamic> _rmO(
+        gcmO->regrid_matrices(sheet_index, elevmaskI));
+    auto &rmO(rm->tmp.take(std::move(*_rmO)));
 
-        rm->add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-            this, 'E', specO.eq_rad, &rmO));
-        rm->add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-            this, 'A', specO.eq_rad, &rmO));
-
-
-        rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm, _1, _2,
-            this, specO.eq_rad, &rmO));
+    rm->add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+        this, 'E', specO.eq_rad, &rmO));
+    rm->add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+        this, 'A', specO.eq_rad, &rmO));
 
 
-        rm->add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
-            this, 'E', specO.eq_rad, &rmO));
-        rm->add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
-            this, 'A', specO.eq_rad, &rmO));
+    rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm, _1, _2,
+        this, specO.eq_rad, &rmO));
 
 
-        // --------------- Simply-named aliases
-        rm->add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
-            this, 'E', specO.eq_rad, &rmO));
-        rm->add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
-            this, 'A', specO.eq_rad, &rmO));
+    rm->add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
+        this, 'E', specO.eq_rad, &rmO));
+    rm->add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
+        this, 'A', specO.eq_rad, &rmO));
 
 
-        rm->add_regrid("AvE", std::bind(&compute_AAmvEAm, _1, _2,
-            this, specO.eq_rad, &rmO));
+    // --------------- Simply-named aliases
+    rm->add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
+        this, 'E', specO.eq_rad, &rmO));
+    rm->add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
+        this, 'A', specO.eq_rad, &rmO));
 
 
-        rm->add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
-            this, 'E', specO.eq_rad, &rmO));
-        rm->add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
-            this, 'A', specO.eq_rad, &rmO));
+    rm->add_regrid("AvE", std::bind(&compute_AAmvEAm, _1, _2,
+        this, specO.eq_rad, &rmO));
 
-        // For testing
-        rm->add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,
-            this, '.'));
-        rm->add_regrid("AAmvAOm", std::bind(&compute_AOmvAAm, _1, _2,
-            this, 'T'));
 
-    } else {
-        // Matrices merge saved global EC's and all ice sheets.
-        // We only do AvE that way.
+    rm->add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
+        this, 'E', specO.eq_rad, &rmO));
+    rm->add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
+        this, 'A', specO.eq_rad, &rmO));
 
-        rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm, _1, _2,
-            this, specO.eq_rad, nullptr));
-
-        rm->add_regrid("AvE", std::bind(&compute_AAmvEAm_by_AOvI, _1, _2,
-            this, specO.eq_rad, nullptr));
-    }
+    // For testing
+    rm->add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,
+        this, '.'));
+    rm->add_regrid("AAmvAOm", std::bind(&compute_AOmvAAm, _1, _2,
+        this, 'T'));
 
     return rm;
 }

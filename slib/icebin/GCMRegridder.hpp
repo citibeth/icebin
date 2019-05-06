@@ -399,11 +399,6 @@ public:
         typename std::vector<std::unique_ptr<IceRegridder>>::const_iterator
     > const_iterator;
 
-//    const_iterator begin() const
-//        { return const_iterator(ice_regridders().cbegin()); }
-//    const_iterator end() const
-//        { return const_iterator(ice_regridders().cend()); }
-
     // -----------------------------------------
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
