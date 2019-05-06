@@ -137,7 +137,9 @@ public:
     /** Constructor used in coupler: create the GCMRegridder first,
         then fill in foceanAOp and foceanAOm later.
     @param _gcmO Underlying regridder for the Ocean Grid Regime. */
-    GCMRegridder_ModelE(std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
+    GCMRegridder_ModelE(
+        std::string const &_global_ecO,
+        std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
 
     // ------------------------------------------------------------
     // Override virtual functions

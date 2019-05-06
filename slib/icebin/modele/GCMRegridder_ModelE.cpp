@@ -326,7 +326,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 }
 
 // ========================================================================
-EigenColVectorT compute_wAOm_e(
+EigenColVectorT compute_wAOm(
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> const &wAOp,
     SparseSetT &dimAOp,   // Constant
@@ -350,27 +350,18 @@ EigenColVectorT compute_wAOm_e(
     return sc_AOmvAOp * map_eigen_colvector(wAOp);
 }
 // ========================================================================
-class EOmvAOm_Unscaled {
-public:
-    SparseSetT dimEOm;
-    std::unique_ptr<EigenSparseMatrixT> M;   // EOmvAOm matrix
-
-    EOmvAOm_Unscaled(
-        SparseSetT &dimAOm,        // const; pre-computed, should not change
-        EigenSparseMatrixT const &EOpvAOp,
-        SparseSetT &dimEOp,
-        SparseSetT &dimAOp);
-};
-
 /** Computes EOmvAOm, based on EOpvAOp.  EOpvAOp is converted to EOmvAOm by
 removing elements that refer to non-existent grid cells in AOm.
 This ultimately provides us with dimEOm as well. */
-EOmvAOm_Unscaled::EOmvAOm_Unscaled(
+EigenSparseMatrixT compute_EOmvAOm_unscaled(
+    SparseSetT &dimEOm,        // NOT const
     SparseSetT &dimAOm,        // const; pre-computed, should not change
     EigenSparseMatrixT const &EOpvAOp,
-    SparseSetT &dimEOp,
-    SparseSetT &dimAOp,
+    SparseSetT const &dimEOp,
+    SparseSetT const &dimAOp)
 {
+    ConstUniverse const_dimAOm({"dimAOm"}, {&dimAOm});
+
     // Convert to EOmvAOm by removing cells not in dimAOm
     TupleListT<2> EOmvAOm_tl;
     for (auto ii(begin(EOpvAOp)); ii != end(EOpvAOp); ++ii) {
@@ -387,9 +378,10 @@ EOmvAOm_Unscaled::EOmvAOm_Unscaled(
 
     // Create the matrix from the TupleList
     EOmvAOm_tl.set_shape(std::array<long,2>{});
-    M.reset(new EigenSparseMatrixT(
-        dimEOm.dense_extent(), dimAOm.dense_extent()));
-    M->setFromTriplets(EOmvAOm_tl.begin(), EOmvAOm_tl.end());
+
+    EigenSparseMatrixT EOmvAOm(dimEOm.dense_extent(), dimAOm.dense_extent());
+    EOmvAOm.setFromTriplets(EOmvAOm_tl.begin(), EOmvAOm_tl.end());
+    return EOmvAOm;
 }
 
 // ------------------------------------------------------
@@ -424,7 +416,7 @@ static std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
     // Compute wAOm (from wAOp)
     SparseSetT dimAOm;
-    EigenColVectorT wAOm_e(compute_wAOm_e(gcmA, wAOp, dimAOp, dimAOm));
+    EigenColVectorT wAOm_e(compute_wAOm(gcmA, wAOp, dimAOp, dimAOm));
 
     Hntr hntr_AOmvAAm(17.17, hntrO, hntrA);
     EigenSparseMatrixT AAmvAOm(MakeDenseEigenT(
@@ -438,14 +430,14 @@ static std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
         AAmvAOm * map_eigen_diagonal(AAmvAOms) * wAOm_e));
 
     // ------------ Compute AOmvEOm (from EOpvAOp)
-    EOmvAOm_Unscaled EOmvAOm(dimAOm, EOpvAOp, dimEOp, dimAOp);
-    auto &dimEOm(EOmvAOm.dimEOm);
-    auto EOmvAOms(sum(*EOmvAOm.M, 1, '-'));
-    auto AOmvEOm(EOmvAOm.M->transpose());
+    SparseSetT dimEOm;
+    EigenSparseMatrixT EOmvAOm(compute_EOmvAOm_unscaled(dimEOm, dimAOm, EOpvAOp, dimEOp, dimAOp));
+    auto EOmvAOms(sum(EOmvAOm, 1, '-'));
+    auto AOmvEOm(EOmvAOm.transpose());
     auto &sAOmvEOm(EOmvAOms);
 
     // ------------- Compute wEOm
-    EigenColVectorT wEOm_e(*EOmvAOm.M * map_eigen_diagonal(EOmvAOms) * wAOm_e);
+    EigenColVectorT wEOm_e(EOmvAOm * map_eigen_diagonal(EOmvAOms) * wAOm_e);
     auto wEOm(to_blitz(wEOm_e));
 
     // ------------ Compute EOmvEAm
@@ -683,7 +675,7 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         "AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
-    EigenColVectorT wAOm_e(compute_wAOm_e(gcmA, wAOp, dimAOp, dimAOm));
+    EigenColVectorT wAOm_e(compute_wAOm(gcmA, wAOp, dimAOp, dimAOm));
 
     HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
     HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
@@ -713,15 +705,12 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
             rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
 
-        const_universe.reset(new ConstUniverse({"dimEOp"}, {&dimEOp}));
-        EOmvAOm_Unscaled EOmvAOm(dimAOm, *EOpvAOp->M, dimEOp, dimAOp);
-        const_universe.reset();        // Check that dims didn't change
-        dimEOm = std::move(EOmvAOm.dimEOm);
+        EigenSparseMatrixT EOmvAOm(compute_EOmvAOm_unscaled(dimEOm, dimAOm, EOpvAOp, dimEOp, dimAOp));
 
         // wEOm_e
-        auto EOmvAOms(sum(*EOmvAOm.M, 1, '-'));
+        auto EOmvAOms(sum(EOmvAOm, 1, '-'));
         tmp.take<EigenColVectorT>(wXOm_e,
-            EigenColVectorT(*EOmvAOm.M * map_eigen_diagonal(EOmvAOms) * wAOm_e));
+            EigenColVectorT(EOmvAOm * map_eigen_diagonal(EOmvAOms) * wAOm_e));
 
 
         // ---------------- Compute the main matrix
@@ -921,8 +910,9 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
 /** @param gcmO A GCMRegridder_Standard that regrids between AOp,EOp,Ip.
         This is typically loaded directly from a NetCDF file. */
 GCMRegridder_ModelE::GCMRegridder_ModelE(
+    std::string const &_global_ecO,
     std::shared_ptr<icebin::GCMRegridder> const &_gcmO)
-    :  gcmO(_gcmO)
+    :  global_ecO(_global_ecO), gcmO(_gcmO)
 {
     // Initialize superclass member
     agridA = make_agridA(gcmO->agridA);
