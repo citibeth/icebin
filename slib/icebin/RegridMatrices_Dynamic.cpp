@@ -308,25 +308,31 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_EvA(IceRegridder const *r
     return ret;
 }
 
-
 std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
     int sheet_index,
     blitz::Array<double,1> const &_elevmaskI,
     RegridParams const &params) const
 {
-    IceRegridder const *regridder = &*ice_regridders()[sheet_index];
+    IceRegridder const *regridder = (sheet_index < 0 ? nullptr :
+        &*ice_regridders()[sheet_index]);
+
+    if (!regridder) (*icebin_error)(-1,
+        "GCMRegridder_Standard only does per-ice sheet matrices,"
+        " does not support merged matrices.");
 
 #if 0
     printf("===== RegridMatrices Grid geometries:\n");
     printf("    nA = %d\n", this->nA());
     printf("    nhc = %d\n", this->nhc());
     printf("    nE = %d\n", this->nE());
-    printf("    nI = %d\n", regridder->nI());
-    printf("    nG = %d\n", regridder->nG());
+    if (regridder) {
+        printf("    nI = %d\n", regridder->nI());
+        printf("    nG = %d\n", regridder->nG());
+    }
 #endif
 
     std::unique_ptr<RegridMatrices_Dynamic> rm(
-        new RegridMatrices_Dynamic(regridder, params));
+        new RegridMatrices_Dynamic(params));
     auto &elevmaskI(rm->tmp.take(blitz::Array<double,1>(_elevmaskI)));
 
     UrAE urA("A", this->nA(),

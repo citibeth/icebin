@@ -978,7 +978,7 @@ This code is just for ice sheets, not global ice (which has super-big EvI that n
     for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
         TmpAlloc tmp;
 
-        auto &emI(elevmasks[sheet_index]);
+        ElevMask<1> &emI(elevmasks[sheet_index]);
         int nI(emI.elev.extent(0));
 
         // Construct an elevmaskI for ice sheet, =nan off ice sheet
@@ -999,11 +999,12 @@ This code is just for ice sheets, not global ice (which has super-big EvI that n
             params.sigma = sigmas[sheet_index];    // TODO: Set smoothing!
         std::unique_ptr<RegridMatrices_Dynamic> rmA(gcmA->regrid_matrices(sheet_index, elevmaskI, params));
         SparseSetT dimA, dimE, dimI;
-        auto AvI(rmA->matrix_d("AvI", {&dimA, &dimI}, params));
-//        auto EvI(rmA->matrix_d("EvI", {&dimE, &dimI}, params));
+//        auto AvI(rmA->matrix_d("AvI", {&dimA, &dimI}, params));   NOT USED
+//        auto EvI(rmA->matrix_d("EvI", {&dimE, &dimI}, params));   NOT USED
         auto AvE(rmA->matrix_d("AvE", {&dimA, &dimE}, params));
 
         // Merge local (per-ice sheet) into global AvE
+TODO (BUG FIX): Merging like this requires UNSCALED matrices!
         spsparse::spcopy(
             spsparse::accum::to_sparse(std::array<SparseSetT *,2>{&dimA, &dimE},
             spsparse::accum::ref(AvE_global_tp)),

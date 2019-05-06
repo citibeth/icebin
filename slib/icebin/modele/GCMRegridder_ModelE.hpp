@@ -98,7 +98,25 @@ class GCMRegridder_ModelE : public GCMRegridder {
 //    blitz::Array<double,1> _foceanAOm, _foceanAOp;    // Hold allocated memory here
 
 public:
-    /** A GCMRegridder_Standard that regrids between AOp,EOp,Ip.
+
+
+    /** Name of file created by global_ec, used for matrices on global
+    (non-ice shet) ice with elevation classes.  Generating those
+    matrices on-the-fly is not practical because the global ice grid
+    is REALLY big.  Instead, we read EvA/AvE out of a pre-computed
+    file.  The global_ec file MUST be generated, on the OCEAN grid,
+    with the following RegridParams:
+        scale = false
+        correctA = true
+
+    NOTE: if (global_ecO==""), then we should just use the ice
+          sheet-supplied GCMRegridderes (gcmO).  This mode is used by
+          global_ec.cpp when computing global ECs for direct use in
+          ModelE, without two-way ice sheet coupling.
+    */
+    std::string const global_ecO;
+
+    /** A GCMRegridder_Standard that regrids between AOp,EOp,Ip for ice sheets.
     This is typically loaded directly from a NetCDF file. */
     std::shared_ptr<icebin::GCMRegridder> const gcmO;
 

@@ -271,7 +271,11 @@ public:
     template<class AccumT>
     void wA(AccumT &&accum, std::string const &ice_sheet_name, bool native);
 
-    /** Produce regridding matrices for this setup. */
+    /** Produce regridding matrices for this setup.
+    @param sheet_index
+       If < 0: Matrix merging all ice sheets will be returned where
+               it makes sense.  (i.e. AvE / EvA)
+       If >= 0: Return matrix for just the specified ice sheet. */
     virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
@@ -283,7 +287,8 @@ public:
         blitz::Array<double,1> const &elevmaskI,
         RegridParams const &params) const
     {
-        auto sheet_ix = ice_regridders().index.at(sheet);
+        int sheet_ix = (sheet == "" ? -1 : 
+            ice_regridders().index.at(sheet));
         return regrid_matrices(sheet_ix, elevmaskI);
     }
 
@@ -394,10 +399,10 @@ public:
         typename std::vector<std::unique_ptr<IceRegridder>>::const_iterator
     > const_iterator;
 
-    const_iterator begin() const
-        { return const_iterator(ice_regridders().cbegin()); }
-    const_iterator end() const
-        { return const_iterator(ice_regridders().cend()); }
+//    const_iterator begin() const
+//        { return const_iterator(ice_regridders().cbegin()); }
+//    const_iterator end() const
+//        { return const_iterator(ice_regridders().cend()); }
 
     // -----------------------------------------
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);

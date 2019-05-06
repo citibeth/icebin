@@ -287,3 +287,5 @@ if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, 
 
     return 0;
 }
+
+

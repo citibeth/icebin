@@ -29,9 +29,8 @@ public:
     std::map<std::string, MatrixFunction> regrids;
 
     RegridMatrices_Dynamic(
-        IceRegridder const * const _ice_regridder,
         RegridParams const &params)
-    : RegridMatrices(params), ice_regridder(_ice_regridder) {}
+    : RegridMatrices(params) {}
 
     void add_regrid(std::string const &spec,
         MatrixFunction const &regrid);
