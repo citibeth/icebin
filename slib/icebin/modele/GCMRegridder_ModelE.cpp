@@ -327,7 +327,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 
 // ========================================================================
 EigenColVectorT compute_wAOm(
-    GCMRegridder_ModelE const *gcmA,
+    blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
+    blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
     blitz::Array<double,1> const &wAOp,
     SparseSetT &dimAOp,   // Constant
     SparseSetT &dimAOm)   // write here
@@ -338,12 +339,12 @@ EigenColVectorT compute_wAOm(
     // dimAOm will be a subset of dimAOp.  Remove points in dimAOp that are ocean.
     for (int iAOp_d=0; iAOp_d < dimAOp.dense_extent(); ++iAOp_d) {
         auto const iAO_s(dimAOp.to_sparse(iAOp_d));
-        if (gcmA->foceanAOm(iAO_s) == 0) dimAOm.add_dense(iAO_s);
+        if (foceanAOm(iAO_s) == 0) dimAOm.add_dense(iAO_s);
     }
 
     // OmvOp
     EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
-        std::bind(&scaled_AOmvAOp, _1, gcmA->foceanAOp, gcmA->foceanAOm, '+'),
+        std::bind(&scaled_AOmvAOp, _1, foceanAOp, foceanAOm, '+'),
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
@@ -356,7 +357,7 @@ This ultimately provides us with dimEOm as well. */
 EigenSparseMatrixT compute_EOmvAOm_unscaled(
     SparseSetT &dimEOm,        // NOT const
     SparseSetT &dimAOm,        // const; pre-computed, should not change
-    EigenSparseMatrixT const &EOpvAOp,
+    EigenSparseMatrixT const &EOpvAOp,    // Unscaled
     SparseSetT const &dimEOp,
     SparseSetT const &dimAOp)
 {
@@ -408,7 +409,7 @@ static std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
     // Compute wAOm (from wAOp)
     SparseSetT dimAOm;
-    EigenColVectorT wAOm_e(compute_wAOm(gcmA, wAOp, dimAOp, dimAOm));
+    EigenColVectorT wAOm_e(compute_wAOm(gcmA->foceanAOp, gcmA->foceanAom, wAOp, dimAOp, dimAOm));
 
     // ------------- Compute wAAm and AAmvAOm
     // Obtain hntrA and hntrO for process below.
@@ -507,13 +508,15 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
         *EOpvAOp->M, dimEOp, dimAOp, EOpvAOp->Mw);
 }
 
-
-static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
+EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
-    GCMRegridder_ModelE const *gcmA,
+    GCMRegridder const *gcmO,
     double const eq_rad,    // Radius of the earth
-    std::vector<ElevMask<1>> const elevmasks)    // elevation and ice cover of each ice sheet
+    std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for each ice sheet
+    bool use_global_ice,
+    bool use_local_ice,
+    bool include_bare_ground)    // true if non-ice covered areas of land should also be included
 {
     // ======================= Create a merged EOpvAOp of base ice and ice sheets
     // (and then call through to _compute_AAmvEAm)
@@ -530,25 +533,33 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
         paramsO.correctA = true;
 
     // Merge in local matrices
+if (use_local_ice) {
     std::array<long,2> EOpvAOp_sheet_shape;
-    for (size_t sheet_index=0; sheet_index < gcmA->gcmO->ice_regridders().index.size(); ++sheet_index) {
+    for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
         ElevMask<1> const &emI(elevmasks[sheet_index]);
         int const nI(emI.elev.extent(0));
 
         // Construct an elevmaskI for ice sheet, =nan off ice sheet
         blitz::Array<double,1> elevmaskI(nI);
         for (int iI=0; iI<nI; ++iI) {
-            auto const m(emI.mask(iI));
-            if (m==IceMask::GROUNDED_ICE || m==IceMask::FLOATING_ICE) {
-                elevmaskI(iI) = emI.elev(iI);
-            } else {
-                elevmaskI(iI) = nan;
+            switch(emI.mask(iI)) {
+                case IceMask::GROUNDED_ICE :
+                case IceMask::FLOATING_ICE :
+                    elevmaskI(iI) = emI.elev(iI);
+                break;
+                case IceMask::ICE_FREE_OCEAN :
+                case IceMask::UNKNOWN :
+                    elevmaskI(iI) = nan;
+                break;
+                case IceMask::ICE_FREE_BEDROCK :
+                    elevmask(iI) = (include_bare_ground ? emI.elev(iI) : nan);
+                break;
             }
         }
 
         // Get local EOpvAOp matrix
         std::unique_ptr<RegridMatrices_Dynamic> rmO(
-            gcmA->gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
+            gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
         SparseSetT dimEO_sheet;
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> EOpvAOp(
             rmO->matrix_d("EvA", {&dimEO_sheet, &dimAO}, paramsO));
@@ -565,8 +576,10 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
                 ii->value());
         }
     }
+}
 
 
+if (use_global_ice) {
     // Merge in global matrix (compressed format; sparse indexing) If
     // an EC is already used by an ice sheet, remove the ice in that
     // EC from the global matrix.  This "cheap trick" will result in a
@@ -581,7 +594,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
 
         // Check that global matrix has same number of ECs as local
         // (and hopefully at same elevations too)
-        if (gcmA->gcmO->nhc() != EOpvAOp.shape(0) / EOpvAOp.shape(1))
+        if (gcmO->nhc() != EOpvAOp.shape(0) / EOpvAOp.shape(1))
             (*icebin_error)(-1, "NHC mismatch between global and local ice");
 
         // Store shape of this matrix for setting shape of merged EOpvAOp
@@ -597,6 +610,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
             }
         }
     }
+}
+TODO: Keep ECs separate for global vs. local ice
 
     if ((EOpvAOp_sheet_shape[0] != EOpvAOp_base_shape[0]) ||
         (EOpvAOp_sheet_shape[1] != EOpvAOp_base_shape[1])) {
@@ -612,6 +627,18 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
 
     // Compute EOpvAOp and wAOp
     EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
+}
+
+
+
+static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
+    std::array<SparseSetT *,2> dims,
+    RegridParams const &paramsA,
+    GCMRegridder_ModelE const *gcmA,
+    double const eq_rad,    // Radius of the earth
+    std::vector<ElevMask<1>> const elevmasks)    // elevation and ice cover of each ice sheet
+{
+    auto EOpvAOp(compute_EOpvAOp_merged(dims, paramsA, gcmA->gcmO, eq_rad, elevmasks));
     auto wAOp(sum(EOpvAOp, 1, '+'));
 
     return _compute_AAmvEAm(dims, paramsA, gcmA, eq_rad,
@@ -677,7 +704,7 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         "AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
-    EigenColVectorT wAOm_e(compute_wAOm(gcmA, wAOp, dimAOp, dimAOm));
+    EigenColVectorT wAOm_e(compute_wAOm(gcmA->foceanAOp, gcmA->foceanAOm, wAOp, dimAOp, dimAOm));
 
     HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
     HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);

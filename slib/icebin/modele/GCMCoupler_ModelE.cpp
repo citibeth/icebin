@@ -601,6 +601,7 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     This function will change foceanOp in areas of ice sheets, setting
     to values in the range [0,1]
 */
+TODO: Remove update_foceanOp
 static void update_foceanOp(
 GCMRegridder *gcmO,
 std::vector<ElevMask<1>> const &elevmasks,
@@ -608,6 +609,8 @@ blitz::Array<double,1> &foceanOp,    // OUT: 0-based array
 blitz::Array<char,1> &changedO)    // OUT
 {
 //    GCMRegridder *gcmA = &*gcmc->gcm_regridder;
+
+This IS MUCH MORE EASILY DONE as a byproduct of merged EOpvAOp (without global ice), which must be computed anyway.
 
     auto nO(gcmO->nA());
 
@@ -627,7 +630,7 @@ blitz::Array<char,1> &changedO)    // OUT
         // Get OvI for continental cells
         std::unique_ptr<RegridMatrices_Dynamic> rmO(gcmO->regrid_matrices(sheet_index, elevmaskI));
         SparseSetT dimO, dimI;
-        RegridParams paramsO;
+        RegridParams paramsO(paramsA);
             paramsO.scale = false;
             paramsO.correctA = false;
         auto OvI(rmO->matrix_d("AvI", {&dimO, &dimI}, paramsO));
@@ -644,6 +647,7 @@ blitz::Array<char,1> &changedO)    // OUT
         TmpAlloc tmp;
 
         blitz::Array<double,1> fcontOp_d(OvI->apply(fcontI_d, 0., true, tmp));    // force_conservation set to true by default, and it probably doesn't matter; but I think it should be false here.
+TODO: This will produce AREA of continent, not FRACTION of continent
 
         // Interpolate into foceanOp_s
         IceRegridder *iceO = &*gcmO->ice_regridders()[sheet_index];
@@ -744,6 +748,119 @@ blitz::Array<char,1> &changedO)    // OUT
             auto const iO_s = dimO.to_sparse(iO_d);
             fgiceO(iO_s) += fgiceO_d(iO_d);        // Will have some rounding error on #s that should ==1.0
             changedO(iO_s) = 1;    // true
+        }
+
+    }
+}
+
+/** Construct merged data on Ocean grid; ready as input for make_tooa
+(variables named after make_topoa.cpp) */
+class MergeTopoO {
+    EigenSparseMatrixT AOvEO;
+    HnterSpec hspec;
+    blitz::Array<double,2> fgiceOp;
+    blitz::Array<double,2> fgiceOm;
+    blitz::Array<double,3> elevEO;
+};
+
+static std::vector<std::string> const otopo_vars
+    {"focean", "flake", "fgrnd", "fgice", "zatmo", "hlake", "zicetop"};
+std::map<std::string, std::unique_ptr<blitz::Array<double,2>>> varsO;
+
+
+void merge_topoO(
+// TOPOO arrays to merge into (global ice)
+blitz::Array<double,2> const &areaO,    // Area of each ocean gridcell
+blitz::Array<double,2> &foceanOp,    // Fractional FOCEAN
+blitz::Array<double,2> &foceanOm,     // Rounded FOCEAN
+blitz::Array<double,2> &flakeO,
+blitz::Array<double,2> &fgrndO,
+blitz::Array<double,2> &fgiceO,
+
+blitz::Array<double,2> &zatmoO,
+blitz::Array<double,2> &hlakeO,
+blitz::Array<double,2> &zicetopO,
+// Local ice to merge in...
+GCMRegridder *gcmO,
+std::vector<ElevMask<1>> const &elevmasks,
+double const eq_rad,    // Radius of the earth
+std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for each ice sheet
+
+
+//EigenSparseMatrixT const &AOmvEOm,
+//SparseSetT const &dimAOm,
+//SparseSetT const &dimEOm)
+{
+    SparseSetT dimEOp, dimAOp;
+    auto nO = gcmO->nA();
+
+    // ------------------ Update land surface fractions
+    {
+        // Get area of non-ocean (fcont/fgrnd) in each gridcell we touch
+        SparseSetT dimEOp, dimAOp;
+        EigenMatrixT EOpvAOp(compute_EOpvAOp_merged(
+            {&dimEOp, &dimAOp},
+            paramsA, gcmO, eq_rad, elevmasks,
+            false, true, true));  // local ice only, include bare ground
+        auto area_contO(sum(EOpvAOp_unscaled, 1, '+'));
+
+        for (size_t iAO_d=0; iAO_d < dimAOp.size(); ++iAO_d) {
+
+            // Update foceanOp
+            long const iAO_s = dimAO.to_sparse(iAO_d);
+
+            double fcontOp = area_contO / areaO(iAO_s);
+            double fcontOp_local = 1.0 - foceanOp_local(iAO_d);
+            foceanOp(iAO_s) = 1.0 - (fcontOp + fcontOp_local);
+
+            // Adjust fgrnd to make it all sum to 1; and round foceanOm at the same time
+            flakeO(iAO_s) = 0.;
+            if (foceanOp(iAO_s) >= 0.5) {
+                foceanOm(iAO_s) = 1.;
+                fgiceO(iAO_s) = 0.;
+                fgrndO(iAO_s) = 0.;
+            } else {
+                foceanOm(iAO_s) = 0.;
+                fgiceO(iAO_s) = round_mantissa(fgiceO(iAO_s), 3);    // will be ==1.0 when needed
+                fgrndO(iAO_s) = 1. - fgiceO(iAO_s);    // Should have pure zeros, not +-1e-17 stuff
+            }
+        }
+    }
+
+
+    // -------------- Compute ZATMO (elevA), etc.
+    {
+        for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
+            SparseSet dimOp,dimI;
+            std::unique_ptr<RegridMatrices_Dynamic> rmO(
+                gcmO->regrid_matrices(sheet_index, elevmaskI));
+            RegridParams paramsO(paramsA);
+                paramsO.scale = true;
+                paramsO.correctA = false;
+            auto OvI(rmO->matrix_d("AvI", {&dimOp, &dimI}, paramsO));
+
+
+            // Construct elevI in dense indexing space
+            ElevMask<1> const &emI(elevmasks[sheet_index]);
+            blitz::Array<double,1> elevI_d(dimI.size());
+            for (size_t iI_d=0; iI_d < dimIp.size(); ++iI_d) {
+                auto iI_s = dimI.to_sparse(iI_d);
+                elevI_d(iO_d) = emI.elev(iI_s);
+            }
+
+            // Compute elevO (dense indexing)
+            TmpAlloc tmp;
+            auto elevO_d(OvI->apply(elevI_d, nan, true, tmp));
+
+            for (size_t iO_d=0; iO_d < dimOp.size(); ++iO_d) {
+                auto iO_s = dimO.to_sparse(iO_d);
+                zatmoO(iO_s) = elevO_d(iO_d);
+TODO: How do we compute MERGED zatmoO correctly?
+                hlakeO(iO_s) = elevO_d(iO_d);
+            }
+
+
+
         }
 
     }
