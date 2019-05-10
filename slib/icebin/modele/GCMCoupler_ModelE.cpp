@@ -720,7 +720,7 @@ blitz::Array<char,1> &changedO)    // OUT
         for (int iI=0; iI<nI; ++iI) {
             auto const m(emI.mask(iI));
             elevmaskI(iI) = (
-                m==IceMask::GROUNDED_ICE || m==IceMask::FLOATING_ICE ?
+                m==IceMask::GROUNDED_ICE || m==IceMask::FLOATING_ICE || m==IceMask::BARE_GROUND ?
                 emI.elev(iI) : nan);
         }
 
@@ -768,6 +768,49 @@ static std::vector<std::string> const otopo_vars
 std::map<std::string, std::unique_ptr<blitz::Array<double,2>>> varsO;
 
 
+get_OvI(
+GCMRegridder *gcmO,
+RegridParams const &paramsA,
+int sheet_index,
+ElevMask<1> &emI,
+SparseSetT &dimOp,
+bool include_ice,
+bool include_bedrock)
+{
+        // Construct an elevmaskI for ice only
+        // (==elevI on ice, nan on ocean or bare land)
+        auto &emI(elevmasks[sheet_index]);
+        int nI = emI.elev.extent(0);
+        blitz::Array<double,1> elevmaskI(nI);
+        for (int iI=0; iI<nI; ++iI) {
+            switch(emI.mask(iI)) {
+                case IceMask::GROUNDED_ICE :
+                case IceMask::FLOATING_ICE :
+                    elevmaskI(iI) = (include_ice ? emI.elev(iI) : nan);
+                break;
+                case IceMask::ICE_FREE_OCEAN :
+                case IceMask::UNKNOWN :
+                    elevmaskI(iI) = nan;
+                break;
+                case IceMask::ICE_FREE_BEDROCK :
+                    elevmask(iI) = (include_bedrock ? emI.elev(iI) : nan);
+                break;
+            }
+
+        }
+
+
+        SparseSet dimOp,dimI;
+        std::unique_ptr<RegridMatrices_Dynamic> rmO(
+            gcmO->regrid_matrices(sheet_index, elevmaskI));
+        RegridParams paramsO(paramsA);
+            paramsO.scale = false;
+            paramsO.correctA = false;
+       return rmO->matrix_d("AvI", {&dimOp, &dimI}, paramsO);
+}
+
+
+
 void merge_topoO(
 // TOPOO arrays to merge into (global ice)
 blitz::Array<double,2> const &areaO,    // Area of each ocean gridcell
@@ -794,7 +837,16 @@ std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for ea
     SparseSetT dimEOp, dimAOp;
     auto nO = gcmO->nA();
 
-    // ------------------ Update land surface fractions
+    // -------------- Multiply key variables by (1-foceanOp), to accumulate later
+    auto &zicetopO_area(zicetopO);
+    for (long iO_s=0; iO_s < nO; ++iO) {
+        zatmoO_frac(iO_s) *= (1. - foceanOp(iO_s));
+        zicetopO_frac(iO_s) *= fgiceOp(iO_s);
+    }
+
+#if 0
+    // ------------------ Update land surface fractions from local ice sheets
+    fcontO_local = 0.;
     {
         // Get area of non-ocean (fcont/fgrnd) in each gridcell we touch
         SparseSetT dimEOp, dimAOp;
@@ -804,69 +856,198 @@ std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for ea
             false, true, true));  // local ice only, include bare ground
         auto area_contO(sum(EOpvAOp_unscaled, 1, '+'));
 
+        // Update foceanOp
         for (size_t iAO_d=0; iAO_d < dimAOp.size(); ++iAO_d) {
-
-            // Update foceanOp
             long const iAO_s = dimAO.to_sparse(iAO_d);
 
-            double fcontOp = area_contO / areaO(iAO_s);
-            double fcontOp_local = 1.0 - foceanOp_local(iAO_d);
-            foceanOp(iAO_s) = 1.0 - (fcontOp + fcontOp_local);
+            fcontOp_local(iAO_d) += area_contO(iAO_d) / areaO(iAO_s);
+//            double fcontOp_old = 1.0 - foceanOp(iAO_s);
+//            double fcontOp_local = area_contO(iAO_d) / areaO(iAO_s);
+//            foceanOp(iAO_s) = 1.0 - (fcontOp_old + fcontOp_local);
 
-            // Adjust fgrnd to make it all sum to 1; and round foceanOm at the same time
-            flakeO(iAO_s) = 0.;
-            if (foceanOp(iAO_s) >= 0.5) {
-                foceanOm(iAO_s) = 1.;
-                fgiceO(iAO_s) = 0.;
-                fgrndO(iAO_s) = 0.;
-            } else {
-                foceanOm(iAO_s) = 0.;
-                fgiceO(iAO_s) = round_mantissa(fgiceO(iAO_s), 3);    // will be ==1.0 when needed
-                fgrndO(iAO_s) = 1. - fgiceO(iAO_s);    // Should have pure zeros, not +-1e-17 stuff
-            }
+
         }
     }
+#endif
 
 
-    // -------------- Compute ZATMO (elevA), etc.
-    {
-        for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
-            SparseSet dimOp,dimI;
-            std::unique_ptr<RegridMatrices_Dynamic> rmO(
-                gcmO->regrid_matrices(sheet_index, elevmaskI));
-            RegridParams paramsO(paramsA);
-                paramsO.scale = true;
-                paramsO.correctA = false;
-            auto OvI(rmO->matrix_d("AvI", {&dimOp, &dimI}, paramsO));
+    // -------------- Compute ZATMO (elevO), etc.
+    for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
 
+        // Construct elevI in dense indexing space
+        ElevMask<1> const &emI(elevmasks[sheet_index]);
+        blitz::Array<double,1> elevI_d(dimI.size());
+        for (size_t iI_d=0; iI_d < dimIp.size(); ++iI_d) {
+            auto iI_s = dimI.to_sparse(iI_d);
+            elevI_d(iO_d) = emI.elev(iI_s);
+        }
 
-            // Construct elevI in dense indexing space
-            ElevMask<1> const &emI(elevmasks[sheet_index]);
-            blitz::Array<double,1> elevI_d(dimI.size());
-            for (size_t iI_d=0; iI_d < dimIp.size(); ++iI_d) {
-                auto iI_s = dimI.to_sparse(iI_d);
-                elevI_d(iO_d) = emI.elev(iI_s);
-            }
+        blitz::Array<double,1> dacontO(nO);    // increase in area of continent [m^2]
+        dacontO = 0.;
+        blitz::Array<double,1> dagiceO(nO);     // increase in area of landice [m^2]
+        dagiceO = 0.;
 
-            // Compute elevO (dense indexing)
-            TmpAlloc tmp;
-            auto elevO_d(OvI->apply(elevI_d, nan, true, tmp));
+        // Update zicetopO from ice-only coverage
+        {TmpAlloc tmp;
+            SparseSetT dimOp;
+            auto OvI_ice(get_OvI(gcmO, paramsA, sheet_index, emI, dimOp, true, false); // unscaled
 
             for (size_t iO_d=0; iO_d < dimOp.size(); ++iO_d) {
                 auto iO_s = dimO.to_sparse(iO_d);
-                zatmoO(iO_s) = elevO_d(iO_d);
-TODO: How do we compute MERGED zatmoO correctly?
-                hlakeO(iO_s) = elevO_d(iO_d);
-            }
-
-
-
+            auto elevO_d(OvI_ice->apply(elevI_d, nan, true, tmp));
+            dagiceO(iO_s) += OvI->wM(iO_d);
+            zicetopO_frac(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d) / area(iO_s);;
         }
 
+        {TmpAlloc tmp;
+            SparseSetT dimOp;
+            auto OvI_ice(get_OvI(gcmO, paramsA, sheet_index, emI, dimOp, true, false); // unscaled
+
+            for (size_t iO_d=0; iO_d < dimOp.size(); ++iO_d) {
+                auto iO_s = dimO.to_sparse(iO_d);
+            auto elevO_d(OvI_ice->apply(elevI_d, nan, true, tmp));
+            dacontO(iO_s) += OvI->wM(iO_d);
+            zatmoO_frac(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d) / area(iO_s);;
+        }
+
+
+
+
+
+            SparseSetT dimOp_cont;
+            auto OvI_cont(get_OvI(gcmO, paramsA, sheet_index, emI, dimOp_cont, true, true);
+
+            // Compute elevO (dense indexing)
+            auto elevO_cont_d(OvI_cont->apply(elevI_d, nan, true, tmp));
+
+        for (size_t iO_d=0; iO_d < dimOp.size(); ++iO_d) {
+            auto iO_s = dimO.to_sparse(iO_d);
+            // Replace ocean in original (global) ZATMO with
+            // (ice+land) from local ice sheet.
+            zicetopO_area(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d);
+        }
     }
+
+
+    // Create a rounding plan
+    int8_t const TO_NONE = 0;
+    int8_t const TO_OCEAN = 1;
+    int8_t const TO_LAND = 2;
+    blitz::Array<int8_t,2> SET_TO(IM,JM);
+    SET_TO = TO_NONE;
+
+
+    for (size_t iAO_d=0; iAO_d < dimAOp.size(); ++iAO_d) {
+        long const iAO_s = dimAO.to_sparse(iAO_d);
+
+        // Adjust fgrnd to make it all sum to 1; and round foceanOm at the same time
+        flakeO(iAO_s) = 0.;
+        double const focean = foceanOp(iAO_s);
+        if (focean > 0. && focean < 0.5) {
+            SET_TO(iAO_s) = TO_LAND;
+        } else if (focean >= 0.5 && focean < 1.0) {
+            SET_TO(iAO_s) = TO_OCEAN;
+        }
+    }
+
+
+    // ---------------- Eliminate single-cell oceans
+    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
+    auto shapeO(blitz::shape(specO.nlat(), specO.nlon()));
+    auto foceanOm2(reshape<double,1,2>(foceanOm, shapeO));
+
+    auto const im(specO.nlon());
+    auto const jm(specO.nlat());
+    std::array<long,2> ijO;
+    for (int j=0; j<JM; ++j) {
+    for (int i=0; i<IM; ++i) {
+
+        int iO(gcmO->agridA.indexing.tuple_to_index(ijO));
+        auto const i(ijO[0]);
+        auto const j(ijO[1]);
+
+        // Avoid edges, where indexing is more complex (and we don't need to correct anyway)
+        if ((i==0) || (i==im-1) || (j==0) || (j==jm-1)) continue;
+
+        if (((foceanOp2(j-1,i) == 0.) || (SET_TO2(j-1,i)==TO_LAND))
+            && ((foceanOp2(j+1,i) == 0.) || (SET_TO2(j+1,i)==TO_LAND))
+            && ((foceanOp2(j,i-1) == 0.) || (SET_TO2(j,i-1)==TO_LAND))
+            && ((foceanOp2(j,i+1) == 0.) || (SET_TO2(j,i+1)==TO_LAND)))
+        {
+            // This cell is surrounded by land
+            if (foceanOp2(j,i) == 0.) SET_TO2(j,i)=TO_NONE;   // defensive: make sure we don't change it
+            else SET_TO2(j,i) = TO_LAND;
+        }
+    }
+
+    // Apply the rounding plan
+    for (int iAO_s=0; iAO_s < nAO; ++iAO_s) {
+        // Adjust fgrnd to make it all sum to 1; and round foceanOm at the same time
+        switch(SET_TO(iAO_s)) {
+            case TO_OCEAN :
+                foceanOm(iAO_s) = 1.;
+                fgiceO(iAO_s) = 0.;
+                fgrndO(iAO_s) = 0.;
+                zatmoO(iAO_s) = 0.;    // All ocean!
+                zicetopO(iAO_s) = 0.;    // Doesn't matter, there's no ice
+                hlakeO(iAO_s) = 0.;    // All ocean at sea level
+            break;
+            case TO_LAND :
+                foceanOm(iAO_s) = 0.;
+                fgiceO(iAO_s) = round_mantissa(fgiceO(iAO_s), 3);    // will be ==1.0 when needed
+                fgrndO(iAO_s) = 1. - fgiceO(iAO_s);    // Should have pure zeros, not +-1e-17 stuff
+                // zicetopO doesn't change
+                // zatmoO: Adjust for land now filling entire cell
+                zatmoO(iAO_s) /= (1. - foceanOm(iAO_s));
+            break;
+        }
+    }
+
 }
 
+void make_topoA(
+GCMRegridder_ModelE *gcmA,    // Gets updated with new fcoeanOp, foceanOm
+blitz::Array<double,2> const &foceanOm,     // Rounded FOCEAN
+blitz::Array<double,2> const &flakeO,
+blitz::Array<double,2> const &fgrndO,
+blitz::Array<double,2> const &fgiceO,
+blitz::Array<double,2> const &zatmoO,
+//SparseSetT const &dimO,    // Tells us which grid cells in O were changed.
+blitz::Array<double,2> const &foceanA,    // Rounded FOCEAN
+blitz::Array<double,2> const &flakeA,
+blitz::Array<double,2> const &fgrndA,
+blitz::Array<double,2> const &fgiceA,
+blitz::Array<double,2> const &zatmoA,
 
+)
+{
+
+    // =====================================================
+    // Regrid TOPO to Atmosphere grid
+    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
+    Hntr hntrAvO(17.17, hntrA, hntrO);
+
+    TupleListT<2> AvO_tp;
+    hntrAvO.scaled_regrid_matrix(spsparse::accum::ref(AvO_tp));
+    EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
+    AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
+
+    fgiceA = 0;
+
+    map_eigen_colvector(foceanA) = AvO_e * map_eigen_colvector(foceanOm);
+    map_eigen_colvector(flakeA) = AvO_e * map_eigen_colvector(flakeO);
+    map_eigen_colvector(fgrndA) = AvO_e * map_eigen_colvector(fgrndO);
+    map_eigen_colvector(fgiceA) = AvO_e * map_eigen_colvector(fgiceO);
+    map_eigen_colvector(zatmoA) = AvO_e * map_eigen_colvector(zatmoO);
+    map_eigen_colvector(elevA) = AvO_e * map_eigen_colvector(elevO);
+
+
+    TupleListT<2> AvE_global_tp;
+    blitz::Array<double,1> elevE_global(nE);
+
+
+}
 // ======================================================================
 
 THE PROBLEM:
