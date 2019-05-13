@@ -815,6 +815,10 @@ void merge_topoO(
 // TOPOO arrays to merge into (global ice)
 blitz::Array<double,2> const &areaO,    // Area of each ocean gridcell
 blitz::Array<double,2> &foceanOp,    // Fractional FOCEAN
+blitz::Array<double,2> &fgiceOp,
+blitz::Array<double,2> &zatmoOp,
+blitz::Array<double,2> &zicetopOp,
+
 blitz::Array<double,2> &foceanOm,     // Rounded FOCEAN
 blitz::Array<double,2> &flakeO,
 blitz::Array<double,2> &fgrndO,
@@ -871,7 +875,7 @@ std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for ea
 #endif
 
 
-    // -------------- Compute ZATMO (elevO), etc.
+    // -------------- Compute additional area of land and ice due to local ice sheets
     for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
 
         // Construct elevI in dense indexing space
@@ -895,10 +899,11 @@ std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for ea
             for (size_t iO_d=0; iO_d < dimOp.size(); ++iO_d) {
                 auto iO_s = dimO.to_sparse(iO_d);
             auto elevO_d(OvI_ice->apply(elevI_d, nan, true, tmp));
-            dagiceO(iO_s) += OvI->wM(iO_d);
-            zicetopO_frac(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d) / area(iO_s);;
+            da_giceO(iO_s) += OvI->wM(iO_d);
+            da_zicetopO(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d);
         }
 
+        // Update from ice+land coverage
         {TmpAlloc tmp;
             SparseSetT dimOp;
             auto OvI_ice(get_OvI(gcmO, paramsA, sheet_index, emI, dimOp, true, false); // unscaled
@@ -906,59 +911,42 @@ std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for ea
             for (size_t iO_d=0; iO_d < dimOp.size(); ++iO_d) {
                 auto iO_s = dimO.to_sparse(iO_d);
             auto elevO_d(OvI_ice->apply(elevI_d, nan, true, tmp));
-            dacontO(iO_s) += OvI->wM(iO_d);
-            zatmoO_frac(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d) / area(iO_s);;
-        }
-
-
-
-
-
-            SparseSetT dimOp_cont;
-            auto OvI_cont(get_OvI(gcmO, paramsA, sheet_index, emI, dimOp_cont, true, true);
-
-            // Compute elevO (dense indexing)
-            auto elevO_cont_d(OvI_cont->apply(elevI_d, nan, true, tmp));
-
-        for (size_t iO_d=0; iO_d < dimOp.size(); ++iO_d) {
-            auto iO_s = dimO.to_sparse(iO_d);
-            // Replace ocean in original (global) ZATMO with
-            // (ice+land) from local ice sheet.
-            zicetopO_area(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d);
+            da_contO(iO_s) += OvI->wM(iO_d);
+            da_zatmoO(iO_s) += elevO_d(iO_d) * OvI->wM(iO_d);
         }
     }
 
 
-    // Create a rounding plan
-    int8_t const TO_NONE = 0;
-    int8_t const TO_OCEAN = 1;
-    int8_t const TO_LAND = 2;
-    blitz::Array<int8_t,2> SET_TO(IM,JM);
-    SET_TO = TO_NONE;
+    // ---------------- Update stuff based on additional land and ice area
 
+    foceanOp0 = foceanOp;    // Original value before we changed it...
+    blitz::Array<bool,1> to_land;
+    to_land = false;
 
-    for (size_t iAO_d=0; iAO_d < dimAOp.size(); ++iAO_d) {
-        long const iAO_s = dimAO.to_sparse(iAO_d);
+    // Update foceanOp, and create new land cells in foceanOm as appropriate.
+    for (int iO=0; iO<nO; ++iO) {
+        if (da_contO(iO) == 0.) continue;
 
-        // Adjust fgrnd to make it all sum to 1; and round foceanOm at the same time
-        flakeO(iAO_s) = 0.;
-        double const focean = foceanOp(iAO_s);
-        if (focean > 0. && focean < 0.5) {
-            SET_TO(iAO_s) = TO_LAND;
-        } else if (focean >= 0.5 && focean < 1.0) {
-            SET_TO(iAO_s) = TO_OCEAN;
+        // Adjust foceanOp, etc. based on how much land we're adding
+        double const by_areaO = 1. / areaO(iO);
+        fgiceOp(iO) = std::min(1.0, fgiceOp(iO) + da_giceO(iO) * by_areaO);
+        foceanOp(iO) = std::max(0.0, foceanOp(iO) - da_contO(iO) * by_areaO);
+        zatmoOp(iO) += da_zatmoO(iO) * by_areaO;
+        zicetopOp(iO) += da_zicetopO(iO) * by_areaO;
+
+        // When we add more land, some cells that used to be ocean
+        // might now become land.
+        if ((foceanOp(iO) < 0.5) && (foceanOm(iO) == 1.0)) {
+            // Block repeated below
+            double const fact = 1. / (1. - foceanOp(iO));
+            foceanOm(iO) = 0.0;
+            fgiceOm(iO) = fgiceOp(iO) * fact;
+            zatmoOm(iO) = zatmoOp(iO) * fact;
+            zicetopOm(iO) = zicetopOp(iO) * fact;
         }
     }
 
-
-    // ---------------- Eliminate single-cell oceans
-    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
-    auto shapeO(blitz::shape(specO.nlat(), specO.nlon()));
-    auto foceanOm2(reshape<double,1,2>(foceanOm, shapeO));
-
-    auto const im(specO.nlon());
-    auto const jm(specO.nlat());
-    std::array<long,2> ijO;
+    // Remove single-cell oceans in foceanOm (turn more stuff to land)
     for (int j=0; j<JM; ++j) {
     for (int i=0; i<IM; ++i) {
 
@@ -969,40 +957,20 @@ std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for ea
         // Avoid edges, where indexing is more complex (and we don't need to correct anyway)
         if ((i==0) || (i==im-1) || (j==0) || (j==jm-1)) continue;
 
-        if (((foceanOp2(j-1,i) == 0.) || (SET_TO2(j-1,i)==TO_LAND))
-            && ((foceanOp2(j+1,i) == 0.) || (SET_TO2(j+1,i)==TO_LAND))
-            && ((foceanOp2(j,i-1) == 0.) || (SET_TO2(j,i-1)==TO_LAND))
-            && ((foceanOp2(j,i+1) == 0.) || (SET_TO2(j,i+1)==TO_LAND)))
+        if (foceanOm2(j-1,i) == 0.
+            && foceanOm2(j+1,i) == 0.
+            && foceanOm2(j,i-1) == 0.
+            && foceanOm2(j,i+1) == 0.
+            && foceanOm2(j,i) == 1.)
         {
-            // This cell is surrounded by land
-            if (foceanOp2(j,i) == 0.) SET_TO2(j,i)=TO_NONE;   // defensive: make sure we don't change it
-            else SET_TO2(j,i) = TO_LAND;
+            // Repeated block from above
+            double const fact = 1. / (1. - foceanOp(iO));
+            foceanOm(iO) = 0.0;
+            fgiceOm(iO) = fgiceOp(iO) * fact;
+            zatmoOm(iO) = zatmoOp(iO) * fact;
+            zicetopOm(iO) = zicetopOp(iO) * fact;
         }
     }
-
-    // Apply the rounding plan
-    for (int iAO_s=0; iAO_s < nAO; ++iAO_s) {
-        // Adjust fgrnd to make it all sum to 1; and round foceanOm at the same time
-        switch(SET_TO(iAO_s)) {
-            case TO_OCEAN :
-                foceanOm(iAO_s) = 1.;
-                fgiceO(iAO_s) = 0.;
-                fgrndO(iAO_s) = 0.;
-                zatmoO(iAO_s) = 0.;    // All ocean!
-                zicetopO(iAO_s) = 0.;    // Doesn't matter, there's no ice
-                hlakeO(iAO_s) = 0.;    // All ocean at sea level
-            break;
-            case TO_LAND :
-                foceanOm(iAO_s) = 0.;
-                fgiceO(iAO_s) = round_mantissa(fgiceO(iAO_s), 3);    // will be ==1.0 when needed
-                fgrndO(iAO_s) = 1. - fgiceO(iAO_s);    // Should have pure zeros, not +-1e-17 stuff
-                // zicetopO doesn't change
-                // zatmoO: Adjust for land now filling entire cell
-                zatmoO(iAO_s) /= (1. - foceanOm(iAO_s));
-            break;
-        }
-    }
-
 }
 
 void make_topoA(
