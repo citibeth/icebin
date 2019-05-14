@@ -409,7 +409,7 @@ static std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
     // Compute wAOm (from wAOp)
     SparseSetT dimAOm;
-    EigenColVectorT wAOm_e(compute_wAOm(gcmA->foceanAOp, gcmA->foceanAom, wAOp, dimAOp, dimAOm));
+    EigenColVectorT wAOm_e(compute_wAOm(gcmA->foceanAOp, gcmA->foceanAOm, wAOp, dimAOp, dimAOm));
 
     // ------------- Compute wAAm and AAmvAOm
     // Obtain hntrA and hntrO for process below.
@@ -510,6 +510,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
 
 EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
     std::array<SparseSetT *,2> dims,
+    std::string const &fname,    // File written by global_ec
     RegridParams const &paramsA,
     GCMRegridder const *gcmO,
     double const eq_rad,    // Radius of the earth
@@ -586,11 +587,10 @@ if (use_global_ice) {
     // SMALL amount of missing ice.  But it's simpler than creating a
     // new set of EC's for global vs. ice sheet ice
     std::array<long,2> EOpvAOp_base_shape(EOpvAOp.shape());
-    {NcIO ncio(spec_name, 'r');
+    {NcIO ncio(fname, 'r');
         // Load from the file
         linear::Weighted_Compressed EOpvAOp;
-        EOpvAOp->ncio(ncio, spec_name);
-
+        EOpvAOp->ncio(ncio, "EvO");
 
         // Check that global matrix has same number of ECs as local
         // (and hopefully at same elevations too)

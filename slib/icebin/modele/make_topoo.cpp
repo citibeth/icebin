@@ -109,7 +109,7 @@ static void callZ(
                     double area = grid_g1mx1m.dxyp(J1m);
                     cells2.push_back(AreaDepth(area, ZICETOP1m(I1m,J1m)));
 
-                    SAREA += area;
+                    SAREA += area;      // Surface area of LAND (non-ocean)
                     SAZSG += area*ZSOLG1m(I1m,J1m);
 
                     if (FGICE1m(I1m,J1m) != 0) {
@@ -130,6 +130,7 @@ static void callZ(
                 } else {
                     ZICETOP(I,J) = 0;
                 }
+TODO: Set zicetop for ALL gridcells with ice, even if they get rounded to ocean.
                 // Determine ZSGLO
                 ZSGLO(I,J) = cells2[0].depth;
                 // Determine ZLAKE and dZLAKE
@@ -440,7 +441,7 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     }
 
 
-    // FOCEAN (0 or 1) is rounded from FOCEAN
+    // FOCEAN (0 or 1) is rounded from FOCEANF
     for (int j=2; j<=JM; ++j) {
     for (int i=1; i<=IM; ++i) {
         auto const foceanf(FOCEANF(i,j));

@@ -267,6 +267,7 @@ public:
 
     unsigned long nA() const { return agridA.dim.sparse_extent(); }
     unsigned long nE() const { return nA() * nhc(-1); }
+    size_t nI(int sheet_index) const { return ice_regridders()[sheet_index]->nI(); }
 
     template<class AccumT>
     void wA(AccumT &&accum, std::string const &ice_sheet_name, bool native);
