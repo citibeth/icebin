@@ -141,6 +141,11 @@ public:
         std::string const &_global_ecO,
         std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
 
+    /** Determines whether an elevation class is handled by IceBin or
+    ModelE push-down */
+    uint16_t underice(int ihc)
+        { return (ihc < gcmO->nhc() ? UI_ICEBIN : UI_NOTHING); }
+
     // ------------------------------------------------------------
     // Override virtual functions
     IceRegridder *ice_regridder(std::string const &name) const;
@@ -161,6 +166,20 @@ public:
 GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO);
 
 extern HntrSpec make_hntrA(HntrSpec const &hntrO);
+
+
+extern std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
+    std::array<SparseSetT *,2> dims,
+    RegridParams const &paramsA,
+    GCMRegridder_ModelE const *gcmA,
+    double const eq_rad,    // Radius of the earth
+
+    // Sub-parts of the computation, pre-computed
+    EigenSparseMatrixT const &EOpvAOp,
+    SpareSetT &dimEOp,
+    SparseSetT &dimAOp,
+    blitz::Array<double,1> const &wAOp);
+
 
 
 }}    // namespace

@@ -386,7 +386,7 @@ EigenSparseMatrixT compute_EOmvAOm_unscaled(
 }
 
 // ------------------------------------------------------
-static std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
+std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
@@ -523,10 +523,9 @@ EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
     // (and then call through to _compute_AAmvEAm)
 
     // Accumulator for merged EOpvAOp (unscaled)
-    SparseSetT dimEOp, dimAOp;
     MakeDenseEigenT EOpvAOp_m(
         {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
-        {&dimEOp, &dimAOp}, '.');
+        dims, '.');
 
     // Regrid params for ice sheet regrid matrices
     RegridParams paramsO(paramsA);
@@ -534,85 +533,85 @@ EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
         paramsO.correctA = true;
 
     // Merge in local matrices
-if (use_local_ice) {
-    std::array<long,2> EOpvAOp_sheet_shape;
-    for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
-        ElevMask<1> const &emI(elevmasks[sheet_index]);
-        int const nI(emI.elev.extent(0));
+    if (use_local_ice) {
+        std::array<long,2> EOpvAOp_sheet_shape;
+        for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
+            ElevMask<1> const &emI(elevmasks[sheet_index]);
+            int const nI(emI.elev.extent(0));
 
-        // Construct an elevmaskI for ice sheet, =nan off ice sheet
-        blitz::Array<double,1> elevmaskI(nI);
-        for (int iI=0; iI<nI; ++iI) {
-            switch(emI.mask(iI)) {
-                case IceMask::GROUNDED_ICE :
-                case IceMask::FLOATING_ICE :
-                    elevmaskI(iI) = emI.elev(iI);
-                break;
-                case IceMask::ICE_FREE_OCEAN :
-                case IceMask::UNKNOWN :
-                    elevmaskI(iI) = nan;
-                break;
-                case IceMask::ICE_FREE_BEDROCK :
-                    elevmask(iI) = (include_bare_ground ? emI.elev(iI) : nan);
-                break;
+            // Construct an elevmaskI for ice sheet, =nan off ice sheet
+            blitz::Array<double,1> elevmaskI(nI);
+            for (int iI=0; iI<nI; ++iI) {
+                switch(emI.mask(iI)) {
+                    case IceMask::GROUNDED_ICE :
+                    case IceMask::FLOATING_ICE :
+                        elevmaskI(iI) = emI.elev(iI);
+                    break;
+                    case IceMask::ICE_FREE_OCEAN :
+                    case IceMask::UNKNOWN :
+                        elevmaskI(iI) = nan;
+                    break;
+                    case IceMask::ICE_FREE_BEDROCK :
+                        elevmask(iI) = (include_bare_ground ? emI.elev(iI) : nan);
+                    break;
+                }
             }
-        }
 
-        // Get local EOpvAOp matrix
-        std::unique_ptr<RegridMatrices_Dynamic> rmO(
-            gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
-        SparseSetT dimEO_sheet;
-        std::unique_ptr<ibmisc::linear::Weighted_Eigen> EOpvAOp(
-            rmO->matrix_d("EvA", {&dimEO_sheet, &dimAO}, paramsO));
-        EOpvAOp_sheet_shape = EOpvAOp.shape();
+            // Get local EOpvAOp matrix
+            std::unique_ptr<RegridMatrices_Dynamic> rmO(
+                gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
+            SparseSetT dimEO_sheet;
+            std::unique_ptr<ibmisc::linear::Weighted_Eigen> EOpvAOp(
+                rmO->matrix_d("EvA", {&dimEO_sheet, &dimAO}, paramsO));
+            EOpvAOp_sheet_shape = EOpvAOp.shape();
 
-        // Merge it in...
-        // Stack ice sheet ECs on top of global ECs.
-        // NOTE: Assumes EC dimension in indexing has largest stride
-        for (auto ii(begin(*EOpvAOp->M)); ii != end(*EOpvAOp-M); ++ii) {
-            // Separate ice sheet ECs from global ECs
-            EOpvAOp_m.add({
-                dimEO.to_sparse(ii->index(0)),
-                dimAO.to_sparse(ii->index(1))},
-                ii->value());
-        }
-    }
-}
-
-
-if (use_global_ice) {
-    // Merge in global matrix (compressed format; sparse indexing) If
-    // an EC is already used by an ice sheet, remove the ice in that
-    // EC from the global matrix.  This "cheap trick" will result in a
-    // SMALL amount of missing ice.  But it's simpler than creating a
-    // new set of EC's for global vs. ice sheet ice
-    std::array<long,2> EOpvAOp_base_shape(EOpvAOp.shape());
-    {NcIO ncio(fname, 'r');
-        // Load from the file
-        linear::Weighted_Compressed EOpvAOp;
-        EOpvAOp->ncio(ncio, "EvO");
-
-        // Check that global matrix has same number of ECs as local
-        // (and hopefully at same elevations too)
-        if (gcmO->nhc() != EOpvAOp.shape(0) / EOpvAOp.shape(1))
-            (*icebin_error)(-1, "NHC mismatch between global and local ice");
-
-        // Store shape of this matrix for setting shape of merged EOpvAOp
-        EOpvAOp_base_shape = EOpvAOp.shape();
-
-        // Copy elements to accumulator matrix
-        std::set<int> seenE;
-        for (auto ii(M.generator()); ++ii; ) {
-            auto iE(ii->index(0));   // In case iE occurs more than once in M
-            if (!dimE.in_sparse(iE) | seenE.contains(iE)) {
-                EOpvAOp_m.add(ii->index(), ii->value());
-                seenE.add(iE);
+            // Merge it in...
+            // Stack ice sheet ECs on top of global ECs.
+            // NOTE: Assumes EC dimension in indexing has largest stride
+            for (auto ii(begin(*EOpvAOp->M)); ii != end(*EOpvAOp-M); ++ii) {
+                // Separate ice sheet ECs from global ECs
+                EOpvAOp_m.add({
+                    dimEO.to_sparse(ii->index(0)),
+                    dimAO.to_sparse(ii->index(1))},
+                    ii->value());
             }
         }
     }
-}
-TODO: Keep ECs separate for global vs. local ice
 
+    if (use_global_ice) {
+        // Merge in global matrix (compressed format; sparse indexing) If
+        // an EC is already used by an ice sheet, remove the ice in that
+        // EC from the global matrix.  This "cheap trick" will result in a
+        // SMALL amount of missing ice.  But it's simpler than creating a
+        // new set of EC's for global vs. ice sheet ice
+        std::array<long,2> EOpvAOp_base_shape(EOpvAOp.shape());
+        {NcIO ncio(fname, 'r');
+            // Load from the file
+            linear::Weighted_Compressed EOpvAOp;
+            EOpvAOp->ncio(ncio, "EvO");
+
+            // Check that global matrix has same number of ECs as local
+            // (and hopefully at same elevations too)
+            if (gcmO->nhc() != EOpvAOp.shape(0) / EOpvAOp.shape(1))
+                (*icebin_error)(-1, "NHC mismatch between global and local ice");
+
+            // Store shape of this matrix for setting shape of merged EOpvAOp
+            EOpvAOp_base_shape = EOpvAOp.shape();
+
+            // Copy elements to accumulator matrix
+            std::set<int> seenE;
+            long offsetE = gcmO->indexingE.extent();
+            for (auto ii(M.generator()); ++ii; ) {
+                auto iE(ii->index(0));   // In case iE occurs more than once in M
+                if (!dimE.in_sparse(iE) | seenE.contains(iE)) {
+                    // Stack global EC's on top of local EC's.
+                    EOpvAOp_m.add({ii->index(0)+offsetE, ii->index(1)}, ii->value());
+                    seenE.add(iE);
+                }
+            }
+        }
+    }
+        
     if ((EOpvAOp_sheet_shape[0] != EOpvAOp_base_shape[0]) ||
         (EOpvAOp_sheet_shape[1] != EOpvAOp_base_shape[1])) {
 
@@ -627,22 +626,6 @@ TODO: Keep ECs separate for global vs. local ice
 
     // Compute EOpvAOp and wAOp
     EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
-}
-
-
-
-static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_merged(
-    std::array<SparseSetT *,2> dims,
-    RegridParams const &paramsA,
-    GCMRegridder_ModelE const *gcmA,
-    double const eq_rad,    // Radius of the earth
-    std::vector<ElevMask<1>> const elevmasks)    // elevation and ice cover of each ice sheet
-{
-    auto EOpvAOp(compute_EOpvAOp_merged(dims, paramsA, gcmA->gcmO, eq_rad, elevmasks));
-    auto wAOp(sum(EOpvAOp, 1, '+'));
-
-    return _compute_AAmvEAm(dims, paramsA, gcmA, eq_rad,
-        EOpvAOp, dimEOp, dimAOp, wAOp);
 }
 
 // -----------------------------------------------------------
@@ -959,6 +942,14 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     auto const nO = gcmO->nA();
     foceanAOp.reference(blitz::Array<double,1>(nO));
     foceanAOm.reference(blitz::Array<double,1>(nO));
+
+    // Read number of global EC's out of global EC matrix file.
+    {NcIO ncio(args.global_ec_mm_fname, 'r');
+        auto dims(get_dims(ncio, {"nhc"}));  // Raises error if appropriate.
+        NcDim &nhc_d(dims[0]);
+        _nhc_global = nhc_d.getSize();
+        _nhc = gcmO->nhc() + _nhc_global;
+    }
 }
 
 
@@ -989,7 +980,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
         this, 'A', specO.eq_rad, &rmO));
 
 
-    rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm, _1, _2,
+    rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm_rmO, _1, _2,
         this, specO.eq_rad, &rmO));
 
 
@@ -1006,7 +997,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
         this, 'A', specO.eq_rad, &rmO));
 
 
-    rm->add_regrid("AvE", std::bind(&compute_AAmvEAm, _1, _2,
+    rm->add_regrid("AvE", std::bind(&compute_AAmvEAm_rmO, _1, _2,
         this, specO.eq_rad, &rmO));
 
 

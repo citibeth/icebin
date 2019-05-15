@@ -243,9 +243,8 @@ public:
     ibmisc::Indexing const &indexing(int iAE) const
         { return (iAE == GridAE::A ? agridA.indexing : indexingE); }
 
-    /** Position of height points in elevation space (same for all GCM
-    grid cells and all ice sheets) */
-    std::vector<double> hcdefs; // [nhc]
+    /** Number of elevation classes supported by this regridder */
+    size_t _nhc;
 
 protected:
     /** Ice sheets stored by index defined in sheets_index */
@@ -262,7 +261,7 @@ public:
 
     /** @return Number of elevation points for grid cells in general */
     /** @return Number of elevation points for a given grid cell */
-    unsigned int nhc(int i1) const { return hcdefs.size(); }
+    unsigned int nhc(int i1) const { return _nhc; }
     unsigned int nhc() const { return nhc(-1); }
 
     unsigned long nA() const { return agridA.dim.sparse_extent(); }
@@ -320,6 +319,10 @@ void GCMRegridder::wA(AccumT &&accum, std::string const &ice_sheet_name, bool na
 /** Generates the matrices required in the GCM */
 class GCMRegridder_Standard : public GCMRegridder
 {
+
+    /** Position of height points in elevation space (same for all GCM
+    grid cells and all ice sheets) */
+    std::vector<double> hcdefs; // [nhc]
 
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> mem_sheets_index;

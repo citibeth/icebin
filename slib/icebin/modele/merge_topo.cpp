@@ -1,3 +1,18 @@
+#include <cmath>
+#include <ibmisc/fortranio.hpp>
+#include <ibmisc/ncbulk.hpp>
+#include <icebin/error.hpp>
+#include <icebin/modele/make_topoo.hpp>
+#include <icebin/modele/grids.hpp>
+
+using namespace blitz;
+using namespace ibmisc;
+using namespace spsparse;
+
+namespace icebin {
+namespace modele {
+
+
 class GetSheetElevO {
     TmpAlloc _tmp;
 public:
@@ -66,7 +81,6 @@ bool include_bedrock)
 void merge_topoO(
     // ------ TOPOO arrays, originally with just global ice
     // Ice model viewpoint (fractional ocean cells)
-    blitz::Array<double,2> const &areaO,    // Area of each ocean gridcell
     blitz::Array<double,2> &foceanOp2,    // Fractional FOCEAN
     blitz::Array<double,2> &fgiceOp2,
     blitz::Array<double,2> &zatmoOp2,
@@ -195,17 +209,32 @@ GCMRegridder_ModelE *gcmA,   // Gets updated with new fcoeanOp, foceanOm
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
 linear::WeightedEigen const &AAmvEAm,
+
 blitz::Array<double,2> const &foceanOm2,     // Rounded FOCEAN
-blitz::Array<double,2> const &flakeO2,
-blitz::Array<double,2> const &fgrndO2,
-blitz::Array<double,2> const &fgiceO2,
-blitz::Array<double,2> const &zatmoO2,
+blitz::Array<double,2> const &flakeOm2,
+blitz::Array<double,2> const &fgrndOm2,
+blitz::Array<double,2> const &fgiceOm2,
+blitz::Array<double,2> const &zatmoOm2,
+blitz::Array<double,2> const &zlakeOm2,
+blitz::Array<double,2> const &zicetopOm2,
 //SparseSetT const &dimO,    // Tells us which grid cells in O were changed.
-blitz::Array<double,2> const &foceanA2,    // Rounded FOCEAN
-blitz::Array<double,2> const &flakeA2,
-blitz::Array<double,2> const &fgrndA2,
-blitz::Array<double,2> const &fgiceA2,
-blitz::Array<double,2> const &zatmoA2)
+blitz::Array<double,2> &foceanA2,    // Rounded FOCEAN
+blitz::Array<double,2> &flakeA2,
+blitz::Array<double,2> &fgrndA2,
+blitz::Array<double,2> &fgiceA2,
+blitz::Array<double,2> &zatmoA2,
+blitz::Array<double,2> &zlakeA2,
+blitz::Array<double,2> &zicetopA2)
+//
+EigenSparseMatrixT const &EOpvAOp,
+RegridParams const &paramsA,
+SparseSetT const &dimEOp,
+SparseSetT const &dimAOp,
+double const eq_rad,
+//
+blitz::Array<double,3> &fhc3,
+blitz::Array<double,3> &elevE3,
+blitz::Array<uint16_t,3> &underice3
 {
     auto foceanOm(reshape1(foceanOm2));
     auto flakeO(reshape1(flakeO2));
@@ -222,37 +251,100 @@ blitz::Array<double,2> const &zatmoA2)
     gcmA->foceanOp = reshape1(foceanOp);    // COPY
     gcmA->foceanOm = reshape1(foceanOm);    // COPY
 
-    // =====================================================
-    // Regrid TOPO to Atmosphere grid
-    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
-    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
-    Hntr hntrAvO(17.17, hntrA, hntrO);
 
-    TupleListT<2> AvO_tp;
-    hntrAvO.scaled_regrid_matrix(spsparse::accum::ref(AvO_tp));
-    EigenSparseMatrixT AvO_e(hntrA.size(), hntrO.size());
-    AvO_e.setFromTriplets(AvO_tp.begin(), AvO_tp.end());
-
-    fgiceA = 0;
-
-    map_eigen_colvector(foceanA) = AvO_e * map_eigen_colvector(foceanOm);
-    map_eigen_colvector(flakeA) = AvO_e * map_eigen_colvector(flakeO);
-    map_eigen_colvector(fgrndA) = AvO_e * map_eigen_colvector(fgrndO);
-    map_eigen_colvector(fgiceA) = AvO_e * map_eigen_colvector(fgiceO);
-    map_eigen_colvector(zatmoA) = AvO_e * map_eigen_colvector(zatmoO);
-    map_eigen_colvector(elevA) = AvO_e * map_eigen_colvector(elevO);
+    HntrSpec &hntrO(dynamic_cast<GridSpec_LonLat *>(&*gcmA->gcmO->agridA.spec)->hntr);
+    HntrSpec &hntrA(dynamic_cast<GridSpec_LonLat *>(&*gcmA->agridA.spec)->hntr);
+    Hntr hntr_AvO(17.17, meta.hspecA, hspecO);
 
 
-    TupleListT<2> AvE_global_tp;
-    blitz::Array<double,1> elevE_global(nE);
+    typedef std::array<blitz::Array<double,2> &,3> tup;
+    std::vector<oatup> tups {
+        {foceanOm2, foceanA2, WTO},
+        {flakeOm2, flakeA2, WTO},
+        {fgrndOm2, fgrndA2, WTO},
+        {fgiceOm2, fgiceA2, WTO},
+        {zatmoOm2, zatmoA2, WTO},
+        {zlakeOm2, zlakeA2, WTO},
+        {zicetopOm2, zicetopA2, fgiceO}};
+
+    // Regrid TOPOO variables and save to TOPOA
+    blitz::Array<double, 2> WTO(const_array(blitz::shape(hspecO.jm,hspecO.im), 1.0));
+    for (auto &t : tups) {
+        auto &xxOm2(t[0]);
+        auto &xxA2(t[1]);
+        auto &xxWTO(t[2]);
+
+        // Regrid to A grid
+        hntr_AvO.regrid(xxWTO, xxOm2, xxA2);
+    }
+
+    // ================= Create fhc, elevE and underice
+    int const nhc_icebin = gcmA->nhc();  // = gcmA->indexingE[2].extent
+    int const nhc_gcm = 1 + nhc_icebin;
+    blitz::TinyVector<int,3> shapeE(nhc_gcm, gcmA->indexingE[1].extent, gcmA->indexingE[0].extent);
+    blitz::TinyVector<int,2> shapeE2(shapeE(0), shapeE(1)*shapeE(2));
+
+    // Initialize
+    fhc = 0;
+    elevE = NaN;
+    underice = 0;    // Elevation grid cell unused
+
+    auto all(blitz::Range::all());
+
+    // ------------ Segment 0: Elevation Classes
+    printf("Segment 2: Elevation Classes\n");
+    auto fhcE2(reshape<double,3,2>(fhc3, shapeE2));
+    auto elevE2(reshape<double,3,2>(elevE3, shapeE2));
+    auto undericeE2(reshape<uint16_t,3,2>(underice3, shapeE2));
+
+    std::array<int,2> iTuple;
+        int &iA2(iTuple[0]);
+        int &ihc(iTuple[1]);
+
+    // Compute AOmvEOm --> fhc
+    auto wAOp(sum(EOpvAOp, 1, '+'));
+    SparseSetT dimAAm,dimEAm;
+    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
+        {&dimAAm, &dimEAm}, paramsA, gcmA, eq_rad,
+        EOpvAOp, dimEOp, dimAOp, wAOp);
+
+    for (auto ii=begin(AAmvEAm); ii != end(AAmvEAm); ++ii) {
+        auto const iA_d = ii->index(0);
+        auto const iA = dimAAm.to_sparse(iA_d);
+        auto const iE_d = ii->index(1);
+        auto const iE = dimEAm.to_sparse(iE_d);
+
+        gcmA->indexingHC.index_to_tuple(&iTuple[0], iE);
+
+        // iE must be contained within cell iA (local propety of matrix)
+        if (iA2 != iA) (*icebin_error)(-1,
+            "Matrix is non-local: iA=%ld, iE=%ld, iA2=%ld",
+            (long)iA, (long)iE, (long)iA2);
+
+        if (ihc < 0 || ihc >= nhc_icebin) (*icebin_error)(-1,
+            "ihc out of range [0,%d): %d", nhc_icebin, ihc);
+
+        if (iA < 0 || iA >= shapeE2(1)) (*icebin_error)(-1,
+            "iA out of range [0,%d): %d", shapeE2(1), iA);
+
+//if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, values(i));
+
+        fhcE2(ihc,iA) += ii->value() / AAmvEAm->wM(iA);   // AAMvEAM is not scaled
+        undericeE2(ihc,iA) = gcmA->underice(ihc);UI_NOTHING;    // No IceBin coupling here
+        elevE2(iA) = gcmA->hcdefs[ihc];
+    }
+
+    // ------------ Segment 1: land part of sealand
+    printf("Segment 1: seaLAND\n");
+    ec_base = nhc_icebin;    
+    for (int j=0; j<meta.hspecA.jm; ++j) {
+    for (int i=0; i<meta.hspecA.im; ++i) {
+        if (fgiceA(j,i) > 0) {
+            fhc(ec_base, j,i) = 1e-30;
+            elevE(ec_base, j,i) = zicetopA(j,i);
+            underice(ec_base, j,i) = UI_NOTHING;
+        }
+    }}
 
 
-}
-
-
-
-
-void merge_topo_O_A()
-{
-}
-
+}}

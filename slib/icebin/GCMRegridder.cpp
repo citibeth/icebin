@@ -67,6 +67,7 @@ void GCMRegridder_Standard::init(
 //    agridA = AbbrGrid(*fgridA);
 //  domainA = std::move(_domainA);
     hcdefs = std::move(_hcdefs);
+    _nhc = hcdefs.size();
     indexingHC = std::move(_indexingHC);
     correctA = _correctA;
 

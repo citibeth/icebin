@@ -86,6 +86,52 @@ static void callZ(
                     "I11,I1M,J11,J1M = %d,%d,%d,%d",
                     I,J,FOCEAN(I,J),
                     I11,I1M,J11,J1M);
+
+                // --------- Determine ZICETOP, even for ocean-only cell
+                double SAREA_li = 0;    // Landice portions only
+                double SAZSG_li = 0;
+                int NM = 0;
+                for (int J1m=J11; J1m <= J1M; ++J1m) {
+                for (int I1m=I11; I1m <= I1M; ++I1m) {
+                    if (FGICE1m(I1m,J1m) == 0) continue;
+
+                    double area = grid_g1mx1m.dxyp(J1m);
+                    SAREA_li += area;
+                    SAZSG_li += area*ZICETOP1m(I1m,J1m);
+                }}
+
+
+
+
+
+
+
+
+
+                double SAREA = 0;    // Entire gridcell...
+                double SAZSG = 0;
+                double SAREA_li = 0;    // Landice portions only
+                double SAZSG_li = 0;
+                for (int J1m=J11; J1m <= J1M; ++J1m) {
+                for (int I1m=I11; I1m <= I1M; ++I1m) {
+                    double area = grid_g1mx1m.dxyp(J1m);
+                    SAREA += area;      // Surface area of LAND (non-ocean)
+
+                    if (FOCEAN1m(I1m,J1m) == 1) continue;
+                    SAZSG += area*ZSOLG1m(I1m,J1m);
+
+                    if (FGICE1m(I1m,J1m) != 0) {
+                        SAREA_li += area;
+                        SAZSG_li += area*ZICETOP1m(I1m,J1m);
+                    }
+                }}
+
+                ZICETOP(I,J) = (SAREA_li > 0 ? SAZSG_li / SAREA_li : 0);
+
+                ZATMOF(I,J) = SAZSG / SAREA;
+
+
+
             } else {  // (I,J) is acontinent cell
                 // Order 1-minute continental cells within (I,J) and sum their area
                 struct AreaDepth {
@@ -130,7 +176,7 @@ static void callZ(
                 } else {
                     ZICETOP(I,J) = 0;
                 }
-TODO: Set zicetop for ALL gridcells with ice, even if they get rounded to ocean.
+
                 // Determine ZSGLO
                 ZSGLO(I,J) = cells2[0].depth;
                 // Determine ZLAKE and dZLAKE
@@ -181,6 +227,8 @@ TODO: Set zicetop for ALL gridcells with ice, even if they get rounded to ocean.
                 ZSGHI(I,J) = cells2[cells2.size()-1].depth;
             }
         }
+
+
         // Replicate Z data to all longitudes at poles
         if (J==1 || J==JM) {
              ZATMO (Range(2,IM),J) = ZATMO (1,J);
@@ -311,11 +359,23 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
+    // ------------- Non-rounded versions
     auto &FOCEANF(out.add("FOCEANF", {
         "description", "Fractional ocean ocver",
         "units", "1",
         "sources", "GISS 1Qx1",
     }));
+    auto &FGICEF(out.add("FGICEF", {
+        "description", "Glacial Ice Surface Fraction (Ocean NOT rounded)",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    }));
+    auto &ZATMOF(out.add("ZATMOF", {
+        "description", "Atmospheric Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+
     out.allocate({IM,JM}, {"im", "jm"},
         true, blitz::fortranArray);
 
@@ -336,7 +396,7 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     //hntr1q1m.regrid(FOCEAN1m, FGICE1m, FGICE, true, -1.0, 1.0);    // Use FCONT1m = 1-FOCEAN1m for weight
     // (use WT1m here for weight instead of 1-FOCEAN1m so that FOCEAN+FLAKE+FGICE = 1
     // (instead of FOCEAN+FLAKE+FGRND=1 and FGICE is a portion of FGRND).
-    hntr1q1m.regrid(WT1m, FGICE1m, FGICE, true);
+    hntr1q1m.regrid(WT1m, FGICE1m, FGICEF, true);
 
     // Here, FGRND=1-FOCEAN is implied.
 
@@ -438,6 +498,7 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     for (int i=1; i<=IM; ++i) {
         FOCEAN(i,1) = 0;
         FGICE(i,1) = 1;
+        FGICEF(i,1) = 1;
     }
 
 
@@ -464,7 +525,7 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
             double const fact = 1. / (1. - foceanf);
 //if (fact != 1) fprintf(stderr, "FACT (%d, %d): %g %g sum=%g, fact=%g\n", i,j, FGICE(i,j),  FOCEANF(i,j), FGICE(i,j)+FOCEANF(i,j), fact);
             FOCEAN(i,j) = 0.;
-            FGICE(i,j) *= fact;
+            FGICE(i,j) = FGICEF(i,j) * fact;
         }
     }}
 
