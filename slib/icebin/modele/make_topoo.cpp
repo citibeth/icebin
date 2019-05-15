@@ -87,27 +87,7 @@ static void callZ(
                     I,J,FOCEAN(I,J),
                     I11,I1M,J11,J1M);
 
-                // --------- Determine ZICETOP, even for ocean-only cell
-                double SAREA_li = 0;    // Landice portions only
-                double SAZSG_li = 0;
-                int NM = 0;
-                for (int J1m=J11; J1m <= J1M; ++J1m) {
-                for (int I1m=I11; I1m <= I1M; ++I1m) {
-                    if (FGICE1m(I1m,J1m) == 0) continue;
-
-                    double area = grid_g1mx1m.dxyp(J1m);
-                    SAREA_li += area;
-                    SAZSG_li += area*ZICETOP1m(I1m,J1m);
-                }}
-
-
-
-
-
-
-
-
-
+                // --------- Determine ZICETOP and ZATMOF, even for ocean-only cell
                 double SAREA = 0;    // Entire gridcell...
                 double SAZSG = 0;
                 double SAREA_li = 0;    // Landice portions only
@@ -127,11 +107,7 @@ static void callZ(
                 }}
 
                 ZICETOP(I,J) = (SAREA_li > 0 ? SAZSG_li / SAREA_li : 0);
-
                 ZATMOF(I,J) = SAZSG / SAREA;
-
-
-
             } else {  // (I,J) is acontinent cell
                 // Order 1-minute continental cells within (I,J) and sum their area
                 struct AreaDepth {
@@ -227,7 +203,6 @@ static void callZ(
                 ZSGHI(I,J) = cells2[cells2.size()-1].depth;
             }
         }
-
 
         // Replicate Z data to all longitudes at poles
         if (J==1 || J==JM) {

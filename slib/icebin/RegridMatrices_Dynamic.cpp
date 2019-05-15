@@ -313,22 +313,15 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
     blitz::Array<double,1> const &_elevmaskI,
     RegridParams const &params) const
 {
-    IceRegridder const *regridder = (sheet_index < 0 ? nullptr :
-        &*ice_regridders()[sheet_index]);
-
-    if (!regridder) (*icebin_error)(-1,
-        "GCMRegridder_Standard only does per-ice sheet matrices,"
-        " does not support merged matrices.");
+    IceRegridder const *regridder = &*ice_regridders()[sheet_index];
 
 #if 0
     printf("===== RegridMatrices Grid geometries:\n");
     printf("    nA = %d\n", this->nA());
     printf("    nhc = %d\n", this->nhc());
     printf("    nE = %d\n", this->nE());
-    if (regridder) {
-        printf("    nI = %d\n", regridder->nI());
-        printf("    nG = %d\n", regridder->nG());
-    }
+    printf("    nI = %d\n", regridder->nI());
+    printf("    nG = %d\n", regridder->nG());
 #endif
 
     std::unique_ptr<RegridMatrices_Dynamic> rm(

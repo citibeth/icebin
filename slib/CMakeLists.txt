@@ -40,7 +40,6 @@ set(icebin_SOURCES
     icebin/GCMRegridder.cpp
     icebin/IceRegridder_L0.cpp
     icebin/RegridMatrices_Dynamic.cpp
-    icebin/RegridMatrices_File.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
 )
 
@@ -62,6 +61,7 @@ if (BUILD_COUPLER)
             icebin/modele/grids.cpp
             icebin/modele/z1qx1n_bs1.cpp
             icebin/modele/make_topoo.cpp
+            icebin/modele/merge_topo.cpp
             icebin/modele/HNTR4.F90
         )
 

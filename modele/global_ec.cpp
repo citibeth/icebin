@@ -530,7 +530,8 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
 /**
 @param matrix_names Names of matrices to generate (or all, if it's empty)
 */
-void global_ec_section(GCMRegridder &gcmA, ParseArgs &args, blitz::Array<double,2> const &elevmaskI, HntrSpec &hspecI2,
+void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
+    blitz::Array<double,2> const &elevmaskI, HntrSpec &hspecI2,
     std::set<std::string> const &matrix_names)
 {
 
