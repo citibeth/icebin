@@ -187,6 +187,26 @@ namespace icebin {
 class GCMRegridder;
 
 
+// From pism/src/base/util/Mask.hh
+struct IceMask {
+    static const char UNKNOWN          = -1;
+    static const char ICE_FREE_BEDROCK = 0;
+    static const char GROUNDED_ICE     = 2;
+    static const char FLOATING_ICE     = 3;
+    static const char ICE_FREE_OCEAN   = 4;
+};
+
+template<int RANK>
+struct ElevMask {
+    blitz::Array<double,RANK> elev;
+    blitz::Array<char,RANK> mask;
+
+    ElevMask(
+        blitz::Array<double,RANK> const &_elev,
+        blitz::Array<char,RANK> const &_mask)
+    : elev(_elev), mask(_mask) {}
+};
+
 // ----------------------------------------------------
 
 extern ibmisc::Indexing derive_indexingE(
@@ -243,14 +263,18 @@ public:
     ibmisc::Indexing const &indexing(int iAE) const
         { return (iAE == GridAE::A ? agridA.indexing : indexingE); }
 
-    /** Number of elevation classes supported by this regridder */
-    size_t _nhc;
-
 protected:
     /** Ice sheets stored by index defined in sheets_index */
     ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> *_ice_regridders;
 
+    /** Position of height points in elevation space (same for all GCM
+    grid cells and all ice sheets) */
+    std::vector<double> _hcdefs; // [nhc]
+
 public:
+
+    std::vector<double> const &hcdefs() const
+        { return _hcdefs; }
 
     ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> &ice_regridders()
         { return *_ice_regridders; }
@@ -261,7 +285,7 @@ public:
 
     /** @return Number of elevation points for grid cells in general */
     /** @return Number of elevation points for a given grid cell */
-    unsigned int nhc(int i1) const { return _nhc; }
+    unsigned int nhc(int i1) const { return (unsigned int)_hcdefs.size(); }
     unsigned int nhc() const { return nhc(-1); }
 
     unsigned long nA() const { return agridA.dim.sparse_extent(); }
@@ -314,10 +338,6 @@ void GCMRegridder::wA(AccumT &&accum, std::string const &ice_sheet_name, bool na
 /** Generates the matrices required in the GCM */
 class GCMRegridder_Standard : public GCMRegridder
 {
-
-    /** Position of height points in elevation space (same for all GCM
-    grid cells and all ice sheets) */
-    std::vector<double> hcdefs; // [nhc]
 
     /** Creates an (index, name) correspondence for ice sheets. */
     ibmisc::IndexSet<std::string> mem_sheets_index;

@@ -1,5 +1,6 @@
 #include <spsparse/eigen.hpp>
 #include <ibmisc/stdio.hpp>
+#include <ibmisc/linear/compressed.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/gridgen/GridGen_LonLat.hpp>
@@ -12,7 +13,7 @@ using namespace std::placeholders;
 namespace icebin {
 namespace modele {
 
-
+static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 // ----------------------------------------------------------------
 // ----------------------------------------------------------------
@@ -186,40 +187,6 @@ static void raw_EOvEA(
 
 // ----------------------------------------------------------------
 // ========================================================================
-class ConstUniverse {
-    std::vector<std::string> names;
-    std::vector<SparseSetT *> dims;
-    std::vector<int> extents;
-
-public:
-    ConstUniverse(
-        std::vector<std::string> &&_names,
-        std::vector<SparseSetT *> &&_dims) :
-        names(std::move(_names)), dims(std::move(_dims))
-    {
-        if (names.size() != dims.size()) (*icebin_error)(-1,
-            "names.size() and dims.size() must match");
-
-        extents.reserve(dims.size());
-        for (size_t i=0; i<dims.size(); ++i)
-            extents.push_back(dims[i]->dense_extent());
-    }
-
-    ~ConstUniverse()
-    {
-        bool err = false;
-        for (size_t i=0; i<dims.size(); ++i) {
-            if (extents[i] != dims[i]->dense_extent()) {
-                fprintf(stderr, "Dimension %s changed from %d to %d\n",
-                    names[i].c_str(), extents[i], dims[i]->dense_extent());
-                err = true;
-            }
-        }
-        if (err) (*icebin_error)(-1,
-            "At least one dimension changed");
-    }
-};
-
 
 GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO)
 {
@@ -394,10 +361,13 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
     // Sub-parts of the computation, pre-computed
     EigenSparseMatrixT const &EOpvAOp,
-    SpareSetT &dimEOp,
+    SparseSetT &dimEOp,
     SparseSetT &dimAOp,
     blitz::Array<double,1> const &wAOp)
 {
+
+    ConstUniverse const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
+
     SparseSetT &dimAAm(*dims[0]);
     SparseSetT &dimEAm(*dims[1]);
 
@@ -508,126 +478,6 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
         *EOpvAOp->M, dimEOp, dimAOp, EOpvAOp->Mw);
 }
 
-EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
-    std::array<SparseSetT *,2> dims,
-    std::string const &fname,    // File written by global_ec
-    RegridParams const &paramsA,
-    GCMRegridder const *gcmO,
-    double const eq_rad,    // Radius of the earth
-    std::vector<ElevMask<1>> const elevmasks,    // elevation and cover types for each ice sheet
-    bool use_global_ice,
-    bool use_local_ice,
-    bool include_bare_ground)    // true if non-ice covered areas of land should also be included
-{
-    // ======================= Create a merged EOpvAOp of base ice and ice sheets
-    // (and then call through to _compute_AAmvEAm)
-
-    // Accumulator for merged EOpvAOp (unscaled)
-    MakeDenseEigenT EOpvAOp_m(
-        {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
-        dims, '.');
-
-    // Regrid params for ice sheet regrid matrices
-    RegridParams paramsO(paramsA);
-        paramsO.scale = false;
-        paramsO.correctA = true;
-
-    // Merge in local matrices
-    if (use_local_ice) {
-        std::array<long,2> EOpvAOp_sheet_shape;
-        for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
-            ElevMask<1> const &emI(elevmasks[sheet_index]);
-            int const nI(emI.elev.extent(0));
-
-            // Construct an elevmaskI for ice sheet, =nan off ice sheet
-            blitz::Array<double,1> elevmaskI(nI);
-            for (int iI=0; iI<nI; ++iI) {
-                switch(emI.mask(iI)) {
-                    case IceMask::GROUNDED_ICE :
-                    case IceMask::FLOATING_ICE :
-                        elevmaskI(iI) = emI.elev(iI);
-                    break;
-                    case IceMask::ICE_FREE_OCEAN :
-                    case IceMask::UNKNOWN :
-                        elevmaskI(iI) = nan;
-                    break;
-                    case IceMask::ICE_FREE_BEDROCK :
-                        elevmask(iI) = (include_bare_ground ? emI.elev(iI) : nan);
-                    break;
-                }
-            }
-
-            // Get local EOpvAOp matrix
-            std::unique_ptr<RegridMatrices_Dynamic> rmO(
-                gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
-            SparseSetT dimEO_sheet;
-            std::unique_ptr<ibmisc::linear::Weighted_Eigen> EOpvAOp(
-                rmO->matrix_d("EvA", {&dimEO_sheet, &dimAO}, paramsO));
-            EOpvAOp_sheet_shape = EOpvAOp.shape();
-
-            // Merge it in...
-            // Stack ice sheet ECs on top of global ECs.
-            // NOTE: Assumes EC dimension in indexing has largest stride
-            for (auto ii(begin(*EOpvAOp->M)); ii != end(*EOpvAOp-M); ++ii) {
-                // Separate ice sheet ECs from global ECs
-                EOpvAOp_m.add({
-                    dimEO.to_sparse(ii->index(0)),
-                    dimAO.to_sparse(ii->index(1))},
-                    ii->value());
-            }
-        }
-    }
-
-    if (use_global_ice) {
-        // Merge in global matrix (compressed format; sparse indexing) If
-        // an EC is already used by an ice sheet, remove the ice in that
-        // EC from the global matrix.  This "cheap trick" will result in a
-        // SMALL amount of missing ice.  But it's simpler than creating a
-        // new set of EC's for global vs. ice sheet ice
-        std::array<long,2> EOpvAOp_base_shape(EOpvAOp.shape());
-        {NcIO ncio(fname, 'r');
-            // Load from the file
-            linear::Weighted_Compressed EOpvAOp;
-            EOpvAOp->ncio(ncio, "EvO");
-
-            // Check that global matrix has same number of ECs as local
-            // (and hopefully at same elevations too)
-            if (gcmO->nhc() != EOpvAOp.shape(0) / EOpvAOp.shape(1))
-                (*icebin_error)(-1, "NHC mismatch between global and local ice");
-
-            // Store shape of this matrix for setting shape of merged EOpvAOp
-            EOpvAOp_base_shape = EOpvAOp.shape();
-
-            // Copy elements to accumulator matrix
-            std::set<int> seenE;
-            long offsetE = gcmO->indexingE.extent();
-            for (auto ii(M.generator()); ++ii; ) {
-                auto iE(ii->index(0));   // In case iE occurs more than once in M
-                if (!dimE.in_sparse(iE) | seenE.contains(iE)) {
-                    // Stack global EC's on top of local EC's.
-                    EOpvAOp_m.add({ii->index(0)+offsetE, ii->index(1)}, ii->value());
-                    seenE.add(iE);
-                }
-            }
-        }
-    }
-        
-    if ((EOpvAOp_sheet_shape[0] != EOpvAOp_base_shape[0]) ||
-        (EOpvAOp_sheet_shape[1] != EOpvAOp_base_shape[1])) {
-
-        (*icebin_error)(-1, "Shape of on-disk and local EOpvAOp differs (%ld,%ld) vs (%ld,%ld)!",
-            EOpv_AOp_base_shape[0], EOpv_AOp_base_shape[1],
-            EOpv_AOp_sheet_shape[0], EOpv_AOp_sheet_shape[1]);
-    }
-
-    // Set overall size
-    dimEO.set_sparse_extent(EOpvAOp_base_shape[0]);
-    dimAO.set_sparse_extent(EOpvAOp_base_shape[1]);
-
-    // Compute EOpvAOp and wAOp
-    EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
-}
-
 // -----------------------------------------------------------
 /** Computes some intermediate values used by more than one top-level
     regrid generator */
@@ -674,9 +524,6 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     SparseSetT &dimXAm(*dims[0]);
     SparseSetT &dimIp(*dims[1]);
 
-    SparseSetT dimIp;
-
-
     // ------------ Params for generating sub-matrices
     RegridParams paramsO(paramsA);
     paramsO.scale = false;
@@ -716,7 +563,7 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
             rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
 
-        EigenSparseMatrixT EOmvAOm(compute_EOmvAOm_unscaled(dimEOm, dimAOm, EOpvAOp, dimEOp, dimAOp));
+        EigenSparseMatrixT EOmvAOm(compute_EOmvAOm_unscaled(dimEOm, dimAOm, *EOpvAOp->M, dimEOp, dimAOp));
 
         // wEOm_e
         auto EOmvAOms(sum(EOmvAOm, 1, '-'));
@@ -931,7 +778,6 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     _ice_regridders = &gcmO->ice_regridders();
 
     correctA = gcmO->correctA;    // Not used
-    hcdefs = gcmO->hcdefs;
     indexingHC = Indexing(
         {"O", "HC"},
         {0L, 0L},
@@ -944,13 +790,20 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     foceanAOm.reference(blitz::Array<double,1>(nO));
 
     // Read number of global EC's out of global EC matrix file.
-    {NcIO ncio(args.global_ec_mm_fname, 'r');
-        auto dims(get_dims(ncio, {"nhc"}));  // Raises error if appropriate.
-        NcDim &nhc_d(dims[0]);
-        _nhc_global = nhc_d.getSize();
-        _nhc = gcmO->nhc() + _nhc_global;
+    if (global_ecO == "") {
+        global_hcdefs.clear();
+    } else {
+        NcIO ncio(global_ecO, 'r');
+        ncio_vector(ncio, global_hcdefs, true, "hcdefs", "double",
+            get_or_add_dims(ncio, {"nhc"}, {_hcdefs.size()} ));
     }
+
+    // Combine local and global hcdefs
+    _hcdefs.clear();
+    for (double elev : gcmO->hcdefs()) _hcdefs.push_back(elev);
+    for (double elev : global_hcdefs) _hcdefs.push_back(elev);
 }
+
 
 
 
@@ -959,7 +812,8 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     blitz::Array<double,1> const &elevmaskI,
     RegridParams const &params) const
 {
-    std::unique_ptr<RegridMatrices_Dynamic> rm(new RegridMatrices_Dynamic(params));
+    IceRegridder const *regridder = &*ice_regridders()[sheet_index];
+    std::unique_ptr<RegridMatrices_Dynamic> rm(new RegridMatrices_Dynamic(regridder, params));
     GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
 
     // Per-ice sheet matrix, makes sense either for:
@@ -971,7 +825,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 
     // Delicate construction of rmO
     std::unique_ptr<RegridMatrices_Dynamic> _rmO(
-        gcmO->regrid_matrices(sheet_index, elevmaskI));
+        gcmO->regrid_matrices(sheet_index, elevmaskI, params));
     auto &rmO(rm->tmp.take(std::move(*_rmO)));
 
     rm->add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,

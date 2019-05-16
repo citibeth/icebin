@@ -115,9 +115,11 @@ void GCMCoupler_ModelE::_ncread(
     // Retrieve name of TOPO file (without Greenland, and on Ocean grid)
     get_or_put_att(config_info, ncio_config.rw, "topo_ocean", topoO_fname);
 
+    // Let's assume that the EOvAO matrix is included in topoO_fname
+
     // Replace the GCMRegridder with a wrapped version that understands
     // the ocean-vs-atmosphere grid complexity of ModelE
-    GCMRegridder_ModelE *gcmA = new GCMRegridder_ModelE(gcm_regridder);
+    GCMRegridder_ModelE *gcmA = new GCMRegridder_ModelE(topoO_fname, gcm_regridder);
     gcm_regridder.reset(gcmA);
 
     // Allocate foceanOm0

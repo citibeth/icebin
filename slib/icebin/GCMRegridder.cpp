@@ -66,8 +66,7 @@ void GCMRegridder_Standard::init(
 //    fgridA = std::move(_gridA);
 //    agridA = AbbrGrid(*fgridA);
 //  domainA = std::move(_domainA);
-    hcdefs = std::move(_hcdefs);
-    _nhc = hcdefs.size();
+    this->_hcdefs = std::move(_hcdefs);
     indexingHC = std::move(_indexingHC);
     correctA = _correctA;
 
@@ -88,7 +87,7 @@ void GCMRegridder::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 void GCMRegridder_Standard::clear()
 {
     agridA.clear();
-    hcdefs.clear();
+    _hcdefs.clear();
     ice_regridders().index.clear();
     ice_regridders().clear();
 }
@@ -104,8 +103,8 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
     // Read/Write gridA and other global stuff
     agridA.ncio(ncio, vname + ".agridA");
     indexingHC.ncio(ncio, vname + ".indexingHC");
-    ncio_vector(ncio, hcdefs, true, vname + ".hcdefs", "double",
-        get_or_add_dims(ncio, {vname + ".nhc"}, {hcdefs.size()} ));
+    ncio_vector(ncio, _hcdefs, true, vname + ".hcdefs", "double",
+        get_or_add_dims(ncio, {vname + ".nhc"}, {_hcdefs.size()} ));
 //  domainA.ncio(ncio, ncInt, vname + ".domainA");
     get_or_put_att(info_v, ncio.rw, "correctA", &correctA, 1);
 

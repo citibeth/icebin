@@ -325,7 +325,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
 #endif
 
     std::unique_ptr<RegridMatrices_Dynamic> rm(
-        new RegridMatrices_Dynamic(params));
+        new RegridMatrices_Dynamic(regridder, params));
     auto &elevmaskI(rm->tmp.take(blitz::Array<double,1>(_elevmaskI)));
 
     UrAE urA("A", this->nA(),

@@ -95,7 +95,7 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
     IceExch dest = interp_grid;
 
-    if (gcm->hcdefs.size() == 0) (*icebin_error)(-1,
+    if (gcm->hcdefs().size() == 0) (*icebin_error)(-1,
         "IceRegridder_L0::GvEp(): hcdefs is zero-length!");
 
     // ---------------------------------------
@@ -118,7 +118,7 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
                 {
                     long ihps[2];
                     double whps[2];
-                    linterp_1d_b(gcm->hcdefs, elevation, ihps, whps);
+                    linterp_1d_b(gcm->hcdefs(), elevation, ihps, whps);
                     auto const iE0 = gcm->indexingHC.tuple_to_index<long,2>({iA, ihps[0]});
                     ret.add({iG, iE0},
                         aexgrid.native_area(id) * whps[0]);
@@ -128,7 +128,7 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
 
                 } break;
                 case InterpStyle::ELEV_CLASS_INTERP : {
-                    int ihps0 = nearest_1d(gcm->hcdefs, elevation);
+                    int ihps0 = nearest_1d(gcm->hcdefs(), elevation);
                     ret.add({iG, gcm->indexingHC.tuple_to_index<long,2>({iA, ihps0})},
                         aexgrid.native_area(id));
                 } break;

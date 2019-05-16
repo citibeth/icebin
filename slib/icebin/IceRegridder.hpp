@@ -28,7 +28,7 @@
 
 namespace icebin {
 
-class GCMRegridder;
+class GCMRegridder_Standard;
 class IceCoupler;
 class IceWriter;    // Adjoint to IceCoupler
 
@@ -57,7 +57,7 @@ public:
 
 
     /** Parent pointer; holds the IceRegridder for ALL ice sheets */
-    GCMRegridder const *gcm;
+    GCMRegridder_Standard const *gcm;
     blitz::Array<double,1> gridA_proj_area;    // Area of GCM's grid cells projected using gridI->sproj
 
 protected:

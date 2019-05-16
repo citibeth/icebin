@@ -31,6 +31,7 @@ static void callZ(
 
     // (IM, IM)
     blitz::Array<double,2> &ZATMO,
+    blitz::Array<double,2> &ZATMOF,
     blitz::Array<double,2> &dZLAKE,
     blitz::Array<double,2> &ZSOLDG,
     blitz::Array<double,2> &ZICETOP,
@@ -695,7 +696,7 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
     ZICETOP = 0;
     callZ(
         FGICE1m, FOCEAN1m, ZICETOP1m, ZSOLG1m,
-        FOCEAN, FLAKE, FGRND, ZATMO,
+        FOCEAN, FLAKE, FGRND, ZATMO, ZATMOF,
         dZLAKE,ZSOLDG,ZICETOP,ZSGLO,ZLAKE,ZGRND,ZSGHI);
 
 #if 0

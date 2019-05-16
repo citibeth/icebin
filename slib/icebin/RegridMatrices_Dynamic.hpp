@@ -18,8 +18,8 @@ class IceRegridder;
     IceRegridder for a SINGLE ice sheet. */
 class RegridMatrices_Dynamic : public RegridMatrices {
 public:
-    /** ice_regridder from which this was constructed */
-    IceRegridder const * const ice_regridder;
+    /** The ice_regridder from which this set of matrices was created. */
+    IceRegridder const *ice_regridder;
 
     ibmisc::TmpAlloc tmp;    // Stores local vars for different types.  TODO: Maybe re-do this as simple classmember variables.  At least, see where it used (by removing it and running the compiler)
 
@@ -29,8 +29,9 @@ public:
     std::map<std::string, MatrixFunction> regrids;
 
     RegridMatrices_Dynamic(
+        IceRegridder const *_ice_regridder,
         RegridParams const &params)
-    : RegridMatrices(params) {}
+    : RegridMatrices(params), ice_regridder(_ice_regridder) {}
 
     void add_regrid(std::string const &spec,
         MatrixFunction const &regrid);
