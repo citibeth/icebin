@@ -214,7 +214,7 @@ void merge_topoO(
 
 EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
     std::array<SparseSetT *,2> dims,
-    std::string const &fname,    // File written by global_ec
+    std::string const &global_ecO,    // File written by global_ec
     RegridParams const &paramsA,
     GCMRegridder const *gcmO,
     double const eq_rad,    // Radius of the earth
@@ -275,10 +275,10 @@ EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
         // EC from the global matrix.  This "cheap trick" will result in a
         // SMALL amount of missing ice.  But it's simpler than creating a
         // new set of EC's for global vs. ice sheet ice
-        {NcIO ncio(fname, 'r');
+        {NcIO ncio(global_ecO, 'r');
             // Load from the file
             linear::Weighted_Compressed EOpvAOp_base;
-            EOpvAOp_base.ncio(ncio, "EvO");
+            EOpvAOp_base.ncio(ncio, "EvA");  // (A in this file) == O
             std::array<long,2> EOpvAOp_base_shape(EOpvAOp_base.shape());
 
             // Check that global matrix has same number of ECs as local

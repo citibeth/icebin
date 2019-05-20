@@ -567,9 +567,13 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
 
         ncio_vector(ncio, gcmA._hcdefs, false, "hcdefs", "double",
             get_or_add_dims(ncio, {"nhc"}, {gcmA._hcdefs.size()}));
+    }
 
+    if (matrix_names.find("AvI") != matrix_names.end()) {
+        NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating AvI\n");
         auto mat(rm->matrix_d("AvI", {&dimA, &dimI}, params));
+        check_negative(*mat, "EvI");
         mat->ncio(ncio, "AvI", {"dimA", "dimI"});
         ncio.flush();
     }

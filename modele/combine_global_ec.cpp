@@ -4,6 +4,7 @@
 #include <ibmisc/linear/linear.hpp>
 #include <ibmisc/linear/compressed.hpp>
 #include <icebin/modele/global_ec.hpp>
+#include <tclap/CmdLine.h>
 
 using namespace std;
 using namespace ibmisc;
@@ -12,6 +13,73 @@ using namespace icebin;
 using namespace icebin::modele;
 
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
+
+
+static std::vector<std::string> split(const std::string& s, char seperator)
+{
+    std::vector<std::string> output;
+    std::string::size_type prev_pos = 0, pos = 0;
+
+    while((pos = s.find(seperator, pos)) != std::string::npos) {
+        std::string substring( s.substr(prev_pos, pos-prev_pos) );
+        output.push_back(substring);
+        prev_pos = ++pos;
+    }
+
+    output.push_back(s.substr(prev_pos, pos-prev_pos)); // Last word
+    return output;
+}
+
+
+std::array<std::string,2>> parse_spec(std::string const &spec)
+{
+    std::vector<std::string> dims = split(spec, 'v');
+    if (dims.size() != 2) (*icebin_error)(-1, "Error parsing matrix spec %s", spec.c_str());
+    return std::array<std::string,2>>{dims[0], dims[1]};
+}
+
+struct ParseArgs {
+    // Names of matrices to generate
+    std::vector<std::array<std::string,2>> matrix_specs = vector<array<string,2>> {
+        {"I","E"}, {"E","I"},
+        {"I","A"}, {"A","I"},
+        {"A","E"},
+        {"I2", "A"}, {"I2", "E"}
+    };
+
+    std::vector<std::string> ifnames;    // Names of files to merge
+    ParseArgs(int argc, char **argv);
+};
+
+ParseArgs::ParseArgs(int argc, char **argv)
+    : sigma(std::array<double,3>{0,0,0})
+{
+
+    // Wrap everything in a try block.  Do this every time, 
+    // because exceptions will be thrown for problems.
+    try {  
+        TCLAP::CmdLine cmd("Command description message", ' ', "<no-version>");
+
+        TCLAP::ValueArg<std::string> matrix_names_a("n", "matrix-names",
+            "Comma-separated names of matrices to generate, no spaces",
+            false, "AvI,EvI,IvE,IvA,AvE", "matrix names", cmd);
+
+        TCLAP::UnlabeledMultiArg<std::string> ifnames_a("files to merge", cmd);
+
+        cmd.parse(argc, argv);
+
+        if (matrix_names_a.getValue() != "") {
+            std::vector<std::string> matrix_names = parse_csv<std::string>(matrix_names_a.getValue());
+            for (auto &name : matrix_names) matrix_specs.push_back(parse_spec(name));
+        }
+
+        ifnames = ifnames_a.getValue();
+    } catch (TCLAP::ArgException &e) { // catch any exceptions
+        std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
+        exit(1);
+    }
+}
+
 
 
 template<class T, int len>
@@ -184,38 +252,18 @@ void combine_chunks(
 
 int main(int argc, char **argv)
 {
-    // Save args as C++ vector
-    vector<string> ifnames;
-    for (int i=1; i<argc; ++i) ifnames.push_back(string(argv[i]));
+    ParseArgs args(argc, argv);
 
     // Parse the output name
-    char *dash = rindex(argv[1], '-');
-    std::string ofname(argv[1], dash);
-
-#if 1
-    vector<array<string,2>> sgridss {
-#if 0
-        {"A","E"},
-#else
-        {"I","E"}, {"E","I"},
-        {"I","A"}, {"A","I"},
-        {"A","E"},
-        {"I2", "A"}, {"I2", "E"}
-#endif
-    };
+    char *dash = rindex(args.ifnames[0].c_str(), '-');
+    std::string ofname(args.ifnames[0].c_str(), dash);
 
     char ofmode = 'w';
-#else
-    vector<array<string,2>> sgridss {
-        {"I2", "A"}, {"I2", "E"}};
-
-    char ofmode = 'a';
-#endif
-
-    for (auto const &sgrids : sgridss) {
-        combine_chunks(ifnames, ofname, ofmode, sgrids);
+    for (auto const &sgrids : args.matrix_specs) {
+        combine_chunks(args.ifnames, ofname, ofmode, sgrids);
         ofmode = 'a';
     }
 
     return 0;
+
 }
