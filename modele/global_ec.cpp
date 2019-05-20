@@ -24,11 +24,10 @@ Regular earth has
 
 
 #include <string>
-#include <sstream>
 #include <iostream>
 
 #include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/join.hpp>
 
 #include <tclap/CmdLine.h>
 
@@ -37,6 +36,7 @@ Regular earth has
 #include <ibmisc/enum.hpp>
 #include <ibmisc/stdio.hpp>
 #include <ibmisc/filesystem.hpp>
+#include <ibmisc/string.hpp>
 #include <spsparse/eigen.hpp>
 #include <spsparse/SparseSet.hpp>
 
@@ -118,7 +118,7 @@ struct ParseArgs {
     std::array<double,3> sigma;    // NOTE: Smoothing in general does not work when ice is sectioned.  Should be applied later if user wants it.
 
     double eq_rad;        // Radius of earth; see ModelE code    
-    std::set<std::string> matrix_names;    // Names of matrices to generate
+    std::vector<std::string> matrix_names;    // Names of matrices to generate
 
     bool run_chunk;        // true if we should compute ice for a chunk; false if we should compute the chunk boundaries
     int chunk_no=-1;
@@ -142,26 +142,6 @@ ostream& operator<<(ostream& os, ParseArgs const &args)
         << "    ec_range: " << args.ec_range << "  ec_skip=" << args.ec_skip << endl
         << "    sigma: " << args.sigma;
 }  
-
-template<class DestT>
-static std::vector<DestT> parse_csv(std::string scsv_str)
-{
-    // Parse to vector of strings
-    std::vector<std::string> scsv;
-    boost::algorithm::split(scsv,  scsv_str, boost::is_any_of(","));
-
-
-    std::vector<DestT> ret;
-    for (std::string &s : scsv) {
-        stringstream myString(s);
-        DestT val;
-        myString >> val;
-        ret.push_back(val);
-    }
-
-
-    return ret;
-}
 
 ParseArgs::ParseArgs(int argc, char **argv)
     : sigma(std::array<double,3>{0,0,0})
@@ -264,7 +244,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         topoo_fname = topoo_fname_a.getValue();
 
         // Parse elevation classes...
-        auto _ec(parse_csv<double>(ec_a.getValue()));
+        auto _ec(split<double>(ec_a.getValue(), ","));
         if (_ec.size() < 2 || _ec.size() > 3) (*icebin_error)(-1,
             "--ec '%%s' must have just two or three values", ec_a.getValue().c_str());
         ec_range[0] = _ec[0];
@@ -276,14 +256,13 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
         eq_rad = eq_rad_a.getValue();
 
-        auto _matrix_names(parse_csv<std::string>(matrix_names_a.getValue()));
-        matrix_names = std::set<std::string>(_matrix_names.begin(), _matrix_names.end());
+        matrix_names = split<std::string>(matrix_names_a.getValue(), ",");
 
         std::string srunchunk(runchunk_a.getValue());
         if (srunchunk == "") {
             run_chunk = false;
         } else {
-            auto bounds(parse_csv<double>(srunchunk));
+            auto bounds(split<double>(srunchunk, ","));
             if (bounds.size() != 5) (*icebin_error)(-1,
                 "--runchunk '%s' must have 5 values", srunchunk.c_str());
 
@@ -524,7 +503,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
 */
 void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
     blitz::Array<double,2> const &elevmaskI, HntrSpec &hspecI2,
-    std::set<std::string> const &matrix_names)
+    std::vector<std::string> const &matrix_names)
 {
 
     std::unique_ptr<RegridMatrices_Dynamic> rm(gcmA.regrid_matrices(0, reshape1(elevmaskI)));
@@ -569,7 +548,10 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
             get_or_add_dims(ncio, {"nhc"}, {gcmA._hcdefs.size()}));
     }
 
-    if (matrix_names.find("AvI") != matrix_names.end()) {
+    std::set<string> matrix_names_set = std::set<std::string>(matrix_names.begin(), matrix_names.end());
+
+
+    if (matrix_names_set.find("AvI") != matrix_names_set.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating AvI\n");
         auto mat(rm->matrix_d("AvI", {&dimA, &dimI}, params));
@@ -578,7 +560,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.find("EvI") != matrix_names.end()) {
+    if (matrix_names_set.find("EvI") != matrix_names_set.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating EvI\n");
         auto mat(rm->matrix_d("EvI", {&dimE, &dimI}, params));
@@ -587,7 +569,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.find("IvE") != matrix_names.end()) {
+    if (matrix_names_set.find("IvE") != matrix_names_set.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating IvE\n");
         auto mat(rm->matrix_d("IvE", {&dimI, &dimE}, params));
@@ -602,7 +584,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.find("IvA") != matrix_names.end()) {
+    if (matrix_names_set.find("IvA") != matrix_names_set.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating IvA\n");
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> mat(
@@ -618,12 +600,21 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.find("AvE") != matrix_names.end()) {
+    if (matrix_names_set.find("AvE") != matrix_names_set.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating AvE\n");
         auto mat(rm->matrix_d("AvE", {&dimA, &dimE}, params));
         check_negative(*mat, "AvE");
         mat->ncio(ncio, "AvE", {"dimA", "dimE"});
+        ncio.flush();
+    }
+
+    if (matrix_names_set.find("EvA") != matrix_names_set.end()) {
+        NcIO ncio(ofname, 'a', "nc4", nocompress);
+        printf("---- Generating EvA\n");
+        auto mat(rm->matrix_d("EvA", {&dimE, &dimA}, params));
+        check_negative(*mat, "EvA");
+        mat->ncio(ncio, "EvA", {"dimE", "dimA"});
         ncio.flush();
     }
 
@@ -701,7 +692,9 @@ void write_chunk_makefile(
     }
     fout << endl;
 
-    fout << "\tcombine_global_ec";
+    fout << "\tcombine_global_ec --matrix-names ";
+    fout << boost::algorithm::join(args.matrix_names, ",");
+
     for (std::array<int,5> const &chunk : chunks)  {
         std::string chunkno(strprintf("%02d", chunk[0]));
         fout << " " << ofname << "-" << chunkno;

@@ -1,6 +1,8 @@
 #include <cstdio>
+#include <cstring>
 #include <prettyprint.hpp>
 #include <icebin/error.hpp>
+#include <ibmisc/string.hpp>
 #include <ibmisc/linear/linear.hpp>
 #include <ibmisc/linear/compressed.hpp>
 #include <icebin/modele/global_ec.hpp>
@@ -15,27 +17,11 @@ using namespace icebin::modele;
 static double const NaN = std::numeric_limits<double>::quiet_NaN();
 
 
-static std::vector<std::string> split(const std::string& s, char seperator)
+std::array<std::string,2> parse_spec(std::string const &spec)
 {
-    std::vector<std::string> output;
-    std::string::size_type prev_pos = 0, pos = 0;
-
-    while((pos = s.find(seperator, pos)) != std::string::npos) {
-        std::string substring( s.substr(prev_pos, pos-prev_pos) );
-        output.push_back(substring);
-        prev_pos = ++pos;
-    }
-
-    output.push_back(s.substr(prev_pos, pos-prev_pos)); // Last word
-    return output;
-}
-
-
-std::array<std::string,2>> parse_spec(std::string const &spec)
-{
-    std::vector<std::string> dims = split(spec, 'v');
+    auto dims(split<std::string>(spec, "v"));
     if (dims.size() != 2) (*icebin_error)(-1, "Error parsing matrix spec %s", spec.c_str());
-    return std::array<std::string,2>>{dims[0], dims[1]};
+    return std::array<std::string,2>{dims[0], dims[1]};
 }
 
 struct ParseArgs {
@@ -52,7 +38,6 @@ struct ParseArgs {
 };
 
 ParseArgs::ParseArgs(int argc, char **argv)
-    : sigma(std::array<double,3>{0,0,0})
 {
 
     // Wrap everything in a try block.  Do this every time, 
@@ -64,12 +49,15 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "Comma-separated names of matrices to generate, no spaces",
             false, "AvI,EvI,IvE,IvA,AvE", "matrix names", cmd);
 
-        TCLAP::UnlabeledMultiArg<std::string> ifnames_a("files to merge", cmd);
+        TCLAP::UnlabeledMultiArg<std::string> ifnames_a("merge-files",
+            "Files with sub-matrices to merge together",
+            true, "filenames", cmd);
 
         cmd.parse(argc, argv);
 
         if (matrix_names_a.getValue() != "") {
-            std::vector<std::string> matrix_names = parse_csv<std::string>(matrix_names_a.getValue());
+            matrix_specs.clear();
+            std::vector<std::string> matrix_names = split<std::string>(matrix_names_a.getValue(), ",");
             for (auto &name : matrix_names) matrix_specs.push_back(parse_spec(name));
         }
 
@@ -255,8 +243,9 @@ int main(int argc, char **argv)
     ParseArgs args(argc, argv);
 
     // Parse the output name
-    char *dash = rindex(args.ifnames[0].c_str(), '-');
-    std::string ofname(args.ifnames[0].c_str(), dash);
+    const char *ifnames_cstr = args.ifnames[0].c_str();
+    char const *dash = strrchr(ifnames_cstr, '-');
+    std::string ofname(ifnames_cstr, dash);
 
     char ofmode = 'w';
     for (auto const &sgrids : args.matrix_specs) {
