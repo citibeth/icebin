@@ -267,11 +267,11 @@ protected:
     /** Ice sheets stored by index defined in sheets_index */
     ibmisc::IndexedVector<std::string, std::unique_ptr<IceRegridder>> *_ice_regridders;
 
+public:
+
     /** Position of height points in elevation space (same for all GCM
     grid cells and all ice sheets) */
     std::vector<double> _hcdefs; // [nhc]
-
-public:
 
     std::vector<double> const &hcdefs() const
         { return _hcdefs; }

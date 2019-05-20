@@ -601,6 +601,7 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
 
 (*icebin_error)(-1, "update_topo() still needs to be written; and should do the same thing as the command-line version.  The old (pre-merge) update_topo() is in the source code currently.");
 
+#if 0
     GCMRegridder_ModelE *gcmA = dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder);
 
     // Transfer elemask and sigma parameters from each ice coupler
@@ -617,6 +618,7 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
         gcmA, topoO_fname, elevmasks, sigmas,
         initial_timestep, gcm_params.hc_segments, gcm_params.primary_segment,
         topoA, foceanOm0);
+#endif
 }
 
 

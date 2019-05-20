@@ -78,9 +78,9 @@ ParseArgs::ParseArgs(int argc, char **argv)
         topoo_fname = topoo_a.getValue();
 //        global_ec_fname = global_ec_a.getValue();
         global_ec_mm_fname = global_ec_mm_a.getValue();
-        elevmask_fname = elevmask_a.getValue();
-            elevI_vname = elevI_vname_a.getValue();
-            fgiceI_vname = fgiceI_vname_a.getValue();
+//        elevmask_fname = elevmask_a.getValue();
+//            elevI_vname = elevI_vname_a.getValue();
+//            fgiceI_vname = fgiceI_vname_a.getValue();
 
         topoa_fname = topoa_a.getValue();
     } catch (TCLAP::ArgException &e) { // catch any exceptions

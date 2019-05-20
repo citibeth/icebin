@@ -1,17 +1,26 @@
 #ifndef ICEBIN_MODELE_GLOBAL_EC_HPP
 #define ICEBIN_MODELE_GLOBAL_EC_HPP
 
+/** Stuff used to read the output of global_ec.cpp */
+
 #include <ibmisc/netcdf.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/GridSpec.hpp>
 
 namespace icebin {
 namespace modele {
+
+BOOST_ENUM_VALUES(GCMGridOption, int,
+    (atmosphere) (0)
+    (ocean) (1)
+    (mismatched) (2)    // (mismatched atmosphere)
+)
+
 namespace global_ec {
 
 /** Metadata read from the file, which we transfer the the output */
 struct Metadata {
-    bool mismatched;
+    GCMGridOption gcm_grid_option;
     icebin::HntrSpec hspecA, hspecI, hspecI2;
     ibmisc::Indexing indexingI, indexingI2, indexingA, indexingHC, indexingE;
     std::vector<double> hcdefs;
@@ -21,7 +30,7 @@ struct Metadata {
 
 inline void Metadata::ncio(ibmisc::NcIO &ncio)
 {
-    ibmisc::get_or_put_att(*ncio.nc, ncio.rw, "mismatched", mismatched);
+    ibmisc::get_or_put_att_enum(*ncio.nc, ncio.rw, "gcm_grid_option", gcm_grid_option);
 
     hspecA.ncio(ncio, "hspecA");
     hspecI.ncio(ncio, "hspecI");

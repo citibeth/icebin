@@ -85,6 +85,7 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         bool correctA) except +
 
     cdef cibmisc.shared_ptr[GCMRegridder] new_GCMRegridder_ModelE(
+        string &global_ecO,
         cibmisc.shared_ptr[GCMRegridder] &gcmO) except +
 
     cdef void GCMRegridder_ModelE_set_focean(

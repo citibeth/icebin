@@ -48,6 +48,7 @@ Regular earth has
 #include <icebin/modele/hntr.hpp>
 
 #include <icebin/gridgen/GridGen_LonLat.hpp>
+#include <icebin/modele/global_ec.hpp>
 
 using namespace std;
 using namespace ibmisc;
@@ -162,15 +163,6 @@ static std::vector<DestT> parse_csv(std::string scsv_str)
     return ret;
 }
 
-BOOST_ENUM_VALUES(GCMGridOption, int,
-    (atmosphere) (0)
-    (ocean) (1)
-    (mismatched) (2)    // (mismatched atmosphere)
-)
-
-std::string(gCMGridOption.str())
-
-
 ParseArgs::ParseArgs(int argc, char **argv)
     : sigma(std::array<double,3>{0,0,0})
 {
@@ -231,7 +223,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
             false, "global_ec.nc", "mask var name", cmd);
 
 
-        TCLAP::MultiArg<int> gcm_grid_option_a("x", "gcm-grid",
+        TCLAP::ValueArg<std::string> gcm_grid_option_a("x", "gcm-grid",
             "Type of GCM Grid to use (atmosphere, ocean, mismatched)."
             "  NOTE: mismatched is on the Atmosphere grid only.",
             false, "mismatched", "output GCM grid", cmd);
@@ -280,7 +272,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         ec_skip = (_ec.size() == 3 ? _ec[2] : 200);
 
         ofname = ofname_a.getValue();
-        gcm_grid_option = parse_enumm<GCMGridOption>(gcm_grid_option_a.getValue());
+        gcm_grid_option = parse_enum<GCMGridOption>(gcm_grid_option_a.getValue());
 
         eq_rad = eq_rad_a.getValue();
 
@@ -501,7 +493,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
     // Create a mismatched regridder, to mediate between different ice
     // extent of GCM vs. IceBin
     std::unique_ptr<modele::GCMRegridder_ModelE> gcmA(
-        new modele::GCMRegridder_ModelE(
+        new modele::GCMRegridder_ModelE("",
             std::shared_ptr<GCMRegridder>(gcmO.release())));
 
     HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
@@ -559,7 +551,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
 
     {NcIO ncio(ofname, 'w', "nc4", nocompress);
         printf("---- Saving metadata\n");
-        get_or_put_att(*ncio.nc, ncio.rw, "gcm_grid_option", args.gcm_grid_option);
+        get_or_put_att_enum(*ncio.nc, ncio.rw, "gcm_grid_option", args.gcm_grid_option);
 
         hspecI.ncio(ncio, "hspecI");
         hspecI2.ncio(ncio, "hspecI2");
@@ -573,8 +565,8 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         gcmA.indexingHC.ncio(ncio, "indexingHC");
         gcmA.indexingE.ncio(ncio, "indexingE");
 
-        ncio_vector(ncio, gcmA.hcdefs, false, "hcdefs", "double",
-            get_or_add_dims(ncio, {"nhc"}, {gcmA.hcdefs.size()}));
+        ncio_vector(ncio, gcmA._hcdefs, false, "hcdefs", "double",
+            get_or_add_dims(ncio, {"nhc"}, {gcmA._hcdefs.size()}));
 
         printf("---- Generating AvI\n");
         auto mat(rm->matrix_d("AvI", {&dimA, &dimI}, params));
@@ -582,7 +574,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.contains("EvI")) {
+    if (matrix_names.find("EvI") != matrix_names.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating EvI\n");
         auto mat(rm->matrix_d("EvI", {&dimE, &dimI}, params));
@@ -591,7 +583,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.contains("IvE")) {
+    if (matrix_names.find("IvE") != matrix_names.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating IvE\n");
         auto mat(rm->matrix_d("IvE", {&dimI, &dimE}, params));
@@ -606,7 +598,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.contains("IvA")) {
+    if (matrix_names.find("IvA") != matrix_names.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating IvA\n");
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> mat(
@@ -622,7 +614,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         ncio.flush();
     }
 
-    if (matrix_names.contains("AvE")) {
+    if (matrix_names.find("AvE") != matrix_names.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating AvE\n");
         auto mat(rm->matrix_d("AvE", {&dimA, &dimE}, params));
@@ -664,22 +656,23 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
 
 void global_ec_section(FileLocator const &files, ParseArgs &args, blitz::Array<double,2> const &elevmaskI)
 {
-    switch(gcm_grid_option.index()) {
-        case GCMGridOption::mismatched :
+    switch(args.gcm_grid_option.index()) {
+        case GCMGridOption::mismatched : {
             // Mismatched grids on Atmosphere grid
             auto gcmA(new_gcmA_mismatched(files, args, elevmaskI));
-            global_ec_section(*gcmA, args, elevmaskI, args.hspecI2, matrix_names);
-
-        case GCMGridOption::atmosphere :
+            global_ec_section(*gcmA, args, elevmaskI, args.hspecI2, args.matrix_names);
+        } break;
+        case GCMGridOption::atmosphere : {
             // Simple matrices on Atmosphere grid
             HntrSpec const hspecA(make_hntrA(args.hspecO));
             auto gcmA(new_gcmA_standard(hspecA, "Atmosphere", args, elevmaskI));
-            global_ec_section(*gcmA, args, elevmaskI, args.hspecI2, matrix_names);
-
-        case GCMGridOption::ocean :
+            global_ec_section(*gcmA, args, elevmaskI, args.hspecI2, args.matrix_names);
+        } break;
+        case GCMGridOption::ocean : {
             // Simple matrices on Ocean grid
-            auto gcmO(new_gcmA_standard(hspecO, "Ocean", args, elevmaskI));
-            global_ec_section(*gcmO, args, elevmaskI, args.hspecI2, matrix_names);
+            auto gcmO(new_gcmA_standard(args.hspecO, "Ocean", args, elevmaskI));
+            global_ec_section(*gcmO, args, elevmaskI, args.hspecI2, args.matrix_names);
+        } break;
     }
 }
 

@@ -40,6 +40,7 @@ extern std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
 /** Instantiates a new C++ object of type GCMRegridder_ModelE.
 NOTE: This function is only enabled if BUILD_MODELE is enabled in CMake. */
 extern std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
+    std::string const &global_ecO,
     std::shared_ptr<GCMRegridder> const &gcmO);
 
 /** Sets the ocean to use for mismatched regridding (icbin::modele::GCMRegridder_ModelE)

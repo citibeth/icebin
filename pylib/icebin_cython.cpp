@@ -72,10 +72,11 @@ std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
 }
 
 std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
+    std::string const &global_ecO,
     std::shared_ptr<GCMRegridder> const &gcmO)
 {
 #ifdef BUILD_MODELE
-    std::shared_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(gcmO));
+    std::shared_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(global_ecO, gcmO));
     return gcmA;
 #else
     return std::shared_ptr<GCMRegridder_ModelE>();
@@ -238,6 +239,7 @@ std::string to_string(PyObject *str, std::string const &vname)
     return std::string(buf, size);
 }
 
+#if 0
 void update_topo(
     // ====== INPUT parameters
     GCMRegridder *_gcmA,
@@ -340,6 +342,6 @@ void update_topo(
         initial_timestep, hc_segments, primary_segment, toposA, foceanOm0);
 #endif
 }
-
+#endif    // if 0
 
 }}
