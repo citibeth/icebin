@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <string>
 #include <iostream>
 #include <tclap/CmdLine.h>
 #include <ibmisc/memory.hpp>
@@ -90,11 +92,6 @@ ParseArgs::ParseArgs(int argc, char **argv)
 }
 
 
-static std::vector<std::string> const itopo_vars
-    {"FOCEAN", "FLAKE", "FGRND", "FGICE", "ZATMO", "ZLAKE", "ZICETOP"};
-static std::vector<std::string> const otopo_vars
-    {"focean", "flake", "fgrnd", "fgice", "zatmo", "hlake", "zicetop"};
-
 
 
 int main(int argc, char **argv)
@@ -117,11 +114,113 @@ int main(int argc, char **argv)
         hspecO.ncio(ncio, "hspec");
     }
 
-printf("AA1\n");
+    // Create the AvO regridder (but not matrix)
+    Hntr hntr_AvO(17.17, meta.hspecA, hspecO);
+
     // ============= Convert TOPOO to TOPOA
     std::map<std::string, std::unique_ptr<blitz::Array<double,2>>> varsA;
 
+    ibmisc::ArrayBundle<double,2> topoo;
+    auto &foceanOm(out.add("FOCEAN", {
+        "description", "0 or 1, Bering Strait 1 cell wide",
+        "units", "1",
+        "source", "GISS 1Qx1",
+    }));
+    auto &flakeOm(out.add("FLAKE", {
+        "description", "Lake Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    }));
+    auto &fgrndOm(out.add("FGRND", {
+        "description", "Ground Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    }));
+    auto &fgiceOm(out.add("FGICE", {
+        "description", "Glacial Ice Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    }));
+    auto &zatmoOm(out.add("ZATMO", {
+        "description", "Atmospheric Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    auto &zlakeOm(out.add("ZLAKE", {
+        "description", "Lake Surface Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    auto &zicetopOm(out.add("ZICETOP", {
+        "description", "Atmospheric Topography (Ice-Covered Regions Only)",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+
+
+    // Copy TOPOO to TOPOA spec, downcasing variable names
+    ibmisc::ArrayBundle<double,2> topoa(topoo);
+    for (auto &d : topoa.data) {
+        std::string &name(d.meta.name);
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+
+        // Set shape
+        d.meta.shape = std::array<int,2>{meta.hspecA.jm, mta.hspecA.im};
+    }
+
+    // Add FOCEANF, which is in TOPOO but not TOPOA.
+    auto &foceanOp(out.add("FOCEANF", {
+        "description", "0 or 1, Bering Strait 1 cell wide",
+        "units", "1",
+        "source", "GISS 1Qx1",
+    }));
+
+
+    topoa.allocate(true);    // check=true
+    auto &foceanA(topoa.array("focean"));
+    auto &flakeA(topoa.array("flake"));
+    auto &fgrndA(topoa.array("fgrnd"));
+    auto &fgiceA(topoa.array("fgice"));
+    auto &zatmoA(topoa.array("zatmo"));
+    auto &zlakeA(topoa.array("zlake"));
+    auto &zicetopA(topoa.array("zicetop"));
+
+
+    // Read TOPOO input
     {NcIO topoo_nc(args.topoo_fname, 'r');
+
+        // Read from topoO file, and allocate resulting arrays.
+        topoo.ncio_alloc(topoo_nc, {}, "", "double",
+            get_or_add_dims(topoo_nc, {"jm", "im"}));
+    }
+
+    // Create gcmA
+
+    // Regrid to A grid, etc.
+    make_topoA(&*gcmA,
+        foceanOp, foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
+        EOpvAOp, paramsA, dimeEOp, dimAOp, eq_rad,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, zlakeA, zicetopA,
+        fhc, elev, underice);
+
+    // Write extended TOPO file
+    {NcIO topoa_nc(args.topoa_fname, 'w');
+
+        // Read from topoO file, and allocate resulting arrays.
+        topoa.ncio(topoa_nc, {}, "", "double",
+            get_or_add_dims(topoa_nc, {"jm", "im"}));
+    }
+
+
+
+
+
+
+
+
+
+
+
 
         // Set up weight vectors for each regrid
         blitz::Array<double,2> fgiceO(hspecO.jm, hspecO.im);

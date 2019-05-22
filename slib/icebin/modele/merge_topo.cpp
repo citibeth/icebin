@@ -312,7 +312,7 @@ EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
     EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
 }
 
-void merge_topoA(
+void make_topoA(
 GCMRegridder_ModelE *gcmA,   // Gets updated with new fcoeanOp, foceanOm
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
@@ -368,25 +368,13 @@ blitz::Array<uint16_t,3> &underice3)
 
 
     blitz::Array<double, 2> WTO(const_array(blitz::shape(hspecO.jm,hspecO.im), 1.0));
-    typedef std::tuple<blitz::Array<double,2> const *, blitz::Array<double,2> *, blitz::Array<double,2> const *> tup;
-    std::vector<tup> tups {
-        tup{&foceanOm2, &foceanA2, &WTO},
-        tup{&flakeOm2, &flakeA2, &WTO},
-        tup{&fgrndOm2, &fgrndA2, &WTO},
-        tup{&fgiceOm2, &fgiceA2, &WTO},
-        tup{&zatmoOm2, &zatmoA2, &WTO},
-        tup{&zlakeOm2, &zlakeA2, &WTO},
-        tup{&zicetopOm2, &zicetopA2, &fgiceOm2}};
-
-    // Regrid TOPOO variables and save to TOPOA
-    for (auto &t : tups) {
-        auto &xxOm2(*std::get<0>(t));
-        auto &xxA2(*std::get<1>(t));
-        auto &xxWTO(*std::get<2>(t));
-
-        // Regrid to A grid
-        hntr_AvO.regrid(xxWTO, xxOm2, xxA2);
-    }
+    hntr_AvO.regrid(WTO, foceanO2, foceanA2);
+    hntr_AvO.regrid(WTO, flakeO2, flakeA2);
+    hntr_AvO.regrid(WTO, fgrndO2, fgrndA2);
+    hntr_AvO.regrid(WTO, fgiceO2, fgiceA2);
+    hntr_AvO.regrid(WTO, zatmoO2, zatmoA2);
+    hntr_AvO.regrid(WTO, zlakeO2, zlakeA2);
+    hntr_AvO.regrid(fgiceO, zicetopO2, zicetopA2);
 
     // ================= Create fhc, elevE and underice
     int const nhc_icebin = gcmA->nhc();  // = gcmA->indexingE[2].extent
