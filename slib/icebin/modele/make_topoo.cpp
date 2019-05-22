@@ -140,6 +140,7 @@ static void callZ(
                         SAZSG_li += area*ZICETOP1m(I1m,J1m);
                     }
                 }}
+                ZATMOF(I,J) = SAZSG / SAREA;
                 std::sort(cells2.begin(), cells2.end());
 
                 if (SAREA == 0) (*icebin_error)(-1,
