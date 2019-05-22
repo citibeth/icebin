@@ -99,7 +99,7 @@ static void callZ(
                     SAREA += area;      // Surface area of LAND (non-ocean)
 
                     if (FOCEAN1m(I1m,J1m) == 1) continue;
-                    SAZSG += area*ZSOLG1m(I1m,J1m);
+                    SAZSG += area*ZICETOP1m(I1m,J1m);
 
                     if (FGICE1m(I1m,J1m) != 0) {
                         SAREA_li += area;
@@ -133,7 +133,7 @@ static void callZ(
                     cells2.push_back(AreaDepth(area, ZICETOP1m(I1m,J1m)));
 
                     SAREA += area;      // Surface area of LAND (non-ocean)
-                    SAZSG += area*ZSOLG1m(I1m,J1m);
+                    SAZSG += area*ZICETOP1m(I1m,J1m);
 
                     if (FGICE1m(I1m,J1m) != 0) {
                         SAREA_li += area;
