@@ -446,4 +446,113 @@ blitz::Array<uint16_t,3> &underice3)
     }}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+std::unique_ptr<GCMRegridder> new_gcmA_standard(
+    HntrSpec const &hspecA,
+    std::string const &grid_name,
+    ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+{
+    ExchangeGrid aexgrid;    // Put our answer in here
+
+    auto const &hspecI(args.hspecI);
+    modele::Hntr hntr(17.17, hspecA, hspecI);
+
+
+    // -------------------------------------------------------------
+    printf("---- Computing overlaps\n");
+
+    // Compute overlaps for cells with ice
+    SparseSet<long,int> _dimA;    // Only include A grid cells with ice
+    SparseSet<long,int> _dimI;    // Only include I grid cells with ice
+    hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), _dimA, _dimI), args.eq_rad);
+
+    // -------------------------------------------------------------
+    printf("---- Creating gcmA for %s\n", grid_name.c_str());
+
+    // Turn HntrSpec --> GridSpec
+    GridSpec_LonLat specA(make_grid_spec(hspecA, false, 1, args.eq_rad));
+    GridSpec_LonLat specI(make_grid_spec(hspecI, false, 1, args.eq_rad));
+
+    // Realize A grid for relevant gridcells
+    auto agridA(make_abbr_grid(grid_name, specA, std::move(_dimA)));
+
+    // Set up elevation classes    
+    std::vector<double> hcdefs;
+    for (double elev=args.ec_range[0]; elev <= args.ec_range[1]; elev += args.ec_skip) {
+        hcdefs.push_back(elev);
+    }
+
+    // Create standard GCMRegridder for A <--> I
+    std::unique_ptr<GCMRegridder_Standard> gcmA(new GCMRegridder_Standard);
+    gcmA->init(
+        std::move(agridA), std::move(hcdefs),
+        Indexing({"A", "HC"}, {0,0}, {agridA.dim.sparse_extent(), hcdefs.size()}, {1,0}),
+        args.correctA);
+
+
+    // --------------------------------------------------
+    // Create IceRegridder for I and add to gcmA
+    auto ice(new_ice_regridder(IceRegridder::Type::L0));
+    auto agridI(make_abbr_grid("Ice", specI, std::move(_dimI)));
+    ice->init("globalI", gcmA->agridA, nullptr,
+        std::move(agridI), std::move(aexgrid),
+        InterpStyle::Z_INTERP);    // You can use different InterpStyle if you like.
+
+    gcmA->add_sheet(std::move(ice));
+
+    return std::unique_ptr<GCMRegridder>(gcmA.release());
+}
+
+std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
+    FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
+{
+    auto const &hspecO(args.hspecO);
+    auto const &hspecI(args.hspecI);
+
+    auto gcmO(new_gcmA_standard(hspecO, "Ocean", args, elevmaskI));
+
+
+    // --------------------------------------------------
+    printf("---- Creating gcmA\n");
+
+    // Create a mismatched regridder, to mediate between different ice
+    // extent of GCM vs. IceBin
+    std::unique_ptr<modele::GCMRegridder_ModelE> gcmA(
+        new modele::GCMRegridder_ModelE("",
+            std::shared_ptr<GCMRegridder>(gcmO.release())));
+
+    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+
+    // Load the fractional ocean mask (based purely on ice extent)
+    {auto fname(files.locate(args.topoo_fname));
+
+        blitz::Array<double,2> foceanO(hspecO.jm, hspecO.im);    // called FOCEAN in make_topoo
+        blitz::Array<double,2> foceanfO(hspecO.jm, hspecO.im);    // called FOCEANF in make_topoo
+
+        printf("---- Reading FOCEAN: %s\n", fname.c_str());
+        NcIO ncio(fname, 'r');
+        ncio_blitz(ncio, foceanO, "FOCEAN", "double", {});
+        ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
+
+
+        gcmA->foceanAOp = reshape1(foceanfO);  // COPY: FOCEANF 
+        gcmA->foceanAOm = reshape1(foceanO);   // COPY: FOCEAN
+    }
+
+    return std::unique_ptr<GCMRegridder>(gcmA.release());
+}
+
+
 }}    // naespace icebin::modele

@@ -106,14 +106,22 @@ public:
     MakeDenseEigenT::AccumT ret;    // Final place for EOvEA
     GCMRegridder_ModelE const *gcmA;
     blitz::Array<double,1> const &wEO_d;
+    // Things obtained from gcmA
+    unsigned int const nhc;    // gcmA->nhc()
+    IndexSet const indexingHCO;    // gcmA->gcmO->indexingHC
+    IndexSet const indexingHCA;    // gcmA->indexingHC
 
 int n=0;
 
     RawEOvEA(
         MakeDenseEigenT::AccumT &&_ret,
         GCMRegridder_ModelE const *_gcmA,
-        blitz::Array<double,1> const &_wEO_d)
-    : ret(std::move(_ret)), gcmA(_gcmA), wEO_d(_wEO_d) {}
+        blitz::Array<double,1> const &_wEO_d,
+        unsigned int const _nhc,    // gcmA->nhc()
+        IndexSet const _indexingHCO,    // gcmA->gcmO->indexingHC
+        IndexSet const _indexingHCA)    // gcmA->indexingHC
+    : ret(std::move(_ret)), wEO_d(_wEO_d), nhc(_nhc),
+        indexingHCO(_indexingHCO), indexingHCA(_indexingHCA) {}
 
     /** Called by Hntr::matrix() (AvO) */
     void add(std::array<int,2> index, double value)
@@ -128,8 +136,8 @@ int n=0;
 
 //if (n < 15) printf("    RawEOvEA: (%d %d) = %g   nc=%d\n", lAO_s, lAA_s, value, gcmA->nhc());
         // Iterate through all possible elevation classes for this gridcell pair
-        for (int ihc=0; ihc<gcmA->nhc(); ++ihc) {
-            long const lEO_s = gcmA->gcmO->indexingHC.tuple_to_index(
+        for (int ihc=0; ihc<nhc; ++ihc) {
+            long const lEO_s = indexingHCO.tuple_to_index(
                 std::array<long,2>{lAO_s,ihc});
 
             // Obtain wEO, size of the elevation grid cell
@@ -139,7 +147,7 @@ int n=0;
 //if (n < 15) printf("      ihc=%d, lEO_s = %ld   lEO_d=%d  weightEO=%g\n", ihc, lEO_s, lEO_d, weightEO);
 
             if (weightEO != 0) {
-                int const lEA_s = gcmA->indexingHC.tuple_to_index(
+                int const lEA_s = indexingHCA.tuple_to_index(
                     std::array<long,2>{lAA_s,ihc});
                 ret.add({lEO_s,lEA_s}, weightEO);
             }
@@ -173,14 +181,17 @@ static void raw_EOvEA(
     HntrSpec const &hntrA,
     double const eq_rad,
     SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
-    GCMRegridder_ModelE const *gcmA,
-    blitz::Array<double,1> &wEO_d)            // == EOvI.wM.  Dense indexing.
+    blitz::Array<double,1> &wEO_d,            // == EOvI.wM.  Dense indexing.
+    // Things obtained from gcmA
+    unsigned int const nhc,    // gcmA->nhc()
+    IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
+    IndexSet const indexingHCA)    // gcmA->indexingHC
 {
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
     Hntr hntr_AOvAA(17.17, hntrO, hntrA, 0);    // dimB=A,  dimA=O
 
     hntr_AOvAA.overlap<RawEOvEA, DimClip>(
-        RawEOvEA(std::move(ret), gcmA, wEO_d),
+        RawEOvEA(std::move(ret), wEO_d, nhc, indexingHCO, indexingHCA),
         eq_rad, DimClip(dimAO));
 }
 
@@ -356,8 +367,18 @@ EigenSparseMatrixT compute_EOmvAOm_unscaled(
 std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
-    GCMRegridder_ModelE const *gcmA,
     double const eq_rad,    // Radius of the earth
+
+    // Things obtained from gcmA
+    unsigned long const nA,     // gcmA->nA()
+    unsigned long const nE,    // gcmA->nE()
+    unsigned int const nhc,    // gcmA->nhc()
+    HntrSpec const &hntrO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
+    HntrSpec const &hntrA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
+    IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
+    IndexSet const indexingHCA,    // gcmA->indexingHC
+    blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
+    blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
 
     // Sub-parts of the computation, pre-computed
     EigenSparseMatrixT const &EOpvAOp,
@@ -372,20 +393,17 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     SparseSetT &dimEAm(*dims[1]);
 
     // Must set sparse_extent
-    dimAAm.set_sparse_extent(gcmA->nA());
-    dimEAm.set_sparse_extent(gcmA->nE());
+    dimAAm.set_sparse_extent(nA);
+    dimEAm.set_sparse_extent(nE);
 
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Compute wAOm (from wAOp)
     SparseSetT dimAOm;
-    EigenColVectorT wAOm_e(compute_wAOm(gcmA->foceanAOp, gcmA->foceanAOm, wAOp, dimAOp, dimAOm));
+    EigenColVectorT wAOm_e(compute_wAOm(foceanAOp, foceanAOm, wAOp, dimAOp, dimAOm));
 
     // ------------- Compute wAAm and AAmvAOm
     // Obtain hntrA and hntrO for process below.
-    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
-    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
-
     if (!hntrA.is_set()) (*icebin_error)(-1, "hntrA must be set");
     if (!hntrO.is_set()) (*icebin_error)(-1, "hntrO must be set");
 
@@ -415,7 +433,8 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
         std::bind(&raw_EOvEA, _1,
             hntrO, hntrA,
-            eq_rad, &dimAOm, gcmA, wEOm),
+            eq_rad, &dimAOm, wEOm,
+            nhc, indexingHCO, indexingHCA),
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
         {&dimEOm, &dimEAm}, '.').to_eigen());
 
@@ -474,7 +493,16 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
     std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
         rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
 
-    return _compute_AAmvEAm(dims, paramsA, gcmA, eq_rad,
+    return _compute_AAmvEAm(dims, paramsA, eq_rad,
+        gcmA->nA(),
+        gcmA->nE(),
+        gcmA->nhc(),
+        cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr,
+        cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr,
+        gcmA->gcmO->indexingHC,
+        gcmA->indexingHC,
+        gcmA->foceanAOp,
+        gcmA->foceanAOm,
         *EOpvAOp->M, dimEOp, dimAOp, EOpvAOp->Mw);
 }
 
@@ -580,7 +608,8 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         reset_ptr(XAmvXOm, MakeDenseEigenT(    // TODO: Call this XAvXO, since it's the same 'm' or 'p'
             std::bind(&raw_EOvEA, _1,
                 hntrO, hntrA,
-                eq_rad, &dimAOm, gcmA, wXOm),
+                eq_rad, &dimAOm, wXOm,
+                gcmA->nhc(), gcmA->gcmO->indexingHC, gcmA->indexingHC),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
     } else {    // X == 'A'
