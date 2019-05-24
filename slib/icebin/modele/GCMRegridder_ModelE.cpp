@@ -217,16 +217,6 @@ GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO)
 }
 
 
-HntrSpec make_hntrA(HntrSpec const &hntrO)
-{
-    if ((hntrO.im % 2 != 0) || (hntrO.jm % 2 != 0)) (*icebin_error)(-1,
-        "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
-        hntrO.im, hntrO.jm);
-
-    // --------------------------
-    // Define Atmosphere grid to be exactly twice the Ocean grid
-    return HntrSpec(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
-}
 
 
 /** Creates Atmosphere grid from an existing Hntr-defined Ocean grid.
@@ -388,10 +378,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
     std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
         rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
 
-    return _compute_AAmvEAm(dims, paramsA, eq_rad,
-        gcmA->nA(),
-        gcmA->nE(),
-        gcmA->nhc(),
+    return _compute_AAmvEAm(dims, paramsA.scale, eq_rad,
         cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr,
         cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr,
         gcmA->gcmO->indexingHC,

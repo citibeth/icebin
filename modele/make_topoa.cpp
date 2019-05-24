@@ -27,6 +27,7 @@ struct ParseArgs {
 //        std::string elevI_vname, fgiceI_vname;
 
     std::string topoa_fname;
+    double eq_rad;
 
     ParseArgs(int argc, char **argv);
 };
@@ -74,6 +75,11 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "OUT: TOPO file on Atmosphere grid",
             true, "global_ec.nc", "topoa file", cmd);
 
+        TCLAP::ValueArg<double> eq_rad_a("R", "radius",
+            "Radius of the earth",
+            false, modele::EQ_RAD, "earth radius", cmd);
+
+
         // Parse the argv array.
         cmd.parse( argc, argv );
 
@@ -85,6 +91,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
 //            fgiceI_vname = fgiceI_vname_a.getValue();
 
         topoa_fname = topoa_a.getValue();
+        eq_rad = eq_rad_a.getValue();
     } catch (TCLAP::ArgException &e) { // catch any exceptions
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
         exit(1);
@@ -103,55 +110,59 @@ int main(int argc, char **argv)
     // Open output file
     NcIO topoa_nc(args.topoa_fname, 'w');
 
-    // =========== Read grids, etc.
-    global_ec::Metadata meta;
-    {NcIO ncio(args.global_ec_mm_fname, 'r');
-        meta.ncio(ncio);
+
+    // =========== Read metadata and EOpvAOp matrix
+    global_ec::Metadata metaO;
+    std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
+    {NcIO ncio(args.global_ecO, 'r');
+    linear::Weighted_Compressed EOpvAOp_s;    // sparse indexing
+        metaO.ncio(ncio);
+
+        EOpvAOp_s.ncio(ncio, "EvA");
+        EOpvAOp.reset(new EigenSparseMatrixT(to_eigen_M(EOpvAOp_s)));
     }
 
-    HntrSpec hspecO;
-    {NcIO ncio(args.topoo_fname, 'r');
-        hspecO.ncio(ncio, "hspec");
-    }
+    HntrSpec &hspecO(metaO.hspecA);
+    HntrSpec hspecA(make_hntrA(hspecO));
+    Indexing &indexingHCO(metaO.indexingHC);
+    Indexing indexingHCA({"A", "HC"}, {0,0}, {hspecA.size(), indexingHCO[1].extent}, {1,0}),
 
     // Create the AvO regridder (but not matrix)
     Hntr hntr_AvO(17.17, meta.hspecA, hspecO);
 
-    // ============= Convert TOPOO to TOPOA
-    std::map<std::string, std::unique_ptr<blitz::Array<double,2>>> varsA;
-
+    // ============= Define input variables
     ibmisc::ArrayBundle<double,2> topoo;
-    auto &foceanOm(out.add("FOCEAN", {
+    auto &foceanOm(topoo.add("FOCEAN", {
         "description", "0 or 1, Bering Strait 1 cell wide",
         "units", "1",
         "source", "GISS 1Qx1",
     }));
-    auto &flakeOm(out.add("FLAKE", {
+    auto &flakeOm(topoo.add("FLAKE", {
         "description", "Lake Surface Fraction",
         "units", "0:1",
         "sources", "GISS 1Qx1",
     }));
-    auto &fgrndOm(out.add("FGRND", {
+    auto &fgrndOm(topoo.add("FGRND", {
         "description", "Ground Surface Fraction",
         "units", "0:1",
         "sources", "GISS 1Qx1",
     }));
-    auto &fgiceOm(out.add("FGICE", {
+    auto &fgiceOm(topoo.add("FGICE", {
         "description", "Glacial Ice Surface Fraction",
         "units", "0:1",
         "sources", "GISS 1Qx1",
     }));
-    auto &zatmoOm(out.add("ZATMO", {
+    auto &zatmoOm(topoo.add("ZATMO", {
         "description", "Atmospheric Topography",
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
-    auto &zlakeOm(out.add("ZLAKE", {
+    auto &zlakeOm(topoo.add("ZLAKE", {
         "description", "Lake Surface Topography",
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
-    auto &zicetopOm(out.add("ZICETOP", {
+    auto &zicetopOm(topoo.add("ZICETOP", {
         "description", "Atmospheric Topography (Ice-Covered Regions Only)",
         "units", "m",
         "sources", "ETOPO2 1Qx1",
@@ -169,21 +180,11 @@ int main(int argc, char **argv)
     }
 
     // Add FOCEANF, which is in TOPOO but not TOPOA.
-    auto &foceanOp(out.add("FOCEANF", {
+    auto &foceanOp(topoo.add("FOCEANF", {
         "description", "0 or 1, Bering Strait 1 cell wide",
         "units", "1",
         "source", "GISS 1Qx1",
     }));
-
-
-    topoa.allocate(true);    // check=true
-    auto &foceanA(topoa.array("focean"));
-    auto &flakeA(topoa.array("flake"));
-    auto &fgrndA(topoa.array("fgrnd"));
-    auto &fgiceA(topoa.array("fgice"));
-    auto &zatmoA(topoa.array("zatmo"));
-    auto &zlakeA(topoa.array("zlake"));
-    auto &zicetopA(topoa.array("zicetop"));
 
 
     // Read TOPOO input
@@ -194,195 +195,62 @@ int main(int argc, char **argv)
             get_or_add_dims(topoo_nc, {"jm", "im"}));
     }
 
-    // Create gcmA
 
-    // Regrid to A grid, etc.
-    make_topoA(&*gcmA,
+    // ------------- Allocate topoa arrays for output
+    topoa.allocate(true);    // check=true
+    auto &foceanA(topoa.array("focean"));
+    auto &flakeA(topoa.array("flake"));
+    auto &fgrndA(topoa.array("fgrnd"));
+    auto &fgiceA(topoa.array("fgice"));
+    auto &zatmoA(topoa.array("zatmo"));
+    auto &zlakeA(topoa.array("zlake"));
+    auto &zicetopA(topoa.array("zicetop"));
+
+    // --------------- Allocate 3D arrays to go in TOPOA file
+    ibmisc::ArrayBundle<double,3> topoa3;
+    auto &fhc(topoa3.add("fhc", {
+        "description", "fraction of ice-covered area for each elevation class",
+        "units", "1"
+    }));
+    auto &elevE(topoa3.add("elevE", {
+        "description", "Elevation of each elevation class",
+        "units", "1"
+    }));
+    ibmisc::ArrayBundle<double,3> topoa3_i;
+    auto &underice(topoa3_i.add("underice", {
+        "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
+    }));
+
+
+    int const nhc_gcm = meta.hcdefs.
+    std::array<int,3> shape3(nhc_gcm, metaO.indexingA[1].extent, meta.indexingA[0].extent);
+    topoa3.allocate(shape3);
+    topoa3_i.allocate(shape3);
+
+
+    // ---------------- Create TOPOA in memory
+    std::vector<uint16_t> underice;
+    for (size_t i=0; i<meta.hcdefs.size(); ++i) underice.push_back(UI_NOTHING);
+    make_topoA(
         foceanOp, foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
-        EOpvAOp, paramsA, dimeEOp, dimAOp, eq_rad,
+        hspecO, hspecA, indexingHCO, indexingHCA, meta.hcdefs, underice,
+        eq_rad, EOpvAOp, dimeEOp, dimAOp,
         foceanA, flakeA, fgrndA, fgiceA, zatmoA, zlakeA, zicetopA,
         fhc, elev, underice);
 
-    // Write extended TOPO file
+    // Write extended TOPOA file
     {NcIO topoa_nc(args.topoa_fname, 'w');
 
-        // Read from topoO file, and allocate resulting arrays.
-        topoa.ncio(topoa_nc, {}, "", "double",
-            get_or_add_dims(topoa_nc, {"jm", "im"}));
+        NcVar info(get_or_add_var(topoa_nc, "info", "int", {}));
+        std::string sval = "ec,land";
+        get_or_put_att(info, topoa_nc.rw, "segments", sval);
+
+        // Write topoA arrays
+        auto jm_im(get_or_add_dims(topoa_nc, {"jm", "im"}));
+        topoa.ncio(topoa_nc, {}, "", "double", jm_im);
+        topoa3.ncio(topoa_nc, {}, "", "double", jm_im);
+        topoa3_i.ncio(topoa_nc, {}, "", "ushort", jm_im);
     }
-
-
-
-
-
-
-
-
-
-
-
-
-        // Set up weight vectors for each regrid
-        blitz::Array<double,2> fgiceO(hspecO.jm, hspecO.im);
-        ncio_blitz(topoo_nc, fgiceO, "FGICE", "", {});
-        blitz::Array<double, 2> WTO(const_array(blitz::shape(hspecO.jm,hspecO.im), 1.0));
-        std::vector<blitz::Array<double,2> *> const weightsO
-            {&WTO, &WTO, &WTO, &WTO, &WTO, &WTO, &fgiceO};
-
-        // Define output variables
-        auto dimsA(get_or_add_dims(topoa_nc, {"jm", "im"}, {meta.hspecA.jm, meta.hspecA.im}));
-
-        // Create the AvO regridder (but not matrix)
-        Hntr hntr_AvO(17.17, meta.hspecA, hspecO);
-
-        // Regrid TOPOO variables and save to TOPOA
-        for (int i=0; i<itopo_vars.size(); ++i) {
-            printf("Reading %s (O)\n", itopo_vars[i].c_str());
-
-            // Read on O grid
-            blitz::Array<double,2> valO2(hspecO.jm, hspecO.im);
-            NcVar ncv(ncio_blitz(topoo_nc, valO2, itopo_vars[i], "", {}));
-
-            // Allocate variable to hold it
-            std::unique_ptr<blitz::Array<double,2>> varAp(
-                new blitz::Array<double,2>(meta.hspecA.jm, meta.hspecA.im));
-            auto &varA(*varAp);
-            varsA.insert(std::make_pair(otopo_vars[i], std::move(varAp)));
-
-            // Regrid to A grid
-            hntr_AvO.regrid(*weightsO[i], valO2, varA);
-        }
-
-        for (int i=0; i<itopo_vars.size(); ++i) {
-            printf("Writing %s (A)\n", otopo_vars[i].c_str());
-
-            std::vector<std::pair<std::string, NcAttValue>> atts;
-            NcVar ncv_in(topoo_nc.nc->getVar(itopo_vars[i]));
-            get_or_put_all_atts(ncv_in, topoo_nc.rw, atts);
-
-
-            // Write it out, transferring attributes from ori ginal variable
-            auto &varA(*varsA.at(otopo_vars[i]));
-            NcVar ncv_out(ncio_blitz(topoa_nc, varA, otopo_vars[i], "double", dimsA));
-            get_or_put_all_atts(ncv_out, topoa_nc.rw, atts);
-        }
-    }
-
-    // ================= Create fhc, elevE and underice
-    int const nhc_icebin = meta.indexingE[2].extent;
-    int const nhc_gcm = 1 + 1 + nhc_icebin;
-    auto dimsE(get_or_add_dims(topoa_nc,
-        {"nhc", "jm", "im"},
-        {nhc_gcm, meta.hspecA.jm, meta.hspecA.im}));
-    blitz::TinyVector<int,3> shapeE(nhc_gcm, meta.indexingE[1].extent, meta.indexingE[0].extent);
-    blitz::TinyVector<int,2> shapeE2(shapeE(0), shapeE(1)*shapeE(2));
-
-printf("shapeE = (%d, %d, %d)\n", shapeE(0), shapeE(1), shapeE(2));
-printf("shapeE2 = (%d, %d)\n", shapeE2(0), shapeE2(1));
-
-
-    blitz::Array<double,3> fhc(shapeE);
-    blitz::Array<double,3> elevE(shapeE);
-    blitz::Array<uint16_t,3> underice(shapeE);
-
-    // Initialize
-    fhc = 0;
-    elevE = NaN;
-    underice = 0;    // Elevation grid cell unused
-
-    auto all(blitz::Range::all());
-    int ec_base = 0;
-
-
-    // ------------ Segment 0: Legacy
-    printf("Segment 0: Legacy\n");
-    auto &fgiceA(*varsA.at("fgice"));
-    auto &zatmoA(*varsA.at("zatmo"));
-    auto &zicetopA(*varsA.at("zicetop"));
-
-    for (int j=0; j<meta.hspecA.jm; ++j) {
-    for (int i=0; i<meta.hspecA.im; ++i) {
-        if (fgiceA(j,i) > 0) {
-            fhc(ec_base, j,i) = 1. * 1e-30;
-            elevE(ec_base, j,i) = zatmoA(j,i);
-            underice(ec_base, j,i) = UI_NOTHING;
-        }
-    }}
-    ec_base += 1;
-
-    // ------------ Segment 1: land part of sealand
-    printf("Segment 1: seaLAND\n");
-    for (int j=0; j<meta.hspecA.jm; ++j) {
-    for (int i=0; i<meta.hspecA.im; ++i) {
-        if (fgiceA(j,i) > 0) {
-            fhc(ec_base, j,i) = 1e-30;
-            elevE(ec_base, j,i) = zicetopA(j,i);
-            underice(ec_base, j,i) = UI_NOTHING;
-        }
-    }}
-    ec_base += 1;
-
-    // ------------ Segment 2: Elevation Classes
-    printf("Segment 2: Elevation Classes\n");
-    auto fhcE2(reshape<double,3,2>(fhc, shapeE2));
-    auto elevE2(reshape<double,3,2>(elevE, shapeE2));
-    auto undericeE2(reshape<uint16_t,3,2>(underice, shapeE2));
-    {NcIO ncio(files.locate(args.global_ec_mm_fname), 'r');
-        auto AvE(linear::nc_read_weighted(ncio.nc, "AvE"));
-
-        // Uncompress AvE
-        std::array<blitz::Array<int,1>,2> indices;
-        blitz::Array<double,1> values;
-        AvE->to_coo(indices[0], indices[1], values);
-
-        // Scan AvE to get fhc
-        int const nnz(AvE->nnz());
-        std::array<int,2> iTuple;
-            int &iA2(iTuple[0]);
-            int &ihc(iTuple[1]);
-
-        for (int ihc=0; ihc<meta.hcdefs.size(); ++ihc) {
-            printf("elevE[ihc=%d] = %g\n", ec_base+ihc, meta.hcdefs[ihc]);
-        }
-
-        for (int i=0; i<nnz; ++i) {
-            auto const iA(indices[0](i));
-            auto const iE(indices[1](i));
-
-            // iE must be contained within cell iA (local propety of matrix)
-            meta.indexingHC.index_to_tuple(&iTuple[0], iE);
-
-            if (iA2 != iA) (*icebin_error)(-1,
-                "Matrix is non-local: iA=%ld, iE=%ld, iA2=%ld",
-                (long)iA, (long)iE, (long)iA2);
-
-            if (ihc < 0 || ihc >= nhc_icebin) (*icebin_error)(-1,
-                "ihc out of range [0,%d): %d", nhc_icebin, ihc);
-
-            if (iA < 0 || iA >= shapeE2(1)) (*icebin_error)(-1,
-                "iA out of range [0,%d): %d", shapeE2(1), iA);
-
-if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, values(i));
-
-
-            fhcE2(ec_base+ihc,iA) += values(i);
-            undericeE2(ec_base+ihc,iA) = UI_NOTHING;    // No IceBin coupling here
-            elevE2(ec_base+ihc,iA) = meta.hcdefs[ihc];
-        }
-    }
-
-    // --------------- Write it out
-    NcVar info(get_or_add_var(topoa_nc, "info", "int", {}));
-    std::string sval = "legacy,land,ec";
-    get_or_put_att(info, topoa_nc.rw, "segments", sval);
-
-    NcVar ncv;
-    ncio_blitz(topoa_nc, fhc, "fhc", "double", dimsE);
-    ncio_blitz(topoa_nc, elevE, "elevE", "double", dimsE);
-    ncio_blitz(topoa_nc, underice, "underice", "double", dimsE);
-
-    topoa_nc.flush();
-    topoa_nc.close();
 
     return 0;
 }

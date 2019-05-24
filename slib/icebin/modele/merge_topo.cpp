@@ -210,6 +210,35 @@ void merge_topoO(
     }}
 }
 
+EigenSparseMatrixT to_eigen_M(  // (generates in dense indexing)
+linear::Weighted_Compressed const &BvA,
+std::array<SparseSetT *,2> dims)
+{
+    typedef typename EigenSparseMatrixT::StorageIndex StorageIndex;
+    typedef typename EigenSparseMatrixT::value_type value_type;
+
+    // ======================= Create a merged EOpvAOp of base ice and ice sheets
+    // (and then call through to _compute_AAmvEAm)
+
+    // Accumulator for merged M (unscaled)
+    MakeDenseEigen BvA_m(
+        {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
+        dims, '.');
+
+    // Copy elements to accumulator matrix
+    for (auto ii(BvA.M.generator()); ++ii; ) {
+        BvA_m.M.add(ii->index(), ii->value());
+    }
+
+    // Set overall size
+    std::array<long,2> BvA_shape(BvA.shape());
+    dims[0]->set_sparse_extent(BvA_shape[0]);
+    dims[1]->set_sparse_extent(BvA_shape[1]);
+
+    // Compute M and wAOp
+    return BvA_m.to_eigen();
+}
+
 
 
 EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
@@ -316,13 +345,10 @@ EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
 
 std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     std::array<SparseSetT *,2> dims,
-    RegridParams const &paramsA,
+    bool scale,        // paramsA.scale
     double const eq_rad,    // Radius of the earth
 
     // Things obtained from gcmA
-    unsigned long const nA,     // gcmA->nA()
-    unsigned long const nE,    // gcmA->nE()
-    unsigned int const nhc,    // gcmA->nhc()
     HntrSpec const &hntrO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
     HntrSpec const &hntrA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
     IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
@@ -336,6 +362,9 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     SparseSetT &dimAOp,
     blitz::Array<double,1> const &wAOp)
 {
+    unsigned long const nA = indexingHCA[0].extent; // hntrA.size()
+    unsigned int const nhc = indexingHCA[1].extent;
+    unsigned long const nE = indexingHCA.extent();
 
     ConstUniverse const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
 
@@ -400,7 +429,7 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     // ------------- Put it all together
     ret->wM.reference(to_blitz(wAAm_e));
     blitz::Array<double,1> sAAmvAOm(sum(AAmvAOm, 0, '-'));
-    if (paramsA.scale) {
+    if (scale) {
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sAAmvAOm) * AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
             map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
@@ -419,8 +448,18 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 }
 
 
+HntrSpec make_hntrA(HntrSpec const &hntrO)
+{
+    if ((hntrO.im % 2 != 0) || (hntrO.jm % 2 != 0)) (*icebin_error)(-1,
+        "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
+        hntrO.im, hntrO.jm);
+
+    // --------------------------
+    // Define Atmosphere grid to be exactly twice the Ocean grid
+    return HntrSpec(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
+}
+
 void make_topoA(
-GCMRegridder_ModelE *gcmA,   // Gets updated with new fcoeanOp, foceanOm
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
 blitz::Array<double,2> const &foceanOp2,
@@ -432,11 +471,18 @@ blitz::Array<double,2> const &zatmoOm2,
 blitz::Array<double,2> const &zlakeOm2,
 blitz::Array<double,2> const &zicetopOm2,
 //
-EigenSparseMatrixT const &EOpvAOp,
-RegridParams const &paramsA,
+// Things obtained from gcmA
+HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
+HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
+IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC   (must reflect local + global ECs)
+IndexSet const indexingHCA,    // gcmA->indexingHC
+std::vector<double> const &hcdefs,        // gcmA->hcdefs()
+std::vector<uint16_t> const &underice,    // gcmA->underice
+//
+double const eq_rad,
+EigenSparseMatrixT const &EOpvAOp,        // UNSCALED
 SparseSetT &dimEOp,    // const
 SparseSetT &dimAOp,    // const
-double const eq_rad,
 //
 //SparseSetT const &dimO,    // Tells us which grid cells in O were changed.
 blitz::Array<double,2> &foceanA2,    // Rounded FOCEAN
@@ -465,14 +511,8 @@ blitz::Array<uint16_t,3> &underice3)
     auto fgiceA(reshape1(fgiceA2));
     auto zatmoA(reshape1(zatmoA2));
 
-    gcmA->foceanAOp = reshape1(foceanOp2);    // COPY
-    gcmA->foceanAOm = reshape1(foceanOm2);    // COPY
 
-
-    HntrSpec &hspecO(dynamic_cast<GridSpec_LonLat *>(&*gcmA->gcmO->agridA.spec)->hntr);
-    HntrSpec &hspecA(dynamic_cast<GridSpec_LonLat *>(&*gcmA->agridA.spec)->hntr);
     Hntr hntr_AvO(17.17, hspecA, hspecO);
-
 
     blitz::Array<double, 2> WTO(const_array(blitz::shape(hspecO.jm,hspecO.im), 1.0));
     hntr_AvO.regrid(WTO, foceanO2, foceanA2);
@@ -484,17 +524,14 @@ blitz::Array<uint16_t,3> &underice3)
     hntr_AvO.regrid(fgiceO, zicetopO2, zicetopA2);
 
     // ================= Create fhc, elevE and underice
-    int const nhc_icebin = gcmA->nhc();  // = gcmA->indexingE[2].extent
+    int const nhc_icebin = hcdefs.size();
     int const nhc_gcm = 1 + nhc_icebin;
-    blitz::TinyVector<int,3> shapeE(nhc_gcm, gcmA->indexingE[1].extent, gcmA->indexingE[0].extent);
-    blitz::TinyVector<int,2> shapeE2(shapeE(0), shapeE(1)*shapeE(2));
+    blitz::TinyVector<int,3> shapeE2(nhc_gcm, indexingHCA[1].extent);
 
     // Initialize
     fhc3 = 0;
     elevE3 = NaN;
     underice3 = 0;    // Elevation grid cell unused
-
-    auto all(blitz::Range::all());
 
     // ------------ Segment 0: Elevation Classes
     printf("Segment 2: Elevation Classes\n");
@@ -510,7 +547,7 @@ blitz::Array<uint16_t,3> &underice3)
     auto wAOp(sum(EOpvAOp, 1, '+'));
     SparseSetT dimAAm,dimEAm;
     std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
-        {&dimAAm, &dimEAm}, paramsA, gcmA, eq_rad,
+        {&dimAAm, &dimEAm}, false, eq_rad,    // scale=false
         EOpvAOp, dimEOp, dimAOp, wAOp));
 
     for (auto ii=begin(*AAmvEAm->M); ii != end(*AAmvEAm->M); ++ii) {
@@ -519,7 +556,7 @@ blitz::Array<uint16_t,3> &underice3)
         int const iE_d = ii->index(1);
         int const iE = dimEAm.to_sparse(iE_d);
 
-        gcmA->indexingHC.index_to_tuple(&iTuple[0], iE);
+        indexingHCA.index_to_tuple(&iTuple[0], iE);
 
         // iE must be contained within cell iA (local propety of matrix)
         if (iA2 != iA) (*icebin_error)(-1,
@@ -536,8 +573,8 @@ blitz::Array<uint16_t,3> &underice3)
 
         int const _ihc = ihc;    // Get around bug in Blitz++
         fhcE2(ihc,iA) += ii->value() / AAmvEAm->wM(iA);    // AAmvEAm is not scaled
-        undericeE2(ihc,iA) = gcmA->underice(ihc);UI_NOTHING;    // No IceBin coupling here
-        elevE2(iA) = gcmA->hcdefs()[ihc];
+        undericeE2(ihc,iA) = underice[ihc];    // No IceBin coupling here
+        elevE2(iA) = hcdefs[ihc];
     }
 
     // ------------ Segment 1: land part of sealand
@@ -564,102 +601,6 @@ blitz::Array<uint16_t,3> &underice3)
 
 
 
-
-// -----------------------------------------------------------
-std::unique_ptr<GCMRegridder> new_gcmA_standard(
-    HntrSpec const &hspecA,
-    std::string const &grid_name,
-    ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
-{
-    ExchangeGrid aexgrid;    // Put our answer in here
-
-    auto const &hspecI(args.hspecI);
-    modele::Hntr hntr(17.17, hspecA, hspecI);
-
-
-    // -------------------------------------------------------------
-    printf("---- Computing overlaps\n");
-
-    // Compute overlaps for cells with ice
-    SparseSet<long,int> _dimA;    // Only include A grid cells with ice
-    SparseSet<long,int> _dimI;    // Only include I grid cells with ice
-    hntr.overlap(ExchAccum(aexgrid, reshape1(elevmaskI), _dimA, _dimI), args.eq_rad);
-
-    // -------------------------------------------------------------
-    printf("---- Creating gcmA for %s\n", grid_name.c_str());
-
-    // Turn HntrSpec --> GridSpec
-    GridSpec_LonLat specA(make_grid_spec(hspecA, false, 1, args.eq_rad));
-    GridSpec_LonLat specI(make_grid_spec(hspecI, false, 1, args.eq_rad));
-
-    // Realize A grid for relevant gridcells
-    auto agridA(make_abbr_grid(grid_name, specA, std::move(_dimA)));
-
-    // Set up elevation classes    
-    std::vector<double> hcdefs;
-    for (double elev=args.ec_range[0]; elev <= args.ec_range[1]; elev += args.ec_skip) {
-        hcdefs.push_back(elev);
-    }
-
-    // Create standard GCMRegridder for A <--> I
-    std::unique_ptr<GCMRegridder_Standard> gcmA(new GCMRegridder_Standard);
-    gcmA->init(
-        std::move(agridA), std::move(hcdefs),
-        Indexing({"A", "HC"}, {0,0}, {agridA.dim.sparse_extent(), hcdefs.size()}, {1,0}),
-        args.correctA);
-
-
-    // --------------------------------------------------
-    // Create IceRegridder for I and add to gcmA
-    auto ice(new_ice_regridder(IceRegridder::Type::L0));
-    auto agridI(make_abbr_grid("Ice", specI, std::move(_dimI)));
-    ice->init("globalI", gcmA->agridA, nullptr,
-        std::move(agridI), std::move(aexgrid),
-        InterpStyle::Z_INTERP);    // You can use different InterpStyle if you like.
-
-    gcmA->add_sheet(std::move(ice));
-
-    return std::unique_ptr<GCMRegridder>(gcmA.release());
-}
-
-std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
-    FileLocator const &files, ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
-{
-    auto const &hspecO(args.hspecO);
-    auto const &hspecI(args.hspecI);
-
-    auto gcmO(new_gcmA_standard(hspecO, "Ocean", args, elevmaskI));
-
-
-    // --------------------------------------------------
-    printf("---- Creating gcmA\n");
-
-    // Create a mismatched regridder, to mediate between different ice
-    // extent of GCM vs. IceBin
-    std::unique_ptr<modele::GCMRegridder_ModelE> gcmA(
-        new modele::GCMRegridder_ModelE("",
-            std::shared_ptr<GCMRegridder>(gcmO.release())));
-
-    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
-
-    // Load the fractional ocean mask (based purely on ice extent)
-    {auto fname(files.locate(args.topoo_fname));
-
-        blitz::Array<double,2> foceanO(hspecO.jm, hspecO.im);    // called FOCEAN in make_topoo
-        blitz::Array<double,2> foceanfO(hspecO.jm, hspecO.im);    // called FOCEANF in make_topoo
-
-        printf("---- Reading FOCEAN: %s\n", fname.c_str());
-        NcIO ncio(fname, 'r');
-        ncio_blitz(ncio, foceanO, "FOCEAN", "double", {});
-        ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
-
-
-        gcmA->foceanAOp = reshape1(foceanfO);  // COPY: FOCEANF 
-        gcmA->foceanAOm = reshape1(foceanO);   // COPY: FOCEAN
-    }
-
-    return std::unique_ptr<GCMRegridder>(gcmA.release());
-}
 
 
 }}    // naespace icebin::modele
