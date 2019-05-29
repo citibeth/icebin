@@ -1,5 +1,5 @@
-#ifndef ICEBIN_MODELE_MAKE_TOPOO_HPP
-#define ICEBIN_MODELE_MAKE_TOPOO_HPP
+#ifndef ICEBIN_MODELE_TOPO_BASE_HPP
+#define ICEBIN_MODELE_TOPO_BASE_HPP
 
 #include <vector>
 #include <string>

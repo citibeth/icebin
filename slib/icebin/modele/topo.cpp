@@ -46,10 +46,10 @@ NOTES:
    invert='-', which produces the inverse matrix of invet='+'.
 */
 static void scaled_AOmvAOp(
-    MakeDenseEigenT::AccumT &&ret,        // {dimAOm, dimAOp}
-    blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
-    blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
-    char invert = '+')
+MakeDenseEigenT::AccumT &&ret,        // {dimAOm, dimAOp}
+blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
+blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
+char invert = '+')
 {
 //    SparseSetT &dimAOp(*ret.dim(1).sparse_set);
     SparseSetT &dimAOp(*ret.sparse_sets[1]);
@@ -181,17 +181,17 @@ NOTES:
       should correct by multiplying by:
           EOvEA_corrected = EOvEA_raw * diag(sum(EOvEA,1,'-') .* wEA)
 */
-static void raw_EOvEA(
-    MakeDenseEigenT::AccumT &&ret,        // {dimEA, dimEO}; dimEO should not change here.
-    HntrSpec const &hntrO,
-    HntrSpec const &hntrA,
-    double const eq_rad,
-    SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
-    blitz::Array<double,1> &wEO_d,            // == EOvI.wM.  Dense indexing.
-    // Things obtained from gcmA
-    unsigned int const nhc,    // gcmA->nhc()
-    IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
-    IndexSet const indexingHCA)    // gcmA->indexingHC
+void raw_EOvEA(
+MakeDenseEigenT::AccumT &&ret,        // {dimEA, dimEO}; dimEO should not change here.
+HntrSpec const &hntrO,
+HntrSpec const &hntrA,
+double const eq_rad,
+SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
+blitz::Array<double,1> &wEO_d,            // == EOvI.wM.  Dense indexing.
+// Things obtained from gcmA
+unsigned int const nhc,    // gcmA->nhc()
+IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
+IndexSet const indexingHCA)    // gcmA->indexingHC
 {
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
     Hntr hntr_AOvAA(17.17, hntrO, hntrA, 0);    // dimB=A,  dimA=O
@@ -207,11 +207,11 @@ static void raw_EOvEA(
 removing elements that refer to non-existent grid cells in AOm.
 This ultimately provides us with dimEOm as well. */
 EigenSparseMatrixT compute_EOmvAOm_unscaled(
-    SparseSetT &dimEOm,        // NOT const
-    SparseSetT &dimAOm,        // const; pre-computed, should not change
-    EigenSparseMatrixT const &EOpvAOp,    // Unscaled
-    SparseSetT const &dimEOp,
-    SparseSetT const &dimAOp)
+SparseSetT &dimEOm,        // NOT const
+SparseSetT &dimAOm,        // const; pre-computed, should not change
+EigenSparseMatrixT const &EOpvAOp,    // Unscaled
+SparseSetT const &dimEOp,
+SparseSetT const &dimAOp)
 {
     ConstUniverse const_dimAOm({"dimAOm"}, {&dimAOm});
 

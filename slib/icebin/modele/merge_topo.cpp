@@ -1,11 +1,3 @@
-class GetSheetElevO {
-public:
-    TmpAlloc _tmp;
-    SparseSetT dimO;
-    blitz::Array<double,1> wO;        // Ice (or land) covered area of each gridcell [m^2]
-    blitz::Array<double,1> elevO;     // Elevation [m]
-};
-
 blitz::Array<double,1> get_elevmaskI(ElevMask<1> const &emI, bool include_ice, bool include_bedrock)
 {
     auto nI(emI.elev.extent(0));
