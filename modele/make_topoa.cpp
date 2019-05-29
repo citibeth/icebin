@@ -21,7 +21,7 @@ static double const NaN = std::numeric_limits<double>::quiet_NaN();
 struct ParseArgs {
     std::string topoo_fname;
 //    std::string global_ec_fname;
-    std::string global_ec_mm_fname;
+    std::string global_ecO_fname;
 // These variables are vestigal
 //    std::string elevmask_fname;
 //        std::string elevI_vname, fgiceI_vname;
@@ -55,9 +55,9 @@ ParseArgs::ParseArgs(int argc, char **argv)
             false, "global_ec.nc", "topoo file", cmd);
 #endif
 
-        TCLAP::ValueArg<std::string> global_ec_mm_a("c", "global_ec_mm",
+        TCLAP::ValueArg<std::string> global_ecO_a("c", "global_ecO",
             "Elevation Class Matrix file (mismatched)",
-            false, "global_ec_mm.nc", "topoo file", cmd);
+            false, "global_ecO.nc", "topoo file", cmd);
 
         TCLAP::ValueArg<std::string> elevmask_a("d", "elevmask",
             "Source file for FGICE1m and ZICETOP1m",
@@ -85,7 +85,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
 
         topoo_fname = topoo_a.getValue();
 //        global_ec_fname = global_ec_a.getValue();
-        global_ec_mm_fname = global_ec_mm_a.getValue();
+        global_ecO_fname = global_ecO_a.getValue();
 //        elevmask_fname = elevmask_a.getValue();
 //            elevI_vname = elevI_vname_a.getValue();
 //            fgiceI_vname = fgiceI_vname_a.getValue();
@@ -99,6 +99,31 @@ ParseArgs::ParseArgs(int argc, char **argv)
 }
 
 
+EigenSparseMatrixT to_eigen_M(  // (generates in dense indexing)
+linear::Weighted_Compressed const &BvA,
+std::array<SparseSetT *,2> dims)
+{
+    // ======================= Create a merged EOpvAOp of base ice and ice sheets
+    // (and then call through to _compute_AAmvEAm)
+
+    // Accumulator for merged M (unscaled)
+    MakeDenseEigenT BvA_m(
+        {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
+        dims, '.');
+
+    // Copy elements to accumulator matrix
+    for (auto ii(BvA.M.generator()); ++ii; ) {
+        BvA_m.M.add(ii->index(), ii->value());
+    }
+
+    // Set overall size
+    std::array<long,2> BvA_shape(BvA.shape());
+    dims[0]->set_sparse_extent(BvA_shape[0]);
+    dims[1]->set_sparse_extent(BvA_shape[1]);
+
+    // Compute M and wAOp
+    return BvA_m.to_eigen();
+}
 
 
 int main(int argc, char **argv)

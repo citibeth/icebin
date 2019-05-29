@@ -176,52 +176,7 @@ extern HntrSpec make_hntrA(HntrSpec const &hntrO);
 // ====================================================================
 // Stuff used by make_topo.cpp
 
-extern std::unique_ptr<ibmisc::linear::Weighted_Eigen> _compute_AAmvEAm(
-    std::array<SparseSetT *,2> dims,
-    RegridParams const &paramsA,
-    GCMRegridder_ModelE const *gcmA,
-    double const eq_rad,    // Radius of the earth
 
-    // Sub-parts of the computation, pre-computed
-    EigenSparseMatrixT const &EOpvAOp,
-    SparseSetT &dimEOp,
-    SparseSetT &dimAOp,
-    blitz::Array<double,1> const &wAOp);
-
-
-class ConstUniverse {
-    std::vector<std::string> names;
-    std::vector<SparseSetT *> dims;
-    std::vector<int> extents;
-
-public:
-    ConstUniverse(
-        std::vector<std::string> &&_names,
-        std::vector<SparseSetT *> &&_dims) :
-        names(std::move(_names)), dims(std::move(_dims))
-    {
-        if (names.size() != dims.size()) (*icebin_error)(-1,
-            "names.size() and dims.size() must match");
-
-        extents.reserve(dims.size());
-        for (size_t i=0; i<dims.size(); ++i)
-            extents.push_back(dims[i]->dense_extent());
-    }
-
-    ~ConstUniverse()
-    {
-        bool err = false;
-        for (size_t i=0; i<dims.size(); ++i) {
-            if (extents[i] != dims[i]->dense_extent()) {
-                fprintf(stderr, "Dimension %s changed from %d to %d\n",
-                    names[i].c_str(), extents[i], dims[i]->dense_extent());
-                err = true;
-            }
-        }
-        if (err) (*icebin_error)(-1,
-            "At least one dimension changed");
-    }
-};
 
 
 

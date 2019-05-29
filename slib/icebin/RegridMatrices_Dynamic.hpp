@@ -7,6 +7,7 @@
 #include <ibmisc/linear/eigen.hpp>
 #include <icebin/RegridMatrices.hpp>
 #include <icebin/eigen_types.hpp>
+#include <icebin/ElevMask.hpp>
 
 namespace icebin {
 

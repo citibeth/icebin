@@ -7,6 +7,9 @@
 #include <ibmisc/bundle.hpp>
 #include <icebin/modele/hntr.hpp>
 
+/** Generate the basic TOPOO file, based on Gary Russell's old TOPO generator.
+This is converted from FORTRAN, and uses 1-based indexing. */
+
 namespace icebin {
 namespace modele {
 

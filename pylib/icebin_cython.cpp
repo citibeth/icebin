@@ -24,6 +24,7 @@
 #include <icebin/IceRegridder.hpp>
 #include <icebin/GCMCoupler.hpp>
 #include <icebin/Grid.hpp>
+#include <icebin/ElevMask.hpp>
 #ifdef BUILD_MODELE
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #endif

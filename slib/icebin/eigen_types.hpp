@@ -17,6 +17,7 @@ template<int RANK>
 template<int RANK>
     using DenseArrayT = blitz::Array<val_type,RANK>;
 typedef MakeDenseEigenT::SparseSetT SparseSetT;
+typedef spsparse::ConstUniverse<sparse_index_type, dense_index_type> ConstUniverseT;
 typedef MakeDenseEigenT::EigenSparseMatrixT EigenSparseMatrixT;
 typedef Eigen::Matrix<val_type, Eigen::Dynamic, Eigen::Dynamic> EigenDenseMatrixT;
 typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1> EigenColVectorT;
