@@ -49,6 +49,7 @@ Regular earth has
 
 #include <icebin/gridgen/GridGen_LonLat.hpp>
 #include <icebin/modele/global_ec.hpp>
+#include <icebin/ElevMask.hpp>
 
 using namespace std;
 using namespace ibmisc;
@@ -93,7 +94,8 @@ static int div_to_nearest(int n, int d) {
 
 
 // This parameter controls memory use.  Larger = more memory, smaller = more segments
-static int const chunk_size = 4000000;    // Not a hard limit
+#static int const chunk_size = 4000000;    // Not a hard limit
+static int const chunk_size = 4000000*6;    // Not a hard limit
 
 
 // ==========================================================
