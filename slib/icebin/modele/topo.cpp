@@ -1,6 +1,7 @@
-#include <ibmisc/linear/compressed.hpp>
-#include <icebin/modele/hntr.hpp>
+#include <ibmisc/linear/eigen.hpp>
 #include <icebin/ElevMask.hpp>
+#include <icebin/modele/hntr.hpp>
+#include <icebin/modele/grids.hpp>
 
 using namespace blitz;
 using namespace ibmisc;
@@ -110,22 +111,20 @@ EigenColVectorT compute_wAOm(
 class RawEOvEA {
 public:
     MakeDenseEigenT::AccumT ret;    // Final place for EOvEA
-    GCMRegridder_ModelE const *gcmA;
     blitz::Array<double,1> const &wEO_d;
     // Things obtained from gcmA
     unsigned int const nhc;    // gcmA->nhc()
-    IndexSet const indexingHCO;    // gcmA->gcmO->indexingHC
-    IndexSet const indexingHCA;    // gcmA->indexingHC
+    ibmisc::Indexing const indexingHCO;    // gcmA->gcmO->indexingHC
+    ibmisc::Indexing const indexingHCA;    // gcmA->indexingHC
 
 int n=0;
 
     RawEOvEA(
         MakeDenseEigenT::AccumT &&_ret,
-        GCMRegridder_ModelE const *_gcmA,
         blitz::Array<double,1> const &_wEO_d,
         unsigned int const _nhc,    // gcmA->nhc()
-        IndexSet const _indexingHCO,    // gcmA->gcmO->indexingHC
-        IndexSet const _indexingHCA)    // gcmA->indexingHC
+        ibmisc::Indexing const _indexingHCO,    // gcmA->gcmO->indexingHC
+        ibmisc::Indexing const _indexingHCA)    // gcmA->indexingHC
     : ret(std::move(_ret)), wEO_d(_wEO_d), nhc(_nhc),
         indexingHCO(_indexingHCO), indexingHCA(_indexingHCA) {}
 
@@ -190,8 +189,8 @@ SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
 blitz::Array<double,1> &wEO_d,            // == EOvI.wM.  Dense indexing.
 // Things obtained from gcmA
 unsigned int const nhc,    // gcmA->nhc()
-IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
-IndexSet const indexingHCA)    // gcmA->indexingHC
+ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC
+ibmisc::Indexing const indexingHCA)    // gcmA->indexingHC
 {
     // Call Hntr to generate AOvAA; and use that (above) to produce EOvEA
     Hntr hntr_AOvAA(17.17, hntrO, hntrA, 0);    // dimB=A,  dimA=O
@@ -213,7 +212,7 @@ EigenSparseMatrixT const &EOpvAOp,    // Unscaled
 SparseSetT const &dimEOp,
 SparseSetT const &dimAOp)
 {
-    ConstUniverse const_dimAOm({"dimAOm"}, {&dimAOm});
+    ConstUniverseT const_dimAOm({"dimAOm"}, {&dimAOm});
 
     // Convert to EOmvAOm by removing cells not in dimAOm
     TupleListT<2> EOmvAOm_tl;
@@ -246,8 +245,8 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     // Things obtained from gcmA
     HntrSpec const &hntrO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
     HntrSpec const &hntrA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
-    IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
-    IndexSet const indexingHCA,    // gcmA->indexingHC
+    ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC
+    ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
     blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
     blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
 
@@ -261,7 +260,7 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     unsigned int const nhc = indexingHCA[1].extent;
     unsigned long const nE = indexingHCA.extent();
 
-    ConstUniverse const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
+    ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
 
     SparseSetT &dimAAm(*dims[0]);
     SparseSetT &dimEAm(*dims[1]);
@@ -342,17 +341,6 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     return ret;
 }
 
-HntrSpec make_hntrA(HntrSpec const &hntrO)
-{
-    if ((hntrO.im % 2 != 0) || (hntrO.jm % 2 != 0)) (*icebin_error)(-1,
-        "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
-        hntrO.im, hntrO.jm);
-
-    // --------------------------
-    // Define Atmosphere grid to be exactly twice the Ocean grid
-    return HntrSpec(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
-}
-
 void make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
@@ -368,10 +356,10 @@ blitz::Array<double,2> const &zicetopOm2,
 // Things obtained from gcmA
 HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
 HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
-IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC   (must reflect local + global ECs)
-IndexSet const indexingHCA,    // gcmA->indexingHC
+ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC   (must reflect local + global ECs)
+ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
 std::vector<double> const &hcdefs,        // gcmA->hcdefs()
-std::vector<uint16_t> const &underice,    // gcmA->underice
+std::vector<uint16_t> const &underice_hc,    // gcmA->underice
 //
 double const eq_rad,
 EigenSparseMatrixT const &EOpvAOp,        // UNSCALED
@@ -391,8 +379,21 @@ blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,
 blitz::Array<uint16_t,3> &underice3)
 {
-    ConstUniverse const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
+    ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
 
+
+    Hntr hntr_AvO(17.17, hspecA, hspecO);
+
+    blitz::Array<double, 2> WTO(const_array(blitz::shape(hspecO.jm,hspecO.im), 1.0));
+    hntr_AvO.regrid(WTO, foceanOm2, foceanA2);
+    hntr_AvO.regrid(WTO, flakeOm2, flakeA2);
+    hntr_AvO.regrid(WTO, fgrndOm2, fgrndA2);
+    hntr_AvO.regrid(WTO, fgiceOm2, fgiceA2);
+    hntr_AvO.regrid(WTO, zatmoOm2, zatmoA2);
+    hntr_AvO.regrid(WTO, zlakeOm2, zlakeA2);
+    hntr_AvO.regrid(fgiceOm2, zicetopOm2, zicetopA2);
+
+    auto foceanOp(reshape1(foceanOp2));
     auto foceanOm(reshape1(foceanOm2));
     auto flakeOm(reshape1(flakeOm2));
     auto fgiceOm(reshape1(fgiceOm2));
@@ -405,22 +406,10 @@ blitz::Array<uint16_t,3> &underice3)
     auto fgiceA(reshape1(fgiceA2));
     auto zatmoA(reshape1(zatmoA2));
 
-
-    Hntr hntr_AvO(17.17, hspecA, hspecO);
-
-    blitz::Array<double, 2> WTO(const_array(blitz::shape(hspecO.jm,hspecO.im), 1.0));
-    hntr_AvO.regrid(WTO, foceanO2, foceanA2);
-    hntr_AvO.regrid(WTO, flakeO2, flakeA2);
-    hntr_AvO.regrid(WTO, fgrndO2, fgrndA2);
-    hntr_AvO.regrid(WTO, fgiceO2, fgiceA2);
-    hntr_AvO.regrid(WTO, zatmoO2, zatmoA2);
-    hntr_AvO.regrid(WTO, zlakeO2, zlakeA2);
-    hntr_AvO.regrid(fgiceO, zicetopO2, zicetopA2);
-
     // ================= Create fhc, elevE and underice
     int const nhc_icebin = hcdefs.size();
     int const nhc_gcm = 1 + nhc_icebin;
-    blitz::TinyVector<int,3> shapeE2(nhc_gcm, indexingHCA[1].extent);
+    blitz::TinyVector<int,2> shapeE2(nhc_gcm, indexingHCA[1].extent);
 
     // Initialize
     fhc3 = 0;
@@ -442,6 +431,8 @@ blitz::Array<uint16_t,3> &underice3)
     SparseSetT dimAAm,dimEAm;
     std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
         {&dimAAm, &dimEAm}, false, eq_rad,    // scale=false
+        hspecO, hspecA, indexingHCO, indexingHCA,
+        foceanOp, foceanOm,
         EOpvAOp, dimEOp, dimAOp, wAOp));
 
     for (auto ii=begin(*AAmvEAm->M); ii != end(*AAmvEAm->M); ++ii) {
@@ -467,7 +458,7 @@ blitz::Array<uint16_t,3> &underice3)
 
         int const _ihc = ihc;    // Get around bug in Blitz++
         fhcE2(ihc,iA) += ii->value() / AAmvEAm->wM(iA);    // AAmvEAm is not scaled
-        undericeE2(ihc,iA) = underice[ihc];    // No IceBin coupling here
+        undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
         elevE2(iA) = hcdefs[ihc];
     }
 
@@ -483,19 +474,6 @@ blitz::Array<uint16_t,3> &underice3)
         }
     }}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 }}    // naespace icebin::modele

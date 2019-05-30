@@ -434,8 +434,10 @@ void Hntr::regrid(
     }
 }
 
+/** Creates a HntrSpec for the Atmosphere grid by halving a HntrSpec
+for the Ocean grid.  Relies on this 2-to-1 relationship of ocean to
+atmosphere in ModelE. */
+extern HntrSpec make_hntrA(HntrSpec const &hntrO);
 
-
-}}
-
+}}    // namespace
 #endif    // guard

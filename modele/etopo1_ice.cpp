@@ -9,7 +9,7 @@
 
 using namespace ibmisc;
 using namespace icebin::modele;
-
+using namespace netCDF;
 
 const int16_t GREENLAND_VAL = 2;    // Used to mark Greenland in ZNGDC1-SeparateGreenland/FCONT1
 const int16_t MIN_LANDICE_THK = 50;    // Anything under this we call seasonal snow cover

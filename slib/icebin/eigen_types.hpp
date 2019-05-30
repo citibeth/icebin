@@ -1,7 +1,13 @@
 #ifndef ICEBIN_EIGEN_TYPES_HPP
 #define ICEBIN_EIGEN_TYPES_HPP
 
+#include <array>
 #include <spsparse/eigen.hpp>
+
+namespace ibmisc {
+namespace linear {
+    class Weighted_Compressed;
+}}
 
 namespace icebin {
 
@@ -24,6 +30,10 @@ typedef Eigen::Matrix<val_type, Eigen::Dynamic, 1> EigenColVectorT;
 typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic> EigenRowVectorT;
 typedef Eigen::DiagonalMatrix<val_type, Eigen::Dynamic> EigenDiagonalMatrixT;
 // -----------------------------------------
+
+EigenSparseMatrixT to_eigen_M(  // (generates in dense indexing)
+ibmisc::linear::Weighted_Compressed const &BvA,
+std::array<SparseSetT *,2> dims);
 
 }
 

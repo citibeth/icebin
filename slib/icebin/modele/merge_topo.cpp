@@ -1,4 +1,17 @@
-blitz::Array<double,1> get_elevmaskI(ElevMask<1> const &emI, bool include_ice, bool include_bedrock)
+#include <icebin/modele/merge_topo.hpp>
+#include <icebin/eigen_types.hpp>
+#include <ibmisc/linear/compressed.hpp>
+
+using namespace blitz;
+using namespace ibmisc;
+using namespace spsparse;
+
+static double const NaN = std::numeric_limits<double>::quiet_NaN();
+
+namespace icebin {
+namespace modele {
+
+static blitz::Array<double,1> get_elevmaskI(ElevMask<1> const &emI, bool include_ice, bool include_bedrock)
 {
     auto nI(emI.elev.extent(0));
 
@@ -20,6 +33,14 @@ blitz::Array<double,1> get_elevmaskI(ElevMask<1> const &emI, bool include_ice, b
     }
     return elevmaskI;
 }
+
+class GetSheetElevO {
+public:
+    TmpAlloc _tmp;
+    SparseSetT dimO;
+    blitz::Array<double,1> wO;        // Ice (or land) covered area of each gridcell [m^2]
+    blitz::Array<double,1> elevO;     // Elevation [m]
+};
 
 GetSheetElevO get_sheet_elevO(
 GCMRegridder *gcmO,
@@ -62,23 +83,23 @@ bool include_bedrock)
 }
 
 void merge_topoO(
-    // ------ TOPOO arrays, originally with just global ice
-    // Ice model viewpoint (fractional ocean cells)
-    blitz::Array<double,2> &foceanOp2,    // Fractional FOCEAN
-    blitz::Array<double,2> &fgiceOp2,
-    blitz::Array<double,2> &zatmoOp2,
-    // ModelE viewpoint (rounded ocean cells)
-    blitz::Array<double,2> &foceanOm2,     // Rounded FOCEAN
-    blitz::Array<double,2> &fgrndOm2,
-    blitz::Array<double,2> &fgiceOm2,
-    blitz::Array<double,2> &zatmoOm2,
-    // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
-    blitz::Array<double,2> &zicetopO2,
-    // ------ Local ice to merge in...
-    GCMRegridder *gcmO,
-    RegridParams const &paramsA,
-    std::vector<ElevMask<1>> const &elevmasks,    // elevation and cover types for each ice sheet
-    double const eq_rad)    // Radius of the earth
+// ------ TOPOO arrays, originally with just global ice
+// Ice model viewpoint (fractional ocean cells)
+blitz::Array<double,2> &foceanOp2,    // Fractional FOCEAN
+blitz::Array<double,2> &fgiceOp2,
+blitz::Array<double,2> &zatmoOp2,
+// ModelE viewpoint (rounded ocean cells)
+blitz::Array<double,2> &foceanOm2,     // Rounded FOCEAN
+blitz::Array<double,2> &fgrndOm2,
+blitz::Array<double,2> &fgiceOm2,
+blitz::Array<double,2> &zatmoOm2,
+// Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
+blitz::Array<double,2> &zicetopO2,
+// ------ Local ice to merge in...
+GCMRegridder *gcmO,
+RegridParams const &paramsA,
+std::vector<ElevMask<1>> const &elevmasks,    // elevation and cover types for each ice sheet
+double const eq_rad)    // Radius of the earth
 {
 
     auto foceanOp(reshape1(foceanOp2));
@@ -287,3 +308,4 @@ bool include_bedrock)    // true if non-ice covered areas of land should also be
     EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
 }
 
+}}    // namespace

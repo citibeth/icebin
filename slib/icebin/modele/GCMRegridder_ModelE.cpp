@@ -1,10 +1,10 @@
+#include <icebin/modele/topo.hpp>
 #include <spsparse/eigen.hpp>
 #include <ibmisc/stdio.hpp>
 #include <ibmisc/linear/compressed.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/gridgen/GridGen_LonLat.hpp>
-#include <icebin/modele/merge_topo.hpp>
 
 using namespace icebin;
 using namespace ibmisc;

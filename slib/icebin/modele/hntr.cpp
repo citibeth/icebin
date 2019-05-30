@@ -229,6 +229,17 @@ void Hntr::mean_polar_matrix()
 
 
 // -------------------------------------------------------------
+HntrSpec make_hntrA(HntrSpec const &hntrO)
+{
+    if ((hntrO.im % 2 != 0) || (hntrO.jm % 2 != 0)) (*icebin_error)(-1,
+        "Ocean grid must have even number of gridcells for im and jm (vs. %d %d)",
+        hntrO.im, hntrO.jm);
+
+    // --------------------------
+    // Define Atmosphere grid to be exactly twice the Ocean grid
+    return HntrSpec(hntrO.im/2, hntrO.jm/2, hntrO.offi*0.5, hntrO.dlat*2.);
+}
+
 
 
 }}

@@ -40,6 +40,7 @@ set(icebin_SOURCES
     icebin/GCMRegridder.cpp
     icebin/IceRegridder_L0.cpp
     icebin/RegridMatrices_Dynamic.cpp
+    icebin/eigen_types.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
 )
 

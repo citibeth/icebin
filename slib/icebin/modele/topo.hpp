@@ -101,8 +101,8 @@ SparseSetT const *dimAO,            // Used to clip in Hntr::matrix()
 blitz::Array<double,1> &wEO_d,            // == EOvI.wM.  Dense indexing.
 // Things obtained from gcmA
 unsigned int const nhc,    // gcmA->nhc()
-IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC
-IndexSet const indexingHCA);    // gcmA->indexingHC
+ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC
+ibmisc::Indexing const indexingHCA);    // gcmA->indexingHC
 
 
 
@@ -137,8 +137,6 @@ SparseSetT &dimAOp,
 blitz::Array<double,1> const &wAOp);
 
 
-extern HntrSpec make_hntrA(HntrSpec const &hntrO);
-
 extern void make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
@@ -154,8 +152,8 @@ blitz::Array<double,2> const &zicetopOm2,
 // Things obtained from gcmA
 HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
 HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
-IndexSet const indexingHCO,    // gcmA->gcmO->indexingHC   (must reflect local + global ECs)
-IndexSet const indexingHCA,    // gcmA->indexingHC
+ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC   (must reflect local + global ECs)
+ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
 std::vector<double> const &hcdefs,        // gcmA->hcdefs()
 std::vector<uint16_t> const &underice,    // gcmA->underice
 //

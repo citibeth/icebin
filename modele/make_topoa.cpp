@@ -5,13 +5,15 @@
 #include <ibmisc/memory.hpp>
 #include <ibmisc/blitz.hpp>
 #include <ibmisc/filesystem.hpp>
-#include <ibmisc/linear/linear.hpp>
+#include <ibmisc/linear/compressed.hpp>
 #include <everytrace.h>
 
 #include <icebin/modele/grids.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/global_ec.hpp>
+#include <icebin/modele/topo.hpp>
 
+using namespace netCDF;
 using namespace ibmisc;
 using namespace icebin;
 using namespace icebin::modele;
@@ -99,33 +101,6 @@ ParseArgs::ParseArgs(int argc, char **argv)
 }
 
 
-EigenSparseMatrixT to_eigen_M(  // (generates in dense indexing)
-linear::Weighted_Compressed const &BvA,
-std::array<SparseSetT *,2> dims)
-{
-    // ======================= Create a merged EOpvAOp of base ice and ice sheets
-    // (and then call through to _compute_AAmvEAm)
-
-    // Accumulator for merged M (unscaled)
-    MakeDenseEigenT BvA_m(
-        {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
-        dims, '.');
-
-    // Copy elements to accumulator matrix
-    for (auto ii(BvA.M.generator()); ++ii; ) {
-        BvA_m.M.add(ii->index(), ii->value());
-    }
-
-    // Set overall size
-    std::array<long,2> BvA_shape(BvA.shape());
-    dims[0]->set_sparse_extent(BvA_shape[0]);
-    dims[1]->set_sparse_extent(BvA_shape[1]);
-
-    // Compute M and wAOp
-    return BvA_m.to_eigen();
-}
-
-
 int main(int argc, char **argv)
 {
     everytrace_init();
@@ -139,21 +114,23 @@ int main(int argc, char **argv)
     // =========== Read metadata and EOpvAOp matrix
     global_ec::Metadata metaO;
     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
-    {NcIO ncio(args.global_ecO, 'r');
+    SparseSetT dimEOp, dimAOp;
+    {NcIO ncio(args.global_ecO_fname, 'r');
     linear::Weighted_Compressed EOpvAOp_s;    // sparse indexing
         metaO.ncio(ncio);
 
         EOpvAOp_s.ncio(ncio, "EvA");
-        EOpvAOp.reset(new EigenSparseMatrixT(to_eigen_M(EOpvAOp_s)));
+        EOpvAOp.reset(new EigenSparseMatrixT(
+            to_eigen_M(EOpvAOp_s, {&dimEOp, &dimAOp})));
     }
 
     HntrSpec &hspecO(metaO.hspecA);
     HntrSpec hspecA(make_hntrA(hspecO));
     Indexing &indexingHCO(metaO.indexingHC);
-    Indexing indexingHCA({"A", "HC"}, {0,0}, {hspecA.size(), indexingHCO[1].extent}, {1,0}),
+    Indexing indexingHCA({"A", "HC"}, {0,0}, {hspecA.size(), indexingHCO[1].extent}, {1,0});
 
     // Create the AvO regridder (but not matrix)
-    Hntr hntr_AvO(17.17, meta.hspecA, hspecO);
+    Hntr hntr_AvO(17.17, hspecA, hspecO);
 
     // ============= Define input variables
     ibmisc::ArrayBundle<double,2> topoo;
@@ -201,7 +178,7 @@ int main(int argc, char **argv)
         std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 
         // Set shape
-        d.meta.shape = std::array<int,2>{meta.hspecA.jm, mta.hspecA.im};
+        d.meta.shape = std::array<int,2>{hspecA.jm, hspecA.im};
     }
 
     // Add FOCEANF, which is in TOPOO but not TOPOA.
@@ -217,7 +194,7 @@ int main(int argc, char **argv)
 
         // Read from topoO file, and allocate resulting arrays.
         topoo.ncio_alloc(topoo_nc, {}, "", "double",
-            get_or_add_dims(topoo_nc, {"jm", "im"}));
+            get_or_add_dims(topoo_nc, {"jm", "im"}, {hspecO.jm, hspecO.im}));
     }
 
 
@@ -241,27 +218,27 @@ int main(int argc, char **argv)
         "description", "Elevation of each elevation class",
         "units", "1"
     }));
-    ibmisc::ArrayBundle<double,3> topoa3_i;
+    ibmisc::ArrayBundle<uint16_t,3> topoa3_i;
     auto &underice(topoa3_i.add("underice", {
         "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
     }));
 
 
-    int const nhc_gcm = meta.hcdefs.
-    std::array<int,3> shape3(nhc_gcm, metaO.indexingA[1].extent, meta.indexingA[0].extent);
-    topoa3.allocate(shape3);
-    topoa3_i.allocate(shape3);
+    int const nhc_gcm = (int)metaO.hcdefs.size();
+    std::array<int,3> shape3 {nhc_gcm, hspecA.jm, hspecA.im};
+    topoa3.allocate(shape3, {"nhc", "jm", "im"});
+    topoa3_i.allocate(shape3, {"nhc", "jm", "im"});
 
 
     // ---------------- Create TOPOA in memory
-    std::vector<uint16_t> underice;
-    for (size_t i=0; i<meta.hcdefs.size(); ++i) underice.push_back(UI_NOTHING);
+    std::vector<uint16_t> underice_hc;
+    for (size_t i=0; i<metaO.hcdefs.size(); ++i) underice_hc.push_back(UI_NOTHING);
     make_topoA(
         foceanOp, foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
-        hspecO, hspecA, indexingHCO, indexingHCA, meta.hcdefs, underice,
-        eq_rad, EOpvAOp, dimeEOp, dimAOp,
+        hspecO, hspecA, indexingHCO, indexingHCA, metaO.hcdefs, underice_hc,
+        args.eq_rad, *EOpvAOp, dimEOp, dimAOp,
         foceanA, flakeA, fgrndA, fgiceA, zatmoA, zlakeA, zicetopA,
-        fhc, elev, underice);
+        fhc, elevE, underice);
 
     // Write extended TOPOA file
     {NcIO topoa_nc(args.topoa_fname, 'w');
@@ -271,7 +248,7 @@ int main(int argc, char **argv)
         get_or_put_att(info, topoa_nc.rw, "segments", sval);
 
         // Write topoA arrays
-        auto jm_im(get_or_add_dims(topoa_nc, {"jm", "im"}));
+        auto jm_im(get_or_add_dims(topoa_nc, {"jm", "im"}, {hspecA.jm, hspecA.im}));
         topoa.ncio(topoa_nc, {}, "", "double", jm_im);
         topoa3.ncio(topoa_nc, {}, "", "double", jm_im);
         topoa3_i.ncio(topoa_nc, {}, "", "ushort", jm_im);

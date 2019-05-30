@@ -1,3 +1,6 @@
+#ifndef ICEBIN_ELEVMASK_HPP
+#define ICEBIN_ELEVMASK_HPP
+
 #include <blitz/array.h>
 
 namespace icebin {
@@ -22,4 +25,5 @@ struct ElevMask {
     : elev(_elev), mask(_mask) {}
 };
 
-}
+}    // namespace
+#endif    // guard
