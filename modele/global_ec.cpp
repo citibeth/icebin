@@ -96,7 +96,7 @@ static int div_to_nearest(int n, int d) {
 
 // This parameter controls memory use.  Larger = more memory, smaller = more segments
 // static int const chunk_size = 4000000;    // Not a hard limit
-static int const chunk_size = 4000000*6;    // Not a hard limit
+static int const chunk_size = 4000000*3;    // Not a hard limit
 
 
 // ==========================================================
