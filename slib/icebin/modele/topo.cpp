@@ -476,4 +476,4 @@ blitz::Array<uint16_t,3> &underice3)
 }
 
 
-}}    // naespace icebin::modele
+}}    // namespace icebin::modele
