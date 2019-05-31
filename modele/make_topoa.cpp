@@ -172,13 +172,15 @@ int main(int argc, char **argv)
 
 
     // Copy TOPOO to TOPOA spec, downcasing variable names
-    ibmisc::ArrayBundle<double,2> topoa(topoo);
-    for (auto &d : topoa.data) {
-        std::string &name(d.meta.name);
+    ibmisc::ArrayBundle<double,2> topoa;
+    for (auto const &d : topoo.data) {
+        std::string name(d.meta.name);
         std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-
-        // Set shape
-        d.meta.shape = std::array<int,2>{hspecA.jm, hspecA.im};
+        topoa.add(ibmisc::ArrayBundle<double,2>::Data(
+            name, blitz::Array<double,2>(),
+            std::array<int,2>{hspecA.jm, hspecA.im},
+            d.meta.sdims,
+            std::vector<std::pair<std::string, std::string>>(d.meta.attr)));
     }
 
     // Add FOCEANF, which is in TOPOO but not TOPOA.
