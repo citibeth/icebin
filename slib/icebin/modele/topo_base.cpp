@@ -2,7 +2,7 @@
 #include <ibmisc/fortranio.hpp>
 #include <ibmisc/ncbulk.hpp>
 #include <icebin/error.hpp>
-#include <icebin/modele/make_topoo.hpp>
+#include <icebin/modele/topo_base.hpp>
 #include <icebin/modele/grids.hpp>
 
 using namespace blitz;

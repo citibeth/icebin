@@ -1,6 +1,6 @@
 #include <iostream>
 #include <tclap/CmdLine.h>
-#include <icebin/modele/make_topoo.hpp>
+#include <icebin/modele/topo_base.hpp>
 #include <ibmisc/memory.hpp>
 #include <everytrace.h>
 
@@ -56,7 +56,6 @@ int main(int argc, char** argv)
     everytrace_init();
     ParseArgs args(argc, argv);
 
-//    std::string et1mfile("etopo1_ice_g1m.nc");
     auto mto(MakeTopoO(EnvSearchPath("MODELE_FILE_PATH"), {
         "FGICE1m", args.et1mfile, "FGICE1m",
         "ZICETOP1m", args.et1mfile, "ZICETOP1m",
