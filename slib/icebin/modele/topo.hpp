@@ -23,47 +23,10 @@ NOTES:
 namespace icebin {
 namespace modele {
 
-
-
-
-/** Diagonal matrix converts wOm <- wOp, weight of the elevation
-classes in the two different systems (ModelE (m) vs. IceBin (p)).
-produces a SCALED matrix.
-
-NOTES:
- 1. Meant to be used with class MakeDenseEigenT.
-
- 2. focean_m is fixed over the course of a run, since ModelE can not
-    change its ocean mask.
-
- 3. Matrix will be diagonal in sparse indexing.
-
- 4. This is a SCALED matrix, not unscaled; it gives no information on
-    the size ("weight") of the grid cells.  It is intended to be used
-    only to convert weight vectors between what ModelE vs. the ice
-    model sees.
-
-@param foceanAOm
-   Ocean surface fraction array (FOCEAN), as seen by
-   ModelE.  On Ocean grid, spase indexing.
-
-@param foceanAOp
-   Ocean surface fraction array (FOCEAN), as seen by
-   ice model.  On Ocean grid, spase indexing.
-@param invert
-   By default, this produces the matrix AOmvAOp, which converts
-   quantities [X m-2] in AOp to quantities [X m-2] in AOm.  In ordert
-   to convert cell norms (weights) from AOm<-AOp, one should use
-   invert='-', which produces the inverse matrix of invet='+'.
-*/
-extern void scaled_AOmvAOp(
-MakeDenseEigenT::AccumT &&ret,        // {dimAOm, dimAOp}
-blitz::Array<double,1> const &foceanAOp,    // sparse indexing, 0-based
-blitz::Array<double,1> const &foceanAOm,    // sparse indexing, 0-based
-char invert = '+');
-
-
-
+/** Encodes relationship between number of ECs in ice model, and
+number of ECs in GCM.  GCM has an extra for the "sealand" EC. */
+inline int get_nhc_gcm(int nhc_ice)
+    { return nhc_ice + 1; }
 
 extern EigenColVectorT compute_wAOm(
 blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp

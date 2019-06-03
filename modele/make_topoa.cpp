@@ -7,6 +7,7 @@
 #include <ibmisc/filesystem.hpp>
 #include <ibmisc/linear/compressed.hpp>
 #include <everytrace.h>
+#include <boost/filesystem.hpp>
 
 #include <icebin/modele/grids.hpp>
 #include <icebin/modele/hntr.hpp>
@@ -107,10 +108,6 @@ int main(int argc, char **argv)
     ParseArgs args(argc, argv);
     EnvSearchPath files("MODELE_FILE_PATH");
 
-    // Open output file
-    NcIO topoa_nc(args.topoa_fname, 'w');
-
-
     // =========== Read metadata and EOpvAOp matrix
     global_ec::Metadata metaO;
     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
@@ -170,8 +167,7 @@ int main(int argc, char **argv)
         "sources", "ETOPO2 1Qx1",
     }));
 
-
-    // Copy TOPOO to TOPOA spec, downcasing variable names
+    // Copy TOPOO to TOPOA spec, downcasing variable names and setting new size
     ibmisc::ArrayBundle<double,2> topoa;
     for (auto const &d : topoo.data) {
         std::string name(d.meta.name);
@@ -225,8 +221,7 @@ int main(int argc, char **argv)
         "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
     }));
 
-
-    int const nhc_gcm = (int)metaO.hcdefs.size();
+    int const nhc_gcm = get_nhc_gcm(metaO.hcdefs.size());
     std::array<int,3> shape3 {nhc_gcm, hspecA.jm, hspecA.im};
     topoa3.allocate(shape3, {"nhc", "jm", "im"});
     topoa3_i.allocate(shape3, {"nhc", "jm", "im"});
@@ -244,7 +239,6 @@ int main(int argc, char **argv)
 
     // Write extended TOPOA file
     {NcIO topoa_nc(args.topoa_fname, 'w');
-
         NcVar info(get_or_add_var(topoa_nc, "info", "int", {}));
         std::string sval = "ec,land";
         get_or_put_att(info, topoa_nc.rw, "segments", sval);
@@ -252,8 +246,9 @@ int main(int argc, char **argv)
         // Write topoA arrays
         auto jm_im(get_or_add_dims(topoa_nc, {"jm", "im"}, {hspecA.jm, hspecA.im}));
         topoa.ncio(topoa_nc, {}, "", "double", jm_im);
-        topoa3.ncio(topoa_nc, {}, "", "double", jm_im);
-        topoa3_i.ncio(topoa_nc, {}, "", "ushort", jm_im);
+        auto nhc_jm_im(get_or_add_dims(topoa_nc, {"nhc", "jm", "im"}, {nhc_gcm, hspecA.jm, hspecA.im}));
+        topoa3.ncio(topoa_nc, {}, "", "double", nhc_jm_im);
+        topoa3_i.ncio(topoa_nc, {}, "", "ushort", nhc_jm_im);
     }
 
     return 0;

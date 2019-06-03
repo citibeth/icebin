@@ -1,5 +1,6 @@
 #include <ibmisc/linear/eigen.hpp>
 #include <icebin/ElevMask.hpp>
+#include <icebin/modele/topo.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/grids.hpp>
 
@@ -408,8 +409,9 @@ blitz::Array<uint16_t,3> &underice3)
 
     // ================= Create fhc, elevE and underice
     int const nhc_icebin = hcdefs.size();
-    int const nhc_gcm = 1 + nhc_icebin;
-    blitz::TinyVector<int,2> shapeE2(nhc_gcm, indexingHCA[1].extent);
+    int const nhc_gcm = get_nhc_gcm(nhc_icebin);
+    auto const nA = indexingHCA[0].extent;
+    blitz::TinyVector<int,2> shapeE2(nhc_gcm, nA);
 
     // Initialize
     fhc3 = 0;
@@ -459,7 +461,7 @@ blitz::Array<uint16_t,3> &underice3)
         int const _ihc = ihc;    // Get around bug in Blitz++
         fhcE2(ihc,iA) += ii->value() / AAmvEAm->wM(iA);    // AAmvEAm is not scaled
         undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
-        elevE2(iA) = hcdefs[ihc];
+        elevE2(ihc, iA) = hcdefs[ihc];
     }
 
     // ------------ Segment 1: land part of sealand

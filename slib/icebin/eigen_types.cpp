@@ -17,10 +17,11 @@ std::array<SparseSetT *,2> dims)
     MakeDenseEigenT BvA_m(
         {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
         dims, '.');
+    auto BvA_accum(BvA_m.accum());
 
     // Copy elements to accumulator matrix
     for (auto ii(BvA.M.generator()); ++ii; ) {
-        BvA_m.M.add(ii->index(), ii->value());
+        BvA_accum.add({ii->index(0), ii->index(1)}, ii->value());
     }
 
     // Set overall size
