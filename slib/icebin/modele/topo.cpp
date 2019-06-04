@@ -419,7 +419,7 @@ blitz::Array<uint16_t,3> &underice3)
     underice3 = 0;    // Elevation grid cell unused
 
     // ------------ Segment 0: Elevation Classes
-    printf("Segment 2: Elevation Classes\n");
+    printf("Segment 0: Elevation Classes\n");
     blitz::Array<double,2> fhcE2(reshape<double,3,2>(fhc3, shapeE2));
     auto elevE2(reshape<double,3,2>(elevE3, shapeE2));
     auto undericeE2(reshape<uint16_t,3,2>(underice3, shapeE2));
@@ -459,7 +459,7 @@ blitz::Array<uint16_t,3> &underice3)
 //if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, values(i));
 
         int const _ihc = ihc;    // Get around bug in Blitz++
-        fhcE2(ihc,iA) += ii->value() / AAmvEAm->wM(iA);    // AAmvEAm is not scaled
+        fhcE2(ihc,iA) += ii->value() / AAmvEAm->wM(iA_d);    // AAmvEAm is not scaled
         undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
         elevE2(ihc, iA) = hcdefs[ihc];
     }
