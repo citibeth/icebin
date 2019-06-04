@@ -432,7 +432,7 @@ blitz::Array<uint16_t,3> &underice3)
     auto wAOp(sum(EOpvAOp, 1, '+'));
     SparseSetT dimAAm,dimEAm;
     std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
-        {&dimAAm, &dimEAm}, false, eq_rad,    // scale=false
+        {&dimAAm, &dimEAm}, true, eq_rad,    // scale=true
         hspecO, hspecA, indexingHCO, indexingHCA,
         foceanOp, foceanOm,
         EOpvAOp, dimEOp, dimAOp, wAOp));
@@ -459,7 +459,7 @@ blitz::Array<uint16_t,3> &underice3)
 //if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, values(i));
 
         int const _ihc = ihc;    // Get around bug in Blitz++
-        fhcE2(ihc,iA) += ii->value() / AAmvEAm->wM(iA_d);    // AAmvEAm is not scaled
+        fhcE2(ihc,iA) += ii->value();
         undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
         elevE2(ihc, iA) = hcdefs[ihc];
     }
