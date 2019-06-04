@@ -25,6 +25,7 @@ std::array<std::string,2> parse_spec(std::string const &spec)
 }
 
 struct ParseArgs {
+    bool scale;
     // Names of matrices to generate
     std::vector<std::array<std::string,2>> matrix_specs = vector<array<string,2>> {
         {"I","E"}, {"E","I"},
@@ -49,12 +50,17 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "Comma-separated names of matrices to generate, no spaces",
             false, "AvI,EvI,IvE,IvA,AvE", "matrix names", cmd);
 
+        TCLAP::ValueArg<bool> scale_a("s", "scale",
+            "Scale the matrix when joining?",
+            false, false, "scale", cmd);
+
         TCLAP::UnlabeledMultiArg<std::string> ifnames_a("merge-files",
             "Files with sub-matrices to merge together",
             true, "filenames", cmd);
 
         cmd.parse(argc, argv);
 
+        scale = scale_a.getValue();
         if (matrix_names_a.getValue() != "") {
             matrix_specs.clear();
             std::vector<std::string> matrix_names = split<std::string>(matrix_names_a.getValue(), ",");
@@ -89,7 +95,8 @@ void combine_chunks(
     std::vector<std::string> const &ifnames,    // Names of input chunks
     std::string const &ofname,
     char ofmode,    // 'w' or 'a' for write mode of output file
-    std::array<std::string,2> const &sgrids)    // {"B", "A"} --> matrix BvA
+    std::array<std::string,2> const &sgrids,    // {"B", "A"} --> matrix BvA
+    bool scale)
 {
     printf("======== BEGIN combine_chunks(%sv%s)\n", sgrids[0].c_str(), sgrids[1].c_str());
 
@@ -200,7 +207,11 @@ void combine_chunks(
             for (int i=0; i<values_d.extent(0); ++i) {
                 int const iB_s = dimB(indices_d(i,0));
                 int const iA_s = dimA(indices_d(i,1));
-                M.add({iB_s, iA_s}, values_d(i) * sM_s(iB_s));
+                if (scale) {
+                    M.add({iB_s, iA_s}, values_d(i) * sM_s(iB_s));
+                } else {
+                    M.add({iB_s, iA_s}, values_d(i));
+                }
             }
 
             /** Check that AvE is local */
@@ -249,7 +260,7 @@ int main(int argc, char **argv)
 
     char ofmode = 'w';
     for (auto const &sgrids : args.matrix_specs) {
-        combine_chunks(args.ifnames, ofname, ofmode, sgrids);
+        combine_chunks(args.ifnames, ofname, ofmode, sgrids, args.scale);
         ofmode = 'a';
     }
 
