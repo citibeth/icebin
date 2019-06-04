@@ -110,7 +110,7 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
 
         if (!std::isnan(elevmaskI(iI))) {
             // This cell not masked: look up elevation point as usual
-            double elevation = std::max(elevmaskI(iI), 0.0);
+            double const elevation = std::max(elevmaskI(iI), 0.0);
 
             // Interpolate in height points
             switch(interp_style.index()) {

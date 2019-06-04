@@ -58,7 +58,7 @@ void GCMRegridder_Standard::init(
     AbbrGrid &&_agridA,
 //    std::unique_ptr<Grid> &&_gridA,
 //  ibmisc::Domain<int> &&_domainA,     // Tells us which cells in gridA to keep...
-    std::vector<double> &&_hcdefs,  // [nhc]
+    std::vector<double> &&hcdefs,  // [nhc]
     ibmisc::Indexing &&_indexingHC,
     bool _correctA)
 {
@@ -66,7 +66,7 @@ void GCMRegridder_Standard::init(
 //    fgridA = std::move(_gridA);
 //    agridA = AbbrGrid(*fgridA);
 //  domainA = std::move(_domainA);
-    this->_hcdefs = std::move(_hcdefs);
+    this->_hcdefs = std::move(hcdefs);
     indexingHC = std::move(_indexingHC);
     correctA = _correctA;
 
