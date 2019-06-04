@@ -470,7 +470,7 @@ blitz::Array<uint16_t,3> &underice3)
     for (int j=0; j<hspecA.jm; ++j) {
     for (int i=0; i<hspecA.im; ++i) {
         if (fgiceA(j,i) > 0) {
-            fhc3(ec_base, j,i) = 1e-30;
+            fhc3(ec_base, j,i) = (fgiceA2(j,i) == 0 ? 0 : 1e-30);
             elevE3(ec_base, j,i) = zicetopA2(j,i);
             underice3(ec_base, j,i) = UI_NOTHING;
         }
