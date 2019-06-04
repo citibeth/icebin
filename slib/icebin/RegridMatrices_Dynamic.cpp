@@ -247,11 +247,11 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_EvA(IceRegridder const *r
     MakeDenseEigenT GvAp_m(
         A.GvAp,
         {SparsifyTransform::ADD_DENSE},
-        {dimG, dimA}, '.');
+        {dimG, dimA}, '.', false);   // include_zero=false
     MakeDenseEigenT EpvG_m(
         E.GvAp,
         {SparsifyTransform::ADD_DENSE},
-        {dimG, dimE}, 'T');
+        {dimG, dimE}, 'T', false);    // include_zero=false
 
     // ----- Convert to Eigen and multiply
     auto GvAp(GvAp_m.to_eigen());
