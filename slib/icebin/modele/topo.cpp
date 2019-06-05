@@ -1,4 +1,5 @@
 #include <ibmisc/linear/eigen.hpp>
+#include <ibmisc/stdio.hpp>
 #include <icebin/ElevMask.hpp>
 #include <icebin/modele/topo.hpp>
 #include <icebin/modele/hntr.hpp>
@@ -342,7 +343,7 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     return ret;
 }
 
-void make_topoA(
+std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
 blitz::Array<double,2> const &foceanOp2,
@@ -456,8 +457,6 @@ blitz::Array<uint16_t,3> &underice3)
         if (iA < 0 || iA >= shapeE2(1)) (*icebin_error)(-1,
             "iA out of range [0,%d): %d", shapeE2(1), iA);
 
-//if (values(i) < 0 || values(i) >= 1.) printf("AvE(%d, ihc=%d) = %g\n", iA, ihc, values(i));
-
         int const _ihc = ihc;    // Get around bug in Blitz++
         fhcE2(ihc,iA) += ii->value();
         undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
@@ -475,6 +474,27 @@ blitz::Array<uint16_t,3> &underice3)
             underice3(ec_base, j,i) = UI_NOTHING;
         }
     }}
+
+
+    // ==================================================
+    // Sanity Check the Result
+    std::vector<std::string> errors;
+    for (int j=0; j<hspecA.jm; ++j) {
+    for (int i=0; i<hspecA.im; ++i) {
+        // ----------- Land fractions must add up to 1
+        double const all_frac = foceanA2(j,i) + fgrndA2(j,i) + flakeA2(j,i) + fgiceA2(j,i);
+        if (std::abs(all_frac-1.0) > 1.e-13) errors.push_back(
+            ibmisc::strprintf("(%d, %d): FOCEAN(%g) + FGRND(%g) + FLAKE(%g) + FGICE(%g)  = %g",
+            i+1,j+1, foceanA2(j,i), fgrndA2(j,i), flakeA2(j,i), fgiceA2(j,i), all_frac));
+
+        // ---------- FHC must add up to 1
+        double all_fhc = 0;
+        for (int ihc=0; ihc<nhc_gcm; ++ihc) all_fhc += fhc3(ihc,j,i);
+        if (all_fhc != 0 && std::abs(all_fhc-1.0) > 1.e-13) errors.push_back(
+            ibmisc::strprintf("(%d, %d): sum(FHC) = %g", i+1,j+1, all_fhc));
+    }}
+
+    return errors;
 }
 
 

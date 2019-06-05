@@ -230,12 +230,15 @@ int main(int argc, char **argv)
     // ---------------- Create TOPOA in memory
     std::vector<uint16_t> underice_hc;
     for (size_t i=0; i<metaO.hcdefs.size(); ++i) underice_hc.push_back(UI_NOTHING);
-    make_topoA(
+    std::vector<std::string> errors(make_topoA(
         foceanOp, foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
         hspecO, hspecA, indexingHCO, indexingHCA, metaO.hcdefs, underice_hc,
         args.eq_rad, *EOpvAOp, dimEOp, dimAOp,
         foceanA, flakeA, fgrndA, fgiceA, zatmoA, zlakeA, zicetopA,
-        fhc, elevE, underice);
+        fhc, elevE, underice));
+
+    // Print sanity check errors to STDERR
+    for (std::string const &err : errors) fprintf(stderr, "%s\n", err.c_str());
 
     // Write extended TOPOA file
     {NcIO topoa_nc(args.topoa_fname, 'w');

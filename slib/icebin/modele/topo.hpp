@@ -99,8 +99,10 @@ SparseSetT &dimEOp,
 SparseSetT &dimAOp,
 blitz::Array<double,1> const &wAOp);
 
-
-extern void make_topoA(
+/**
+@return A textual list of errors found in the sanity check.
+*/
+std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
 blitz::Array<double,2> const &foceanOp2,
