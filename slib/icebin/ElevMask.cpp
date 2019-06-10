@@ -26,22 +26,20 @@ void read_elevmask_pism(
     blitz::Array<double,1> &emI_land,
     blitz::Array<double,1> &emI_ice)
 {
-    {NcIO ncio(fname, 'r');
-        netCDF::NcVar nc_topg = ncio.nc->getVar("topg");
-        std::vector<NamedDim> ndims(named_dims(nc_topg));
-    }
+    NcIO ncio(fname, 'r');
 
-    // Read the file
+    netCDF::NcVar nc_topg = ncio.nc->getVar("topg");
+    std::vector<NamedDim> ndims(named_dims(nc_topg));
+
+    // Allocate arrays 
     blitz::Array<double,2> topg(ndims[1].extent, ndims[2].extent);
     blitz::Array<double,2> thk(ndims[1].extent, ndims[2].extent);
     blitz::Array<int8_t,2> mask(ndims[1].extent, ndims[2].extent);
 
-    /* Read it in */
-    {NcIO ncio(fname, 'r');
-        ncio_blitz_partial(ncio, topg, "topg", "double", {}, {itime,0,0}, {1,2});
-        ncio_blitz_partial(ncio, thk, "thk", "double", {}, {itime,0,0}, {1,2});
-        ncio_blitz_partial(ncio, mask, "mask", "double", {}, {itime,0,0}, {1,2});
-    }
+    // Read into allocated arrays
+    ncio_blitz_partial(ncio, topg, "topg", "double", {}, {itime,0,0}, {1,2});
+    ncio_blitz_partial(ncio, thk, "thk", "double", {}, {itime,0,0}, {1,2});
+    ncio_blitz_partial(ncio, mask, "mask", "double", {}, {itime,0,0}, {1,2});
 
     // Move to 1D
     auto topg1(reshape1(topg));
