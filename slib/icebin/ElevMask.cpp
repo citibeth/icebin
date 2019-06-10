@@ -22,18 +22,25 @@ static double const NaN = std::numeric_limits<double>::quiet_NaN();
 @param emI_ice Elevation-mask for just ice-covered areas */
 void read_elevmask_pism(
     std::string const &fname,
+    int const itime,    // Value of PISM time dimension to read
     blitz::Array<double,1> &emI_land,
     blitz::Array<double,1> &emI_ice)
 {
-    // Variables to be used from the PISM file.
-    blitz::Array<double,2> topg, thk;
-    blitz::Array<char,2> mask;
+    {NcIO ncio(fname, 'r');
+        netCDF::NcVar nc_topg = ncio.nc->getVar("topg");
+        std::vector<NamedDim> ndims(named_dims(nc_topg));
+    }
+
+    // Read the file
+    blitz::Array<double,2> topg(ndims[1].extent, ndims[2].extent);
+    blitz::Array<double,2> thk(ndims[1].extent, ndims[2].extent);
+    blitz::Array<int8_t,2> mask(ndims[1].extent, ndims[2].extent);
 
     /* Read it in */
     {NcIO ncio(fname, 'r');
-        ncio_blitz_alloc(ncio, topg, "topg", "double");
-        ncio_blitz_alloc(ncio, thk, "thk", "double");
-        ncio_blitz_alloc(ncio, mask, "mask", "");
+        ncio_blitz_partial(ncio, topg, "topg", "double", {}, {itime,0,0}, {1,2});
+        ncio_blitz_partial(ncio, thk, "thk", "double", {}, {itime,0,0}, {1,2});
+        ncio_blitz_partial(ncio, mask, "mask", "double", {}, {itime,0,0}, {1,2});
     }
 
     // Move to 1D
@@ -50,14 +57,14 @@ void read_elevmask_pism(
         switch(mask1(iI)) {
             case IceMask::GROUNDED_ICE :
             case IceMask::FLOATING_ICE :
-                emI_land(iI) = emI_ice(iI) = topg(iI) + thk(iI);
+                emI_land(iI) = emI_ice(iI) = topg1(iI) + thk1(iI);
             break;
             case IceMask::ICE_FREE_OCEAN :
             case IceMask::UNKNOWN :
                 emI_land(iI) = emI_ice(iI) = NaN;
             break;
             case IceMask::ICE_FREE_BEDROCK :
-                emI_land(iI) = topg(iI);
+                emI_land(iI) = topg1(iI);
                 emI_ice(iI) = NaN;
             break;
         }

@@ -13,6 +13,7 @@ namespace icebin {
 @param emI_ice Elevation-mask for just ice-covered areas */
 void read_elevmask_pism(
     std::string const &fname,
+    int const itime,    // Value of PISM time dimension to read
     blitz::Array<double,1> &emI_land,
     blitz::Array<double,1> &emI_ice);
 
