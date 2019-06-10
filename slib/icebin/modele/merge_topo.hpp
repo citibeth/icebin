@@ -6,6 +6,9 @@
 #include <icebin/RegridMatrices.hpp>
 #include <icebin/GCMRegridder.hpp>
 
+/** Subroutines for merging local ice sheets into base set up based on
+global ice (eg from ETOPO1). */
+
 namespace icebin {
 
 class GCMRegridder;

@@ -207,7 +207,7 @@ int main(int argc, char **argv)
     // Indexing indexingHCA({"A", "HC"}, {0,0}, {hspecA.size(), indexingHCO[1].extent}, {1,0});
 
     // Read TOPOO input (global ice)
-    {NcIO topoo_nc(args.topoo_merged_fname, 'r');
+    {NcIO topoo_nc(args.topoo_ng_fname, 'r');
 
         // Read from topoO file, and allocate resulting arrays.
         topoo.ncio_alloc(topoo_nc, {}, "", "double",
@@ -234,7 +234,7 @@ int main(int argc, char **argv)
         // Dispatch to the read method, based on format.
         blitz::Array<double,1> emI_land, emI_ice;
         if (stype == "pism") {
-            read_elevmask_pism(spec, emI_land, emI_ice);
+            read_elevmask_pism(spec, 0, emI_land, emI_ice);
         } else {
             (*icebin_error)(-1,
                 "Unrecognized elevmask spec type %s", stype.c_str());
@@ -245,21 +245,19 @@ int main(int argc, char **argv)
         emI_ices.push_back(emI_ice);
     }
 
-    // ===================== Compute the merged TOPOO and EOpvAOp
-
-    //RegridParams(bool _scale, bool _correctA, std::array<double,3> const &_sigma) :
-    RegridParams paramsA(false, true, {0.,0.,0.});
-
+    
+    // We need correctA=true here to get FOCEANF, etc.
     merge_topoO(
         foceanOp, fgiceOp, zatmoOp,
-        foceanOm, fgrndOm, fgiceOm, zatmoOm, zicetopO,
-        &gcmO, paramsA, emI_lands, emI_ices, args.eq_rad);
-
+        foceanOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, &gcmO,
+        RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
+        emI_lands, emI_ices, args.eq_rad);
 
     SparseSetT dimEOp, dimAOp;
     EigenSparseMatrixT EOpvAOp_merged(compute_EOpvAOp_merged(
-        {&dimEOp, &dimAOp},
-        EOpvAOp_ng, paramsA, &gcmO, args.eq_rad, emI_ices,
+        {&dimEOp, &dimAOp}, EOpvAOp_ng,
+        RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
+        &gcmO, args.eq_rad, emI_ices,
         true, true));    // use_global_ice=t, use_local_ice=t
 
     // ================== Write output

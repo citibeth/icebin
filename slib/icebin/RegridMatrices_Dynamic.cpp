@@ -124,7 +124,7 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
 
         if (params.scale) {
             // Get two diagonal Eigen scale matrices
-            auto sApvI((wApvI_b));
+            auto sApvI(sum(*ApvI, 0, '-'));
 
             ret->M.reset(new EigenSparseMatrixT(
                 map_eigen_diagonal(sApvI) * *ApvI));    // ApvI_scaled
