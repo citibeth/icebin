@@ -5,7 +5,7 @@ include_directories(${TCLAP_INCLUDE_DIR})
 
 foreach (PRG
     giss2nc
-    etopo1_ice make_topoo global_ec combine_global_ec make_topoa
+    etopo1_ice make_topoo global_ec combine_global_ec make_topoa make_merged_topoo
     # make_topo oneway
 
     # Obsolete

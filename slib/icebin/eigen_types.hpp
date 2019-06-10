@@ -2,6 +2,7 @@
 #define ICEBIN_EIGEN_TYPES_HPP
 
 #include <array>
+#include <ibmisc/zarray.hpp>
 #include <spsparse/eigen.hpp>
 
 namespace ibmisc {
@@ -31,8 +32,12 @@ typedef Eigen::Matrix<val_type, 1, Eigen::Dynamic> EigenRowVectorT;
 typedef Eigen::DiagonalMatrix<val_type, Eigen::Dynamic> EigenDiagonalMatrixT;
 // -----------------------------------------
 
+/** Decompresses a compressed matrix into an Eigen-type sparse matrix.
+@param BvA The compressed matrix, to decompress (sparse indexing)
+@param dims Dimensions to use / append when creating the decompressed matrix.
+@return The decompressed matrix (dense indexing) */
 EigenSparseMatrixT to_eigen_M(  // (generates in dense indexing)
-ibmisc::linear::Weighted_Compressed const &BvA,
+ibmisc::ZArray<int,double,2> const &BvA,
 std::array<SparseSetT *,2> dims);
 
 }

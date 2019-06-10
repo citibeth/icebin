@@ -59,8 +59,8 @@ ParseArgs::ParseArgs(int argc, char **argv)
 #endif
 
         TCLAP::ValueArg<std::string> global_ecO_a("c", "global_ecO",
-            "Elevation Class Matrix file (mismatched)",
-            false, "global_ecO.nc", "topoo file", cmd);
+            "Elevation Class Matrix file (elevation grid)",
+            false, "global_ecO.nc", "matrix file", cmd);
 
         TCLAP::ValueArg<std::string> elevmask_a("d", "elevmask",
             "Source file for FGICE1m and ZICETOP1m",
@@ -113,10 +113,11 @@ int main(int argc, char **argv)
     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
     SparseSetT dimEOp, dimAOp;
     {NcIO ncio(args.global_ecO_fname, 'r');
-    linear::Weighted_Compressed EOpvAOp_s;    // sparse indexing
+    ZArray<int,double,2> EOpvAOp_s;
+
         metaO.ncio(ncio);
 
-        EOpvAOp_s.ncio(ncio, "EvA");
+        EOpvAOp_s.ncio(ncio, "EvA.M");
         EOpvAOp.reset(new EigenSparseMatrixT(
             to_eigen_M(EOpvAOp_s, {&dimEOp, &dimAOp})));
     }

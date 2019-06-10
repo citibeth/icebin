@@ -7,7 +7,7 @@ using namespace spsparse;
 namespace icebin {
 
 EigenSparseMatrixT to_eigen_M(  // (generates in dense indexing)
-ibmisc::linear::Weighted_Compressed const &BvA,
+ibmisc::ZArray<int,double,2> const &BvA,
 std::array<SparseSetT *,2> dims)
 {
     // ======================= Create a merged EOpvAOp of base ice and ice sheets
@@ -20,7 +20,7 @@ std::array<SparseSetT *,2> dims)
     auto BvA_accum(BvA_m.accum());
 
     // Copy elements to accumulator matrix
-    for (auto ii(BvA.M.generator()); ++ii; ) {
+    for (auto ii(BvA.generator()); ++ii; ) {
         BvA_accum.add({ii->index(0), ii->index(1)}, ii->value());
     }
 

@@ -1,6 +1,5 @@
 #include <ibmisc/linear/eigen.hpp>
 #include <ibmisc/stdio.hpp>
-#include <icebin/ElevMask.hpp>
 #include <icebin/modele/topo.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/grids.hpp>

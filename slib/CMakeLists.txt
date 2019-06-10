@@ -32,6 +32,7 @@ add_custom_command(
 
 set(icebin_SOURCES
     icebin/error.cpp
+    icebin/ElevMask.cpp
     icebin/GridSpec.cpp
     icebin/Grid.cpp
     icebin/AbbrGrid.cpp
