@@ -140,6 +140,21 @@ blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,
 blitz::Array<uint16_t,3> &underice3);
 
+/** Check that FHC sums to 1 in every gridcell.
+@param errors Return any errors found by adding to this vector. */
+void sanity_check_fhc(
+blitz::Array<double,3> const &fhc3,
+std::vector<std::string> &errors);
+
+
+/** Check that land fractions sum to 1 in every gridcell.
+@param errors Return any errors found by adding to this vector. */
+void sanity_check_land_fractions(
+blitz::Array<double,2> const &foceanA2,    // Rounded FOCEAN
+blitz::Array<double,2> const &flakeA2,
+blitz::Array<double,2> const &fgrndA2,
+blitz::Array<double,2> const &fgiceA2,
+std::vector<std::string> &errors);
 
 
 }}    // namespace

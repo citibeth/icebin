@@ -29,26 +29,31 @@ core requirement of the ModelE ocean.
     is ice or land; NaN where there is not.)
 @param emI_ices Per-ice sheet elevmaskI arrays (elevation where there
     is ice; NaN where there is not.)
+@return Any errors encountered on the sanity check
 */
 extern void merge_topoO(
 // ------ TOPOO arrays, originally with just global ice
+// Ice sheets will be merged into them.
+//
 // Ice model viewpoint (fractional ocean cells)
 blitz::Array<double,2> &foceanOp2,    // Fractional FOCEAN
 blitz::Array<double,2> &fgiceOp2,
 blitz::Array<double,2> &zatmoOp2,
 // ModelE viewpoint (rounded ocean cells)
 blitz::Array<double,2> &foceanOm2,     // Rounded FOCEAN
+blitz::Array<double,2> &flakeOm2,
 blitz::Array<double,2> &fgrndOm2,
 blitz::Array<double,2> &fgiceOm2,
 blitz::Array<double,2> &zatmoOm2,
-// Not affected by ocean gridcell rounding; as long as top of ice is maintained even for ocean-rounded cells.
+// Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
 // ------ Local ice to merge in...
 GCMRegridder *gcmO,
 RegridParams const &paramsA,
 std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
-double const eq_rad);    // Radius of the earth
+double const eq_rad,    // Radius of the earth
+std::vector<std::string> &errors);
 
 
 
@@ -76,7 +81,9 @@ GCMRegridder const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emI_ices,
 bool use_global_ice,
-bool use_local_ice);
+bool use_local_ice,
+std::vector<std::string> &errors);
+
 
 }} // namespace
 #endif // guard

@@ -1,4 +1,5 @@
 #include <icebin/modele/merge_topo.hpp>
+#include <icebin/modele/topo.hpp>
 #include <icebin/eigen_types.hpp>
 #include <ibmisc/linear/compressed.hpp>
 
@@ -69,6 +70,7 @@ blitz::Array<double,2> &fgiceOp2,
 blitz::Array<double,2> &zatmoOp2,
 // ModelE viewpoint (rounded ocean cells)
 blitz::Array<double,2> &foceanOm2,     // Rounded FOCEAN
+blitz::Array<double,2> &flakeOm2,
 blitz::Array<double,2> &fgrndOm2,
 blitz::Array<double,2> &fgiceOm2,
 blitz::Array<double,2> &zatmoOm2,
@@ -79,13 +81,15 @@ GCMRegridder *gcmO,
 RegridParams const &paramsA,
 std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
-double const eq_rad)    // Radius of the earth
+double const eq_rad,    // Radius of the earth
+std::vector<std::string> &errors)
 {
 
     auto foceanOp(reshape1(foceanOp2));
     auto fgiceOp(reshape1(fgiceOp2));
     auto zatmoOp(reshape1(zatmoOp2));
     auto foceanOm(reshape1(foceanOm2));
+    auto flakeOm(reshape1(flakeOm2));
     auto fgrndOm(reshape1(fgrndOm2));
     auto fgiceOm(reshape1(fgiceOm2));
     auto zatmoOm(reshape1(zatmoOm2));
@@ -178,8 +182,8 @@ double const eq_rad)    // Radius of the earth
             // Block repeated below
             double const fact = 1. / (1. - foceanOp(iO));
             foceanOm(iO) = 0.0;
-            fgrndOm(iO) = 1.0;
             fgiceOm(iO) = fgiceOp(iO) * fact;
+            fgrndOm(iO) = 1.0 - fgiceOm(iO) - flakeOm(iO);
             zatmoOm(iO) = zatmoOp(iO) * fact;
         }
     }
@@ -206,11 +210,14 @@ double const eq_rad)    // Radius of the earth
             // Repeated block from above
             double const fact = 1. / (1. - foceanOp(iO));
             foceanOm(iO) = 0.0;
-            fgrndOm(iO) = 1.0;
             fgiceOm(iO) = fgiceOp(iO) * fact;
+            fgrndOm(iO) = 1.0 - fgiceOm(iO) - flakeOm(iO);
             zatmoOm(iO) = zatmoOp(iO) * fact;
         }
     }}
+
+    // Run sanity checks
+    sanity_check_land_fractions(foceanOm2, flakeOm2, fgrndOm2, fgiceOm2, errors);
 }
 
 EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
@@ -221,7 +228,8 @@ GCMRegridder const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emIs,
 bool use_global_ice,
-bool use_local_ice)
+bool use_local_ice,
+std::vector<std::string> &errors)
 {
     // ======================= Create a merged EOpvAOp of base ice and ice sheets
     // (and then call through to _compute_AAmvEAm)
@@ -279,7 +287,9 @@ bool use_local_ice)
     dims[0]->set_sparse_extent(offsetE + EOpvAOp_base_shape[0]);
     dims[1]->set_sparse_extent(EOpvAOp_base_shape[1]);
 
-    return EOpvAOp_m.to_eigen();
+
+    EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
+    return EOpvAOp;
 }
 
 }}    // namespace

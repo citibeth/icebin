@@ -478,22 +478,43 @@ blitz::Array<uint16_t,3> &underice3)
     // ==================================================
     // Sanity Check the Result
     std::vector<std::string> errors;
-    for (int j=0; j<hspecA.jm; ++j) {
-    for (int i=0; i<hspecA.im; ++i) {
+    sanity_check_land_fractions(foceanA2, flakeA2, fgrndA2, fgiceA2, errors);
+    sanity_check_fhc(fhc3, errors);
+ 
+    return errors;
+}
+
+void sanity_check_fhc(
+blitz::Array<double,3> const &fhc3,
+std::vector<std::string> &errors)
+{
+    for (int j=0; j<fhc3.extent(1); ++j) {
+    for (int i=0; i<fhc3.extent(2); ++i) {
+        // ---------- FHC must add up to 1
+        double all_fhc = 0;
+        for (int ihc=0; ihc<fhc3.extent(0); ++ihc) all_fhc += fhc3(ihc,j,i);
+        all_fhc += 1.0;    // Disregard 1e-30 values
+        if (all_fhc != 1.0 && std::abs(all_fhc-2.0) > 1.e-13) errors.push_back(
+            ibmisc::strprintf("(%d, %d): sum(FHC) = %g", i+1,j+1, all_fhc-1.0));
+    }}
+
+}
+
+void sanity_check_land_fractions(
+blitz::Array<double,2> const &foceanA2,    // Rounded FOCEAN
+blitz::Array<double,2> const &flakeA2,
+blitz::Array<double,2> const &fgrndA2,
+blitz::Array<double,2> const &fgiceA2,
+std::vector<std::string> &errors)
+{
+    for (int j=0; j<foceanA2.extent(0); ++j) {
+    for (int i=0; i<foceanA2.extent(1); ++i) {
         // ----------- Land fractions must add up to 1
         double const all_frac = foceanA2(j,i) + fgrndA2(j,i) + flakeA2(j,i) + fgiceA2(j,i);
         if (std::abs(all_frac-1.0) > 1.e-13) errors.push_back(
             ibmisc::strprintf("(%d, %d): FOCEAN(%g) + FGRND(%g) + FLAKE(%g) + FGICE(%g)  = %g",
             i+1,j+1, foceanA2(j,i), fgrndA2(j,i), flakeA2(j,i), fgiceA2(j,i), all_frac));
-
-        // ---------- FHC must add up to 1
-        double all_fhc = 0;
-        for (int ihc=0; ihc<nhc_gcm; ++ihc) all_fhc += fhc3(ihc,j,i);
-        if (all_fhc != 0 && std::abs(all_fhc-1.0) > 1.e-13) errors.push_back(
-            ibmisc::strprintf("(%d, %d): sum(FHC) = %g", i+1,j+1, all_fhc));
     }}
-
-    return errors;
 }
 
 

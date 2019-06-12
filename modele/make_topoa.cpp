@@ -239,7 +239,7 @@ int main(int argc, char **argv)
         fhc, elevE, underice));
 
     // Print sanity check errors to STDERR
-    for (std::string const &err : errors) fprintf(stderr, "%s\n", err.c_str());
+    for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
 
     // Write extended TOPOA file
     {NcIO topoa_nc(args.topoa_fname, 'w');
@@ -255,5 +255,5 @@ int main(int argc, char **argv)
         topoa3_i.ncio(topoa_nc, {}, "", "ushort", nhc_jm_im);
     }
 
-    return 0;
+    if (errors.size() > 0) return -1;
 }

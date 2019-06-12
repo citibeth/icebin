@@ -245,23 +245,29 @@ int main(int argc, char **argv)
         emI_ices.push_back(emI_ice);
     }
 
-    
+    std::vector<std::string> errors;
+
     // We need correctA=true here to get FOCEANF, etc.
     merge_topoO(
         foceanOp, fgiceOp, zatmoOp,
-        foceanOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, &gcmO,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, &gcmO,
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
-        emI_lands, emI_ices, args.eq_rad);
+        emI_lands, emI_ices, args.eq_rad, errors);
 
     SparseSetT dimEOp, dimAOp;
     EigenSparseMatrixT EOpvAOp_merged(compute_EOpvAOp_merged(
         {&dimEOp, &dimAOp}, EOpvAOp_ng,
         RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
         &gcmO, args.eq_rad, emI_ices,
-        true, true));    // use_global_ice=t, use_local_ice=t
+        true, true, errors));    // use_global_ice=t, use_local_ice=t
+
+    // Print sanity check errors to STDERR
+    for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
+    if (errors.size() > 0) return -1;
 
     // ================== Write output
     // Write all inputs to a single output file
+    ZArray<int,double,2> EOpvAOp_c({EOpvAOp_merged.rows(), EOpvAOp_merged.cols()});
     {NcIO ncio(args.topoo_merged_fname, 'w');
 
         // Write Ocean grid metadata
@@ -270,11 +276,11 @@ int main(int argc, char **argv)
         // Compress and Write EOpvAOp; our merged EOpvAOp needs to be
         // in the same (compressed) format as the original base
         // EOpvAOp that we read.
-        ZArray<int,double,2> EOpvAOp_c({EOpvAOp_merged.rows(), EOpvAOp_merged.cols()});
-        auto EOpvAOp_a(EOpvAOp_c.accum());
-        for (auto ii=begin(EOpvAOp_merged); ii != end(EOpvAOp_merged); ++ii) {
-            EOpvAOp_a.add({ii->index(0), ii->index(1)}, ii->value());
-        }
+        {auto EOpvAOp_a(EOpvAOp_c.accum());
+            for (auto ii=begin(EOpvAOp_merged); ii != end(EOpvAOp_merged); ++ii) {
+                EOpvAOp_a.add({ii->index(0), ii->index(1)}, ii->value());
+            }
+        }    // Flush compression on ~EOpvAOp_a()
 
         // We write just the main matrix; but not the other things involved in
         // linear::Weighted_Compressed.
