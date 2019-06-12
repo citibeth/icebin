@@ -109,22 +109,27 @@ int main(int argc, char **argv)
     EnvSearchPath files("MODELE_FILE_PATH");
 
     // =========== Read metadata and EOpvAOp matrix
-    global_ec::Metadata metaO;
     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
     SparseSetT dimEOp, dimAOp;
+    icebin::HntrSpec hspecO;
+    ibmisc::Indexing indexingHC;
+    std::vector<double> hcdefs;
+    std::vector<uint16_t> underice_hc;
     {NcIO ncio(args.global_ecO_fname, 'r');
     ZArray<int,double,2> EOpvAOp_s;
 
-        metaO.ncio(ncio);
+        hspecO.ncio(ncio, "hspecA");    // Actually ocean grid
+        indexingHC.ncio(ncio, "indexingHC");
+        ncio_vector(ncio, hcdefs, true, "hcdefs", "double", {});
+        ncio_vector(ncio, underice_hc, true, "underice_hc", "short", {});
 
         EOpvAOp_s.ncio(ncio, "EvA.M");
         EOpvAOp.reset(new EigenSparseMatrixT(
             to_eigen_M(EOpvAOp_s, {&dimEOp, &dimAOp})));
     }
 
-    HntrSpec &hspecO(metaO.hspecA);
     HntrSpec hspecA(make_hntrA(hspecO));
-    Indexing &indexingHCO(metaO.indexingHC);
+    Indexing &indexingHCO(indexingHC);
     Indexing indexingHCA({"A", "HC"}, {0,0}, {hspecA.size(), indexingHCO[1].extent}, {1,0});
 
     // Create the AvO regridder (but not matrix)
@@ -222,18 +227,16 @@ int main(int argc, char **argv)
         "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
     }));
 
-    int const nhc_gcm = get_nhc_gcm(metaO.hcdefs.size());
+    int const nhc_gcm = get_nhc_gcm(hcdefs.size());
     std::array<int,3> shape3 {nhc_gcm, hspecA.jm, hspecA.im};
     topoa3.allocate(shape3, {"nhc", "jm", "im"});
     topoa3_i.allocate(shape3, {"nhc", "jm", "im"});
 
 
     // ---------------- Create TOPOA in memory
-    std::vector<uint16_t> underice_hc;
-    for (size_t i=0; i<metaO.hcdefs.size(); ++i) underice_hc.push_back(UI_NOTHING);
     std::vector<std::string> errors(make_topoA(
         foceanOp, foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
-        hspecO, hspecA, indexingHCO, indexingHCA, metaO.hcdefs, underice_hc,
+        hspecO, hspecA, indexingHCO, indexingHCA, hcdefs, underice_hc,
         args.eq_rad, *EOpvAOp, dimEOp, dimAOp,
         foceanA, flakeA, fgrndA, fgiceA, zatmoA, zlakeA, zicetopA,
         fhc, elevE, underice));

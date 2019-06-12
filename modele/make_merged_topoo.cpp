@@ -255,11 +255,13 @@ int main(int argc, char **argv)
         emI_lands, emI_ices, args.eq_rad, errors);
 
     SparseSetT dimEOp, dimAOp;
+    std::vector<double> hcdefs;
+    std::vector<uint16_t> underice_hc;
     EigenSparseMatrixT EOpvAOp_merged(compute_EOpvAOp_merged(
         {&dimEOp, &dimAOp}, EOpvAOp_ng,
         RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
         &gcmO, args.eq_rad, emI_ices,
-        true, true, errors));    // use_global_ice=t, use_local_ice=t
+        true, true, metaO.hcdefs, hcdefs, underice_hc, errors));    // use_global_ice=t, use_local_ice=t
 
     // Print sanity check errors to STDERR
     for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
@@ -267,11 +269,16 @@ int main(int argc, char **argv)
 
     // ================== Write output
     // Write all inputs to a single output file
-    ZArray<int,double,2> EOpvAOp_c({EOpvAOp_merged.rows(), EOpvAOp_merged.cols()});
+//    ZArray<int,double,2> EOpvAOp_c({EOpvAOp_merged.rows(), EOpvAOp_merged.cols()});
+    ZArray<int,double,2> EOpvAOp_c({dimEOp.sparse_extent(), dimAOp.sparse_extent()});
     {NcIO ncio(args.topoo_merged_fname, 'w');
 
         // Write Ocean grid metadata
-        metaO.ncio(ncio);
+        metaO.hspecA.ncio(ncio, "hspecA");    // Actually ocean grid
+        metaO.indexingHC.ncio(ncio, "indexingHC");
+        auto xxdims(get_or_add_dims(ncio, {"nhc"}, {hcdefs.size()}));
+        ncio_vector(ncio, hcdefs, true, "hcdefs", "double", xxdims);
+        ncio_vector(ncio, underice_hc, true, "underice_hc", "short", xxdims);
 
         // Compress and Write EOpvAOp; our merged EOpvAOp needs to be
         // in the same (compressed) format as the original base

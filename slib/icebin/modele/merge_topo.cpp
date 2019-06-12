@@ -1,5 +1,6 @@
 #include <icebin/modele/merge_topo.hpp>
 #include <icebin/modele/topo.hpp>
+#include <icebin/modele/grids.hpp>
 #include <icebin/eigen_types.hpp>
 #include <ibmisc/linear/compressed.hpp>
 
@@ -219,7 +220,6 @@ std::vector<std::string> &errors)
     // Run sanity checks
     sanity_check_land_fractions(foceanOm2, flakeOm2, fgrndOm2, fgiceOm2, errors);
 }
-
 EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
 std::array<SparseSetT *,2> dims,
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed; UNSCALED
@@ -229,6 +229,9 @@ double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emIs,
 bool use_global_ice,
 bool use_local_ice,
+std::vector<double> const &hcdefs_base, // [nhc]  Elev class definitions for base ice
+std::vector<double> &hcdefs, // OUT:  Elev class definitions for merged ice
+std::vector<uint16_t> &underice_hc,
 std::vector<std::string> &errors)
 {
     // ======================= Create a merged EOpvAOp of base ice and ice sheets
@@ -239,6 +242,9 @@ std::vector<std::string> &errors)
         {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
         dims, '.');
     auto EOpvAOp_accum(EOpvAOp_m.accum());
+
+    hcdefs.clear();
+    underice_hc.clear();
 
     // Merge in local matrices
     std::array<long,2> EOpvAOp_sheet_shape {0,0};
@@ -263,6 +269,10 @@ std::vector<std::string> &errors)
                     ii->value());
             }
         }
+
+        hcdefs.insert(hcdefs.end(), gcmO->hcdefs().begin(), gcmO->hcdefs().end());
+        for (size_t i=0; i<gcmO->hcdefs().size(); ++i)
+            underice_hc.push_back(UI_ICEBIN);
     }
 
     std::array<long,2> EOpvAOp_base_shape {0,0};
@@ -280,6 +290,9 @@ std::vector<std::string> &errors)
             // Stack global EC's on top of local EC's.
             EOpvAOp_accum.add({ii->index(0)+offsetE, ii->index(1)}, ii->value());
         }
+        hcdefs.insert(hcdefs.end(), hcdefs_base.begin(), hcdefs_base.end());
+        for (size_t i=0; i<hcdefs_base.size(); ++i)
+            underice_hc.push_back(UI_NOTHING);
     }
 
 
@@ -287,7 +300,7 @@ std::vector<std::string> &errors)
     dims[0]->set_sparse_extent(offsetE + EOpvAOp_base_shape[0]);
     dims[1]->set_sparse_extent(EOpvAOp_base_shape[1]);
 
-
+    // Convert to Eigen
     EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
     return EOpvAOp;
 }

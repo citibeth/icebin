@@ -71,6 +71,11 @@ matrix is all based on un-rounded ("raw") verions of TOPO fields.
     true.  Set to false in order to generate EOpvAOp matrix from local
     ice only.
 @param use_local_ice Merge local ice into output matrix?  Normally true.
+@param hcdefs_base Levels of elevation classes [m] in base EOpvAOp
+@param hcdefs OUT: ELevation levels for merged EOpvAOp
+@param underice_hc OUT: Expected model underneath the ice of each elevation class
+    UI_NOTHING for base ice
+    UI_ICEBIN for local ice
 @return Merged EOpvAOp matrix.  Dense indexing, using dimension maps from dims.
 */
 EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
@@ -82,6 +87,9 @@ double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emI_ices,
 bool use_global_ice,
 bool use_local_ice,
+std::vector<double> const &hcdefs_base, // [nhc]  Elev class definitions for base ice
+std::vector<double> &hcdefs, // OUT:  Elev class definitions for merged ice
+std::vector<uint16_t> &underice_hc,
 std::vector<std::string> &errors);
 
 
