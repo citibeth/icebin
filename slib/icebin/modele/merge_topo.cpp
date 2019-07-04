@@ -61,6 +61,19 @@ blitz::Array<double,1> const &elevmaskI)
     return ret;
 }
 
+void sanity_nonan(
+std::string const &label,
+blitz::Array<double,2> const &varA2,    // Rounded FOCEAN
+std::vector<std::string> &errors)
+{
+    for (int j=0; j<varA2.extent(0); ++j) {
+    for (int i=0; i<varA2.extent(1); ++i) {
+        if (std::isnan(varA2(j,i))) errors.push_back(
+            ibmisc::strprintf("(%d, %d): %s is NaN", i+1,j+1, label.c_str()));
+    }}
+}
+
+
 void merge_topoO(
 // ------ TOPOO arrays, originally with just global ice
 // Ice sheets will be merged into them.
@@ -95,6 +108,17 @@ std::vector<std::string> &errors)
     auto fgiceOm(reshape1(fgiceOm2));
     auto zatmoOm(reshape1(zatmoOm2));
     auto zicetopO(reshape1(zicetopO2));
+
+    // Sanity check inputs
+    sanity_nonan("foceanOp2-0", foceanOp2, errors);
+    sanity_nonan("fgiceOp2-0", fgiceOp2, errors);
+    sanity_nonan("zatmoOp2-0", zatmoOp2, errors);
+    sanity_nonan("foceanOm2-0", foceanOm2, errors);
+    sanity_nonan("flakeOm2-0", flakeOm2, errors);
+    sanity_nonan("fgrndOm2-0", fgrndOm2, errors);
+    sanity_nonan("fgiceOm2-0", fgiceOm2, errors);
+    sanity_nonan("zatmoOm2-0", zatmoOm2, errors);
+    sanity_nonan("zicetopO2-0", zicetopO2, errors);
 
     auto nO = gcmO->nA();
 
@@ -161,7 +185,7 @@ std::vector<std::string> &errors)
 
     // ---------------- Update stuff based on additional land and ice area
     // Update foceanOp, and create new land cells in foceanOm as appropriate.
-    for (int iO=0; iO<nO; ++iO) {
+    for (int iO=0; iO<nO; ++iO) {    // sparse indexing
         if (da_contO(iO) == 0.) continue;
 
         // Adjust foceanOp, etc. based on how much land we're adding
@@ -173,9 +197,10 @@ std::vector<std::string> &errors)
         foceanOp(iO) = foceanOp(iO) - da_contO(iO)*by_areaO;
         zatmoOp(iO) += da_zatmoO(iO) * by_areaO;
 
-
-        double const nzicetopO = (zicetopO(iO)*fgiceOp0 + da_zicetopO(iO)*by_areaO * diff_fgiceOp) / fgiceOp(iO);
-        zicetopO(iO) = nzicetopO;
+        if (fgiceOp(iO) != 0) {
+            double const nzicetopO = (zicetopO(iO)*fgiceOp0 + da_zicetopO(iO)*by_areaO * diff_fgiceOp) / fgiceOp(iO);
+            zicetopO(iO) = nzicetopO;
+        }
 
         // When we add more land, some cells that used to be ocean
         // might now become land.
@@ -204,12 +229,13 @@ std::vector<std::string> &errors)
             && foceanOm2(j+1,i) == 0.
             && foceanOm2(j,i-1) == 0.
             && foceanOm2(j,i+1) == 0.
-            && foceanOm2(j,i) == 1.)
+            && foceanOm2(j,i) == 1. && foceanOp2(j,i) != 1.)
         {
-            long const iO(gcmO->agridA.indexing.tuple_to_index(std::array<long,2>{j,i}));
+            long const iO(gcmO->agridA.indexing.tuple_to_index(std::array<long,2>{i,j}));    // Always use alphabetical order
 
             // Repeated block from above
-            double const fact = 1. / (1. - foceanOp(iO));
+            double const denom = 1. - foceanOp(iO);
+            double const fact = 1. / denom;
             foceanOm(iO) = 0.0;
             fgiceOm(iO) = fgiceOp(iO) * fact;
             fgrndOm(iO) = 1.0 - fgiceOm(iO) - flakeOm(iO);
@@ -217,7 +243,16 @@ std::vector<std::string> &errors)
         }
     }}
 
-    // Run sanity checks
+    // Run sanity checks on output
+    sanity_nonan("foceanOp2", foceanOp2, errors);
+    sanity_nonan("fgiceOp2", fgiceOp2, errors);
+    sanity_nonan("zatmoOp2", zatmoOp2, errors);
+    sanity_nonan("foceanOm2", foceanOm2, errors);
+    sanity_nonan("flakeOm2", flakeOm2, errors);
+    sanity_nonan("fgrndOm2", fgrndOm2, errors);
+    sanity_nonan("fgiceOm2", fgiceOm2, errors);
+    sanity_nonan("zatmoOm2", zatmoOm2, errors);
+    sanity_nonan("zicetopO2", zicetopO2, errors);
     sanity_check_land_fractions(foceanOm2, flakeOm2, fgrndOm2, fgiceOm2, errors);
 }
 
@@ -344,8 +379,8 @@ Indexing const &indexingHC0)
 
     // Create a map from new HC value to new HC index
     std::map<double,int> hcdefs_map;
-    for (size_t i=0; i<hcdefs0.size(); ++i) {
-        hcdefs_map.insert(std::make_pair(hcdefs0[i], i));
+    for (int i=0; i<nhc; ++i) {
+        hcdefs_map.insert(std::make_pair(ret.hcdefs[i], i));
         ret.underice_hc.push_back(UI_NOTHING);
     }
 
@@ -354,14 +389,13 @@ Indexing const &indexingHC0)
     for (size_t i=0; i<hcdefs0.size(); ++i)
         to_new.push_back(hcdefs_map[hcdefs0[i]]);
 
-
     // Create indexing for for new matrix
     ret.indexingHC = indexingHC_change_nhc(indexingHC0, nhc);
 
 
     // Re-do the sparsematrix with new ECs
     MakeDenseEigenT EOpvAOp_m(
-        {SparsifyTransform::ADD_DENSE, SparsifyTransform::ID},   // convert sparse to dense indexing
+        {SparsifyTransform::ADD_DENSE, SparsifyTransform::KEEP_DENSE},   // convert sparse to dense indexing
         std::array<SparseSetT *,2>{&ret.dimEOp, dims0[1]}, '.');
     auto EOpvAOp_accum(EOpvAOp_m.accum());
 
