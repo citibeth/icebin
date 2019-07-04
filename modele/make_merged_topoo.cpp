@@ -261,11 +261,21 @@ int main(int argc, char **argv)
         {&dimEOp, &dimAOp}, EOpvAOp_ng,
         RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
         &gcmO, args.eq_rad, emI_ices,
-        true, true, metaO.hcdefs, hcdefs, underice_hc, errors));    // use_global_ice=t, use_local_ice=t
+        true, true,    // use_global_ice=t, use_local_ice=t
+        metaO.hcdefs, hcdefs, underice_hc, errors));
+
+    // Construct new indexingHC with merged # of ECs
+    auto const &ix1(metaO.indexingHC[1]);
+    Indexing indexingHC(
+        std::vector<IndexingData>{
+            metaO.indexingHC[0],
+            IndexingData(ix1.name, ix1.base, hcdefs.size())
+        },
+        std::vector<int>(
+            metaO.indexingHC.indices()));
 
     // Print sanity check errors to STDERR
     for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
-    if (errors.size() > 0) return -1;
 
     // ================== Write output
     // Write all inputs to a single output file
@@ -275,7 +285,7 @@ int main(int argc, char **argv)
 
         // Write Ocean grid metadata
         metaO.hspecA.ncio(ncio, "hspecA");    // Actually ocean grid
-        metaO.indexingHC.ncio(ncio, "indexingHC");
+		indexingHC.ncio(ncio, "indexingHC");
         auto xxdims(get_or_add_dims(ncio, {"nhc"}, {hcdefs.size()}));
         ncio_vector(ncio, hcdefs, true, "hcdefs", "double", xxdims);
         ncio_vector(ncio, underice_hc, true, "underice_hc", "short", xxdims);
@@ -302,5 +312,6 @@ int main(int argc, char **argv)
 
     }
 
+    if (errors.size() > 0) return -1;
     return 0;
 }

@@ -248,6 +248,7 @@ std::vector<std::string> &errors)
 
     // Merge in local matrices
     std::array<long,2> EOpvAOp_sheet_shape {0,0};
+    long offsetE = 0;
     if (use_local_ice) {
         for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
             // Get local EOpvAOp matrix
@@ -276,8 +277,8 @@ std::vector<std::string> &errors)
     }
 
     std::array<long,2> EOpvAOp_base_shape {0,0};
-    long offsetE = gcmO->indexingE.extent();
     if (use_global_ice) {
+        offsetE = gcmO->indexingE.extent();
         // Merge in global matrix (compressed format; sparse indexing)
         EOpvAOp_base_shape = EOpvAOp_base.shape();
 
