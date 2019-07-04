@@ -24,7 +24,8 @@ namespace icebin {
 namespace accum {
 
 
-/* This accumulator splits between domains based on the first dimension (0) of AccumulatorT. */
+/* This accumulator splits between domains based on the first dimension (0) of AccumulatorT.
+Used to distribute a sparse matrix across MPI nodes. */
 template<class AccumulatorT, class DomainDecomposerT>
 class Domain {
     std::vector<AccumulatorT *> subs;    // One per domain
