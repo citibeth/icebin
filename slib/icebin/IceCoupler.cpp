@@ -76,8 +76,10 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
     self->ice_regridder = &*_gcm_coupler->gcm_regridder->ice_regridders().at(sheet_name);
-    self->elevmaskI.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
-    self->elevmaskI = nan;
+    self->emI_ice.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
+    self->emI_ice = nan;
+    self->emI_land.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
+    self->emI_land = nan;
 
 //    if (rw_full) ncio_blitz(ncio, elevmaskI, true, vname + ".elevmaskI", "double",
 //        get_dims(ncio ,{vname + ".gridI.cells.nfull"}));
@@ -323,20 +325,23 @@ bool run_ice)
     }
 
     // ========== Update regridding matrices
-    int maskI_ix = standard_names[OUTPUT].at("maskI");
-    blitz::Array<double,1> out_maskI(ice_ovalsI(maskI_ix, blitz::Range::all()));
-    for (int i=0; i<nI(); ++i) maskI(i) = (char)out_maskI(i);
+    int emI_ice_ix = standard_names[OUTPUT].at("elevmask_ice");
+    blitz::Array<double,1> out_emI_ice(ice_ovalsI(emI_ice_ix, blitz::Range::all()));
 
-    int elevmaskI_ix = standard_names[OUTPUT].at("elevmaskI");
-    blitz::Array<double,1> out_elevmaskI(ice_ovalsI(elevmaskI_ix, blitz::Range::all()));
+    int emI_land_ix = standard_names[OUTPUT].at("elevmask_land");
+    blitz::Array<double,1> out_emI_land(ice_ovalsI(emI_land_ix, blitz::Range::all()));
+
     // Check that elevmaskI is an alias for variable #elevmaskI_ix in ice_ovalsI
-    if (&ice_ovalsI(elevmaskI_ix,0) != &out_elevmaskI(0)) (*icebin_error)(-1,
-        "ice_ovalsI <%p> != elevmaskI <%p>\n", &ice_ovalsI(elevmaskI_ix,0), &out_elevmaskI(0));
+    if (&ice_ovalsI(emI_ice_ix,0) != &out_emI_ice(0)) (*icebin_error)(-1,
+        "ice_ovalsI <%p> != emI_ice <%p>\n", &ice_ovalsI(emI_ice_ix,0), &out_emI_ice(0));
+    if (&ice_ovalsI(emI_land_ix,0) != &out_emI_land(0)) (*icebin_error)(-1,
+        "ice_ovalsI <%p> != emI_land <%p>\n", &ice_ovalsI(emI_land_ix,0), &out_emI_land(0));
 
-    elevmaskI = out_elevmaskI;    // Copy
+    emI_ice = out_emI_ice;    // Copy
+    emI_land = out_emI_land;    // Copy
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
-    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, elevmaskI));
+    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, emI_ice));
     RegridParams regrid_params(true, true, {0,0,0});
     RegridParams regrid_params_nc(true, false, {0,0,0});    // correctA=False
 

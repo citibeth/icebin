@@ -42,6 +42,7 @@ struct GCMInput {
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
 
+    // Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
     // _s = sparse indexing
     std::array<VectorMultivec, GridAE::count> gcm_ivalsAE_s;
 

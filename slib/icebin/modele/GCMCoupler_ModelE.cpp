@@ -609,11 +609,12 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
     GCMRegridder_ModelE *gcmA = dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder);
 
     // Transfer elemask and sigma parameters from each ice coupler
-    std::vector<ElevMask<1>> elevmasks;
+    std::vector<ElevMask<1>> emI_ices, emI_lands;
     std::vector<std::array<double,3>> sigmas;
     for (size_t sheet_index=0; sheet_index < gcmA->ice_regridders().index.size(); ++sheet_index) {
         IceCoupler *icec(&*ice_couplers[sheet_index]);
-        elevmasks.push_back(ElevMask<1>(icec->elevmaskI, icec->maskI));
+        emI_ices.push_back(ElevMask<1>(icec->emI_ice, icec->maskI));
+        emI_lands.push_back(ElevMask<1>(icec->emI_land, icec->maskI));
         sigmas.push_back(icec->sigma);
     }
 

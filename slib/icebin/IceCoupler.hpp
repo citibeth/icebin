@@ -80,8 +80,7 @@ public:
     std::array<std::unique_ptr<IceWriter>, 2> writer;
 
     // Current ice sheet elevation
-    blitz::Array<double,1> elevmaskI;    // Elevation on ice sheet, NaN elsewhere (from PISM side of coupler)
-    blitz::Array<char,1> maskI;      // 'O'=ocean, 'L'=land, 'I'=ice sheet
+    blitz::Array<double,1> emI_ice, emI_land;
 public:
     std::string const &name() const { return _name; }
     AbbrGrid const &agridI() { return ice_regridder->agridI; }
