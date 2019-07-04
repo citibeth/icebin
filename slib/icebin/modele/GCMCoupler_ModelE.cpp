@@ -336,21 +336,25 @@ void gcmce_reference_globals(
     F90Array<double, 3> fhc,
     F90Array<int, 3> underice,
     F90Array<double, 3> elevE,
+    F90Array<double, 2> fland,
     F90Array<double, 2> focean,
     F90Array<double, 2> flake,
     F90Array<double, 2> fgrnd,
     F90Array<double, 2> fgice,
-    F90Array<double, 2> zatmo)
+    F90Array<double, 2> zatmo,
+    F90Array<double, 2> zlake)
 {
     Topos *topos(&self->modele_inputs);
     topos->fhc.reference(f_to_c(fhc.to_blitz()));
     topos->underice.reference(f_to_c(underice.to_blitz()));
     topos->elevE.reference(f_to_c(elevE.to_blitz()));
+    topos->fland.reference(f_to_c(fland.to_blitz()));
     topos->focean.reference(f_to_c(focean.to_blitz()));
     topos->flake.reference(f_to_c(flake.to_blitz()));
     topos->fgrnd.reference(f_to_c(fgrnd.to_blitz()));
     topos->fgice.reference(f_to_c(fgice.to_blitz()));
     topos->zatmo.reference(f_to_c(zatmo.to_blitz()));
+    topos->zlake.reference(f_to_c(zlake.to_blitz()));
 }
 
 // ===========================================================

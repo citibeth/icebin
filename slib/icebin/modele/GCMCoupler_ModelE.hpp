@@ -71,11 +71,13 @@ struct Topos
     blitz::Array<double,3> elevE;
 
     // i,j arrays on Atmosphere grid
+    blitz::Array<double,2> fland;
     blitz::Array<double,2> focean;
     blitz::Array<double,2> flake;
     blitz::Array<double,2> fgrnd;    // Alt: fearth0
     blitz::Array<double,2> fgice;    // Alt: flice
     blitz::Array<double,2> zatmo;      // i,j
+    blitz::Array<double,2> zlake;      // i,j
 };
 
 
