@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Generates PISM grid as of year 2019
+
 #include <string>
 #include <ctype.h>
 #include <algorithm>
@@ -41,11 +43,6 @@ namespace po = boost::program_options;
 
 static const double km = 1000.0;
 
-BOOST_ENUM_VALUES(IceModel, int,
-    (pism) (0)
-    (searise) (1)
-)
-
 BOOST_ENUM_VALUES(Zone, int,
     (greenland) (0)
     (antarctica) (1)
@@ -61,9 +58,7 @@ int main(int argc, char **argv)
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "produce help message")
-        ("zone", po::value<std::string>(), "Greenland or Antarctica")
-        ("grid", po::value<int>(), "Cell size [km]")
-        ("icemodel", po::value<std::string>(), "Ice model to use (pism or searise)");
+        ("zone", po::value<std::string>(), "Greenland or Antarctica");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -80,17 +75,8 @@ int main(int argc, char **argv)
         zone = ibmisc::parse_enum<Zone>(szone);
     }
 
-    int grid_size = 20;
-    if (vm.count("grid")) grid_size = vm["grid"].as<int>();
-
-    IceModel icemodel = IceModel::pism;
-    if (vm.count("icemodel")) {
-        std::string sicemodel = vm["icemodel"].as<std::string>();
-        icemodel = ibmisc::parse_enum<IceModel>(sicemodel);
-    }
-
     // ------------------------------------------------------
-    double dsize = (double)grid_size;
+    double dsize = 900 * 20.;    // [m]
 
     printf("------------- Set up the local ice grid\n");
 
@@ -98,27 +84,28 @@ int main(int argc, char **argv)
     // NOTE: PISM option is only for the OLD PISM.
     //       More recently, PISM switched their indices to be the same
     //       as SeaRISE and ModelE
-    auto indices(icemodel == IceModel::pism
-        ? std::vector<int>{0,1}
-        : std::vector<int>{1,0});
+    std::vector<int> const indices {1,0};
 
     GridSpec_XY spec;
     if (zone == Zone::greenland) {
         spec = GridSpec_XY::make_with_boundaries(
-            "+proj=stere +lon_0=-39 +lat_0=90 +lat_ts=71.0 +ellps=WGS84",
+            //"+init='EPSG:3413'",
+            "+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs",
             std::move(indices),
-            (- 800.0 - .5*dsize)*km, (- 800.0 + 300.0*5 + .5*dsize)*km,   dsize*km,
-            (-3400.0 - .5*dsize)*km, (-3400.0 + 560.0*5 + .5*dsize)*km,   dsize*km);
+            -678650., 905350., dsize,
+            -3371600., -635600., dsize);
     } else {    // Antarctica
+#if 0
         spec = GridSpec_XY::make_with_boundaries(
             "+proj=stere +lon_0=0 +lat_0=-90 +lat_ts=71.0 +ellps=WGS84",
             std::move(indices),
-            (-2800.0 - .5*dsize)*km, (-2800.0 + 1200*5.0 + .5*dsize)*km,   dsize*km,
-            (-2800.0 - .5*dsize)*km, (-2800.0 + 1200*5.0 + .5*dsize)*km,   dsize*km);
+            (-2800.0 - .5*dsize), (-2800.0 + 1200*5.0 + .5*dsize),   dsize,
+            (-2800.0 - .5*dsize), (-2800.0 + 1200*5.0 + .5*dsize),   dsize);
+#endif
     }
 
     // ------------ Make the grid from the spec
-    std::string name(ibmisc::strprintf("sr_g%d_%s", grid_size, icemodel.str()));
+    std::string name(ibmisc::strprintf("pism2_g%d_%s", 20, "pism2"));
     Grid grid(make_grid(name, spec, &EuclidianClip::keep_all));
 
     // ------------- Write it out to NetCDF
