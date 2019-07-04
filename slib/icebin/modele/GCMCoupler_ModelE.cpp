@@ -389,9 +389,11 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
     self->cold_start(
         ibmisc::Datetime(yeari,1,1), time_s);
 
+    // NOTE: Not needed because these things MUST be properly computed
+    //       in the initial conditions TOPO file loaded by ModelE
     // b) Compute fhc, elevE
     // c) Compute ZATMO, FGICE, etc.
-    self->update_topo(time_s, true);    // initial_timestep=true
+    //    self->update_topo(time_s);    // initial_timestep=true
 
     // d) Sync with dynamic ice model
     gcmce_couple_native(self, itimei, false);    // run_ice=false
@@ -537,7 +539,7 @@ printf("END gcmce_couple_native() every_outs\n");
     self->update_gcm_ivals(out);
     // 2. Sets icebin_nhc, 
     // 3. Updates FHC, ZATMO, etc.
-    self->update_topo(time_s, false);    // initial_timestep=false
+    self->update_topo(time_s);    // initial_timestep=false
 }
 // =======================================================
 /** Called from MPI rank */
@@ -600,7 +602,7 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
 
 
 /** This needs to be run at least once before matrices can be generated. */
-void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
+void GCMCoupler_ModelE::update_topo(double time_s)
 {
 
 (*icebin_error)(-1, "update_topo() still needs to be written; and should do the same thing as the command-line version.  The old (pre-merge) update_topo() is in the source code currently.");

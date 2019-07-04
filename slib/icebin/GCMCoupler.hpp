@@ -249,9 +249,8 @@ public:
         ibmisc::Datetime _time_base,
         double time_start_s);
 
-    /** Top level method to compute (or re-compute) the TOPO parameters.
-    @param initial_timestep True if this is the initialization timestep. */
-    virtual void update_topo(double time_s, bool initial_timestep) = 0;
+    /** Top level method to re-compute values originally loaded from the TOPO file. */
+    virtual void update_topo(double time_s) = 0;
 
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.
