@@ -285,7 +285,10 @@ int main(int argc, char **argv)
         // EOpvAOp that we read.
         {auto EOpvAOp_a(EOpvAOp_c.accum());
             for (auto ii=begin(EOpvAOp_merged); ii != end(EOpvAOp_merged); ++ii) {
-                EOpvAOp_a.add({ii->index(0), ii->index(1)}, ii->value());
+                EOpvAOp_a.add({
+                    dimEOp.to_sparse(ii->index(0)),
+                    dimAOp.to_sparse(ii->index(1))},
+                    ii->value());
             }
         }    // Flush compression on ~EOpvAOp_a()
 
