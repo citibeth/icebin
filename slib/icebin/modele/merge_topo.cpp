@@ -220,8 +220,22 @@ std::vector<std::string> &errors)
     // Run sanity checks
     sanity_check_land_fractions(foceanOm2, flakeOm2, fgrndOm2, fgiceOm2, errors);
 }
-EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
-std::array<SparseSetT *,2> dims,
+
+/** Creates a new indexingHC (1-D Atm. grid indexing plus nhc)
+indexing scheme from and old one, changing nhc along the way. */
+Indexing indexingHC_change_nhc(Indexing const &indexingHC0, int nhc)
+{
+    return Indexing(
+        std::vector<IndexingData>{
+            indexingHC0[0],
+            IndexingData(indexingHC0[1].name, indexingHC0[1].base, nhc)
+        },
+        std::vector<int>(indexingHC0.indices()));
+}
+
+
+EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
+SparseSetT &dimAOp,    // dimAOp is appended; dimEOp is returned as part of return variable.
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed; UNSCALED
 RegridParams const &paramsO,
 GCMRegridder const *gcmO,     // A bunch of local ice sheets
@@ -230,21 +244,20 @@ std::vector<blitz::Array<double,1>> const &emIs,
 bool use_global_ice,
 bool use_local_ice,
 std::vector<double> const &hcdefs_base, // [nhc]  Elev class definitions for base ice
-std::vector<double> &hcdefs, // OUT:  Elev class definitions for merged ice
-std::vector<uint16_t> &underice_hc,
+Indexing const &indexingHC_base,
+bool squash_ecs,    // Should ECs be merged if they are the same elevation?
 std::vector<std::string> &errors)
 {
+    EOpvAOpResult ret;    // return variable
+
     // ======================= Create a merged EOpvAOp of base ice and ice sheets
     // (and then call through to _compute_AAmvEAm)
 
     // Accumulator for merged EOpvAOp (unscaled)
     MakeDenseEigenT EOpvAOp_m(
         {SparsifyTransform::ADD_DENSE},   // convert sparse to dense indexing
-        dims, '.');
+        {&ret.dimEOp, &dimAOp}, '.');
     auto EOpvAOp_accum(EOpvAOp_m.accum());
-
-    hcdefs.clear();
-    underice_hc.clear();
 
     // Merge in local matrices
     std::array<long,2> EOpvAOp_sheet_shape {0,0};
@@ -271,16 +284,16 @@ std::vector<std::string> &errors)
             }
         }
 
-        hcdefs.insert(hcdefs.end(), gcmO->hcdefs().begin(), gcmO->hcdefs().end());
+        ret.hcdefs.insert(ret.hcdefs.end(), gcmO->hcdefs().begin(), gcmO->hcdefs().end());
         for (size_t i=0; i<gcmO->hcdefs().size(); ++i)
-            underice_hc.push_back(UI_ICEBIN);
+            ret.underice_hc.push_back(UI_ICEBIN);
     }
 
     std::array<long,2> EOpvAOp_base_shape {0,0};
     if (use_global_ice) {
         offsetE = gcmO->indexingE.extent();
         // Merge in global matrix (compressed format; sparse indexing)
-        EOpvAOp_base_shape = EOpvAOp_base.shape();
+        EOpvAOp_base_shape = EOpvAOp_base.shape();  // sparse shape of ZArray
 
         // printf("EOpvAOp_base_shape = [%d %d] (NHC=%g)\n", EOpvAOp_base_shape[0], EOpvAOp_base_shape[1], (double)EOpvAOp_base_shape[0] / (double)EOpvAOp_base_shape[1]);
 
@@ -291,19 +304,87 @@ std::vector<std::string> &errors)
             // Stack global EC's on top of local EC's.
             EOpvAOp_accum.add({ii->index(0)+offsetE, ii->index(1)}, ii->value());
         }
-        hcdefs.insert(hcdefs.end(), hcdefs_base.begin(), hcdefs_base.end());
+        ret.hcdefs.insert(ret.hcdefs.end(), hcdefs_base.begin(), hcdefs_base.end());
         for (size_t i=0; i<hcdefs_base.size(); ++i)
-            underice_hc.push_back(UI_NOTHING);
+            ret.underice_hc.push_back(UI_NOTHING);
     }
 
 
     // Set overall size
-    dims[0]->set_sparse_extent(offsetE + EOpvAOp_base_shape[0]);
-    dims[1]->set_sparse_extent(EOpvAOp_base_shape[1]);
+    ret.dimEOp.set_sparse_extent(offsetE + EOpvAOp_base_shape[0]);
+    dimAOp.set_sparse_extent(EOpvAOp_base_shape[1]);
 
     // Convert to Eigen
-    EigenSparseMatrixT EOpvAOp(EOpvAOp_m.to_eigen());
-    return EOpvAOp;
+    ret.EOpvAOp.reset(new EigenSparseMatrixT(EOpvAOp_m.to_eigen()));
+    ret.indexingHC = indexingHC_change_nhc(indexingHC_base, ret.hcdefs.size());
+
+    if (squash_ecs) {
+        return squash_ECs({&ret.dimEOp, &dimAOp}, *ret.EOpvAOp, ret.hcdefs, ret.indexingHC);
+    } else {
+        return ret;
+    }
+}
+
+
+/** Merges repeated ECs */
+EOpvAOpResult squash_ECs(
+std::array<SparseSetT *,2> dims0,    // const
+EigenSparseMatrixT const &EOpvAOp0,
+std::vector<double> const &hcdefs0, // Elevation of each EC in EOpvAOp0
+Indexing const &indexingHC0)
+{
+    EOpvAOpResult ret;
+
+    ConstUniverseT const_dims0({"dimEOp0", "dimAOp0"}, {dims0[0], dims0[1]});
+
+    // Determine new set of ECs
+    std::set<double> hcdefs_set(hcdefs0.begin(), hcdefs0.end());
+    ret.hcdefs = std::vector<double>(hcdefs_set.begin(), hcdefs_set.end());  // sorted...
+    int const nhc = ret.hcdefs.size();
+
+    // Create a map from new HC value to new HC index
+    std::map<double,int> hcdefs_map;
+    for (size_t i=0; i<hcdefs0.size(); ++i) {
+        hcdefs_map.insert(std::make_pair(hcdefs0[i], i));
+        ret.underice_hc.push_back(UI_NOTHING);
+    }
+
+    // Define to_new[] such that: ihc_new == to_new[ihc_old]
+    std::vector<int> to_new;
+    for (size_t i=0; i<hcdefs0.size(); ++i)
+        to_new.push_back(hcdefs_map[hcdefs0[i]]);
+
+
+    // Create indexing for for new matrix
+    ret.indexingHC = indexingHC_change_nhc(indexingHC0, nhc);
+
+
+    // Re-do the sparsematrix with new ECs
+    MakeDenseEigenT EOpvAOp_m(
+        {SparsifyTransform::ADD_DENSE, SparsifyTransform::ID},   // convert sparse to dense indexing
+        std::array<SparseSetT *,2>{&ret.dimEOp, dims0[1]}, '.');
+    auto EOpvAOp_accum(EOpvAOp_m.accum());
+
+    std::array<int,2> iTuple;
+        int &iAO0(iTuple[0]);
+        int &ihc0(iTuple[1]);
+    for (auto ii(begin(EOpvAOp0)); ii != end(EOpvAOp0); ++ii) {
+        // Convert iEO0 (in old elevation class space) to iE1 (in new)
+        int const iEO0 = dims0[0]->to_sparse(ii->index(0));
+        indexingHC0.index_to_tuple(&iTuple[0], iEO0);
+        int const ihc1 = to_new[ihc0];
+        int const iE1 = indexingHC0.tuple_to_index(std::array<long,2>{iAO0,ihc1});
+
+        // Separate ice sheet ECs from global ECs
+        EOpvAOp_accum.add({iE1, ii->index(1)}, ii->value());
+    }
+    auto const nA = dims0[1]->sparse_extent();
+    ret.dimEOp.set_sparse_extent(nA * nhc);
+
+    ret.EOpvAOp.reset(new EigenSparseMatrixT(EOpvAOp_m.to_eigen()));
+
+
+    return ret;
 }
 
 }}    // namespace

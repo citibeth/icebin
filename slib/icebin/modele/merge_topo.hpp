@@ -3,6 +3,7 @@
 
 #include <ibmisc/blitz.hpp>
 #include <ibmisc/zarray.hpp>
+#include <ibmisc/indexing.hpp>
 #include <icebin/RegridMatrices.hpp>
 #include <icebin/GCMRegridder.hpp>
 
@@ -55,6 +56,14 @@ std::vector<blitz::Array<double,1>> const &emI_ices,
 double const eq_rad,    // Radius of the earth
 std::vector<std::string> &errors);
 
+/** Return type for compute_EOpvAOp_merged(), ec */
+struct EOpvAOpResult {
+    SparseSetT dimEOp;    // dimEOp is set and returned; dimAOp is appended
+    std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
+    std::vector<double> hcdefs; // OUT:  Elev class definitions for merged ice
+    ibmisc::Indexing indexingHC;
+    std::vector<uint16_t> underice_hc;
+};
 
 
 /** Merge per-ice sheet data into a global base EOpvAOp matrix (from
@@ -78,8 +87,8 @@ matrix is all based on un-rounded ("raw") verions of TOPO fields.
     UI_ICEBIN for local ice
 @return Merged EOpvAOp matrix.  Dense indexing, using dimension maps from dims.
 */
-EigenSparseMatrixT compute_EOpvAOp_merged(  // (generates in dense indexing)
-std::array<SparseSetT *,2> dims,
+EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
+SparseSetT &dimAOp,    // dimAOp is appended
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed
 RegridParams const &paramsA,
 GCMRegridder const *gcmO,     // A bunch of local ice sheets
@@ -88,9 +97,18 @@ std::vector<blitz::Array<double,1>> const &emI_ices,
 bool use_global_ice,
 bool use_local_ice,
 std::vector<double> const &hcdefs_base, // [nhc]  Elev class definitions for base ice
-std::vector<double> &hcdefs, // OUT:  Elev class definitions for merged ice
-std::vector<uint16_t> &underice_hc,
+ibmisc::Indexing const &indexingHC_base,
+bool squash_ecs,    // Should ECs be merged if they are the same elevation?
 std::vector<std::string> &errors);
+
+
+/** Merges repeated ECs */
+EOpvAOpResult squash_ECs(
+std::array<SparseSetT *,2> dims0,
+EigenSparseMatrixT const &EOpvAOp0,
+std::vector<double> const &hcdefs0, // Elevation of each EC in EOpvAOp0
+ibmisc::Indexing const &indexingHC0);
+
 
 
 }} // namespace

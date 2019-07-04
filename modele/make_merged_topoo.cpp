@@ -67,11 +67,15 @@ struct ParseArgs {
     state files written by PISM are read. */
     std::vector<std::string> elevmask_xfnames;
 
+    /** Should elevation classes between global and local ice be merged?
+    This is desired when running without two-way coupling. */
+    bool squash_ec;
+
     /** Output filename; the merged TOPOO and merged EOpvAOp matrices
     are written to this file. */
     std::string topoo_merged_fname;
 
-    /** Readius of the earth to use when needed. */
+    /** Radius of the earth to use when needed. */
     double eq_rad;
 
     ParseArgs(int argc, char **argv);
@@ -98,6 +102,10 @@ ParseArgs::ParseArgs(int argc, char **argv)
             "File containing the GCMRegridder representing all ice sheets to be merged in (ocean grid)",
             false, "gcmO.nc", "GCMRegridder description", cmd);
 
+        TCLAP::ValueArg<bool> squash_ec_a("s", "squash_ec",
+            "Merge elevation classes between global and local ice?",
+            false, true, "bool", cmd);
+
         TCLAP::MultiArg<std::string> elevmask_a("e", "elevmask",
             "<Source file for ice sheet elevation and maks>",
             false, "[type]:[fname]", cmd);
@@ -119,6 +127,7 @@ ParseArgs::ParseArgs(int argc, char **argv)
         topoo_ng_fname = topoo_ng_a.getValue();
         global_ecO_ng_fname = global_ecO_ng_a.getValue();
         gcmO_fname = gcmO_ng_a.getValue();
+        squash_ec = squash_ec_a.getValue();
         elevmask_xfnames = elevmask_a.getValue();
         topoo_merged_fname = topoo_merged_a.getValue();
     } catch (TCLAP::ArgException &e) { // catch any exceptions
@@ -254,49 +263,39 @@ int main(int argc, char **argv)
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, args.eq_rad, errors);
 
-    SparseSetT dimEOp, dimAOp;
-    std::vector<double> hcdefs;
-    std::vector<uint16_t> underice_hc;
-    EigenSparseMatrixT EOpvAOp_merged(compute_EOpvAOp_merged(
-        {&dimEOp, &dimAOp}, EOpvAOp_ng,
+    SparseSetT dimAOp;
+    EOpvAOpResult eam(compute_EOpvAOp_merged(
+        dimAOp, EOpvAOp_ng,
         RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
         &gcmO, args.eq_rad, emI_ices,
         true, true,    // use_global_ice=t, use_local_ice=t
-        metaO.hcdefs, hcdefs, underice_hc, errors));
+        metaO.hcdefs, metaO.indexingHC, args.squash_ec, errors));
 
-    // Construct new indexingHC with merged # of ECs
-    auto const &ix1(metaO.indexingHC[1]);
-    Indexing indexingHC(
-        std::vector<IndexingData>{
-            metaO.indexingHC[0],
-            IndexingData(ix1.name, ix1.base, hcdefs.size())
-        },
-        std::vector<int>(
-            metaO.indexingHC.indices()));
 
     // Print sanity check errors to STDERR
     for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
 
     // ================== Write output
     // Write all inputs to a single output file
-//    ZArray<int,double,2> EOpvAOp_c({EOpvAOp_merged.rows(), EOpvAOp_merged.cols()});
-    ZArray<int,double,2> EOpvAOp_c({dimEOp.sparse_extent(), dimAOp.sparse_extent()});
+    ZArray<int,double,2> EOpvAOp_c({eam.dimEOp.sparse_extent(), dimAOp.sparse_extent()});
     {NcIO ncio(args.topoo_merged_fname, 'w');
 
         // Write Ocean grid metadata
         metaO.hspecA.ncio(ncio, "hspecA");    // Actually ocean grid
-		indexingHC.ncio(ncio, "indexingHC");
-        auto xxdims(get_or_add_dims(ncio, {"nhc"}, {hcdefs.size()}));
-        ncio_vector(ncio, hcdefs, true, "hcdefs", "double", xxdims);
-        ncio_vector(ncio, underice_hc, true, "underice_hc", "short", xxdims);
+
+
+        eam.indexingHC.ncio(ncio, "indexingHC");
+        auto xxdims(get_or_add_dims(ncio, {"nhc"}, {eam.hcdefs.size()}));
+        ncio_vector(ncio, eam.hcdefs, true, "hcdefs", "double", xxdims);
+        ncio_vector(ncio, eam.underice_hc, true, "underice_hc", "short", xxdims);
 
         // Compress and Write EOpvAOp; our merged EOpvAOp needs to be
         // in the same (compressed) format as the original base
         // EOpvAOp that we read.
         {auto EOpvAOp_a(EOpvAOp_c.accum());
-            for (auto ii=begin(EOpvAOp_merged); ii != end(EOpvAOp_merged); ++ii) {
+            for (auto ii=begin(*eam.EOpvAOp); ii != end(*eam.EOpvAOp); ++ii) {
                 EOpvAOp_a.add({
-                    dimEOp.to_sparse(ii->index(0)),
+                    eam.dimEOp.to_sparse(ii->index(0)),
                     dimAOp.to_sparse(ii->index(1))},
                     ii->value());
             }
