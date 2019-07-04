@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import matplotlib
+import matplotlib.pyplot
 import netCDF4
 import icebin
 from icebin import ibgrid
