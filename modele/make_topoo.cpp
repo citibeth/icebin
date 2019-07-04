@@ -67,7 +67,14 @@ int main(int argc, char** argv)
 
 
     printf("============ Writing Output\n");
+    std::vector<double> lonc(mto.hspec.lonc());
+    std::vector<double> latc(mto.hspec.latc());
     {NcIO ncio(args.ofname, 'w');
+        ncio_vector(ncio, lonc, false, "lon", "double",
+            get_or_add_dims(ncio, {"im"}, {lonc.size()}));
+        ncio_vector(ncio, latc, false, "lat", "double",
+            get_or_add_dims(ncio, {"jm"}, {latc.size()}));
+
         mto.hspec.ncio(ncio, "hspec");
         mto.bundle.ncio(ncio, {}, "", "double");
 

@@ -216,11 +216,17 @@ int main(int argc, char **argv)
     // Indexing indexingHCA({"A", "HC"}, {0,0}, {hspecA.size(), indexingHCO[1].extent}, {1,0});
 
     // Read TOPOO input (global ice)
+    blitz::Array<double,2> zsgloO;
+        std::string zsgloO_units, zsgloO_sources;
     {NcIO topoo_nc(args.topoo_ng_fname, 'r');
 
         // Read from topoO file, and allocate resulting arrays.
         topoo.ncio_alloc(topoo_nc, {}, "", "double",
             get_or_add_dims(topoo_nc, {"jm", "im"}, {hspecO.jm, hspecO.im}));
+
+        auto ncvar(ncio_blitz_alloc(topoo_nc, zsgloO, "ZSGLO", "double"));
+            get_att(ncvar, "units").getValues(zsgloO_units);
+            get_att(ncvar, "sources").getValues(zsgloO_sources);
     }
 
     // Read the GCMRegridder
@@ -263,6 +269,17 @@ int main(int argc, char **argv)
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, args.eq_rad, errors);
 
+    // Compute ZOCEAN by truncating 
+    // This never changes in a model run (since the ocean is fixed)
+    // Therefore, it doesn't need to be part of merge_topoO()
+    blitz::Array<double,2> zoceanOm(hspecO.jm, hspecO.im);
+    for (int j=0; j<hspecO.jm; ++j) {
+    for (int i=0; i<hspecO.im; ++i) {
+        zoceanOm(j,i) = foceanOm(j,i) == 1. ? std::max(0.,-zsgloO(j,i)) : 0.;
+    }}
+
+
+
     SparseSetT dimAOp;
     EOpvAOpResult eam(compute_EOpvAOp_merged(
         dimAOp, EOpvAOp_ng,
@@ -278,11 +295,17 @@ int main(int argc, char **argv)
     // ================== Write output
     // Write all inputs to a single output file
     ZArray<int,double,2> EOpvAOp_c({eam.dimEOp.sparse_extent(), dimAOp.sparse_extent()});
+    std::vector<double> lonc(metaO.hspecA.lonc());
+    std::vector<double> latc(metaO.hspecA.latc());
     {NcIO ncio(args.topoo_merged_fname, 'w');
 
         // Write Ocean grid metadata
-        metaO.hspecA.ncio(ncio, "hspecA");    // Actually ocean grid
+        metaO.hspecA.ncio(ncio, "hspecO");    // Actually ocean grid
 
+        ncio_vector(ncio, lonc, false, "lon", "double",
+            get_or_add_dims(ncio, {"im"}, {lonc.size()}));
+        ncio_vector(ncio, latc, false, "lat", "double",
+            get_or_add_dims(ncio, {"jm"}, {latc.size()}));
 
         eam.indexingHC.ncio(ncio, "indexingHC");
         auto xxdims(get_or_add_dims(ncio, {"nhc"}, {eam.hcdefs.size()}));
@@ -303,12 +326,15 @@ int main(int argc, char **argv)
 
         // We write just the main matrix; but not the other things involved in
         // linear::Weighted_Compressed.
-        EOpvAOp_c.ncio(ncio, "EvA.M");
+        EOpvAOp_c.ncio(ncio, "EvO.M");
 
         // Write out all the TOPOO items
-        topoo.ncio(ncio, {}, "", "double",
-            get_or_add_dims(ncio, {"jm", "im"}, {hspecO.jm, hspecO.im}));
-
+        auto dims(get_or_add_dims(ncio, {"jm", "im"}, {hspecO.jm, hspecO.im}));
+        topoo.ncio(ncio, {}, "", "double", dims);
+        auto ncvar(ncio_blitz(ncio, zoceanOm, "ZOCEAN", "double", dims));
+            ncvar.putAtt("description", "Depth of Ocean");
+            ncvar.putAtt("units", zsgloO_units);
+            ncvar.putAtt("sources", zsgloO_sources);
     }
 
     if (errors.size() > 0) return -1;

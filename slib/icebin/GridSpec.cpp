@@ -189,6 +189,43 @@ void GridSpec_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
     }
 }
 // ---------------------------------------------------------
+/** provides lon variable found in ModelE files, indicating
+longitude center of each cell. */
+std::vector<double> HntrSpec::lonc() const
+{
+    std::vector<double> ret;
+
+    // Longitude grid boundaries
+    double const deg_by_im = 360. / (double)im;
+    for (int i=0; i<im; ++i) {
+        // A longitude offset of -180 is added: in hntr grids,
+        // the cell with longitude index=0 starts at 180 degrees W.
+        // This splits the map in the Pacific Ocean when
+        // plotting data naively
+        ret.push_back( -180. + (offi + (double)i + .5) * deg_by_im );
+    }
+    return ret;
+}
+
+/** provides lat variable found in ModelE files, indicating
+latitude center of each cell. */
+std::vector<double> HntrSpec::latc() const
+{
+    std::vector<double> ret;
+
+    // Latitude grid boundaries
+    double dlat_d = dlat / 60.;    // Convert minutes -> degrees
+    for (int j=0; j<jm/2; ++j) {
+        double lat = ((double)j + .5) * dlat_d;
+        ret.push_back(lat);
+        ret.push_back(-lat);
+    }
+
+    std::sort(ret.begin(), ret.end());
+    return ret;
+}
+
+// ---------------------------------------------------------
 int GridSpec_LonLat::nlat() const {
     int south_pole_offset, north_pole_offset;
 

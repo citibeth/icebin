@@ -160,6 +160,13 @@ struct HntrSpec {
     int ndata() const { return size(); }    // Convention makes this more like regular ModelE grids
 
     bool is_set() const { return (im >= 0); }
+
+    /** provides lon variable found in ModelE files, indicating
+    longitude center of each cell. */
+    std::vector<double> lonc() const;
+    /** provides lat variable found in ModelE files, indicating
+    latitude center of each cell. */
+    std::vector<double> latc() const;
 };
 
 

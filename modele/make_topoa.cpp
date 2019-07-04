@@ -118,12 +118,12 @@ int main(int argc, char **argv)
     {NcIO ncio(args.global_ecO_fname, 'r');
     ZArray<int,double,2> EOpvAOp_s;
 
-        hspecO.ncio(ncio, "hspecA");    // Actually ocean grid
+        hspecO.ncio(ncio, "hspecO");    // Actually ocean grid
         indexingHC.ncio(ncio, "indexingHC");
         ncio_vector(ncio, hcdefs, true, "hcdefs", "double", {});
         ncio_vector(ncio, underice_hc, true, "underice_hc", "short", {});
 
-        EOpvAOp_s.ncio(ncio, "EvA.M");
+        EOpvAOp_s.ncio(ncio, "EvO.M");
         EOpvAOp.reset(new EigenSparseMatrixT(
             to_eigen_M(EOpvAOp_s, {&dimEOp, &dimAOp})));
     }
@@ -178,6 +178,7 @@ int main(int argc, char **argv)
     for (auto const &d : topoo.data) {
         std::string name(d.meta.name);
         std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        if (name == "zlake") name = "hlake";   // ModeLE wants it to be called hlake
         topoa.add(ibmisc::ArrayBundle<double,2>::Data(
             name, blitz::Array<double,2>(),
             std::array<int,2>{hspecA.jm, hspecA.im},
@@ -209,7 +210,7 @@ int main(int argc, char **argv)
     auto &fgrndA(topoa.array("fgrnd"));
     auto &fgiceA(topoa.array("fgice"));
     auto &zatmoA(topoa.array("zatmo"));
-    auto &zlakeA(topoa.array("zlake"));
+    auto &hlakeA(topoa.array("hlake"));
     auto &zicetopA(topoa.array("zicetop"));
 
     // --------------- Allocate 3D arrays to go in TOPOA file
@@ -238,17 +239,25 @@ int main(int argc, char **argv)
         foceanOp, foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
         hspecO, hspecA, indexingHCO, indexingHCA, hcdefs, underice_hc,
         args.eq_rad, *EOpvAOp, dimEOp, dimAOp,
-        foceanA, flakeA, fgrndA, fgiceA, zatmoA, zlakeA, zicetopA,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
         fhc, elevE, underice));
 
     // Print sanity check errors to STDERR
     for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
 
     // Write extended TOPOA file
+    std::vector<double> lonc(hspecA.lonc());
+    std::vector<double> latc(hspecA.latc());
     {NcIO topoa_nc(args.topoa_fname, 'w');
         NcVar info(get_or_add_var(topoa_nc, "info", "int", {}));
         std::string sval = "ec,land";
         get_or_put_att(info, topoa_nc.rw, "segments", sval);
+
+        ncio_vector(topoa_nc, lonc, false, "lon", "double",
+            get_or_add_dims(topoa_nc, {"im"}, {lonc.size()}));
+        ncio_vector(topoa_nc, latc, false, "lat", "double",
+            get_or_add_dims(topoa_nc, {"jm"}, {latc.size()}));
+
 
         // Write topoA arrays
         auto jm_im(get_or_add_dims(topoa_nc, {"jm", "im"}, {hspecA.jm, hspecA.im}));
