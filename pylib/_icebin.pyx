@@ -135,21 +135,6 @@ cdef class GCMRegridder:
 
         return ret
 
-#    def update_topo(self, topoO_fname, elevmask_sigmas, bool initial_timestamp, segments, primary_segment,
-#        fhc, underice, elevE,
-#        focean, flake, fgrnd, fgice, zatmo,
-#        foceanOm0):
-#        """Allows Python users access to GCMCoupler_Modele::update_topo().
-#        Starting from output of Gary's program (on the Ocean grid), this subroutine
-#        produces a ModelE TOPO file (as internal arrays) on the Atmosphere grid."""
-#
-#        cicebin.update_topo(
-#            self.cself.get(), topoO_fname.encode(),
-#            <PyObject *>elevmask_sigmas, initial_timestamp, segments.encode(), primary_segment.encode(),
-#            <PyObject *>fhc, <PyObject *>underice, <PyObject *>elevE,
-#            <PyObject *>focean, <PyObject *>flake, <PyObject *>fgrnd, <PyObject *>fgice, <PyObject *>zatmo,
-#            <PyObject *>foceanOm0)
-
     def ncio(self, ibmisc.NcIO ncio, vname):
         self.cself.get().ncio(deref(ncio.cself), vname.encode())
 

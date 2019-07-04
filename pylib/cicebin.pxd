@@ -115,12 +115,6 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         bool scale, bool correctA,
         double sigma_x, double sigma_y, double sigma_z, bool conserve) except +
 
-    cdef void update_topo(GCMRegridder *_gcmA, string &topoO_fname,
-        PyObject *elev_sigmas_py, bool initial_timestep, string &segments_py, string &primary_segment_py,
-        PyObject *fhc_py, PyObject *underice_py, PyObject *elevE_py,
-        PyObject *focean_py, PyObject *flake_py, PyObject *fgrnd_py,
-        PyObject *fgice_py, PyObject *zatmo_py, PyObject *foceanOm0_py) except +
-
 cdef extern from "icebin/GridSpec.hpp" namespace "icebin":
     pass
 
