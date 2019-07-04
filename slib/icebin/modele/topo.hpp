@@ -138,7 +138,7 @@ blitz::Array<double,2> &zicetopA2,
 //
 blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,
-blitz::Array<uint16_t,3> &underice3);
+blitz::Array<int16_t,3> &underice3);
 
 /** Check that FHC sums to 1 in every gridcell.
 @param errors Return any errors found by adding to this vector. */

@@ -378,7 +378,7 @@ blitz::Array<double,2> &zicetopA2,
 //
 blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,
-blitz::Array<uint16_t,3> &underice3)
+blitz::Array<int16_t,3> &underice3)
 {
     ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
 
@@ -422,7 +422,7 @@ blitz::Array<uint16_t,3> &underice3)
     printf("Segment 0: Elevation Classes\n");
     blitz::Array<double,2> fhcE2(reshape<double,3,2>(fhc3, shapeE2));
     auto elevE2(reshape<double,3,2>(elevE3, shapeE2));
-    auto undericeE2(reshape<uint16_t,3,2>(underice3, shapeE2));
+    auto undericeE2(reshape<int16_t,3,2>(underice3, shapeE2));
 
     std::array<int,2> iTuple;
         int &iA2(iTuple[0]);

@@ -222,7 +222,7 @@ int main(int argc, char **argv)
         "description", "Elevation of each elevation class",
         "units", "1"
     }));
-    ibmisc::ArrayBundle<uint16_t,3> topoa3_i;
+    ibmisc::ArrayBundle<int16_t,3> topoa3_i;
     auto &underice(topoa3_i.add("underice", {
         "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
     }));
@@ -255,7 +255,7 @@ int main(int argc, char **argv)
         topoa.ncio(topoa_nc, {}, "", "double", jm_im);
         auto nhc_jm_im(get_or_add_dims(topoa_nc, {"nhc", "jm", "im"}, {nhc_gcm, hspecA.jm, hspecA.im}));
         topoa3.ncio(topoa_nc, {}, "", "double", nhc_jm_im);
-        topoa3_i.ncio(topoa_nc, {}, "", "ushort", nhc_jm_im);
+        topoa3_i.ncio(topoa_nc, {}, "", "short", nhc_jm_im);
     }
 
     if (errors.size() > 0) return -1;
