@@ -390,6 +390,7 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     }
 
     ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"E1vE0");
+This needs to change; must use EOmvAOm_merged from merge_TOPO stuff.
     ncio_spsparse(ncio, out.AvE1_s, false, vname_base+"AvE1");
     ncio_spsparse(ncio, out.wAvE1_s, false, vname_base+"wAvE1");
 }

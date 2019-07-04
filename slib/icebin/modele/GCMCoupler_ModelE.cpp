@@ -367,6 +367,7 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
     std::string fname(fname_c, fname_n);
     // TODO: Get ice model to save/restore state
     // We must figure out how to get an appropriate filename
+    // Must also save/restore state of self->modele_inputs (somewhere; here or in Fortran code)
     if (self->am_i_root()) {
     }
 }
