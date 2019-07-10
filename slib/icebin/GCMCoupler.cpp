@@ -205,6 +205,7 @@ VectorMultivec const &gcm_ovalsE,
 bool run_ice)
 {
 printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
+    // ------------------------ Most MPI Nodes
     if (!gcm_params.am_i_root()) {
         GCMInput out({0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
@@ -214,6 +215,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         return out;
     }
 
+    // ----------------------- Root MPI Node
     std::array<double,2> timespan{last_time_s, time_s};
 
     // Figure out our calendar day to format filenames
@@ -238,6 +240,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
 
     update_topo(time_s);
 
+    // Log the results
     if (gcm_params.icebin_logging) {
         std::string fname = "gcm-in-" + sdate + ".nc";
         NcIO ncio(fname, 'w');
