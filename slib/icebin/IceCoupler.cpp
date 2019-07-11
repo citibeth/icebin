@@ -251,12 +251,18 @@ for (int j=0; j<nI(); ++j) {
 // -----------------------------------------------------------
 /** 
 @param do_run True if we are to actually run (otherwise just return ice_ovalsI from current state)
+@param gcm_ivalsAE_s Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
+       Accumulates here from many ice shets. _s = sparse indexing
 @return ice_ovalsI */
 void IceCoupler::couple(
 double time_s,
 // Values from GCM, passed GCM -> Ice
 VectorMultivec const &gcm_ovalsE_s,
-GCMInput &out,    // Accumulate matrices here...
+// ------- Output Variables
+std::array<VectorMultivec, GridAE::count> gcm_ivalsAE_s,    // (accumulate many ice sheets)
+std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_nc,
+//GCMInput &out,    // Accumulate matrices here...
+// ------- Flags
 bool run_ice)
 {
     if (!gcm_coupler->am_i_root()) {
@@ -345,31 +351,14 @@ bool run_ice)
     RegridParams regrid_params(true, true, {0,0,0});
     RegridParams regrid_params_nc(true, false, {0,0,0});    // correctA=False
 
-    SparseSetT dimA1;
-    SparseSetT dimE1;
+    // ------ Update E1vE0 translation between old and new elevation classes
+    //        (global for all ice sheets)
     // A SparseSet that is identity for the entire range of I
     SparseSetT dimI(id_sparse_set<SparseSetT>(nI()));
 
-    // ---- Update AvE1 matrix and weights (global for all ice sheets)
-
-    // Adds to dimA1 and dimE1
-    auto AvE1(rm->matrix_d("AvE", {&dimA1, &dimE1}, regrid_params));
-
-    spcopy(
-        accum::to_sparse(AvE1->dims,
-        accum::ref(out.AvE1_s)),
-        *AvE1->M);
-
-    TupleListLT<1> &out_wAvE1_s(out.wAvE1_s);    // Get around bug in gcc@4.9.3
-    spcopy(
-        accum::to_sparse(make_array(AvE1->dims[0]),
-        accum::ref(out_wAvE1_s)),
-        AvE1->wM);    // blitz::Array<double,1>
-
-
-    // ------ Update E1vE0 translation between old and new elevation classes
-    //        (global for all ice sheets)
-    auto E1vI_nc(rm->matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
+    // _nc means "No Correct" for changes in area due to projections
+    // See commit d038e5cb for deeper explanation
+    E1vI_nc = std::move(rm->matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
 
     // Don't do this on the first round, since we don't yet have an IvE0
     if (run_ice) {
@@ -458,7 +447,7 @@ bool run_ice)
             auto jj_s(AE1vIs[iAE]->dims[0]->to_sparse(jj));
             for (int nn=0; nn < gcm_ivalsX.cols(); ++nn)
                 vals[nn] = gcm_ivalsX(jj,nn);
-            out.gcm_ivalsAE_s[iAE].add(jj_s, vals);
+            gcm_ivalsAE_s[iAE].add(jj_s, vals);
         }
     }        // iAE
 
@@ -491,6 +480,13 @@ bool run_ice)
     IvE0 = std::move(IvE1->M);
 
     printf("END IceCoupler::couple(%s)\n", name().c_str());
+}
+
+IceModel::update_AvE(
+TupleListLT<2> &AvE1_s,    // OUT: Put fully merged AvE here (sparse indexing)
+TupleListLT<1> wAvE1_s)
+{
+
 }
 // =======================================================
 /** Specialized init signature for IceWriter */
