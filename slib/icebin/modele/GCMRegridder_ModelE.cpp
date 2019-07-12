@@ -122,7 +122,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 // ========================================================================
 // ========================================================================
 // ------------------------------------------------------
-/** Computes AAmvEAM (with scaling)
+/** Computes AAmvEAM (with scaling) FOR A SINGLE ICE SHEET!!!
 @param dims {dimAAm, dimEAm} User-supplied dimension maps, which will be added to.
 @param paramsA Regridding parameters.  NOTE: correctA is ignored.
 @param gcmA Used to obtain access to foceanAOp, foceanAOm, gridA, gridO
@@ -132,7 +132,6 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 */
 static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
     std::array<SparseSetT *,2> dims,
-    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
@@ -562,13 +561,14 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_AvE(
     RegridParams const &params)
 {
 
+    // --------------------- Compute EOpvAOp (merged global + local ice)
+
     // struct EOpvAOpResult:
     //     SparseSetT dimEOp;    // dimEOp is set and returned; dimAOp is appended
     //     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
     //     std::vector<double> hcdefs; // OUT:  Elev class definitions for merged ice
     //     ibmisc::Indexing indexingHC;
     //     std::vector<uint16_t> underice_hc;
-
 
     std::vector<std::string> errors;
     SparseSetT dimAOp;
@@ -579,32 +579,45 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_AvE(
         metaO.hcdefs, metaO.indexingHC, false, errors));
 
 
-    SparseSetT dimAAm, dimEAm;
-    auto AAmvEAm(_compute_AAmvEAm({&dimAAm, &dimEEm}, true, metaO.eq_rad,
-
-
     // Print sanity check errors to STDERR
     if (errors.size() > 0) {
         for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
-        (*icebin_error)(-1, "GCMRegridder_ModelE: Problems detected reading global_ecO file, stopping now.");
+        (*icebin_error)(-1, "GCMRegridder_ModelE: Problems detected creating merged global_ecO file, stopping now.");
     }
 
-    // Convert to sparse indexing...
-        spcopy(
-            accum::to_sparse(make_array(E1vI.dims[0]),
-            accum::ref(E1vE0_g.wM)),    // Output
-            E1vE0.wM);   // Input
 
-        spcopy(
-            accum::to_sparse(make_array(E1vI.dims[0], &dimE0),
-            accum::ref(E1vE0_g.M)),
-            E1vE0);
+    // ----------------- Compute AAMvEAm
+    SparseSetT dimAAm, dimEAm;
+    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(compute_AAmvEAm(
+        {&dimAAm, &dimEEm}, this, specO.eq_rad,
+        cast_GridSpec_LonLat(*this->gcmO->agridA.spec).hntr,
+        cast_GridSpec_LonLat(*this->agridA.spec).hntr,
+        this->gcmO->indexingHC,
+        this->indexingHC,
+        this->foceanAOp,
+        this->foceanAOm,
+        *eam.EOpvAOp->M, eam.dimEOp, dimAOp, eam.EOpAOp->Mw));
+        
 
-        spcopy(
-            accum::to_sparse(make_array(&dimE0),
-            accum::ref(E1vE0_g.Mw)),
-            E1vE0.Mw);
+    linear::Weighted_Tuple AvE_g;
 
+    // ---------------- Convert to sparse indexing
+    spcopy(
+        accum::to_sparse(make_array(&dimAAm),
+        accum::ref(AvE_g.wM)),    // Output
+        AAmvEAm.wM);   // Input
+
+    spcopy(
+        accum::to_sparse(make_array(E1vI.dims[0], &dimE0),
+        accum::ref(AvE_g.M)),
+        *AAmvEAm.M);
+
+    spcopy(
+        accum::to_sparse(make_array(&dimE0),
+        accum::ref(AvE_g.Mw)),
+        AAmvEAm.Mw);
+
+    return AvE_g;
 }
 
 }}    // namespace

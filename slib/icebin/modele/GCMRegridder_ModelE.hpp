@@ -154,7 +154,10 @@ public:
         { return cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr; }
     HntrSpec const &hspecA()
         { return cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr; }
+    GridSpec_LonLat const &specO()
+        { return cast_GridSpec_LonLat(*gcmO->agridA.spec); }
 
+TODO: get rid of eq_rad in metaO
 
     /** Determines whether an elevation class is handled by IceBin or
     ModelE push-down */
