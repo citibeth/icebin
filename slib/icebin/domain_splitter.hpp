@@ -135,6 +135,7 @@ std::vector<GCMInput> split_by_domain(
         &outs.front().MATRIX), \
         out.MATRIX)
 
+// Yes split / distribute E1vE0_s
     SPCOPY(E1vE0_s, domainsE);
     SPCOPY(AvE1_s, domainsA);
     SPCOPY(wAvE1_s, domainsA);

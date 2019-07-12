@@ -158,7 +158,80 @@ void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 //        ---> see RegridMatrices_Dynamic.cpp
 // ---------------------------------------------------------------------
 
+/** Default implementation. */
+linear::Weighted_Tuple GCMRegridder::global_AvE(
+    std::vector<blitz::Array<double,1>> const &emI_lands,
+    std::vector<blitz::Array<double,1>> const &emI_ices,
+    RegridParams const &params)
+{
+    linear::WeightedTuple AvE_g;    // _g = global
 
+
+    for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+        auto &ice_sheet(*ice_regridders()[sheet_index]);
+        auto rm(regrid_matrices(sheet_index, emI_ices[sheet_index], params));
+
+        SparseSetT dimA1;
+        SparseSetT dimE;
+        // ---- Update AvE matrix and weights (global for all ice sheets)
+        // Adds to dimA1 and dimE
+        auto AvE(rm->matrix_d("AvE", {&dimA1, &dimE}, regrid_params));
+
+        // Accumulate per-ice sheet matrix and weights into total.
+        spcopy(
+            accum::to_sparse({AvE->dims[0]}),
+            accum::ref(AvE_g.wM),
+            AvE.wM);
+
+        spcopy(
+            accum::to_sparse(AvE->dims,
+            accum::ref(AvE_g.M)),
+            *AvE.M);
+
+        spcopy(
+            accum::to_sparse({AvE->dims[1]}),
+            accum::ref(AvE_g.Mw),
+            AvE.Mw);
+    }    // Flush accumulators at destruction time
+
+    ret->set_shape(std::array<long,2>{nA(), nE()});
+    return AvE;
+}
+// ------------------------------------------------------------
+virtual linear::Weighted_Tuple GCMRegridder::global_E1vE0(
+    std::vector<linear::WeightedEigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
+    std::vector<linear::WeightedEigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+    std::vector<SparseSetT *> const &dimE0s)    // dimE0 accompanying IvE0
+{
+    linear::WeightedTuple E1vE0_g;    // _g = global
+
+    // ---------- Compute each E1vE0 and merge...
+    for (size_t sheet_index=0; sheet_index < ice_couplers.size(); ++sheet_index) {
+        auto &E1vI(*E1vIs[sheet_index]);
+        auto &IvE0(*IvE0s[sheet_index]);
+        auto &dimE0(*dimE0s[sheet_index]);
+
+        // Don't do this on the first round, since we don't yet have an IvE0
+        EigenSparseMatrixT E1vE0(*E1vI.M * *IvE0.M);
+        spcopy(
+            accum::to_sparse(make_array(E1vI.dims[0]),
+            accum::ref(E1vE0_g.wM)),    // Output
+            E1vE0.wM);   // Input
+
+        spcopy(
+            accum::to_sparse(make_array(E1vI.dims[0], &dimE0),
+            accum::ref(E1vE0_g.M)),
+            E1vE0);
+
+        spcopy(
+            accum::to_sparse(make_array(&dimE0),
+            accum::ref(E1vE0_g.Mw)),
+            E1vE0.Mw);
+    }    // Flush accumulators
+
+    E1vE0_g.set_shape(std::array<long,2>{nE(), nE()});
+    return E1vE0_g;
+}
 
 
 }   // namespace icebin

@@ -272,7 +272,6 @@ Indexing indexingHC_change_nhc(Indexing const &indexingHC0, int nhc)
 EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
 SparseSetT &dimAOp,    // dimAOp is appended; dimEOp is returned as part of return variable.
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed; UNSCALED
-RegridParams const &paramsO,
 GCMRegridder const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emIs,

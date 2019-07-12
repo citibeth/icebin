@@ -428,7 +428,7 @@ blitz::Array<int16_t,3> &underice3)
         int &iA2(iTuple[0]);
         int &ihc(iTuple[1]);
 
-    // Compute AOmvEOm --> fhc
+    // Compute AAmvEAm --> fhc
     auto wAOp(sum(EOpvAOp, 1, '+'));
     SparseSetT dimAAm,dimEAm;
     std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(

@@ -20,6 +20,7 @@ namespace global_ec {
 
 /** Metadata read from the file, which we transfer the the output */
 struct Metadata {
+    double eq_rad;    // Radius ouf the earth; must be the same as in ModelE
     GCMGridOption gcm_grid_option;
     icebin::HntrSpec hspecA, hspecI, hspecI2;
     ibmisc::Indexing indexingI, indexingI2, indexingA, indexingHC, indexingE;
@@ -31,6 +32,7 @@ struct Metadata {
 inline void Metadata::ncio(ibmisc::NcIO &ncio)
 {
     ibmisc::get_or_put_att_enum(*ncio.nc, ncio.rw, "gcm_grid_option", gcm_grid_option);
+    ibmisc::get_or_put_att(*ncio.nc, ncio.rw, "eq_rad", eq_rad);
 
     hspecA.ncio(ncio, "hspecA");
     hspecI.ncio(ncio, "hspecI");

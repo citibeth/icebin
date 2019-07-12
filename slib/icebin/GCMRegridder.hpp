@@ -274,6 +274,7 @@ public:
     template<class AccumT>
     void wA(AccumT &&accum, std::string const &ice_sheet_name, bool native);
 
+
     /** Produce regridding matrices for this setup. */
     virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
@@ -290,6 +291,31 @@ public:
         return regrid_matrices(sheet_ix, elevmaskI);
     }
 
+    // ==================== Compute merged matrices for all ice sheets
+    // "Extra" operations; such as adding legacy ice, ECs (for legacy ice), etc.
+    // can happen here.
+
+    /** Computes global AvE, including any base ice, etc.
+    @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
+    @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
+    @param params Parameters to use in generating regridding matrices.
+        Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
+    virtual std::unique_ptr<ibmisc::linear::Weighted> global_AvE(
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        RegridParams const &params) const;
+
+    /** Produces regridding matrix from last coupling timestep's ECs to this timestep's.
+    Includes any extra ECs, etc. added in global_AvE()
+    @param dimE0s Dimension mapping for E0 dimension of each matrix in IvE0s.
+    @param IvE0s IvE0 of each ice sheet (IvE from past timestep)
+        NOTE: dimI is not needed because I always uses identity index mapping.
+    @param params Parameters to use in generating regridding matrices.
+        Should be RegridParams(true, false, {0,0,0}) to give conservative matrix. */
+    virtual std::unique_ptr<ibmisc::linear::Weighted> global_E1vE0(
+        std::vector<SparseSetT *> const dimE0s,
+        std::vector<EigenSparseMatrixT *> const &IvE0s,
+        RegridParams const &params) const = 0;
 
 
     /**

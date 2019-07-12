@@ -114,6 +114,13 @@ void GCMCoupler_ModelE::_ncread(
     auto config_info(get_or_add_var(ncio_config, vname + ".info", "int", {}));
     // Retrieve name of TOPO file (without Greenland, and on Ocean grid)
     get_or_put_att(config_info, ncio_config.rw, "topo_ocean", topoO_fname);
+    get_or_put_att(config_info, ncio_config.rw, "global_ec", global_ecO_fname);  // Must contain EvA at the very least
+
+    /** EOpvAOp matrix for global (base) ice */
+    ibmisc::ZArray<int,double,2> EOpvAOp_base;
+    /** Metadata read from GLOBAL_EC file along with EOpvAOp_base */
+    global_ec::Metadata metaO;
+
 
     // Let's assume that the EOvAO matrix is included in topoO_fname
 
@@ -602,8 +609,14 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
 // Update TOPO file during a coupled run
 
 
+***** TODO: Try to make a GCMRegridder_Merged_ModelE that handles everything including mismatched regridding on O, loading unmerged TOPOO file, ultimate conversion to A; and even producing a global AvE.
+
+
+
 /** This needs to be run at least once before matrices can be generated. */
-void GCMCoupler_ModelE::update_topo(double time_s)
+void GCMCoupler_ModelE::update_topo(double time_s
+TupleListLT<2> &AvE1_s,    // OUT: Put fully merged AvE here (sparse indexing)
+TupleListLT<1> wAvE1_s)
 {
 
 (*icebin_error)(-1, "update_topo() still needs to be written; and should do the same thing as the command-line version.  The old (pre-merge) update_topo() is in the source code currently.");

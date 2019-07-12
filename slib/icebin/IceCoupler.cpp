@@ -253,18 +253,19 @@ for (int j=0; j<nI(); ++j) {
 @param do_run True if we are to actually run (otherwise just return ice_ovalsI from current state)
 @param gcm_ivalsAE_s Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
        Accumulates here from many ice shets. _s = sparse indexing
-@return ice_ovalsI */
-void IceCoupler::couple(
+*/
+IceCoupler::CoupleOut IceCoupler::couple(
 double time_s,
 // Values from GCM, passed GCM -> Ice
 VectorMultivec const &gcm_ovalsE_s,
 // ------- Output Variables
-std::array<VectorMultivec, GridAE::count> gcm_ivalsAE_s,    // (accumulate many ice sheets)
-std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_nc,
+std::array<VectorMultivec, GridAE::count> &gcm_ivalsAE_s,    // (accumulate over many ice sheets)
 //GCMInput &out,    // Accumulate matrices here...
 // ------- Flags
 bool run_ice)
 {
+    IceCoupler::CoupleOut ret;
+
     if (!gcm_coupler->am_i_root()) {
         printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
@@ -274,7 +275,7 @@ bool run_ice)
         ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
         printf("[noroot] END IceCoupler::couple(%s)\n", name().c_str());
-        return;
+        return ret;
     }
 
     printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
@@ -358,7 +359,7 @@ bool run_ice)
 
     // _nc means "No Correct" for changes in area due to projections
     // See commit d038e5cb for deeper explanation
-    E1vI_nc = std::move(rm->matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
+    ret.E1vI_nc = std::move(rm->matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
 
     // Don't do this on the first round, since we don't yet have an IvE0
     if (run_ice) {
@@ -476,10 +477,13 @@ bool run_ice)
     }
 
     // Save stuff for next time around
+    ret.dimE0 = set::move(dimE0);
+    ret.IvE0 = std::move(IvE0);
     dimE0 = std::move(dimE1);
-    IvE0 = std::move(IvE1->M);
+    IvE0 = std::move(IvE1);
 
     printf("END IceCoupler::couple(%s)\n", name().c_str());
+    return ret;
 }
 
 IceModel::update_AvE(

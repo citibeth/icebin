@@ -148,16 +148,30 @@ public:
     This defaults to NOP, and is set by the coupling contract. */
     std::function<void(blitz::Array<double,2> &, double)> reconstruct_ice_ivalsI;
 
+#if 0
+    struct CoupleOut {
+        std::unique_ptr<linear::Weighted_Eigen> E1vE0;
+
+    };
+#endif
+
+    struct CoupleOut {
+        SparseSetT dimE0;
+        std::unique_ptr<EigenSparseMatrixT> IvE0;
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> &E1vI_nc;
+    };
+
     /** (4) Run the ice model for one coupling timestep.
     @param time_s Seconds since GCMParams::time_base.  Helps with debugging.
     @param out Outputs are stored here
     @param run_ice Set to false to get initial conditions of ice sheet (in out)
     */
-    void couple(
+    CoupleOut couple(
         double time_s,
         // Values from GCM, passed GCM -> Ice
         VectorMultivec const &gcm_ovalsE,
-        GCMInput &out,    // Accumulate matrices here...
+        std::array<VectorMultivec, GridAE::count> &gcm_ivalsAE_s,    // (accumulate many ice sheets)
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> &E1vI_nc,    // OUT
         bool run_ice);
 
     /** (4.1) @param index Index of each grid value.

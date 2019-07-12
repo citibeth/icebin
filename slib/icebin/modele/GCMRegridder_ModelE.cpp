@@ -481,6 +481,14 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     _hcdefs.clear();
     for (double elev : gcmO->hcdefs()) _hcdefs.push_back(elev);
     for (double elev : global_hcdefs) _hcdefs.push_back(elev);
+
+    // Read EOpvAOp_base from global_ec file
+    // Read metadata and global EOpvAOp matrix (from output of global_ec.cpp)
+    {NcIO ncio(global_ecO_fname, 'r');
+        metaO.ncio(ncio);
+        EOpvAOp_base.ncio(ncio, "EvA.M");
+    }
+
 }
 
 
@@ -546,6 +554,57 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
         this, 'T'));
 
     return rm;
+}
+// -----------------------------------------------------------------------
+linear::Weighted_Tuple GCMRegridder_ModelE::global_AvE(
+    std::vector<blitz::Array<double,1>> const &emI_lands,
+    std::vector<blitz::Array<double,1>> const &emI_ices,
+    RegridParams const &params)
+{
+
+    // struct EOpvAOpResult:
+    //     SparseSetT dimEOp;    // dimEOp is set and returned; dimAOp is appended
+    //     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
+    //     std::vector<double> hcdefs; // OUT:  Elev class definitions for merged ice
+    //     ibmisc::Indexing indexingHC;
+    //     std::vector<uint16_t> underice_hc;
+
+
+    std::vector<std::string> errors;
+    SparseSetT dimAOp;
+    EOpvAOpResult eam(compute_EOpvAOp_merged(
+        dimAOp, EOpvAOp_base,
+        &*gcmO, metaO.eq_rad, emI_ices,
+        true, true,    // use_global_ice=t, use_local_ice=t
+        metaO.hcdefs, metaO.indexingHC, false, errors));
+
+
+    SparseSetT dimAAm, dimEAm;
+    auto AAmvEAm(_compute_AAmvEAm({&dimAAm, &dimEEm}, true, metaO.eq_rad,
+
+
+    // Print sanity check errors to STDERR
+    if (errors.size() > 0) {
+        for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
+        (*icebin_error)(-1, "GCMRegridder_ModelE: Problems detected reading global_ecO file, stopping now.");
+    }
+
+    // Convert to sparse indexing...
+        spcopy(
+            accum::to_sparse(make_array(E1vI.dims[0]),
+            accum::ref(E1vE0_g.wM)),    // Output
+            E1vE0.wM);   // Input
+
+        spcopy(
+            accum::to_sparse(make_array(E1vI.dims[0], &dimE0),
+            accum::ref(E1vE0_g.M)),
+            E1vE0);
+
+        spcopy(
+            accum::to_sparse(make_array(&dimE0),
+            accum::ref(E1vE0_g.Mw)),
+            E1vE0.Mw);
+
 }
 
 }}    // namespace

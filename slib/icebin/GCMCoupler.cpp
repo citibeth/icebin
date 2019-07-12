@@ -233,12 +233,35 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     // Initialize output: A and E
     GCMInput out({gcm_inputsAE[0].size(), gcm_inputsAE[1].size()});
 
+    std::vector<CoupleOut> couts;
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+        IceCoupler::CoupleOut cout;
         auto &ice_coupler(ice_couplers[sheetix]);
-        ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
+
+//        ibmisc::linear::Weighted_Eigen *E1vI_nc;
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_ptr;
+        couts.push_back(ice_coupler->couple(
+            time_s, gcm_ovalsE,
+            out.gcm_ivalsAE_s, run_ice));
     }
 
-    update_topo(time_s);
+    // Compute E1vE0, to allow for updating elevation classes
+    // NOTE: ECs in the nullspace of E0 and E1 will NOT be touched.
+    {
+        std::vector<linear::WeightedEigen *> const &E1vIs;
+        std::vector<linear::WeightedEigen *> const &IvE0s;
+        std::vector<SparseSetT *> const &dimE0s;
+
+        for (auto &cout : couts)  {
+            E1vIs.push_back(&*cout.E1vI_nc);
+            IvE0s.push_back(&*cout.IvE0);
+            dimE0s.push_back(&cout.dimE0);
+        }
+        out.E1vE0 = gcm_regridder.global_E1vE0(E1vIs, IvE0s, dimE0s);
+    }
+
+*** TODO Compute out.AvE1_s in update_topo(), instead of assembling it bit by bit in ice_coupler->couple()
+    update_topo(time_s, out.AvE1_s, out.wAvE1_s);
 
     // Log the results
     if (gcm_params.icebin_logging) {

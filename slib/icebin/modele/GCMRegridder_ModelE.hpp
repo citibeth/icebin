@@ -125,6 +125,9 @@ public:
     This is typically loaded directly from a NetCDF file. */
     std::shared_ptr<icebin::GCMRegridder> const gcmO;
 
+    /** Base EOpvAOp matrix, laoded from TOPO_OC file */
+    ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed
+
     /** ModelE ocean cover, on the Ocean grid, as seen by the ice
     model (sparse indexing).  Ocean grid cells can contain fractional
     ocean cover.  foceanAOp can change over the course of a ModelE
@@ -139,12 +142,19 @@ public:
     mid-run. */
     blitz::Array<double,1> foceanAOm;
 
+
     /** Constructor used in coupler: create the GCMRegridder first,
         then fill in foceanAOp and foceanAOm later.
     @param _gcmO Underlying regridder for the Ocean Grid Regime. */
     GCMRegridder_ModelE(
         std::string const &_global_ecO,
         std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
+
+    HntrSpec const &hspecO()
+        { return cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr; }
+    HntrSpec const &hspecA()
+        { return cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr; }
+
 
     /** Determines whether an elevation class is handled by IceBin or
     ModelE push-down */

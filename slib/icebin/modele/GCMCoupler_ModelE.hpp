@@ -142,6 +142,9 @@ public:
     program, sans ice sheets) */
     std::string topoO_fname;
 
+    /** Name of file on ocean grid containing the EvA matrix for global (non-IceBin) ice. */
+    std::string global_ecO_fname;
+
     // Initial ModelE state of foceanO; this cannot change.
     blitz::Array<double,2> foceanOm0;
 
