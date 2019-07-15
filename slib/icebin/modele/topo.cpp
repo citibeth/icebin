@@ -380,7 +380,18 @@ blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,
 blitz::Array<int16_t,3> &underice3)
 {
-    ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
+    {ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
+
+        // Compute AAmvEAm --> fhc
+        auto wAOp(sum(EOpvAOp, 1, '+'));
+        SparseSetT dimAAm,dimEAm;
+        std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
+            {&dimAAm, &dimEAm}, true, eq_rad,    // scale=true
+            hspecO, hspecA, indexingHCO, indexingHCA,
+            foceanOp, foceanOm,
+            EOpvAOp, dimEOp, dimAOp, wAOp));
+    }
+
 
 
     Hntr hntr_AvO(17.17, hspecA, hspecO);
@@ -427,15 +438,6 @@ blitz::Array<int16_t,3> &underice3)
     std::array<int,2> iTuple;
         int &iA2(iTuple[0]);
         int &ihc(iTuple[1]);
-
-    // Compute AAmvEAm --> fhc
-    auto wAOp(sum(EOpvAOp, 1, '+'));
-    SparseSetT dimAAm,dimEAm;
-    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
-        {&dimAAm, &dimEAm}, true, eq_rad,    // scale=true
-        hspecO, hspecA, indexingHCO, indexingHCA,
-        foceanOp, foceanOm,
-        EOpvAOp, dimEOp, dimAOp, wAOp));
 
     for (auto ii=begin(*AAmvEAm->M); ii != end(*AAmvEAm->M); ++ii) {
         int const iA_d = ii->index(0);
