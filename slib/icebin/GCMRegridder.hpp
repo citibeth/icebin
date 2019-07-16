@@ -300,10 +300,9 @@ public:
     @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
     @param params Parameters to use in generating regridding matrices.
         Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
-    virtual std::unique_ptr<ibmisc::linear::Weighted> global_AvE(
-        std::vector<blitz::Array<double,1>> const &emI_lands,
+    virtual linear::Weighted_Tuple global_unscaled_AvE(
         std::vector<blitz::Array<double,1>> const &emI_ices,
-        RegridParams const &params) const;
+        std::vector<blitz::Array<double,1>> const &emI_lands) const;
 
     /** Produces regridding matrix from last coupling timestep's ECs to this timestep's.
     Includes any extra ECs, etc. added in global_AvE()
@@ -312,7 +311,7 @@ public:
         NOTE: dimI is not needed because I always uses identity index mapping.
     @param params Parameters to use in generating regridding matrices.
         Should be RegridParams(true, false, {0,0,0}) to give conservative matrix. */
-    virtual std::unique_ptr<ibmisc::linear::Weighted> global_E1vE0(
+    virtual linear::Weighted_Tuple global_unscaled_E1vE0(
         std::vector<SparseSetT *> const dimE0s,
         std::vector<EigenSparseMatrixT *> const &IvE0s,
         RegridParams const &params) const = 0;

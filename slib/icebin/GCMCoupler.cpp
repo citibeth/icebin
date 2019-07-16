@@ -257,10 +257,25 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
             IvE0s.push_back(&*cout.IvE0);
             dimE0s.push_back(&cout.dimE0);
         }
-        out.E1vE0 = gcm_regridder.global_E1vE0(E1vIs, IvE0s, dimE0s);
+
+        out.E1vE0_unscaled = gcm_regridder.global_unscaled_E1vE0(
+            E1vIs, IvE0s, dimE0s);
     }
 
-*** TODO Compute out.AvE1_s in update_topo(), instead of assembling it bit by bit in ice_coupler->couple()
+    {
+        std::vector<blitz::Array<double,1>> emI_ices, emI_lands;
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
+
+            emI_ices.push_back(blitz::Array<double,1>(ice_coupler->emI_ice));
+            emI_lands.push_back(blitz::Array<double,1>(land_coupler->emI_ice));
+        }
+
+        out.AvE_unscaled = gcm_regridder.global_unscaled_AvE(
+            emI_ices, emI_lands);
+    }
+
+
     update_topo(time_s, out.AvE1_s, out.wAvE1_s);
 
     // Log the results

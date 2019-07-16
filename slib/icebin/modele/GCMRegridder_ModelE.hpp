@@ -126,7 +126,7 @@ public:
     std::shared_ptr<icebin::GCMRegridder> const gcmO;
 
     /** Base EOpvAOp matrix, laoded from TOPO_OC file */
-    ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed
+    ibmisc::ZArray<int,double,2> EOpvAOp_base,    // from linear::Weighted_Compressed
 
     /** ModelE ocean cover, on the Ocean grid, as seen by the ice
     model (sparse indexing).  Ocean grid cells can contain fractional
@@ -178,6 +178,12 @@ TODO: get rid of eq_rad in metaO
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
         RegridParams const &params = RegridParams()) const;
+
+    linear::Weighted_Tuple global_AvE(
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        RegridParams const &params) const;
+
 };
 
 /** Casts to a Grid_Lonlat, which is what we know is used by ModelE */

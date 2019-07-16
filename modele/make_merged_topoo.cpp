@@ -282,7 +282,7 @@ int main(int argc, char **argv)
     SparseSetT dimAOp;
     EOpvAOpResult eam(compute_EOpvAOp_merged(
         dimAOp, EOpvAOp_ng,
-//        RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
+        RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
         &gcmO, args.eq_rad, emI_ices,
         true, true,    // use_global_ice=t, use_local_ice=t
         metaO.hcdefs, metaO.indexingHC, args.squash_ec, errors));

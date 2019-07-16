@@ -234,11 +234,26 @@ int main(int argc, char **argv)
     topoa3_i.allocate(shape3, {"nhc", "jm", "im"});
 
 
+    // ------------------- Create AAmvEAm, needed for TOPOA
+    std::unique_ptr<ConstUniverseT> const_dimAOp(
+        new ConstUniverseT({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp}));
+
+    // Compute AAmvEAm --> fhc
+    auto wAOp(sum(*EOpvAOp, 1, '+'));
+    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
+        true, args.eq_rad,    // scale=true
+        hspecO, hspecA, indexingHCO, indexingHCA,
+        foceanOp, foceanOm,
+        *EOpvAOp, dimEOp, dimAOp, wAOp));
+
+    const_dimAOp.reset();    // Check for any const violations
+
+
     // ---------------- Create TOPOA in memory
     std::vector<std::string> errors(make_topoA(
-        foceanOp, foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
         hspecO, hspecA, indexingHCO, indexingHCA, hcdefs, underice_hc,
-        args.eq_rad, *EOpvAOp, dimEOp, dimAOp,
+        *AAmvEAm, dimEOp, dimAOp,
         foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
         fhc, elevE, underice));
 

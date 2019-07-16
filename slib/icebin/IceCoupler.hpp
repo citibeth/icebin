@@ -157,8 +157,8 @@ public:
 
     struct CoupleOut {
         SparseSetT dimE0;
-        std::unique_ptr<EigenSparseMatrixT> IvE0;
-        std::unique_ptr<ibmisc::linear::Weighted_Eigen> &E1vI_nc;
+        std::unique_ptr<EigenSparseMatrixT> IvE0;    // SCALED
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> &E1vI_nc;    // SCALED
     };
 
     /** (4) Run the ice model for one coupling timestep.

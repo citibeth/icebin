@@ -543,11 +543,13 @@ printf("END gcmce_couple_native() every_outs\n");
         boost::mpi::scatter(self->gcm_params.world, out, self->gcm_params.gcm_root);
     }
 
-    // 1. Copies values back into modele.gcm_ivals
+    // 1. Copies values back into modele.gcm_ivals from scatterd MPI stuff
     self->update_gcm_ivals(out);
+#if 0
     // 2. Sets icebin_nhc, 
     // 3. Updates FHC, ZATMO, etc.
     self->update_topo(time_s);    // initial_timestep=false
+#endif
 }
 // =======================================================
 /** Called from MPI rank */

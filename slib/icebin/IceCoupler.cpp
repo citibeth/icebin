@@ -349,8 +349,8 @@ bool run_ice)
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
     std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, emI_ice));
-    RegridParams regrid_params(true, true, {0,0,0});
-    RegridParams regrid_params_nc(true, false, {0,0,0});    // correctA=False
+    RegridParams regrid_params(true, true, {0,0,0}); // scale=true
+    RegridParams regrid_params_nc(true, false, {0,0,0});    // scale=t, correctA=False
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
@@ -360,17 +360,6 @@ bool run_ice)
     // _nc means "No Correct" for changes in area due to projections
     // See commit d038e5cb for deeper explanation
     ret.E1vI_nc = std::move(rm->matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
-
-    // Don't do this on the first round, since we don't yet have an IvE0
-    if (run_ice) {
-        TupleListLT<2> &out_E1vE0_s(out.E1vE0_s);
-        EigenSparseMatrixT E1vE0(*E1vI_nc->M * *IvE0);
-        spcopy(
-            accum::to_sparse(make_array(&dimE1, &dimE0),
-            accum::ref(out_E1vE0_s)),
-            E1vE0);
-    }
-
 
     // ========= Compute gcm_ivalsE
 

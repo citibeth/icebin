@@ -60,11 +60,14 @@ struct GCMInput {
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    linear::Weighted_Tuple E1vE0;    // Sparse indexing
+    linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
 
     // Regrid matrix to convert to atmosphere.
     // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
-    linear::Weighted_Tuple AvE1;
+//    linear::Weighted_Tuple AvE1_unscaled;
+
+Root arrays should be returned...
+
 
     GCMInput(std::array<int, GridAE::count> const &nvar) :
         gcm_ivalsAE_s({

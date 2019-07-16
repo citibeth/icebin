@@ -159,11 +159,13 @@ void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 // ---------------------------------------------------------------------
 
 /** Default implementation. */
-linear::Weighted_Tuple GCMRegridder::global_AvE(
+linear::Weighted_Tuple GCMRegridder::global_unscaled_AvE(
     std::vector<blitz::Array<double,1>> const &emI_lands,
     std::vector<blitz::Array<double,1>> const &emI_ices,
-    RegridParams const &params)
+    RegridParams const &params) const
 {
+    (*icebin_error)(-1, "Generic GCMRegridder::global_unscaled_AvE() has not been tested; but it should be close to correct, if needed.");
+#if 0
     linear::WeightedTuple AvE_g;    // _g = global
 
 
@@ -196,12 +198,13 @@ linear::Weighted_Tuple GCMRegridder::global_AvE(
 
     ret->set_shape(std::array<long,2>{nA(), nE()});
     return AvE;
+#endif
 }
 // ------------------------------------------------------------
-virtual linear::Weighted_Tuple GCMRegridder::global_E1vE0(
+virtual linear::Weighted_Tuple GCMRegridder::global_unscaled_E1vE0(
     std::vector<linear::WeightedEigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
     std::vector<linear::WeightedEigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
-    std::vector<SparseSetT *> const &dimE0s)    // dimE0 accompanying IvE0
+    std::vector<SparseSetT *> const &dimE0s) const    // dimE0 accompanying IvE0
 {
     linear::WeightedTuple E1vE0_g;    // _g = global
 
@@ -212,7 +215,7 @@ virtual linear::Weighted_Tuple GCMRegridder::global_E1vE0(
         auto &dimE0(*dimE0s[sheet_index]);
 
         // Don't do this on the first round, since we don't yet have an IvE0
-        EigenSparseMatrixT E1vE0(*E1vI.M * *IvE0.M);
+        EigenSparseMatrixT E1vE0(map_eigen_diagonal(E1vI->wM) * *E1vI.M * *IvE0.M);    // UNSCALED
         spcopy(
             accum::to_sparse(make_array(E1vI.dims[0]),
             accum::ref(E1vE0_g.wM)),    // Output
