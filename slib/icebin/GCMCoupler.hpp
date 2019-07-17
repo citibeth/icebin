@@ -45,6 +45,14 @@ struct GCMInput {
     // Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
     // _s = sparse indexing
     std::array<VectorMultivec, GridAE::count> gcm_ivalsAE_s;
+    std::array<std::vector<double>, GridAE::count> gcm_ivalsAE_weight_s;
+
+    // Output fields from coupling back into GCM
+    //    * Computed by merging from IceCoupler::couple()
+    //    * UNSCALED: values must be divided by last column (the weight)
+//    VectorMultivec gcm_ivalsA_s;
+//    VectorMultivec gcm_ivalsE_s;
+
 
     // This is all for elevation classes in ICE space (ice_nhc, not gcm_nhc)
 
@@ -71,7 +79,7 @@ Root arrays should be returned...
 
     GCMInput(std::array<int, GridAE::count> const &nvar) :
         gcm_ivalsAE_s({
-            VectorMultivec(nvar[0]),
+            VectorMultivec(nvar[0]),   // Add weight as last column
             VectorMultivec(nvar[1]),
         })
     {}

@@ -349,8 +349,6 @@ bool run_ice)
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
     std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, emI_ice));
-    RegridParams regrid_params(true, true, {0,0,0}); // scale=true
-    RegridParams regrid_params_nc(true, false, {0,0,0});    // scale=t, correctA=False
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
@@ -359,14 +357,17 @@ bool run_ice)
 
     // _nc means "No Correct" for changes in area due to projections
     // See commit d038e5cb for deeper explanation
-    ret.E1vI_nc = std::move(rm->matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
+    ret.E1vI_unscaled_nc = rm->matrix_d("EvI", {&dimE1, &dimI},
+        RegridParams(false, false, {0,0,0}));    // scale=f, correctA=f
 
     // ========= Compute gcm_ivalsE
-
-    auto A1vI(rm->matrix_d("AvI", {&dimA1, &dimI}, regrid_params));
+    auto A1vI_unscaled(rm->matrix_d("AvI", {&dimA1, &dimI},
+        RegridParams(false, true, {0,0,0}));    // scale=f, correctA=t
 
     // Do it once for _E variables and once for _A variables.
-    std::array<linear::Weighted_Eigen * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI_nc};
+    std::array<linear::Weighted_Eigen * const, GridAE::count> AE1vIs
+        {&*A1vI_unscaled, &*E1vI_unscaled_nc};
+
     for (int iAE=0; iAE < GridAE::count; ++iAE) {
 
         // Assuming column-major matrices...
@@ -427,23 +428,26 @@ bool run_ice)
         // -------------------------- END Sanity Check
 
         // Regrid while recombining variables
+        // (Do not need to use Weighted_Eigen::apply(), since this is not IvE)
         EigenDenseMatrixT gcm_ivalsX((*AE1vIs[iAE]->M) * (
             ice_ovalsI_e * gcmi_v_iceo_T.M + gcmi_v_iceo_T.b.replicate(nI(),1) ));
-
         // Sparsify while appending to the global VectorMultivec
         // (Transposes order in memory)
-        std::vector<double> vals(gcm_ivalsX.cols());
+        std::vector<double> vals(gcm_ivalsAE_s[iAE].size()); // Extra col for weight
         for (int jj=0; jj < gcm_ivalsX.rows(); ++jj) {
             auto jj_s(AE1vIs[iAE]->dims[0]->to_sparse(jj));
-            for (int nn=0; nn < gcm_ivalsX.cols(); ++nn)
+            int nn = 0;
+            for (; nn < gcm_ivalsX.cols(); ++nn)
                 vals[nn] = gcm_ivalsX(jj,nn);
             gcm_ivalsAE_s[iAE].add(jj_s, vals);
+            gcm_ivalsAE_weight_s[iAE].push_back(AE1vIs[iAE]->wM(jj))   // Add weight as separate vector
         }
     }        // iAE
 
     // Compute IvE (for next timestep)
     std::unique_ptr<linear::Weighted_Eigen> IvE1(
-        rm->matrix_d("IvE", {&dimI, &dimE1}, regrid_params));
+        rm->matrix_d("IvE", {&dimI, &dimE1},
+        RegridParams(true, true, {0,0,0}))); // scale=t, correctA=t
 
     // wIvE0.reference(IvE1->wM);
 

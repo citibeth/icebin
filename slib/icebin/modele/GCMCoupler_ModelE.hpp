@@ -114,6 +114,26 @@ public:
     }
 };
 
+struct GCMInput_ModelE : public GCMInput
+{
+
+    enum class A {FOCEAN, FLAKE, FGRND, FGICE, ZATMO, ZLAKE, ZICETOP, NUM};
+    enum class B {FHC, ELEV, UNDERICE, NUM};
+
+    // TOPO file stuff
+    //    * Computed by GCMCoupler_ModelE::couple()
+    //    * SCALED: ready-to-use values
+    std::array<VectorMultivec, GridAE::count> topoAE_s;
+    std::array<std::vector<double>, GridAE::count> topoAE_weight_s;
+
+    GCMInput_ModelE(std::array<int, GridAE::count> const &nvar) :
+        GCMInput(nvar),   // From the contract
+        topoAE_s({
+            VectorMultivec(A::NUM),   // Add weight as last column
+            VectorMultivec(E::NUM),
+        })
+    {}
+};
 
 
 class GCMCoupler_ModelE : public GCMCoupler
@@ -171,7 +191,7 @@ public:
 
 
     // 1. Copies values back into modele_inputs.gcm_ivals
-    void update_gcm_ivals(GCMInput const &out);
+    void update_gcm_ivals(GCMInput_ModelE const &out);
 
 };    // class GCMCouler_ModelE
 

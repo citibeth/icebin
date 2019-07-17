@@ -544,7 +544,7 @@ printf("END gcmce_couple_native() every_outs\n");
     }
 
     // 1. Copies values back into modele.gcm_ivals from scatterd MPI stuff
-    self->update_gcm_ivals(out);
+    self->apply_gcm_ivals(out);
 #if 0
     // 2. Sets icebin_nhc, 
     // 3. Updates FHC, ZATMO, etc.
@@ -552,11 +552,21 @@ printf("END gcmce_couple_native() every_outs\n");
 #endif
 }
 // =======================================================
-/** Called from MPI rank */
-void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
+
+/** Called from MPI rank.  Copies output of coupling back into
+appropriate dense-indexing ModelE variables. */
+void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
 {
-    printf("BEGIN GCMCoupler_ModelE::update_gcm_ivals\n");
+    printf("BEGIN GCMCoupler_ModelE::apply_gcm_ivals\n");
     auto nvar(out.nvar());    // A and E
+
+    // Write to here...
+    for (int iAE=0; iAE<GridAE::count; ++iAE) {
+        if (nvar[iAE] < 0) (*icebin_error)(-1,
+            "nvar[%d]=%d < 0, it should not be\n", iAE, nvar[iAE]);
+    }
+
+    // ================================= A
 
     // Update gcm_ivalA variables...
     // Read from here...
@@ -565,24 +575,34 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     if (gcm_ivalsA.size() != nvar[GridAE::A]) (*icebin_error)(-1,
         "gcm_ivalsA is wrong size: %ld vs. %d", gcm_ivalsA.size(), nvar[GridAE::A]);
 
-    // Write to here...
-    for (int iAE=0; iAE<GridAE::count; ++iAE) {
-        if (nvar[iAE] < 0) (*icebin_error)(-1,
-            "nvar[%d]=%d < 0, it should not be\n", iAE, nvar[iAE]);
+    // Clear output: because non-present elements in sparse gcm_ivalsA are 0
+    for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) (*gcm_ivalsA[ivar]) = 0;
+
+    // Create summed weights
+    blitz::Array<double,1> sA_s(nA());
+    sA_s = 0;
+    for (int iA_d=0; iA_d<gcm_ivalsA_s.size(); ++iA_d) {
+        auto iA_s(gcm_ivalsA_s.index[iA_d]);
+        sA_s[iA_s] += gcm_ivalsA_s.vals[iA_d];
+    }
+    for (int iA_s=0; iA_s<sA_s.shape(0); ++iA_s) {
+        sA_s(iA_s) = 1. / sA_s(iA_s);    // Will create NaNs but we dont care...
     }
 
-    for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) (*gcm_ivalsA[ivar]) = 0;
+    // Copy sparse arrays to output
     for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
         long iA = gcm_ivalsA_s.index[ix];
         auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
         int const i = ij[0];
         int const j = ij[1];
         for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
+TODO: Is this correct?  Does not gcm_ivalsA use Fortran-style column-major 1-based indexing???
             (*gcm_ivalsA[ivar])(j,i) +=
-                gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar];
+                gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar] * sA_s(iA);
         }
     }
 
+    // ================================= E
     // Update gcm_ivalE variables...
     // Read from here...
     VectorMultivec const &gcm_ivalsE_s(out.gcm_ivalsAE_s[GridAE::E]);
@@ -590,8 +610,21 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
     if (gcm_ivalsE.size() != nvar[GridAE::E]) (*icebin_error)(-1,
         "gcm_ivalsE is wrong size: %ld vs. %d", gcm_ivalsE.size(), nvar[GridAE::E]);
 
-    // Write to here...
+    // Clear output: because non-present elements in sparse gcm_ivalsA are 0
     for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) (*gcm_ivalsE[ivar]) = 0;
+
+    // Create summed weights
+    blitz::Erray<double,1> sE_s(nE());
+    sE_s = 0;
+    for (int iE_d=0; iE_d<gcm_ivalsE_s.size(); ++iE_d) {
+        auto iE_s(gcm_ivalsE_s.index[iE_d]);
+        sE_s[iE_s] += gcm_ivalsE_s.vals[iE_d];
+    }
+    for (int iE_s=0; iE_s<sE_s.shape(0); ++iE_s) {
+        sE_s(iE_s) = 1. / sE_s(iE_s);    // Will create NaNs but we dont care...
+    }
+
+    // Copy sparse arrays to output
     for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
         long iE = gcm_ivalsE_s.index[ix];
         auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
@@ -600,12 +633,13 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
         int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
         int const ihc_gcm = gcm_params.icebin_base_hc + ihc_ice;
 
+TODO: Is this correct?  Does not gcm_ivalsE use Fortran-style column-major 1-based indexing???
         for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
             (*gcm_ivalsE[ivar])(ihc_gcm,j,i) +=
-                gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar];
+                gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar] * sE_s(iE);
         }
     }
-    printf("END GCMCoupler_ModelE::update_gcm_ivals\n");
+    printf("END GCMCoupler_ModelE::apply_gcm_ivals\n");
 }
 // ============================================================================
 // Update TOPO file during a coupled run

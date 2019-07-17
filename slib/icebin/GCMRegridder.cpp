@@ -202,7 +202,7 @@ linear::Weighted_Tuple GCMRegridder::global_unscaled_AvE(
 }
 // ------------------------------------------------------------
 virtual linear::Weighted_Tuple GCMRegridder::global_unscaled_E1vE0(
-    std::vector<linear::WeightedEigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
+    std::vector<linear::WeightedEigen *> const &E1vIs_unscaled, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) UNSCALED matrix
     std::vector<linear::WeightedEigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
     std::vector<SparseSetT *> const &dimE0s) const    // dimE0 accompanying IvE0
 {
@@ -210,12 +210,12 @@ virtual linear::Weighted_Tuple GCMRegridder::global_unscaled_E1vE0(
 
     // ---------- Compute each E1vE0 and merge...
     for (size_t sheet_index=0; sheet_index < ice_couplers.size(); ++sheet_index) {
-        auto &E1vI(*E1vIs[sheet_index]);
+        auto &E1vI_unscaled(*E1vIs_unscaled[sheet_index]);
         auto &IvE0(*IvE0s[sheet_index]);
         auto &dimE0(*dimE0s[sheet_index]);
 
         // Don't do this on the first round, since we don't yet have an IvE0
-        EigenSparseMatrixT E1vE0(map_eigen_diagonal(E1vI->wM) * *E1vI.M * *IvE0.M);    // UNSCALED
+        EigenSparseMatrixT E1vE0(*E1vI_unscaled.M * *IvE0.M);    // UNSCALED
         spcopy(
             accum::to_sparse(make_array(E1vI.dims[0]),
             accum::ref(E1vE0_g.wM)),    // Output

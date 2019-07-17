@@ -312,9 +312,9 @@ public:
     @param params Parameters to use in generating regridding matrices.
         Should be RegridParams(true, false, {0,0,0}) to give conservative matrix. */
     virtual linear::Weighted_Tuple global_unscaled_E1vE0(
-        std::vector<SparseSetT *> const dimE0s,
-        std::vector<EigenSparseMatrixT *> const &IvE0s,
-        RegridParams const &params) const = 0;
+        std::vector<linear::WeightedEigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
+        std::vector<linear::WeightedEigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+        std::vector<SparseSetT *> const &dimE0s) const = 0;    // dimE0 accompanying IvE0
 
 
     /**
