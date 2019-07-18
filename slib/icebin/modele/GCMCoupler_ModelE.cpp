@@ -486,7 +486,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
     // Gather it to root
     // boost::mpi::communicator &gcm_world(world);
     // Init our output struct based on number of A and E variables.
-    GCMInput out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
+    GCMInput_ModelE out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
     if (self->am_i_root()) {
         // =================== MPI ROOT =============================
         std::vector<VectorMultivec> every_gcm_ovalsE_s;
@@ -508,12 +508,12 @@ printf("END gcm_ovalsE_s\n");
 #endif
 
         // Couple on root!
-        GCMInput out(
+        GCMInput_ModelE out(
             self->couple(time_s,
                 gcm_ovalsE_s, run_ice));
 
         // Split up the output (and 
-        std::vector<GCMInput> every_outs(
+        std::vector<GCMInput_ModelE> every_outs(
             split_by_domain<DomainDecomposer_ModelE>(out,
                 *self->domains, *self->domains));
 #if 0
@@ -555,7 +555,7 @@ printf("END gcmce_couple_native() every_outs\n");
 
 /** Called from MPI rank.  Copies output of coupling back into
 appropriate dense-indexing ModelE variables. */
-void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
+void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput_ModelE const &out)
 {
     printf("BEGIN GCMCoupler_ModelE::apply_gcm_ivals\n");
     auto nvar(out.nvar());    // A and E
