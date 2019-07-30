@@ -146,10 +146,11 @@ void GCMCoupler::_ncread(
     std::cout << gcm_constants;
     std::cout << "========= GCM Outputs" << std::endl;
     std::cout << gcm_outputsE;
-    std::cout << "========= GCM InputsA" << std::endl;
-    std::cout << gcm_inputsAE[GridAE::A];
-    std::cout << "========= GCM InputsA" << std::endl;
-    std::cout << gcm_inputsAE[GridAE::E];
+    std::cout << "========= GCM Inputs" << std::endl;
+    for (size_t i=0; i<gcm_inputs.size(); ++i) {
+        std::cout << "--------------- " << i << " " << gcm_inputs_grid[i] << std::endl;
+        std::cout << gcm_inputs_grid[i] << ':' << gcm_inputs[i];
+    }
 
     // Read m.segments
     std::string segments;

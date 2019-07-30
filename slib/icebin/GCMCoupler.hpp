@@ -44,8 +44,8 @@ struct GCMInput {
 
     // Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
     // _s = sparse indexing
-    std::array<VectorMultivec, GridAE::count> gcm_ivalsAE_s;
-    std::array<std::vector<double>, GridAE::count> gcm_ivalsAE_weight_s;
+    std::vector<VectorMultivec> gcm_ivalss_s;
+    std::vector<std::vector<double>> gcm_ivalss_weight_s;
 
     // Output fields from coupling back into GCM
     //    * Computed by merging from IceCoupler::couple()
@@ -77,12 +77,9 @@ struct GCMInput {
 Root arrays should be returned...
 
 
-    GCMInput(std::array<int, GridAE::count> const &nvar) :
-        gcm_ivalsAE_s({
-            VectorMultivec(nvar[0]),   // Add weight as last column
-            VectorMultivec(nvar[1]),
-        })
-    {}
+    GCMInput(std::vector<int> const &nvar) {
+        for (int nv : nvar) gcm_ivals_s.push_back(VectorMultivec(nv));
+    }
 
     std::array<int, GridAE::count> nvar() const
     {
@@ -217,7 +214,9 @@ public:
     VarSet gcm_outputsE;
 
     /** Description of fields to send back to the GCM; some on E, some on A */
-    std::array<VarSet, GridAE::count> gcm_inputsAE;    // gcm_inputsE, gcm_inputsA
+    std::vector<VarSet> gcm_inputs;
+    /** Tells whether each gcm_inputs is on A or E grid */
+    std::vector<char> gcm_inputs_grid;
 
     /** Names of items used in the SCALARS dimension of VarTranslator.
     Used for ice_input and gcm_inputs.

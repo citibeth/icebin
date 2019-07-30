@@ -308,7 +308,7 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // Commented out because this needs to be regridded with correctA=False
     // For that, we need to add a third segment to GridAE.  For now, that's
     // just not worth the effort.
-    ok = ok && vtE_nc.set("elevE", "elevmask_ice", UNIT, 1.0);
+//    ok = ok && vtE_nc.set("elevE", "elevmask_ice", UNIT, 1.0);
 
     // Top layer state from ice model
     ok = ok && vtE_nc.set("ice_top_senth", "ice_top_senth", UNIT, 1.0);

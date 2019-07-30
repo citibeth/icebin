@@ -103,6 +103,15 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
     // be placed directly into the VarTransformer.
 
     scalars.add("by_dt", nan, "s-1", 1., "Inverse of coupling timestep");
+
+
+    // Set up gcm_inputs array   (see IndexAE:  enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;)
+    gcm_inputs_grid = std::vector<char> {'A','E','A','E'};
+    for (int i=0; i<InputAE::COUNT; ++i) {
+        gcm_inputs.push_back(VarSet());
+        gcm_ivalssA.push_back({});
+        gcm_ivalssE.push_back({});
+    }
 }
 // -----------------------------------------------------
 void GCMCoupler_ModelE::_ncread(
@@ -287,12 +296,17 @@ char const *long_name_f, int long_name_len)
 extern "C"
 void gcmce_add_gcm_inputa(
 GCMCoupler_ModelE *self,
+int index_ae,
 F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 bool initial,    // bool
 char const *long_name_f, int long_name_len)
 {
+    if (gcm_inputs_grid[index_ae] != 'E') (*icebin_error)(-1,
+        "gcmce_add_gcm_inpute() trying to add to VarSet on grid '%c'",
+        gcm_inputs_grid[index_ae]);
+
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
@@ -303,21 +317,26 @@ char const *long_name_f, int long_name_len)
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    self->gcm_inputsAE[GridAE::A].add(
+    self->gcm_inputs[index_ae].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivalsA.push_back(std::move(var));
+    self->modele_inputs.gcm_ivalssA[index_ae].push_back(std::move(var));
 }
 // -----------------------------------------------------
 extern "C"
 void gcmce_add_gcm_inpute(
 GCMCoupler_ModelE *self,
+int index_ae,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 int initial,    // bool
 char const *long_name_f, int long_name_len)
 {
+    if (gcm_inputs_grid[index_ae] != 'E') (*icebin_error)(-1,
+        "gcmce_add_gcm_inpute() trying to add to VarSet on grid '%c'",
+        gcm_inputs_grid[index_ae]);
+
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
@@ -328,42 +347,12 @@ char const *long_name_f, int long_name_len)
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    self->gcm_inputsAE[GridAE::E].add(
+    self->gcm_inputs[index_ae].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivalsE.push_back(std::move(var));
+    self->modele_inputs.gcm_ivalssE[index_ae].push_back(std::move(var));
 }
 // -----------------------------------------------------
-// ==========================================================
-// Called from LIShetIceBin::reference_globals()
-
-extern "C"
-void gcmce_reference_globals(
-    GCMCoupler_ModelE *self,
-    F90Array<double, 3> fhc,
-    F90Array<int, 3> underice,
-    F90Array<double, 3> elevE,
-    F90Array<double, 2> fland,
-    F90Array<double, 2> focean,
-    F90Array<double, 2> flake,
-    F90Array<double, 2> fgrnd,
-    F90Array<double, 2> fgice,
-    F90Array<double, 2> zatmo,
-    F90Array<double, 2> zlake)
-{
-    Topos *topos(&self->modele_inputs);
-    topos->fhc.reference(f_to_c(fhc.to_blitz()));
-    topos->underice.reference(f_to_c(underice.to_blitz()));
-    topos->elevE.reference(f_to_c(elevE.to_blitz()));
-    topos->fland.reference(f_to_c(fland.to_blitz()));
-    topos->focean.reference(f_to_c(focean.to_blitz()));
-    topos->flake.reference(f_to_c(flake.to_blitz()));
-    topos->fgrnd.reference(f_to_c(fgrnd.to_blitz()));
-    topos->fgice.reference(f_to_c(fgice.to_blitz()));
-    topos->zatmo.reference(f_to_c(zatmo.to_blitz()));
-    topos->zlake.reference(f_to_c(zlake.to_blitz()));
-}
-
 // ===========================================================
 // Called from LISheetIceBin::io_rsf()   (warm starts)
 
@@ -486,7 +475,10 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
     // Gather it to root
     // boost::mpi::communicator &gcm_world(world);
     // Init our output struct based on number of A and E variables.
-    GCMInput_ModelE out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
+    std::vector<int> sizes;
+    for (VarSet const &vs : gcm_inputs) sizes.push_back(vs.size());
+    GCMInput out(sizes);
+
     if (self->am_i_root()) {
         // =================== MPI ROOT =============================
         std::vector<VectorMultivec> every_gcm_ovalsE_s;
@@ -516,16 +508,6 @@ printf("END gcm_ovalsE_s\n");
         std::vector<GCMInput_ModelE> every_outs(
             split_by_domain<DomainDecomposer_ModelE>(out,
                 *self->domains, *self->domains));
-#if 0
-printf("BEGIN gcmce_couple_native() every_outs\n");
-for (size_t i=0; i<every_outs.size(); ++i) {
-    auto &gcmo(every_outs[i]);
-    printf("    every_outs[%ld]: |gcm_ivalsA_s|=%ld, |gcm_ivalsE_s|=%ld\n", i,
-        gcmo.gcm_ivalsAE_s[GridAE::A].size(),
-        gcmo.gcm_ivalsAE_s[GridAE::E].size());
-}
-printf("END gcmce_couple_native() every_outs\n");
-#endif
 
         // Scatter!
         boost::mpi::scatter(self->gcm_params.world, every_outs, out, self->gcm_params.gcm_root);
@@ -555,7 +537,7 @@ printf("END gcmce_couple_native() every_outs\n");
 
 /** Called from MPI rank.  Copies output of coupling back into
 appropriate dense-indexing ModelE variables. */
-void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput_ModelE const &out)
+void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
 {
     printf("BEGIN GCMCoupler_ModelE::apply_gcm_ivals\n");
     auto nvar(out.nvar());    // A and E
@@ -566,79 +548,92 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput_ModelE const &out)
             "nvar[%d]=%d < 0, it should not be\n", iAE, nvar[iAE]);
     }
 
-    // ================================= A
+    for (size_t index_ae=0; index_ae < gcm_inputs.size(); ++index_ae) {
+    switch(gcm_inputs_grid[index_ae]) {
+        case 'A' : {
+            VectorMultivec const &gcm_ivalsA_s(out.gcm_ivals_s[index_ae]);    // src
+            std::vector<std::unique_ptr<blitz::Array<double,2>>> const &gcm_ivalsA(gcm_ivalssA[index_ae]); // dest
 
-    // Update gcm_ivalA variables...
-    // Read from here...
-    VectorMultivec const &gcm_ivalsA_s(out.gcm_ivalsAE_s[GridAE::A]);
-    std::vector<std::unique_ptr<blitz::Array<double,2>>> &gcm_ivalsA(modele_inputs.gcm_ivalsA);
-    if (gcm_ivalsA.size() != nvar[GridAE::A]) (*icebin_error)(-1,
-        "gcm_ivalsA is wrong size: %ld vs. %d", gcm_ivalsA.size(), nvar[GridAE::A]);
+            // ================================= A
 
-    // Clear output: because non-present elements in sparse gcm_ivalsA are 0
-    for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) (*gcm_ivalsA[ivar]) = 0;
+            // Update gcm_ivalA variables...
+            // Read from here...
+            if (gcm_ivalsA.size() != gcm_inputs[index_ae].size()) (*icebin_error)(-1,
+                "gcm_ivalsA is wrong size: %ld vs. %ld", gcm_ivalsA.size(), gcm_inputs[index_ae].size());
 
-    // Create summed weights
-    blitz::Array<double,1> sA_s(nA());
-    sA_s = 0;
-    for (int iA_d=0; iA_d<gcm_ivalsA_s.size(); ++iA_d) {
-        auto iA_s(gcm_ivalsA_s.index[iA_d]);
-        sA_s[iA_s] += gcm_ivalsA_s.vals[iA_d];
-    }
-    for (int iA_s=0; iA_s<sA_s.shape(0); ++iA_s) {
-        sA_s(iA_s) = 1. / sA_s(iA_s);    // Will create NaNs but we dont care...
-    }
+            // Clear output: because non-present elements in sparse gcm_ivalsA are 0
+            for (auto &gcm_ivalA : gcm_ivalsA) gcm_ivalA = 0;
 
-    // Copy sparse arrays to output
-    for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
-        long iA = gcm_ivalsA_s.index[ix];
-        auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
-        int const i = ij[0];
-        int const j = ij[1];
-        for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
-TODO: Is this correct?  Does not gcm_ivalsA use Fortran-style column-major 1-based indexing???
-            (*gcm_ivalsA[ivar])(j,i) +=
-                gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar] * sA_s(iA);
-        }
-    }
+            // Create summed weights
+            blitz::Array<double,1> sA_s(nA());
+            sA_s = 0;
+            for (int iA_d=0; iA_d<gcm_ivalsA_s.size(); ++iA_d) {
+                auto iA_s(gcm_ivalsA_s.index[iA_d]);
+                sA_s[iA_s] += gcm_ivalsA_s.vals[iA_d];
+            }
+            for (int iA_s=0; iA_s<sA_s.shape(0); ++iA_s) {
+                sA_s(iA_s) = 1. / sA_s(iA_s);    // Will create NaNs but we dont care...
+            }
 
-    // ================================= E
-    // Update gcm_ivalE variables...
-    // Read from here...
-    VectorMultivec const &gcm_ivalsE_s(out.gcm_ivalsAE_s[GridAE::E]);
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsE(modele_inputs.gcm_ivalsE);
-    if (gcm_ivalsE.size() != nvar[GridAE::E]) (*icebin_error)(-1,
-        "gcm_ivalsE is wrong size: %ld vs. %d", gcm_ivalsE.size(), nvar[GridAE::E]);
+            // Copy sparse arrays to output
+            int const nvar = gcm_inputs[index_ae].size();
+            for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
+                long iA = gcm_ivalsA_s.index[ix];
+                auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
+                int const i = ij[0];
+                int const j = ij[1];
+                for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
+                    // Original Fortran (partial) arrays have been converted to
+                    // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
+                    (*gcm_ivalsA[ivar])(j,i) +=
+                        gcm_ivalsA_s.vals[i*nvar + ivar] * sA_s(iA);
+                }
+            }
+        } break;
+        case 'E' : {
+            // ================================= E
+            VectorMultivec const &gcm_ivalsE_s(out.gcm_ivals_s[index_ae]);    // src
+            std::vector<std::unique_ptr<blitz::Array<double,2>>> const &gcm_ivalsE(gcm_ivalssE[index_ae]); // dest
 
-    // Clear output: because non-present elements in sparse gcm_ivalsA are 0
-    for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) (*gcm_ivalsE[ivar]) = 0;
+            // Update gcm_ivalE variables...
+            // Read from here...
+            if (gcm_ivalsE.size() != gcm_inputs[index_ae].size()) (*icebin_error)(-1,
+                "gcm_ivalsE is wrong size: %ld vs. %ld", gcm_ivalsE.size(), gcm_inputs[index_ae].size());
 
-    // Create summed weights
-    blitz::Erray<double,1> sE_s(nE());
-    sE_s = 0;
-    for (int iE_d=0; iE_d<gcm_ivalsE_s.size(); ++iE_d) {
-        auto iE_s(gcm_ivalsE_s.index[iE_d]);
-        sE_s[iE_s] += gcm_ivalsE_s.vals[iE_d];
-    }
-    for (int iE_s=0; iE_s<sE_s.shape(0); ++iE_s) {
-        sE_s(iE_s) = 1. / sE_s(iE_s);    // Will create NaNs but we dont care...
-    }
+            // Clear output: because non-present elements in sparse gcm_ivalsA are 0
+            for (auto &gcm_ivalE : gcm_ivalsE) gcm_ivalE = 0;
 
-    // Copy sparse arrays to output
-    for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
-        long iE = gcm_ivalsE_s.index[ix];
-        auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
-        int const i = ijk[0];
-        int const j = ijk[1];
-        int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
-        int const ihc_gcm = gcm_params.icebin_base_hc + ihc_ice;
+            // Create summed weights
+            blitz::Erray<double,1> sE_s(nE());
+            sE_s = 0;
+            for (int iE_d=0; iE_d<gcm_ivalsE_s.size(); ++iE_d) {
+                auto iE_s(gcm_ivalsE_s.index[iE_d]);
+                sE_s[iE_s] += gcm_ivalsE_s.vals[iE_d];
+            }
+            for (int iE_s=0; iE_s<sE_s.shape(0); ++iE_s) {
+                sE_s(iE_s) = 1. / sE_s(iE_s);    // Will create NaNs but we dont care...
+            }
 
-TODO: Is this correct?  Does not gcm_ivalsE use Fortran-style column-major 1-based indexing???
-        for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
-            (*gcm_ivalsE[ivar])(ihc_gcm,j,i) +=
-                gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar] * sE_s(iE);
-        }
-    }
+            // Copy sparse arrays to output
+            for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
+                long iE = gcm_ivalsE_s.index[ix];
+                auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
+                int const i = ijk[0];
+                int const j = ijk[1];
+                int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
+                int const ihc_gcm = gcm_params.icebin_base_hc + ihc_ice;
+
+                for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
+                    // Original Fortran (partial) arrays have been converted to
+                    // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
+                    (*gcm_ivalsE[ivar])(ihc_gcm,j,i) +=
+                        gcm_ivalsE_s.vals[i*gcm_inputs[index_ae].size() + ivar] * sE_s(iE);
+                }
+            }
+        } break;
+        default :
+            (*icebin_error)(-1, "Illegal gcm_inputs_grid of '%c'", gcm_inputs_grid[index_ae]);
+    }}
     printf("END GCMCoupler_ModelE::apply_gcm_ivals\n");
 }
 // ============================================================================
