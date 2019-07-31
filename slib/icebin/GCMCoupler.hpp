@@ -70,6 +70,8 @@ struct GCMInput {
     // step's elevation classes.
     linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
 
+//    linear::Weighted_Tuple AvE_unscaled;    // Sparse indexing
+
     // Regrid matrix to convert to atmosphere.
     // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
 //    linear::Weighted_Tuple AvE1_unscaled;
@@ -138,17 +140,7 @@ struct GCMParams {
     // Should IceBin update topography?
     bool dynamic_topo = false;
 
-    std::vector<HCSegmentData> hc_segments {    // 0-based
-        HCSegmentData("legacy", 0, 1),
-        HCSegmentData("sealand", 1, 2),
-        HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
-    int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
-    std::string primary_segment = "ec";
-
-    HCSegmentData &segment(std::string const &name)
-        { return get_segment(hc_segments, name); }
-    HCSegmentData const &segment(std::string const &name) const
-        { return get_segment(hc_segments, name); }
+    int const icebin_base_hc = 0;    // First GCM elevation class that is an IceBin class (0-based indexing)
 
     GCMParams(MPI_Comm _gcm_comm, int _gcm_root);
 };

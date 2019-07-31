@@ -500,12 +500,15 @@ printf("END gcm_ovalsE_s\n");
 #endif
 
         // Couple on root!
-        GCMInput_ModelE out(
+        GCMInput out(
             self->couple(time_s,
                 gcm_ovalsE_s, run_ice));
 
+        // Add new TOPO file to out
+        
+
         // Split up the output (and 
-        std::vector<GCMInput_ModelE> every_outs(
+        std::vector<GCMInput> every_outs(
             split_by_domain<DomainDecomposer_ModelE>(out,
                 *self->domains, *self->domains));
 
@@ -519,6 +522,7 @@ printf("END gcm_ovalsE_s\n");
         boost::mpi::gather(self->gcm_params.world, gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Let root do the work...
+        // update_topo() is built into this
         self->couple(time_s, gcm_ovalsE_s, run_ice);
 
         // Receive our output back from root
@@ -527,11 +531,6 @@ printf("END gcm_ovalsE_s\n");
 
     // 1. Copies values back into modele.gcm_ivals from scatterd MPI stuff
     self->apply_gcm_ivals(out);
-#if 0
-    // 2. Sets icebin_nhc, 
-    // 3. Updates FHC, ZATMO, etc.
-    self->update_topo(time_s);    // initial_timestep=false
-#endif
 }
 // =======================================================
 
@@ -638,6 +637,137 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
 }
 // ============================================================================
 // Update TOPO file during a coupled run
+
+
+void GCMCoupler_ModelE::update_topo(
+double time_s,    // Simulation time
+std::vector<blitz::Array<double,1>> const &emI_lands,
+std::vector<blitz::Array<double,1>> const &emI_ices,
+// ---------- Input & Output
+// Read: E1vE0_unscaled, AvE_unscaled
+// Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
+GCMInput &out)
+{
+    GCMRegridder_ModelE const *gcmA(
+        dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
+
+    // Read from TOPOO file
+    ibmisc::ArrayBundle<double,2> topoo(topoo_bundle(BundleOType::MERGEO, topoO_fname));
+        auto &foceanOp(topoo.array("FOCEANF"));
+        auto &fgiceOp(topoo.array("FGICEF"));
+        auto &zatmoOp(topoo.array("ZATMOF"));
+        auto &foceanOm(topoo.array("FOCEAN"));
+        auto &flakeOm(topoo.array("FLAKE"));
+        auto &fgrndOm(topoo.array("FGRND"));
+        auto &fgiceOm(topoo.array("FGICE"));
+        auto &zatmoOm(topoo.array("ZATMO"));
+        auto &zlakeOm(topoo.array("ZLAKE"));
+        auto &zicetopO(topoo.array("ZICETOP"));
+
+    // Allocate space for TOPOA output variables
+    TopoABundles topoa(this->hspecA(), topoo);
+        auto &foceanA(topoa.a.array("focean"));
+        auto &flakeA(topoa.a.array("flake"));
+        auto &fgrndA(topoa.a.array("fgrnd"));
+        auto &fgiceA(topoa.a.array("fgice"));
+        auto &zatmoA(topoa.a.array("zatmo"));
+        auto &hlakeA(topoa.a.array("hlake"));
+        auto &zicetopA(topoa.a.array("zicetop"));
+
+        auto &fhc(topoa.a3.array("fhc"));
+        auto &elevE(topoa.a3.array("elevE"));
+
+        auto &underice_i(topoa.a3_i.array("underice"));
+
+    // ------------------ Create merged TOPOO file (in RAM)
+    // We need correctA=true here to get FOCEANF, etc.
+    merge_topoO(
+        foceanOp, fgiceOp, zatmoOp,  // Our own bundle
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, gcmO,
+        RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
+        emI_lands, emI_ices, args.eq_rad, errors);
+
+
+    // Print sanity check errors to STDERR
+    for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
+
+    if (errors.size() > 0) (*icebin_error)(-1,
+        "Errors in TOPO merging or regridding; halting!");
+
+    // ---------------- Compute AAMVEAM
+    linear::Weighted_Tuple AAmvEAm(gcmA->global_unscaled_AvE(emI_lands, emI_ices, foceanOp, foceanOm));
+
+    // ---------------- Create TOPOA file (in RAM)
+    std::vector<std::string> errors(make_topoA(
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
+        gcmA->hspecO(), gcmA->hspecA(), gcmA->indexingHC, gcmA->hcdefs(), gcmA->underice,
+        AAmvEAm,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
+        fhc, elevE, underice));
+
+    // Print sanity check errors to STDERR
+    for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
+
+    if (errors.size() > 0) (*icebin_error)(-1,
+        "Errors in TOPO merging or regridding; halting!");
+
+    // ------------------ Deallocate stuff we no longer need
+    AAmvEAm.clear();
+    topoo.free();
+
+    // ------------------- Convert underice to double and store in topoa
+    auto &hspecA(gcmA->hspecA());
+    std::array<int,3> shape3 {gcmA->nhc(), hspecA.jm, hspecA.im};
+    topoa.a3.add("underice", {});
+    topoa.a3.at("underice").allocate(true, shape3);
+    auto &underice(topoa.a3.array("underice"));
+    underice = underice_i;
+    
+
+    // ------------------ Pack TOPOA stuff into output variables
+    {
+        static std::vector<std::string> const vars {"focean", "flake", "fgrnd", "fgice", "zatmo", "hlake", "zicetop"};
+
+        std::vector<int> const ivars_ix;
+        std::vector<int> const ovars_ix;
+        for (auto const &name : vars) {
+            // Index in topoa.a
+            ivars_ix.push_back(topoa.index.at(name));
+            // Index in contract
+            ovars_ix.push_back(gcm_inputs[IndexAE::ATOPO].index.at(name));
+        }
+
+        VectorMultivec &gcm_ivalsA_s(this->gcm_ivalss_s[IndexAE::ATOPO]);
+        gcm_ivalsA_s.nvar = vars.size();
+        std::vector val(gcm_ivals_s.nvar);
+
+        for (int j=0; j<hspecA.jm; ++j) {
+        for (int i=0; i<hspecA.im; ++i) {
+
+            for (int k=0; k<gcm_ivals_s.size(); ++k) val[ovars_ix[k]] = topoa.array(ivars_ix[k])(j,i);
+            auto ij = gcmA->indexing.tuple_to_index(std::array<int,2>{i,j});
+            gcm_ivalsA_s.add(ij, val);
+        }}
+
+
+    }
+
+    VectorMultivec &gcm_ivalsE_s(this->gcm_ivalss_s[IndexAE::ETOPO]);
+TODO: Do the same for EC output variables
+
+
+TODO: Take care of FLAND, which was not computed by make_topoa
+
+
+
+  
+}));
+
+
+
+
+
+
 
 
 ***** TODO: Try to make a GCMRegridder_Merged_ModelE that handles everything including mismatched regridding on O, loading unmerged TOPOO file, ultimate conversion to A; and even producing a global AvE.

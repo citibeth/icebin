@@ -264,6 +264,9 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     }
 
     {
+        update_topo(time_s, AvE_unscaled, emI_lands, emI_ices, out);
+
+TODO: Move this logic into update_topo(), since it requires foceanAOp and foceanAOm from merge step
         std::vector<blitz::Array<double,1>> emI_ices, emI_lands;
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);
@@ -272,12 +275,11 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
             emI_lands.push_back(blitz::Array<double,1>(land_coupler->emI_ice));
         }
 
-        out.AvE_unscaled = gcm_regridder.global_unscaled_AvE(
+        linear::Weighted_Tuple AvE_unscaled = gcm_regridder.global_unscaled_AvE(
             emI_ices, emI_lands);
+
+
     }
-
-
-    update_topo(time_s, out.AvE1_s, out.wAvE1_s);
 
     // Log the results
     if (gcm_params.icebin_logging) {

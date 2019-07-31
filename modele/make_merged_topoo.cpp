@@ -143,61 +143,6 @@ int main(int argc, char **argv)
     ParseArgs args(argc, argv);
 
     // ============= Define input/output  variables
-    ibmisc::ArrayBundle<double,2> topoo;
-
-    // ------------- Non-rounded versions (Op)
-    auto &foceanOp(topoo.add("FOCEANF", {
-        "description", "Fractional ocean ocver",
-        "units", "1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &fgiceOp(topoo.add("FGICEF", {
-        "description", "Glacial Ice Surface Fraction (Ocean NOT rounded)",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &zatmoOp(topoo.add("ZATMOF", {
-        "description", "Atmospheric Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
-
-    // ------------ Rounded Versions (Om)
-    auto &foceanOm(topoo.add("FOCEAN", {
-        "description", "0 or 1, Bering Strait 1 cell wide",
-        "units", "1",
-        "source", "GISS 1Qx1",
-    }));
-    auto &flakeOm(topoo.add("FLAKE", {
-        "description", "Lake Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &fgrndOm(topoo.add("FGRND", {
-        "description", "Ground Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &fgiceOm(topoo.add("FGICE", {
-        "description", "Glacial Ice Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &zatmoOm(topoo.add("ZATMO", {
-        "description", "Atmospheric Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
-    auto &zlakeOm(topoo.add("ZLAKE", {
-        "description", "Lake Surface Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
-    auto &zicetopO(topoo.add("ZICETOP", {
-        "description", "Atmospheric Topography (Ice-Covered Regions Only)",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
 
 
     // ================================== Read Input Files
@@ -215,6 +160,7 @@ int main(int argc, char **argv)
     // Indexing indexingHCA({"A", "HC"}, {0,0}, {hspecA.size(), indexingHCO[1].extent}, {1,0});
 
     // Read TOPOO input (global ice)
+    ibmisc::ArrayBundle<double,2> topoo(topoo_bundle(BundleOType::MERGEO));
     blitz::Array<double,2> zsgloO;
         std::string zsgloO_units, zsgloO_sources;
     {NcIO topoo_nc(args.topoo_ng_fname, 'r');
@@ -227,6 +173,16 @@ int main(int argc, char **argv)
             get_att(ncvar, "units").getValues(zsgloO_units);
             get_att(ncvar, "sources").getValues(zsgloO_sources);
     }
+    auto &foceanOp(topoo.array("FOCEANF"));
+    auto &fgiceOp(topoo.array("FGICEF"));
+    auto &zatmoOp(topoo.array("ZATMOF"));
+    auto &foceanOm(topoo.array("FOCEAN"));
+    auto &flakeOm(topoo.array("FLAKE"));
+    auto &fgrndOm(topoo.array("FGRND"));
+    auto &fgiceOm(topoo.array("FGICE"));
+    auto &zatmoOm(topoo.array("ZATMO"));
+    auto &zlakeOm(topoo.array("ZLAKE"));
+    auto &zicetopO(topoo.array("ZICETOP"));
 
     // Read the GCMRegridder
     GCMRegridder_Standard gcmO;

@@ -55,14 +55,14 @@ struct ModelEParams
 // ---------------------------------------------
 
 
+/** Different indices into gcm_inputs (see INDEXAE_* in LISheetIceBin.F90)*/
+enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;
 
 class DomainDecomposer_ModelE {
     ibmisc::Domain domainA_global;
     size_t ndomain;
     blitz::Array<int,1> rank_of_j;    // indexing base=1
 public:
-    /** Different indices into gcm_inputs (see INDEXAE_* in LISheetIceBin.F90)*/
-    enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;
 
     DomainDecomposer_ModelE(std::vector<int> const &endj, ibmisc::Domain const &_domainA_global);
 

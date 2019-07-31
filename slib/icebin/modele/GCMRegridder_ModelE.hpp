@@ -128,6 +128,7 @@ public:
     /** Base EOpvAOp matrix, laoded from TOPO_OC file */
     ibmisc::ZArray<int,double,2> EOpvAOp_base,    // from linear::Weighted_Compressed
 
+#if 0
     /** ModelE ocean cover, on the Ocean grid, as seen by the ice
     model (sparse indexing).  Ocean grid cells can contain fractional
     ocean cover.  foceanAOp can change over the course of a ModelE
@@ -141,7 +142,7 @@ public:
     ModelE run, because the ModelE ocean is not able to change shape
     mid-run. */
     blitz::Array<double,1> foceanAOm;
-
+#endif
 
     /** Constructor used in coupler: create the GCMRegridder first,
         then fill in foceanAOp and foceanAOm later.

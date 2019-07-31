@@ -127,6 +127,7 @@ int main(int argc, char **argv)
         EOpvAOp.reset(new EigenSparseMatrixT(
             to_eigen_M(EOpvAOp_s, {&dimEOp, &dimAOp})));
     }
+    int const nhc_gcm = get_nhc_gcm(hcdefs.size());
 
     HntrSpec hspecA(make_hntrA(hspecO));
     Indexing &indexingHCO(indexingHC);
@@ -135,103 +136,33 @@ int main(int argc, char **argv)
     // Create the AvO regridder (but not matrix)
     Hntr hntr_AvO(17.17, hspecA, hspecO);
 
-    // ============= Define input variables
-    ibmisc::ArrayBundle<double,2> topoo;
-    auto &foceanOm(topoo.add("FOCEAN", {
-        "description", "0 or 1, Bering Strait 1 cell wide",
-        "units", "1",
-        "source", "GISS 1Qx1",
-    }));
-    auto &flakeOm(topoo.add("FLAKE", {
-        "description", "Lake Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &fgrndOm(topoo.add("FGRND", {
-        "description", "Ground Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &fgiceOm(topoo.add("FGICE", {
-        "description", "Glacial Ice Surface Fraction",
-        "units", "0:1",
-        "sources", "GISS 1Qx1",
-    }));
-    auto &zatmoOm(topoo.add("ZATMO", {
-        "description", "Atmospheric Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
-    auto &zlakeOm(topoo.add("ZLAKE", {
-        "description", "Lake Surface Topography",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
-    auto &zicetopOm(topoo.add("ZICETOP", {
-        "description", "Atmospheric Topography (Ice-Covered Regions Only)",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
 
-    // Copy TOPOO to TOPOA spec, downcasing variable names and setting new size
-    ibmisc::ArrayBundle<double,2> topoa;
-    for (auto const &d : topoo.data) {
-        std::string name(d.meta.name);
-        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-        if (name == "zlake") name = "hlake";   // ModeLE wants it to be called hlake
-        topoa.add(ibmisc::ArrayBundle<double,2>::Data(
-            name, blitz::Array<double,2>(),
-            std::array<int,2>{hspecA.jm, hspecA.im},
-            d.meta.sdims,
-            std::vector<std::pair<std::string, std::string>>(d.meta.attr)));
-    }
+    // Read input file, and allocate output arrays, ready to save to output file.
+    auto topoo(topoo_bundle(BundleOType::MAKEA, args.topoo_fname));
+    TopoABundles topoa(topoo, hspecA, nhc_gcm);
 
-    // Add FOCEANF, which is in TOPOO but not TOPOA.
-    auto &foceanOp(topoo.add("FOCEANF", {
-        "description", "0 or 1, Bering Strait 1 cell wide",
-        "units", "1",
-        "source", "GISS 1Qx1",
-    }));
+    // --------- Fetch just-allocated arrays
+    auto &foceanOm(topoo.array("FOCEAN"));
+    auto &flakeOm(topoo.array("FLAKE"));
+    auto &fgrndOm(topoo.array("FGRND"));
+    auto &fgiceOm(topoo.array("FGICE"));
+    auto &zatmoOm(topoo.array("ZATMO"));
+    auto &zlakeOm(topoo.array("ZLAKE"));
+    auto &zicetopOm(topoo.array("ZICETOP"));
+    auto &foceanOp(topoo.array("FOCEANF"));
 
+    auto &foceanA(topoa.a.array("focean"));
+    auto &flakeA(topoa.a.array("flake"));
+    auto &fgrndA(topoa.a.array("fgrnd"));
+    auto &fgiceA(topoa.a.array("fgice"));
+    auto &zatmoA(topoa.a.array("zatmo"));
+    auto &hlakeA(topoa.a.array("hlake"));
+    auto &zicetopA(topoa.a.array("zicetop"));
 
-    // Read TOPOO input
-    {NcIO topoo_nc(args.topoo_fname, 'r');
+    auto &fhc(topoa.a3.array("fhc"));
+    auto &elevE(topoa.a3.array("elevE"));
 
-        // Read from topoO file, and allocate resulting arrays.
-        topoo.ncio_alloc(topoo_nc, {}, "", "double",
-            get_or_add_dims(topoo_nc, {"jm", "im"}, {hspecO.jm, hspecO.im}));
-    }
-
-
-    // ------------- Allocate topoa arrays for output
-    topoa.allocate(true);    // check=true
-    auto &foceanA(topoa.array("focean"));
-    auto &flakeA(topoa.array("flake"));
-    auto &fgrndA(topoa.array("fgrnd"));
-    auto &fgiceA(topoa.array("fgice"));
-    auto &zatmoA(topoa.array("zatmo"));
-    auto &hlakeA(topoa.array("hlake"));
-    auto &zicetopA(topoa.array("zicetop"));
-
-    // --------------- Allocate 3D arrays to go in TOPOA file
-    ibmisc::ArrayBundle<double,3> topoa3;
-    auto &fhc(topoa3.add("fhc", {
-        "description", "fraction of ice-covered area for each elevation class",
-        "units", "1"
-    }));
-    auto &elevE(topoa3.add("elevE", {
-        "description", "Elevation of each elevation class",
-        "units", "1"
-    }));
-    ibmisc::ArrayBundle<int16_t,3> topoa3_i;
-    auto &underice(topoa3_i.add("underice", {
-        "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
-    }));
-
-    int const nhc_gcm = get_nhc_gcm(hcdefs.size());
-    std::array<int,3> shape3 {nhc_gcm, hspecA.jm, hspecA.im};
-    topoa3.allocate(shape3, {"nhc", "jm", "im"});
-    topoa3_i.allocate(shape3, {"nhc", "jm", "im"});
+    auto &underice(topoa.a3_i.array("underice"));
 
 
     // ------------------- Create AAmvEAm, needed for TOPOA
@@ -243,7 +174,7 @@ int main(int argc, char **argv)
     std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
         true, args.eq_rad,    // scale=true
         hspecO, hspecA, indexingHCO, indexingHCA,
-        foceanOp, foceanOm,
+        foceanOp, foceanOm,   // These don't change over course of a run
         *EOpvAOp, dimEOp, dimAOp, wAOp));
 
     const_dimAOp.reset();    // Check for any const violations

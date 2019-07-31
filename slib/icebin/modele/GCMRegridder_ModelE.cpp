@@ -559,9 +559,16 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     return rm;
 }
 // -----------------------------------------------------------------------
+/** Computes global AvE, including any base ice, etc.
+    @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
+    @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
+    @param params Parameters to use in generating regridding matrices.
+        Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
 linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
-    std::vector<blitz::Array<double,1>> const &emI_ices,
-    std::vector<blitz::Array<double,1>> const &emI_lands) const
+    std::vector<blitz::Array<double,1>> const &emI_lands,
+    std::vector<blitz::Array<double,1>> const &emI_ices) const
+    blitz::Array<double,2> const &foceanAOp,
+    blitz::Array<double,2> const &foceanAOm) const
 {
 
     // --------------------- Compute EOpvAOp (merged global + local ice)
@@ -598,8 +605,8 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
         cast_GridSpec_LonLat(*this->agridA.spec).hntr,
         this->gcmO->indexingHC,
         this->indexingHC,
-        this->foceanAOp,
-        this->foceanAOm,
+        foceanAOp,
+        foceanAOm,
         *eam.EOpvAOp->M, eam.dimEOp, dimAOp, eam.EOpAOp->Mw));
 
     return linear::to_weighted_tuple(*AAmvEAm);

@@ -295,14 +295,6 @@ public:
     // "Extra" operations; such as adding legacy ice, ECs (for legacy ice), etc.
     // can happen here.
 
-    /** Computes global AvE, including any base ice, etc.
-    @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
-    @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
-    @param params Parameters to use in generating regridding matrices.
-        Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
-    virtual linear::Weighted_Tuple global_unscaled_AvE(
-        std::vector<blitz::Array<double,1>> const &emI_ices,
-        std::vector<blitz::Array<double,1>> const &emI_lands) const;
 
     /** Produces regridding matrix from last coupling timestep's ECs to this timestep's.
     Includes any extra ECs, etc. added in global_AvE()
