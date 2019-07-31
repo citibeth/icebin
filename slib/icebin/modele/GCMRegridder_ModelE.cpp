@@ -122,7 +122,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 // ========================================================================
 // ========================================================================
 // ------------------------------------------------------
-/** Computes AAmvEAM (with scaling)
+#if 0
+/** Computes AAmvEAM (with scaling) FOR A SINGLE ICE SHEET!!!
 @param dims {dimAAm, dimEAm} User-supplied dimension maps, which will be added to.
 @param paramsA Regridding parameters.  NOTE: correctA is ignored.
 @param gcmA Used to obtain access to foceanAOp, foceanAOm, gridA, gridO
@@ -132,7 +133,6 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 */
 static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
     std::array<SparseSetT *,2> dims,
-    RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
@@ -155,7 +155,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
         gcmA->foceanAOm,
         *EOpvAOp->M, dimEOp, dimAOp, EOpvAOp->Mw);
 }
-
+#endif
 // -----------------------------------------------------------
 /** Computes some intermediate values used by more than one top-level
     regrid generator */
@@ -357,23 +357,26 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     auto &dimXOm(X=='E' ? hh.dimEOm : hh.dimAOm);
     auto &dimXOp(X=='E' ? hh.dimEOp : hh.dimAOp);
 
-printf("XOpvIp: %ld\n", (long)(XOpvIp->M->nonZeros()));
-printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
+//printf("XOpvIp: %ld\n", (long)(XOpvIp->M->nonZeros()));
+//printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
 
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
     ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
+    auto sXAm(sum(*XAmvXOm, 0, '-'));
     if (paramsA.scale) {
-        auto sXAm(sum(*XAmvXOm, 0, '-'));
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sXAm) *  *XAmvXOm *
             crop_mvp(dimXOm, dimXOp, 0,
                 map_eigen_diagonal(sXOpvIp) * *XOpvIp->M)));
     } else {
-        EigenSparseMatrixT M1(map_eigen_diagonal(sXOpvIp) * *XOpvIp->M);
-        EigenSparseMatrixT M2(crop_mvp(dimXOm, dimXOp, 0, M1));
-        EigenSparseMatrixT M3(*XAmvXOm * M2);
-        ret->M.reset(new EigenSparseMatrixT(*XAmvXOm * M2));
+        // Apply fixes done for scaled version (2017-10-15) to unscaled
+        // see 5e0f7d79.  Ensure that M_unscaled = wM * M_scaled
+        blitz::Array<double,1> scale(wXAm_e * sXAm);
+        ret->M.reset(new EigenSparseMatrixT(
+            map_eigen_diagonal(scale) *  *XAmvXOm *
+            crop_mvp(dimXOm, dimXOp, 0,
+                map_eigen_diagonal(sXOpvIp) * *XOpvIp->M)));
     }
     ret->Mw.reference(XOpvIp->Mw);
 
@@ -481,6 +484,14 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     _hcdefs.clear();
     for (double elev : gcmO->hcdefs()) _hcdefs.push_back(elev);
     for (double elev : global_hcdefs) _hcdefs.push_back(elev);
+
+    // Read EOpvAOp_base from global_ec file
+    // Read metadata and global EOpvAOp matrix (from output of global_ec.cpp)
+    {NcIO ncio(global_ecO_fname, 'r');
+        metaO.ncio(ncio);
+        EOpvAOp_base.ncio(ncio, "EvA.M");
+    }
+
 }
 
 
@@ -512,9 +523,9 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     rm->add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
         this, 'A', specO.eq_rad, &rmO));
 
-
-    rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm_rmO, _1, _2,
-        this, specO.eq_rad, &rmO));
+// We never need this.
+//    rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm_rmO, _1, _2,
+//        this, specO.eq_rad, &rmO));
 
 
     rm->add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
@@ -530,8 +541,8 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
         this, 'A', specO.eq_rad, &rmO));
 
 
-    rm->add_regrid("AvE", std::bind(&compute_AAmvEAm_rmO, _1, _2,
-        this, specO.eq_rad, &rmO));
+//    rm->add_regrid("AvE", std::bind(&compute_AAmvEAm_rmO, _1, _2,
+//        this, specO.eq_rad, &rmO));
 
 
     rm->add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
@@ -547,5 +558,84 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 
     return rm;
 }
+// -----------------------------------------------------------------------
+/** Computes global AvE, including any base ice, etc.
+    @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
+    @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
+    @param params Parameters to use in generating regridding matrices.
+        Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
+linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
+    std::vector<blitz::Array<double,1>> const &emI_lands,
+    std::vector<blitz::Array<double,1>> const &emI_ices) const
+    blitz::Array<double,2> const &foceanAOp,
+    blitz::Array<double,2> const &foceanAOm) const
+{
+
+    // --------------------- Compute EOpvAOp (merged global + local ice)
+
+    // struct EOpvAOpResult:
+    //     SparseSetT dimEOp;    // dimEOp is set and returned; dimAOp is appended
+    //     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
+    //     std::vector<double> hcdefs; // OUT:  Elev class definitions for merged ice
+    //     ibmisc::Indexing indexingHC;
+    //     std::vector<uint16_t> underice_hc;
+
+    std::vector<std::string> errors;
+    SparseSetT dimAOp;
+    EOpvAOpResult eam(compute_EOpvAOp_merged(
+        dimAOp, EOpvAOp_base,
+        &*gcmO, metaO.eq_rad, emI_ices,
+        true, true,    // use_global_ice=t, use_local_ice=t
+        metaO.hcdefs, metaO.indexingHC, false, errors));
+
+
+    // Print sanity check errors to STDERR
+    if (errors.size() > 0) {
+        for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
+        (*icebin_error)(-1, "GCMRegridder_ModelE: Problems detected creating merged global_ecO file, stopping now.");
+    }
+
+
+    // ----------------- Compute AAMvEAm
+    SparseSetT dimAAm, dimEAm;
+    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
+        false,    // scale=false
+        specO.eq_rad,
+        cast_GridSpec_LonLat(*this->gcmO->agridA.spec).hntr,
+        cast_GridSpec_LonLat(*this->agridA.spec).hntr,
+        this->gcmO->indexingHC,
+        this->indexingHC,
+        foceanAOp,
+        foceanAOm,
+        *eam.EOpvAOp->M, eam.dimEOp, dimAOp, eam.EOpAOp->Mw));
+
+    return linear::to_weighted_tuple(*AAmvEAm);
+
+
+#if 0
+    // ---------------- Convert to sparse indexing as linear::Weighted_Tuple
+    linear::Weighted_Tuple AvE_g;
+
+    spcopy(
+        accum::to_sparse(make_array(&dimAAm),
+        accum::ref(AvE_g.wM)),    // Output
+        AAmvEAm.wM);   // Input
+
+    spcopy(
+        accum::to_sparse(make_array(E1vI.dims[0], &dimE0),
+        accum::ref(AvE_g.M)),
+        *AAmvEAm.M);
+
+    spcopy(
+        accum::to_sparse(make_array(&dimE0),
+        accum::ref(AvE_g.Mw)),
+        AAmvEAm.Mw);
+
+    return AvE_g;
+#endif
+
+}
+
+
 
 }}    // namespace

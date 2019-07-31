@@ -125,6 +125,10 @@ public:
     This is typically loaded directly from a NetCDF file. */
     std::shared_ptr<icebin::GCMRegridder> const gcmO;
 
+    /** Base EOpvAOp matrix, laoded from TOPO_OC file */
+    ibmisc::ZArray<int,double,2> EOpvAOp_base,    // from linear::Weighted_Compressed
+
+#if 0
     /** ModelE ocean cover, on the Ocean grid, as seen by the ice
     model (sparse indexing).  Ocean grid cells can contain fractional
     ocean cover.  foceanAOp can change over the course of a ModelE
@@ -138,6 +142,7 @@ public:
     ModelE run, because the ModelE ocean is not able to change shape
     mid-run. */
     blitz::Array<double,1> foceanAOm;
+#endif
 
     /** Constructor used in coupler: create the GCMRegridder first,
         then fill in foceanAOp and foceanAOm later.
@@ -145,6 +150,15 @@ public:
     GCMRegridder_ModelE(
         std::string const &_global_ecO,
         std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
+
+    HntrSpec const &hspecO()
+        { return cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr; }
+    HntrSpec const &hspecA()
+        { return cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr; }
+    GridSpec_LonLat const &specO()
+        { return cast_GridSpec_LonLat(*gcmO->agridA.spec); }
+
+TODO: get rid of eq_rad in metaO
 
     /** Determines whether an elevation class is handled by IceBin or
     ModelE push-down */
@@ -165,6 +179,12 @@ public:
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
         RegridParams const &params = RegridParams()) const;
+
+    linear::Weighted_Tuple global_AvE(
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        RegridParams const &params) const;
+
 };
 
 /** Casts to a Grid_Lonlat, which is what we know is used by ModelE */
