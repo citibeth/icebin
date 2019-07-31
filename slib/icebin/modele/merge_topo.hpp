@@ -91,6 +91,7 @@ matrix is all based on un-rounded ("raw") verions of TOPO fields.
 EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
 SparseSetT &dimAOp,    // dimAOp is appended
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed
+RegridParams paramsO,
 GCMRegridder const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emI_ices,

@@ -23,6 +23,10 @@ NOTES:
 namespace icebin {
 namespace modele {
 
+/** Argument to topoo_bundle() */
+enum class {MERGEO, MAKEA} BundleOType;
+
+
 /** Encodes relationship between number of ECs in ice model, and
 number of ECs in GCM.  GCM has an extra for the "sealand" EC. */
 inline int get_nhc_gcm(int nhc_ice)
@@ -98,6 +102,45 @@ EigenSparseMatrixT const &EOpvAOp,
 SparseSetT &dimEOp,
 SparseSetT &dimAOp,
 blitz::Array<double,1> const &wAOp);
+
+/** Create, allocate and load data into a bundle representing a TOPOO file.
+@param type Allows for variations on which variables are added to the bundle
+    BundleOType::MERGEO: Variables appropriate for make_merged_topoo.cpp
+    BundleOType::MAKEA: Variables appropriate for input of make_topoa.cpp
+@param topoO_fname
+    Name of TOPOO file to load (output of make_topoo.cpp or make_merged_topoo.cpp)
+    If not set, then don't load or allocate anything.
+*/
+ibmisc::ArrayBundle<double,2> topoo_bundle(
+BundleOType type,
+std::string const &topoO_fname = "");
+
+/** Result of function to generate bundles of variables stored in a TOPOA file. */
+struct TopoABundles {
+    /** 2-D variables on A (atmosphere) grid (eg: focean, flake, etc) */
+    ibmisc::ArrayBundle<double,2> a;
+
+    /** 3-d variables on elevation grid associated with A (atmosphere)
+    grid.  Eg: fhc */
+    ibmisc::ArrayBundle<double,3> a3;
+
+    /** 3-d int16_t-valued variables on elevation grid associated with A
+        (atmosphere) grid.
+    Eg: underice */
+    ibmisc::ArrayBundle<int16_t,3> a3_i;
+
+    /** Generate the appropriate bundles.
+    @param hspecA
+        Description of A (atmosphere) grid
+    @param topoo
+        Output of topoo_bundle(), from which to derive bundle on A (atmosphere) grid */
+    TopoABundles(HntrSpec const &hspecA,
+        ibmisc::ArrayBundle<double,2> const &topoo);
+};
+
+
+
+
 
 /**
 @return A textual list of errors found in the sanity check.

@@ -341,10 +341,14 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
 }
 
-
-
-enum class {MERGEO, MAKEA} BundleOType;
-
+/** Create, allocate and load data into a bundle representing a TOPOO file.
+@param type Allows for variations on which variables are added to the bundle
+    BundleOType::MERGEO: Variables appropriate for make_merged_topoo.cpp
+    BundleOType::MAKEA: Variables appropriate for input of make_topoa.cpp
+@param topoO_fname
+    Name of TOPOO file to load (output of make_topoo.cpp or make_merged_topoo.cpp)
+    If not set, then don't load or allocate anything.
+*/
 ibmisc::ArrayBundle<double,2> topoo_bundle(
 BundleOType type,
 std::string const &topoO_fname = "")
@@ -419,17 +423,7 @@ std::string const &topoO_fname = "")
     }
 
 }
-
-
-struct TopoABundles {
-    ibmisc::ArrayBundle<double,2> a;
-    ibmisc::ArrayBundle<double,3> a3;
-    ibmisc::ArrayBundle<int16_t,3> a3_i;
-
-    TopoABundles(HntrSpec const &hspecA,
-        ibmisc::ArrayBundle<double,2> const &topoo);
-};
-
+// ------------------------------------------------------------------------
 TopoABundles::TopoABundles(
 ibmisc::ArrayBundle<double,2> const &topoo,
 HntrSpec const &hspecA,
@@ -474,8 +468,7 @@ int const nhc_gcm)
     this->a3_i.allocate(shape3, {"nhc", "jm", "im"});
 
 }
-
-
+// ------------------------------------------------------------------------
 std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
