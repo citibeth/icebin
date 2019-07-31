@@ -76,8 +76,10 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     self->_name = sheet_name;
     self->gcm_coupler = _gcm_coupler;
     self->ice_regridder = &*_gcm_coupler->gcm_regridder->ice_regridders().at(sheet_name);
-    self->elevmaskI.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
-    self->elevmaskI = nan;
+    self->emI_ice.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
+    self->emI_ice = nan;
+    self->emI_land.reference(blitz::Array<double,1>(self->ice_regridder->nI()));
+    self->emI_land = nan;
 
 //    if (rw_full) ncio_blitz(ncio, elevmaskI, true, vname + ".elevmaskI", "double",
 //        get_dims(ncio ,{vname + ".gridI.cells.nfull"}));
@@ -249,14 +251,21 @@ for (int j=0; j<nI(); ++j) {
 // -----------------------------------------------------------
 /** 
 @param do_run True if we are to actually run (otherwise just return ice_ovalsI from current state)
-@return ice_ovalsI */
-void IceCoupler::couple(
+@param gcm_ivalsAE_s Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
+       Accumulates here from many ice shets. _s = sparse indexing
+*/
+IceCoupler::CoupleOut IceCoupler::couple(
 double time_s,
 // Values from GCM, passed GCM -> Ice
 VectorMultivec const &gcm_ovalsE_s,
-GCMInput &out,    // Accumulate matrices here...
+// ------- Output Variables
+std::array<VectorMultivec, GridAE::count> &gcm_ivalsAE_s,    // (accumulate over many ice sheets)
+//GCMInput &out,    // Accumulate matrices here...
+// ------- Flags
 bool run_ice)
 {
+    IceCoupler::CoupleOut ret;
+
     if (!gcm_coupler->am_i_root()) {
         printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
 
@@ -266,7 +275,7 @@ bool run_ice)
         ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
         printf("[noroot] END IceCoupler::couple(%s)\n", name().c_str());
-        return;
+        return ret;
     }
 
     printf("BEGIN IceCoupler::couple(%s)\n", name().c_str());
@@ -323,66 +332,42 @@ bool run_ice)
     }
 
     // ========== Update regridding matrices
-    int maskI_ix = standard_names[OUTPUT].at("maskI");
-    blitz::Array<double,1> out_maskI(ice_ovalsI(maskI_ix, blitz::Range::all()));
-    for (int i=0; i<nI(); ++i) maskI(i) = (char)out_maskI(i);
+    int emI_ice_ix = standard_names[OUTPUT].at("elevmask_ice");
+    blitz::Array<double,1> out_emI_ice(ice_ovalsI(emI_ice_ix, blitz::Range::all()));
 
-    int elevmaskI_ix = standard_names[OUTPUT].at("elevmaskI");
-    blitz::Array<double,1> out_elevmaskI(ice_ovalsI(elevmaskI_ix, blitz::Range::all()));
+    int emI_land_ix = standard_names[OUTPUT].at("elevmask_land");
+    blitz::Array<double,1> out_emI_land(ice_ovalsI(emI_land_ix, blitz::Range::all()));
+
     // Check that elevmaskI is an alias for variable #elevmaskI_ix in ice_ovalsI
-    if (&ice_ovalsI(elevmaskI_ix,0) != &out_elevmaskI(0)) (*icebin_error)(-1,
-        "ice_ovalsI <%p> != elevmaskI <%p>\n", &ice_ovalsI(elevmaskI_ix,0), &out_elevmaskI(0));
+    if (&ice_ovalsI(emI_ice_ix,0) != &out_emI_ice(0)) (*icebin_error)(-1,
+        "ice_ovalsI <%p> != emI_ice <%p>\n", &ice_ovalsI(emI_ice_ix,0), &out_emI_ice(0));
+    if (&ice_ovalsI(emI_land_ix,0) != &out_emI_land(0)) (*icebin_error)(-1,
+        "ice_ovalsI <%p> != emI_land <%p>\n", &ice_ovalsI(emI_land_ix,0), &out_emI_land(0));
 
-    elevmaskI = out_elevmaskI;    // Copy
+    emI_ice = out_emI_ice;    // Copy
+    emI_land = out_emI_land;    // Copy
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
-    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, elevmaskI));
-    RegridParams regrid_params(true, true, {0,0,0});
-    RegridParams regrid_params_nc(true, false, {0,0,0});    // correctA=False
-
-    SparseSetT dimA1;
-    SparseSetT dimE1;
-    // A SparseSet that is identity for the entire range of I
-    SparseSetT dimI(id_sparse_set<SparseSetT>(nI()));
-
-    // ---- Update AvE1 matrix and weights (global for all ice sheets)
-
-    // Adds to dimA1 and dimE1
-    auto AvE1(rm->matrix_d("AvE", {&dimA1, &dimE1}, regrid_params));
-
-    spcopy(
-        accum::to_sparse(AvE1->dims,
-        accum::ref(out.AvE1_s)),
-        *AvE1->M);
-
-    TupleListLT<1> &out_wAvE1_s(out.wAvE1_s);    // Get around bug in gcc@4.9.3
-    spcopy(
-        accum::to_sparse(make_array(AvE1->dims[0]),
-        accum::ref(out_wAvE1_s)),
-        AvE1->wM);    // blitz::Array<double,1>
-
+    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, emI_ice));
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
-    auto E1vI_nc(rm->matrix_d("EvI", {&dimE1, &dimI}, regrid_params_nc));
+    // A SparseSet that is identity for the entire range of I
+    SparseSetT dimI(id_sparse_set<SparseSetT>(nI()));
 
-    // Don't do this on the first round, since we don't yet have an IvE0
-    if (run_ice) {
-        TupleListLT<2> &out_E1vE0_s(out.E1vE0_s);
-        EigenSparseMatrixT E1vE0(*E1vI_nc->M * *IvE0);
-        spcopy(
-            accum::to_sparse(make_array(&dimE1, &dimE0),
-            accum::ref(out_E1vE0_s)),
-            E1vE0);
-    }
-
+    // _nc means "No Correct" for changes in area due to projections
+    // See commit d038e5cb for deeper explanation
+    ret.E1vI_unscaled_nc = rm->matrix_d("EvI", {&dimE1, &dimI},
+        RegridParams(false, false, {0,0,0}));    // scale=f, correctA=f
 
     // ========= Compute gcm_ivalsE
-
-    auto A1vI(rm->matrix_d("AvI", {&dimA1, &dimI}, regrid_params));
+    auto A1vI_unscaled(rm->matrix_d("AvI", {&dimA1, &dimI},
+        RegridParams(false, true, {0,0,0}));    // scale=f, correctA=t
 
     // Do it once for _E variables and once for _A variables.
-    std::array<linear::Weighted_Eigen * const, GridAE::count> AE1vIs {&*A1vI, &*E1vI_nc};
+    std::array<linear::Weighted_Eigen * const, GridAE::count> AE1vIs
+        {&*A1vI_unscaled, &*E1vI_unscaled_nc};
+
     for (int iAE=0; iAE < GridAE::count; ++iAE) {
 
         // Assuming column-major matrices...
@@ -443,23 +428,26 @@ bool run_ice)
         // -------------------------- END Sanity Check
 
         // Regrid while recombining variables
+        // (Do not need to use Weighted_Eigen::apply(), since this is not IvE)
         EigenDenseMatrixT gcm_ivalsX((*AE1vIs[iAE]->M) * (
             ice_ovalsI_e * gcmi_v_iceo_T.M + gcmi_v_iceo_T.b.replicate(nI(),1) ));
-
         // Sparsify while appending to the global VectorMultivec
         // (Transposes order in memory)
-        std::vector<double> vals(gcm_ivalsX.cols());
+        std::vector<double> vals(gcm_ivalsAE_s[iAE].size()); // Extra col for weight
         for (int jj=0; jj < gcm_ivalsX.rows(); ++jj) {
             auto jj_s(AE1vIs[iAE]->dims[0]->to_sparse(jj));
-            for (int nn=0; nn < gcm_ivalsX.cols(); ++nn)
+            int nn = 0;
+            for (; nn < gcm_ivalsX.cols(); ++nn)
                 vals[nn] = gcm_ivalsX(jj,nn);
-            out.gcm_ivalsAE_s[iAE].add(jj_s, vals);
+            gcm_ivalsAE_s[iAE].add(jj_s, vals);
+            gcm_ivalsAE_weight_s[iAE].push_back(AE1vIs[iAE]->wM(jj))   // Add weight as separate vector
         }
     }        // iAE
 
     // Compute IvE (for next timestep)
     std::unique_ptr<linear::Weighted_Eigen> IvE1(
-        rm->matrix_d("IvE", {&dimI, &dimE1}, regrid_params));
+        rm->matrix_d("IvE", {&dimI, &dimE1},
+        RegridParams(true, true, {0,0,0}))); // scale=t, correctA=t
 
     // wIvE0.reference(IvE1->wM);
 
@@ -482,10 +470,20 @@ bool run_ice)
     }
 
     // Save stuff for next time around
+    ret.dimE0 = set::move(dimE0);
+    ret.IvE0 = std::move(IvE0);
     dimE0 = std::move(dimE1);
-    IvE0 = std::move(IvE1->M);
+    IvE0 = std::move(IvE1);
 
     printf("END IceCoupler::couple(%s)\n", name().c_str());
+    return ret;
+}
+
+IceModel::update_AvE(
+TupleListLT<2> &AvE1_s,    // OUT: Put fully merged AvE here (sparse indexing)
+TupleListLT<1> wAvE1_s)
+{
+
 }
 // =======================================================
 /** Specialized init signature for IceWriter */

@@ -54,42 +54,9 @@ struct ModelEParams
 };
 // ---------------------------------------------
 
-struct ModelEOutputs
-{
-    // Pointers to arrys within ModelE
 
-    // gcm_ovalsE[ovar](i, j, ihc)    Fortran-order 1-based indexing
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ovalsE;
-};
-
-struct Topos
-{
-    // --------- State variables we can update inside ModelE
-    // i,j,ihc arrays on Elevation grid
-    blitz::Array<double,3> fhc;
-    blitz::Array<int,3> underice;
-    blitz::Array<double,3> elevE;
-
-    // i,j arrays on Atmosphere grid
-    blitz::Array<double,2> focean;
-    blitz::Array<double,2> flake;
-    blitz::Array<double,2> fgrnd;    // Alt: fearth0
-    blitz::Array<double,2> fgice;    // Alt: flice
-    blitz::Array<double,2> zatmo;      // i,j
-};
-
-
-struct ModelEInputs : public Topos
-{
-    // Pointers to arrys within ModelE
-
-    // --------- Flux stuff
-    // gcm_ivalsAI[A/E][ivar](i, j, ihc)    Fortran-order 1-based indexing
-    std::vector<std::unique_ptr<blitz::Array<double,2>>> gcm_ivalsA;
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ivalsE;
-};
-
-
+/** Different indices into gcm_inputs (see INDEXAE_* in LISheetIceBin.F90)*/
+enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;
 
 class DomainDecomposer_ModelE {
     ibmisc::Domain domainA_global;
@@ -112,6 +79,28 @@ public:
     }
 };
 
+#if 0
+struct GCMInput_ModelE : public GCMInput
+{
+
+    enum class A {FOCEAN, FLAKE, FGRND, FGICE, ZATMO, ZLAKE, ZICETOP, NUM};
+    enum class B {FHC, ELEV, UNDERICE, NUM};
+
+    // TOPO file stuff
+    //    * Computed by GCMCoupler_ModelE::couple()
+    //    * SCALED: ready-to-use values
+    std::array<VectorMultivec, GridAE::count> topoAE_s;
+    std::array<std::vector<double>, GridAE::count> topoAE_weight_s;
+
+    GCMInput_ModelE(std::array<int, GridAE::count> const &nvar) :
+        GCMInput(nvar),   // From the contract
+        topoAE_s({
+            VectorMultivec(A::NUM),   // Add weight as last column
+            VectorMultivec(E::NUM),
+        })
+    {}
+};
+#endif
 
 
 class GCMCoupler_ModelE : public GCMCoupler
@@ -124,11 +113,19 @@ public:
     Works for A and E grids. */
     std::unique_ptr<DomainDecomposer_ModelE> domains;
 
-    ModelEOutputs modele_outputs;
+    // ================== ModelE Outputs
+    // gcm_ovalsE[ovar](i, j, ihc)    Fortran-order 1-based indexing
+    std::vector<std::unique_ptr<blitz::Array<double,3>>> gcm_ovalsE;
 
+    // ================== ModelE Inputs
     // Variables borrowed from ModelE, used to return data to it.
     // All these variables are Fortran-order, 1-based indexing
-    ModelEInputs modele_inputs;
+
+    // References back to original ModelE-supplied MPI arrays
+    // gcm_ivalsA[set_index][ivar](i, j, ihc)    C++-order 0 based ordering
+    // Indexed the same as gcm_inputs.
+    std::vector<std::vector<std::unique_ptr<blitz::Array<double,2>>>> gcm_ivalssA;
+    std::vector<std::vector<std::unique_ptr<blitz::Array<double,3>>>> gcm_ivalssE;
 
     // Low and high indices for this MPI rank.
     // Indices are in Fortran order (im, jm) with zero-based indexing
@@ -139,6 +136,9 @@ public:
     /** Name of the Ocean-level TOPO file (output of modified Gary's
     program, sans ice sheets) */
     std::string topoO_fname;
+
+    /** Name of file on ocean grid containing the EvA matrix for global (non-IceBin) ice. */
+    std::string global_ecO_fname;
 
     // Initial ModelE state of foceanO; this cannot change.
     blitz::Array<double,2> foceanOm0;
@@ -166,7 +166,7 @@ public:
 
 
     // 1. Copies values back into modele_inputs.gcm_ivals
-    void update_gcm_ivals(GCMInput const &out);
+    void update_gcm_ivals(GCMInput_ModelE const &out);
 
 };    // class GCMCouler_ModelE
 
