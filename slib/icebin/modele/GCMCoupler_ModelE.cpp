@@ -633,6 +633,7 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
         default :
             (*icebin_error)(-1, "Illegal gcm_inputs_grid of '%c'", gcm_inputs_grid[index_ae]);
     }}
+
     printf("END GCMCoupler_ModelE::apply_gcm_ivals\n");
 }
 // ============================================================================
@@ -644,7 +645,6 @@ double time_s,    // Simulation time
 std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
 // ---------- Input & Output
-// Read: E1vE0_unscaled, AvE_unscaled
 // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
 GCMInput &out)
 {
@@ -694,7 +694,7 @@ GCMInput &out)
     if (errors.size() > 0) (*icebin_error)(-1,
         "Errors in TOPO merging or regridding; halting!");
 
-    // ---------------- Compute AAMVEAM
+    // ---------------- Compute AAmvEAm (requires merged foceanOp, foceanOm)
     linear::Weighted_Tuple AAmvEAm(gcmA->global_unscaled_AvE(emI_lands, emI_ices, foceanOp, foceanOm));
 
     // ---------------- Create TOPOA file (in RAM)
@@ -703,7 +703,7 @@ GCMInput &out)
         gcmA->hspecO(), gcmA->hspecA(), gcmA->indexingHC, gcmA->hcdefs(), gcmA->underice,
         AAmvEAm,
         foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
-        fhc, elevE, underice));
+        fhc, elevE, underice_i));
 
     // Print sanity check errors to STDERR
     for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
@@ -717,7 +717,8 @@ GCMInput &out)
 
     // ------------------- Convert underice to double and store in topoa
     auto &hspecA(gcmA->hspecA());
-    std::array<int,3> shape3 {gcmA->nhc(), hspecA.jm, hspecA.im};
+    auto const nhc(gcmA->nhc());
+    std::array<int,3> shape3 {nhc, hspecA.jm, hspecA.im};
     topoa.a3.add("underice", {});
     topoa.a3.at("underice").allocate(true, shape3);
     auto &underice(topoa.a3.array("underice"));
@@ -726,34 +727,60 @@ GCMInput &out)
 
     // ------------------ Pack TOPOA stuff into output variables
     {
-        static std::vector<std::string> const vars {"focean", "flake", "fgrnd", "fgice", "zatmo", "hlake", "zicetop"};
+        // See LISheetIceBin.F90 (modelE); same as variables found in classic TOPO file
+        // These variables should be: "focean", "flake", "fgrnd", "fgice", "zatmo", "hlake"
+        VarSet &gcm_inputsA(this->gcm_inputs[IndexAE::ATOPO]);
+        VectorMultivec &gcm_ivalsA_s(this->gcm_ivalss_s[IndexAE::ATOPO]);
 
-        std::vector<int> const ivars_ix;
-        std::vector<int> const ovars_ix;
-        for (auto const &name : vars) {
-            // Index in topoa.a
-            ivars_ix.push_back(topoa.index.at(name));
-            // Index in contract
-            ovars_ix.push_back(gcm_inputs[IndexAE::ATOPO].index.at(name));
+        // Map between contract and TOPOA variables
+        std::vector<blitz::Array<double,2>> iarrays;
+        for (size_t k=0; k<gcm_inputsA.index.size(); ++i) {
+            // k = index in contract
+            // ivaris_ix = Index in topoa.a
+            iarrays.push_back(&topoa.a.array(topoa.a.index.at(name)));
         }
 
-        VectorMultivec &gcm_ivalsA_s(this->gcm_ivalss_s[IndexAE::ATOPO]);
-        gcm_ivalsA_s.nvar = vars.size();
-        std::vector val(gcm_ivals_s.nvar);
-
+        // Copy every element
+        std::vector val(gcm_ivalsA_s.nvar);
         for (int j=0; j<hspecA.jm; ++j) {
         for (int i=0; i<hspecA.im; ++i) {
-
-            for (int k=0; k<gcm_ivals_s.size(); ++k) val[ovars_ix[k]] = topoa.array(ivars_ix[k])(j,i);
+            for (int k=0; k<gcm_ivalsA_s.size(); ++k) {
+                val[k] = (*iarrays(k))(j,i);
+            }
             auto ij = gcmA->indexing.tuple_to_index(std::array<int,2>{i,j});
             gcm_ivalsA_s.add(ij, val);
         }}
-
-
     }
 
-    VectorMultivec &gcm_ivalsE_s(this->gcm_ivalss_s[IndexAE::ETOPO]);
-TODO: Do the same for EC output variables
+    // ------------------ Pack TOPOE stuff into output variables
+    {
+        // See LISheetIceBin.F90 (modelE); same as variables found in classic TOPO file
+        // These variables should be: fhc, elevE, underice
+        VarSet &gcm_inputsE(this->gcm_inputs[IndexAE::ETOPO]);
+        VectorMultivec &gcm_ivalsE_s(this->gcm_ivalss_s[IndexAE::ETOPO]);
+
+        // Map between contract and TOPOE variables
+        std::vector<blitz::Array<double,3> *> iarrays;
+        for (size_t k=0; k<gcm_inputsE.index.size(); ++i) {
+            // k = index in contract
+            // ivaris_ix = Index in topoa.a3
+            iarrays.push_back(&topoa.a3.array(topoa.a3.index.at(name)));
+        }
+
+        // Copy every element
+        std::vector val(gcm_ivalsE_s.nvar);
+        for (int ihc=0; ihc<nhc; ++ihc) {
+        for (int j=0; j<hspecA.jm; ++j) {
+        for (int i=0; i<hspecA.im; ++i) {
+            for (int k=0; k<gcm_ivalsE_s.size(); ++k) {
+                val[k] = (*iarrays(k))(ihc,j,i);
+            }
+            auto ij = gcmE->indexing.tuple_to_index(std::array<int,2>{i,j,ihc});
+            gcm_ivalsE_s.add(ij, val);
+        }}}
+    }
+
+
 
 
 TODO: Take care of FLAND, which was not computed by make_topoa

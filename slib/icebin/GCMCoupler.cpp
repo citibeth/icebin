@@ -263,22 +263,18 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
             E1vIs, IvE0s, dimE0s);
     }
 
-    {
-        update_topo(time_s, AvE_unscaled, emI_lands, emI_ices, out);
 
-TODO: Move this logic into update_topo(), since it requires foceanAOp and foceanAOm from merge step
-        std::vector<blitz::Array<double,1>> emI_ices, emI_lands;
+    // Run update_topo()
+    {
+        std::vector<blitz::Array<double,1> *> emI_ices, emI_lands;
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);
 
-            emI_ices.push_back(blitz::Array<double,1>(ice_coupler->emI_ice));
-            emI_lands.push_back(blitz::Array<double,1>(land_coupler->emI_ice));
+            emI_ices.push_back(&ice_coupler->emI_ice);
+            emI_lands.push_back(&ice_coupler->emI_land);
         }
 
-        linear::Weighted_Tuple AvE_unscaled = gcm_regridder.global_unscaled_AvE(
-            emI_ices, emI_lands);
-
-
+        update_topo(time_s, emI_lands, emI_ices, out);
     }
 
     // Log the results
@@ -428,15 +424,15 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
 {
     ibmisc::ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
 
+TODO: Fix this
     for (int iAE=0; iAE<GridAE::count; ++iAE) {
         ncio_dense(ncio, out.gcm_ivalsAE_s[iAE], gcm_inputsAE[iAE],
             gcm_regridder->indexing(iAE), vname_base);
     }
 
     ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"E1vE0");
-This needs to change; must use EOmvAOm_merged from merge_TOPO stuff.
-    ncio_spsparse(ncio, out.AvE1_s, false, vname_base+"AvE1");
-    ncio_spsparse(ncio, out.wAvE1_s, false, vname_base+"wAvE1");
+//    ncio_spsparse(ncio, out.AvE1_s, false, vname_base+"AvE1");
+//    ncio_spsparse(ncio, out.wAvE1_s, false, vname_base+"wAvE1");
 }
 
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */

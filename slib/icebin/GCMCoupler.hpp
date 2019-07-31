@@ -251,7 +251,13 @@ public:
         double time_start_s);
 
     /** Top level method to re-compute values originally loaded from the TOPO file. */
-    virtual void update_topo(double time_s) = 0;
+    void GCMCoupler_ModelE::update_topo(
+        double time_s,    // Simulation time
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        // ---------- Input & Output
+        // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
+        GCMInput &out);
 
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.
