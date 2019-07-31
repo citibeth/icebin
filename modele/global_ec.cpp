@@ -534,6 +534,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
     {NcIO ncio(ofname, 'w', "nc4", nocompress);
         printf("---- Saving metadata\n");
         get_or_put_att_enum(*ncio.nc, ncio.rw, "gcm_grid_option", args.gcm_grid_option);
+        get_or_put_att_enum(*ncio.nc, ncio.rw, "eq_rad", args.eq_rad);
 
         hspecI.ncio(ncio, "hspecI");
         hspecI2.ncio(ncio, "hspecI2");

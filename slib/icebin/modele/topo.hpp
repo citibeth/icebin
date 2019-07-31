@@ -80,7 +80,7 @@ SparseSetT const &dimEOp,
 SparseSetT const &dimAOp);
 
 
-extern std::unique_ptr<ibmisc::linear::Weighted_Eigen> _compute_AAmvEAm(
+extern ibmisc::linear::Weighted_Tuple _compute_AAmvEAm(
 std::array<SparseSetT *,2> dims,
 bool scale,        // paramsA.scale
 double const eq_rad,    // Radius of the earth

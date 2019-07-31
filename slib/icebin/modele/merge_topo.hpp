@@ -85,12 +85,12 @@ matrix is all based on un-rounded ("raw") verions of TOPO fields.
 @param underice_hc OUT: Expected model underneath the ice of each elevation class
     UI_NOTHING for base ice
     UI_ICEBIN for local ice
+@param paramsA Regrid parmaeters that are used by command line programs (known to work)
 @return Merged EOpvAOp matrix.  Dense indexing, using dimension maps from dims.
 */
 EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
 SparseSetT &dimAOp,    // dimAOp is appended
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed
-RegridParams const &paramsA,
 GCMRegridder const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emI_ices,
@@ -99,7 +99,8 @@ bool use_local_ice,
 std::vector<double> const &hcdefs_base, // [nhc]  Elev class definitions for base ice
 ibmisc::Indexing const &indexingHC_base,
 bool squash_ecs,    // Should ECs be merged if they are the same elevation?
-std::vector<std::string> &errors);
+std::vector<std::string> &errors,
+RegridParams const &paramsA = RegridParams(false, false, {0.,0.,0.}))
 
 
 /** Merges repeated ECs */

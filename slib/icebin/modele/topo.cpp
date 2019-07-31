@@ -237,9 +237,7 @@ SparseSetT const &dimAOp)
     return EOmvAOm;
 }
 // ------------------------------------------------------------------------
-
 std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
-    std::array<SparseSetT *,2> dims,
     bool scale,        // paramsA.scale
     double const eq_rad,    // Radius of the earth
 
@@ -252,25 +250,24 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
 
     // Sub-parts of the computation, pre-computed
-    EigenSparseMatrixT const &EOpvAOp,
+    EigenSparseMatrixT const &EOpvAOp,    // unscaled
     SparseSetT &dimEOp,
     SparseSetT &dimAOp,
     blitz::Array<double,1> const &wAOp)
 {
+    SparseSetT dimAAm, dimEAm;
+
     unsigned long const nA = indexingHCA[0].extent; // hntrA.size()
     unsigned int const nhc = indexingHCA[1].extent;
     unsigned long const nE = indexingHCA.extent();
 
     ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
 
-    SparseSetT &dimAAm(*dims[0]);
-    SparseSetT &dimEAm(*dims[1]);
-
     // Must set sparse_extent
     dimAAm.set_sparse_extent(nA);
     dimEAm.set_sparse_extent(nE);
 
-    std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
+    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Compute wAOm (from wAOp)
     SparseSetT dimAOm;
@@ -289,7 +286,7 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
         {&dimAOm, &dimAAm}, 'T').to_eigen());
 
     blitz::Array<double,1> AAmvAOms(sum(AAmvAOm, 1, '-'));    // Note unusual way we weight/scale here
-    auto &wAAm_e(ret->tmp.make<EigenColVectorT>(
+    auto &wAAm_e(AAmvEAm->tmp.make<EigenColVectorT>(
         AAmvAOm * map_eigen_diagonal(AAmvAOms) * wAOm_e));
 
     // ------------ Compute AOmvEOm (from EOpvAOp)
@@ -317,35 +314,171 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     // ------------ Compute wEAm
     auto EAmvEOms(sum(EOmvEAm, 0, '-'));
     auto &sEOmvEAm(EAmvEOms);
-    auto &wEAm_e(ret->tmp.make<EigenColVectorT>(
+    auto &wEAm_e(AAmvEAm->tmp.make<EigenColVectorT>(
         EAmvEOm * map_eigen_diagonal(EAmvEOms) * wEOm_e));
 
 
     // ------------- Put it all together
-    ret->wM.reference(to_blitz(wAAm_e));
+    AAmvEAm->wM.reference(to_blitz(wAAm_e));
     blitz::Array<double,1> sAAmvAOm(sum(AAmvAOm, 0, '-'));
     if (scale) {
-        ret->M.reset(new EigenSparseMatrixT(
+        AAmvEAm->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sAAmvAOm) * AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
             map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
     } else {
-        blitz::Array<double,1> scale(ret->wM * sAAmvAOm);
-        ret->M.reset(new EigenSparseMatrixT(
+        // Maintains identity: M_unscaled = wM * M_scaled
+        blitz::Array<double,1> scale(AAmvEAm->wM * sAAmvAOm);
+        AAmvEAm->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(scale) *
             AAmvAOm *    // Works on whole cells, not just ice sheet; so we need to normalize by sAAmvAOm, not sAAm
             map_eigen_diagonal(sAOmvEOm) * AOmvEOm *
             map_eigen_diagonal(sEOmvEAm) * EOmvEAm));
     }
-    ret->Mw.reference(to_blitz(wEAm_e));
+    AAmvEAm->Mw.reference(to_blitz(wEAm_e));
 
-    return ret;
+    return AAmvEAm;
+
 }
+
+
+
+enum class {MERGEO, MAKEA} BundleOType;
+
+ibmisc::ArrayBundle<double,2> topoo_bundle(
+BundleOType type,
+std::string const &topoO_fname = "")
+{
+
+    // ------------- Non-rounded versions (Op)
+    topoo.add("FOCEANF", {
+        "description", "Fractional ocean ocver",
+        "units", "1",
+        "sources", "GISS 1Qx1",
+    });
+    if (type == BundleOType::MERGEO) {
+        auto &fgiceOp(topoo.add("FGICEF", {
+            "description", "Glacial Ice Surface Fraction (Ocean NOT rounded)",
+            "units", "0:1",
+            "sources", "GISS 1Qx1",
+        }));
+        auto &zatmoOp(topoo.add("ZATMOF", {
+            "description", "Atmospheric Topography",
+            "units", "m",
+            "sources", "ETOPO2 1Qx1",
+        }));
+    }
+
+
+
+    // ------------ Rounded Versions (Om)
+    topoo.add("FOCEAN", {
+        "description", "0 or 1, Bering Strait 1 cell wide",
+        "units", "1",
+        "source", "GISS 1Qx1",
+    });
+
+    auto &flakeOm(topoo.add("FLAKE", {
+        "description", "Lake Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    }));
+    auto &fgrndOm(topoo.add("FGRND", {
+        "description", "Ground Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    }));
+    auto &fgiceOm(topoo.add("FGICE", {
+        "description", "Glacial Ice Surface Fraction",
+        "units", "0:1",
+        "sources", "GISS 1Qx1",
+    }));
+    auto &zatmoOm(topoo.add("ZATMO", {
+        "description", "Atmospheric Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    auto &zlakeOm(topoo.add("ZLAKE", {
+        "description", "Lake Surface Topography",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    auto &zicetopOm(topoo.add("ZICETOP", {
+        "description", "Atmospheric Topography (Ice-Covered Regions Only)",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+
+    // Read TOPOO input
+    if (topoO_fname != "") {
+        NcIO topoo_nc(args.topoo_fname, 'r');
+
+        // Read from topoO file, and allocate resulting arrays.
+        topoo.ncio_alloc(topoo_nc, {}, "", "double",
+            get_dims(topoo_nc, {"jm", "im"}));
+    }
+
+}
+
+
+struct TopoABundles {
+    ibmisc::ArrayBundle<double,2> a;
+    ibmisc::ArrayBundle<double,3> a3;
+    ibmisc::ArrayBundle<int16_t,3> a3_i;
+
+    TopoABundles(HntrSpec const &hspecA,
+        ibmisc::ArrayBundle<double,2> const &topoo);
+};
+
+TopoABundles::TopoABundles(
+ibmisc::ArrayBundle<double,2> const &topoo,
+HntrSpec const &hspecA,
+int const nhc_gcm)
+{
+
+    static std::vector<std::string> const varsO {"FOCEAN", "FLAKE", "FGRND", "FGICE", "ZATMO", "ZLAKE", "ZICETOP"};
+    static std::vector<std::string> const varsA {"focean", "flake", "fgrnd", "fgice", "zatmo", "hlake", "zicetop"};
+
+    for (size_t i=0; i<varsO.size(); ++i) {
+        std::string const &nameO(varsO[i]);
+        std::string const &nameA(varsA[i]);
+
+        // Get data record for this variable
+        auto &d(topoo.at(nameO));
+
+        // Add to topoa based on info from topoo
+        this->a.add(ibmisc::ArrayBundle<double,2>::Data(
+            nameA, blitz::Array<double,2>(),
+            std::array<int,2>{hspecA.jm, hspecA.im},
+            d.meta.sdims,
+            std::vector<std::pair<std::string, std::string>>(d.meta.attr)));
+    }
+    this->a.allocate(std::array<int,2>{hspecA.jm, hspecA.im}, {"jm","im"}, true);    // check=true
+
+
+    // --------------- Allocate 3D arrays to go in TOPOA file
+    auto &fhc(this->a3.add("fhc", {
+        "description", "fraction of ice-covered area for each elevation class",
+        "units", "1"
+    }));
+    auto &elevE(this->a3.add("elevE", {
+        "description", "Elevation of each elevation class",
+        "units", "1"
+    }));
+    auto &underice(this->a3_i.add("underice", {
+        "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
+    }));
+
+    std::array<int,3> shape3 {nhc_gcm, hspecA.jm, hspecA.im};
+    this->a3.allocate(shape3, {"nhc", "jm", "im"});
+    this->a3_i.allocate(shape3, {"nhc", "jm", "im"});
+
+}
+
 
 std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
-blitz::Array<double,2> const &foceanOp2,
 blitz::Array<double,2> const &foceanOm2,     // Rounded FOCEAN
 blitz::Array<double,2> const &flakeOm2,
 blitz::Array<double,2> const &fgrndOm2,
@@ -357,17 +490,12 @@ blitz::Array<double,2> const &zicetopOm2,
 // Things obtained from gcmA
 HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
 HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
-ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC   (must reflect local + global ECs)
 ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
 std::vector<double> const &hcdefs,        // gcmA->hcdefs()
 std::vector<uint16_t> const &underice_hc,    // gcmA->underice
 //
-double const eq_rad,
-EigenSparseMatrixT const &EOpvAOp,        // UNSCALED
-SparseSetT &dimEOp,    // const
-SparseSetT &dimAOp,    // const
-//
-//SparseSetT const &dimO,    // Tells us which grid cells in O were changed.
+linear::Weighted_Tuple const &AAmvEAm,
+// ----- Outputs
 blitz::Array<double,2> &foceanA2,    // Rounded FOCEAN
 blitz::Array<double,2> &flakeA2,
 blitz::Array<double,2> &fgrndA2,
@@ -380,8 +508,6 @@ blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,
 blitz::Array<int16_t,3> &underice3)
 {
-    ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
-
 
     Hntr hntr_AvO(17.17, hspecA, hspecO);
 
@@ -394,7 +520,6 @@ blitz::Array<int16_t,3> &underice3)
     hntr_AvO.regrid(WTO, zlakeOm2, zlakeA2);
     hntr_AvO.regrid(fgiceOm2, zicetopOm2, zicetopA2);
 
-    auto foceanOp(reshape1(foceanOp2));
     auto foceanOm(reshape1(foceanOm2));
     auto flakeOm(reshape1(flakeOm2));
     auto fgiceOm(reshape1(fgiceOm2));
@@ -427,15 +552,6 @@ blitz::Array<int16_t,3> &underice3)
     std::array<int,2> iTuple;
         int &iA2(iTuple[0]);
         int &ihc(iTuple[1]);
-
-    // Compute AOmvEOm --> fhc
-    auto wAOp(sum(EOpvAOp, 1, '+'));
-    SparseSetT dimAAm,dimEAm;
-    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
-        {&dimAAm, &dimEAm}, true, eq_rad,    // scale=true
-        hspecO, hspecA, indexingHCO, indexingHCA,
-        foceanOp, foceanOm,
-        EOpvAOp, dimEOp, dimAOp, wAOp));
 
     for (auto ii=begin(*AAmvEAm->M); ii != end(*AAmvEAm->M); ++ii) {
         int const iA_d = ii->index(0);
