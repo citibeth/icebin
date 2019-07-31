@@ -90,8 +90,8 @@ blitz::Array<double,2> &fgiceOm2,
 blitz::Array<double,2> &zatmoOm2,
 // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
-// ------ Local ice to merge in...
-GCMRegridder *gcmO,
+// ------ Local ice sheets to merge in...
+GCMRegridder *gcmO,    // Multiple IceRegridders
 RegridParams const &paramsA,
 std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
@@ -272,7 +272,7 @@ Indexing indexingHC_change_nhc(Indexing const &indexingHC0, int nhc)
 EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
 SparseSetT &dimAOp,    // dimAOp is appended; dimEOp is returned as part of return variable.
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed; UNSCALED
-RegridParams const &paramsO,
+RegridParams paramsO,
 GCMRegridder const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emIs,
@@ -295,6 +295,7 @@ std::vector<std::string> &errors)
     auto EOpvAOp_accum(EOpvAOp_m.accum());
 
     // Merge in local matrices
+    paramsO.scale = false;
     std::array<long,2> EOpvAOp_sheet_shape {0,0};
     long offsetE = 0;
     if (use_local_ice) {
