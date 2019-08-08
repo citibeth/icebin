@@ -17,6 +17,7 @@
 #include <icebin/modele/grids.hpp>
 #include <icebin/modele/hntr.hpp>
 #include <icebin/modele/global_ec.hpp>
+#include <icebin/modele/topo.hpp>
 #include <icebin/modele/merge_topo.hpp>
 
 using namespace netCDF;

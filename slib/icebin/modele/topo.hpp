@@ -2,7 +2,7 @@
 #define ICEBIN_MODELE_TOPO_HPP
 
 #include <ibmisc/indexing.hpp>
-#include <ibmisc/linear/eigen.hpp>
+#include <ibmisc/linear/tuple.hpp>
 #include <icebin/modele/hntr.hpp>
 
 /** Utilities involved in computing TOPO files:
@@ -20,11 +20,13 @@ NOTES:
     GCMRegridder_ModeleE
 */
 
+using namespace ibmisc;
+
 namespace icebin {
 namespace modele {
 
 /** Argument to topoo_bundle() */
-enum class {MERGEO, MAKEA} BundleOType;
+enum BundleOType {MERGEO, MAKEA};
 
 
 /** Encodes relationship between number of ECs in ice model, and
@@ -84,7 +86,7 @@ SparseSetT const &dimEOp,
 SparseSetT const &dimAOp);
 
 
-extern ibmisc::linear::Weighted_Tuple _compute_AAmvEAm(
+extern std::unique_ptr<ibmisc::linear::Weighted_Eigen> _compute_AAmvEAm_EIGEN(
 std::array<SparseSetT *,2> dims,
 bool scale,        // paramsA.scale
 double const eq_rad,    // Radius of the earth
@@ -102,6 +104,27 @@ EigenSparseMatrixT const &EOpvAOp,
 SparseSetT &dimEOp,
 SparseSetT &dimAOp,
 blitz::Array<double,1> const &wAOp);
+
+
+extern ibmisc::linear::Weighted_Tuple _compute_AAmvEAm(
+bool scale,        // paramsA.scale
+double const eq_rad,    // Radius of the earth
+
+// Things obtained from gcmA
+HntrSpec const &hntrO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
+HntrSpec const &hntrA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
+ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC
+ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
+blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
+blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
+
+// Sub-parts of the computation, pre-computed
+EigenSparseMatrixT const &EOpvAOp,
+SparseSetT &dimEOp,
+SparseSetT &dimAOp,
+blitz::Array<double,1> const &wAOp);
+
+
 
 /** Create, allocate and load data into a bundle representing a TOPOO file.
 @param type Allows for variations on which variables are added to the bundle
@@ -134,8 +157,13 @@ struct TopoABundles {
         Description of A (atmosphere) grid
     @param topoo
         Output of topoo_bundle(), from which to derive bundle on A (atmosphere) grid */
-    TopoABundles(HntrSpec const &hspecA,
-        ibmisc::ArrayBundle<double,2> const &topoo);
+    TopoABundles(
+        ibmisc::ArrayBundle<double,2> const &topoo,
+        HntrSpec const &hspecA,
+        int const nhc_gcm);
+
+    /** ncdims must be {nhc, jm, im} */
+    void ncio(NcIO &ncio, std::vector<netCDF::NcDim> const &ncdims);
 };
 
 
@@ -148,7 +176,6 @@ struct TopoABundles {
 std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
-blitz::Array<double,2> const &foceanOp2,
 blitz::Array<double,2> const &foceanOm2,     // Rounded FOCEAN
 blitz::Array<double,2> const &flakeOm2,
 blitz::Array<double,2> const &fgrndOm2,
@@ -160,17 +187,12 @@ blitz::Array<double,2> const &zicetopOm2,
 // Things obtained from gcmA
 HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
 HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
-ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC   (must reflect local + global ECs)
 ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
 std::vector<double> const &hcdefs,        // gcmA->hcdefs()
-std::vector<uint16_t> const &underice,    // gcmA->underice
+std::vector<uint16_t> const &underice_hc,    // gcmA->underice
 //
-double const eq_rad,
-EigenSparseMatrixT const &EOpvAOp,        // UNSCALED
-SparseSetT &dimEOp,    // const
-SparseSetT &dimAOp,    // const
+linear::Weighted_Tuple const &AAmvEAm,
 //
-//SparseSetT const &dimO,    // Tells us which grid cells in O were changed.
 blitz::Array<double,2> &foceanA2,    // Rounded FOCEAN
 blitz::Array<double,2> &flakeA2,
 blitz::Array<double,2> &fgrndA2,

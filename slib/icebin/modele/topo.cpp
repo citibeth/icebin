@@ -237,7 +237,8 @@ SparseSetT const &dimAOp)
     return EOmvAOm;
 }
 // ------------------------------------------------------------------------
-std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
+std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm_EIGEN(
+    std::array<SparseSetT *,2> dims,
     bool scale,        // paramsA.scale
     double const eq_rad,    // Radius of the earth
 
@@ -255,19 +256,21 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
     SparseSetT &dimAOp,
     blitz::Array<double,1> const &wAOp)
 {
-    SparseSetT dimAAm, dimEAm;
-
     unsigned long const nA = indexingHCA[0].extent; // hntrA.size()
     unsigned int const nhc = indexingHCA[1].extent;
     unsigned long const nE = indexingHCA.extent();
 
     ConstUniverseT const_dimAOp({"dimEOp", "dimAOp"}, {&dimEOp, &dimAOp});
 
+    SparseSetT &dimAAm(*dims[0]);
+    SparseSetT &dimEAm(*dims[1]);
+
     // Must set sparse_extent
     dimAAm.set_sparse_extent(nA);
     dimEAm.set_sparse_extent(nE);
 
-    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(new linear::Weighted_Eigen(dims, false));    // not conservative
+    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(
+        new linear::Weighted_Eigen({&dimAAm,&dimEAm}, false));    // not conservative
 
     // Compute wAOm (from wAOp)
     SparseSetT dimAOm;
@@ -341,6 +344,33 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 
 }
 
+linear::Weighted_Tuple _compute_AAmvEAm(
+    bool scale,        // paramsA.scale
+    double const eq_rad,    // Radius of the earth
+
+    // Things obtained from gcmA
+    HntrSpec const &hntrO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
+    HntrSpec const &hntrA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
+    ibmisc::Indexing const indexingHCO,    // gcmA->gcmO->indexingHC
+    ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
+    blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
+    blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
+
+    // Sub-parts of the computation, pre-computed
+    EigenSparseMatrixT const &EOpvAOp,    // unscaled
+    SparseSetT &dimEOp,
+    SparseSetT &dimAOp,
+    blitz::Array<double,1> const &wAOp)
+{
+    SparseSetT dimAAm, dimEAm;
+    std::unique_ptr<linear::Weighted_Eigen> ret(_compute_AAmvEAm_EIGEN(
+        {&dimAAm, &dimEAm},
+        scale, eq_rad, hntrO, hntrA,
+        indexingHCO, indexingHCA, foceanAOp, foceanAOm,
+        EOpvAOp, dimEOp, dimAOp, wAOp));
+    return to_tuple(*ret);
+}
+
 /** Create, allocate and load data into a bundle representing a TOPOO file.
 @param type Allows for variations on which variables are added to the bundle
     BundleOType::MERGEO: Variables appropriate for make_merged_topoo.cpp
@@ -351,8 +381,9 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm(
 */
 ibmisc::ArrayBundle<double,2> topoo_bundle(
 BundleOType type,
-std::string const &topoO_fname = "")
+std::string const &topoO_fname)
 {
+    ibmisc::ArrayBundle<double,2> topoo;
 
     // ------------- Non-rounded versions (Op)
     topoo.add("FOCEANF", {
@@ -415,12 +446,14 @@ std::string const &topoO_fname = "")
 
     // Read TOPOO input
     if (topoO_fname != "") {
-        NcIO topoo_nc(args.topoo_fname, 'r');
+        NcIO topoo_nc(topoO_fname, 'r');
 
         // Read from topoO file, and allocate resulting arrays.
         topoo.ncio_alloc(topoo_nc, {}, "", "double",
             get_dims(topoo_nc, {"jm", "im"}));
     }
+
+    return topoo;
 
 }
 // ------------------------------------------------------------------------
@@ -468,6 +501,18 @@ int const nhc_gcm)
     this->a3_i.allocate(shape3, {"nhc", "jm", "im"});
 
 }
+
+void TopoABundles::ncio(NcIO &ncio, std::vector<netCDF::NcDim> const &ncdims)
+{
+    auto &nhc(ncdims[0]);
+    auto &jm(ncdims[1]);
+    auto &im(ncdims[2]);
+
+    this->a.ncio(ncio, {}, "", "double", {jm, im});
+    this->a3.ncio(ncio, {}, "", "double", ncdims);
+    this->a3_i.ncio(ncio, {}, "", "int16", ncdims);
+}
+
 // ------------------------------------------------------------------------
 std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
@@ -546,11 +591,9 @@ blitz::Array<int16_t,3> &underice3)
         int &iA2(iTuple[0]);
         int &ihc(iTuple[1]);
 
-    for (auto ii=begin(*AAmvEAm->M); ii != end(*AAmvEAm->M); ++ii) {
-        int const iA_d = ii->index(0);
-        int const iA = dimAAm.to_sparse(iA_d);
-        int const iE_d = ii->index(1);
-        int const iE = dimEAm.to_sparse(iE_d);
+    for (auto ii=begin(AAmvEAm.M); ii != end(AAmvEAm.M); ++ii) {
+        int const iA = ii->index(0);
+        int const iE = ii->index(1);
 
         indexingHCA.index_to_tuple(&iTuple[0], iE);
 

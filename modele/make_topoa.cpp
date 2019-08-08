@@ -6,6 +6,7 @@
 #include <ibmisc/blitz.hpp>
 #include <ibmisc/filesystem.hpp>
 #include <ibmisc/linear/compressed.hpp>
+#include <ibmisc/linear/eigen.hpp>
 #include <everytrace.h>
 #include <boost/filesystem.hpp>
 
@@ -171,10 +172,10 @@ int main(int argc, char **argv)
 
     // Compute AAmvEAm --> fhc
     auto wAOp(sum(*EOpvAOp, 1, '+'));
-    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
+    linear::Weighted_Tuple AAmvEAm(_compute_AAmvEAm(
         true, args.eq_rad,    // scale=true
         hspecO, hspecA, indexingHCO, indexingHCA,
-        foceanOp, foceanOm,   // These don't change over course of a run
+        reshape1(foceanOp), reshape1(foceanOm),   // These don't change over course of a run
         *EOpvAOp, dimEOp, dimAOp, wAOp));
 
     const_dimAOp.reset();    // Check for any const violations
@@ -183,8 +184,8 @@ int main(int argc, char **argv)
     // ---------------- Create TOPOA in memory
     std::vector<std::string> errors(make_topoA(
         foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
-        hspecO, hspecA, indexingHCO, indexingHCA, hcdefs, underice_hc,
-        *AAmvEAm, dimEOp, dimAOp,
+        hspecO, hspecA, indexingHCA, hcdefs, underice_hc,
+        AAmvEAm,
         foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
         fhc, elevE, underice));
 
@@ -206,11 +207,8 @@ int main(int argc, char **argv)
 
 
         // Write topoA arrays
-        auto jm_im(get_or_add_dims(topoa_nc, {"jm", "im"}, {hspecA.jm, hspecA.im}));
-        topoa.ncio(topoa_nc, {}, "", "double", jm_im);
         auto nhc_jm_im(get_or_add_dims(topoa_nc, {"nhc", "jm", "im"}, {nhc_gcm, hspecA.jm, hspecA.im}));
-        topoa3.ncio(topoa_nc, {}, "", "double", nhc_jm_im);
-        topoa3_i.ncio(topoa_nc, {}, "", "short", nhc_jm_im);
+        topoa.ncio(topoa_nc, nhc_jm_im);
     }
 
     if (errors.size() > 0) return -1;

@@ -100,8 +100,7 @@ bool use_local_ice,
 std::vector<double> const &hcdefs_base, // [nhc]  Elev class definitions for base ice
 ibmisc::Indexing const &indexingHC_base,
 bool squash_ecs,    // Should ECs be merged if they are the same elevation?
-std::vector<std::string> &errors,
-RegridParams const &paramsA = RegridParams(false, false, {0.,0.,0.}))
+std::vector<std::string> &errors);
 
 
 /** Merges repeated ECs */

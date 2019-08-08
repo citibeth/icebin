@@ -32,7 +32,7 @@ struct Metadata {
 inline void Metadata::ncio(ibmisc::NcIO &ncio)
 {
     ibmisc::get_or_put_att_enum(*ncio.nc, ncio.rw, "gcm_grid_option", gcm_grid_option);
-    ibmisc::get_or_put_att(*ncio.nc, ncio.rw, "eq_rad", eq_rad);
+    ibmisc::get_or_put_att(*ncio.nc, ncio.rw, "eq_rad", "double", &eq_rad, 1);
 
     hspecA.ncio(ncio, "hspecA");
     hspecI.ncio(ncio, "hspecI");

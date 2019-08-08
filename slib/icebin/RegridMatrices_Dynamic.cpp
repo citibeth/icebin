@@ -383,6 +383,7 @@ std::unique_ptr<linear::Weighted_Eigen> RegridMatrices_Dynamic::matrix_d(
     //    std::array<SparseSetT *,2> dims, RegridParams const &params)> MatrixFunction;
     MatrixFunction const &matrix_fn(regrids.at(spec_name));
     std::unique_ptr<linear::Weighted_Eigen> BvA(matrix_fn(dims, params));
+    BvA->scaled = params.scale;
     return BvA;
 }
 // ----------------------------------------------------------------

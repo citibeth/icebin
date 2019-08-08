@@ -146,7 +146,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
     std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
         rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
 
-    return _compute_AAmvEAm(dims, paramsA.scale, eq_rad,
+    return _compute_AAmvEAm_EIGEN(dims, paramsA.scale, eq_rad,
         cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr,
         cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr,
         gcmA->gcmO->indexingHC,
