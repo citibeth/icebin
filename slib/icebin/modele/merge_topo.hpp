@@ -62,7 +62,7 @@ struct EOpvAOpResult {
     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
     std::vector<double> hcdefs; // OUT:  Elev class definitions for merged ice
     ibmisc::Indexing indexingHC;
-    std::vector<uint16_t> underice_hc;
+    std::vector<int16_t> underice_hc;
 };
 
 

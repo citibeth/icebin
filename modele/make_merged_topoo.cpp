@@ -153,7 +153,7 @@ int main(int argc, char **argv)
     ibmisc::ZArray<int,double,2> EOpvAOp_ng;
     {NcIO ncio(args.global_ecO_ng_fname, 'r');
         metaO.ncio(ncio);
-        EOpvAOp_ng.ncio(ncio, "EvA.M");
+        EOpvAOp_ng.ncio(ncio, "EvO.M");
     }
     HntrSpec &hspecO(metaO.hspecA);
     // HntrSpec hspecA(make_hntrA(hspecO));
@@ -266,7 +266,7 @@ int main(int argc, char **argv)
         eam.indexingHC.ncio(ncio, "indexingHC");
         auto xxdims(get_or_add_dims(ncio, {"nhc"}, {eam.hcdefs.size()}));
         ncio_vector(ncio, eam.hcdefs, true, "hcdefs", "double", xxdims);
-        ncio_vector(ncio, eam.underice_hc, true, "underice_hc", "short", xxdims);
+        ncio_vector(ncio, eam.underice_hc, true, "underice_hc", "short", xxdims);  // Must be short for NetCDF3
 
         // Compress and Write EOpvAOp; our merged EOpvAOp needs to be
         // in the same (compressed) format as the original base

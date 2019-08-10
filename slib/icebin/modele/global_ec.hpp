@@ -25,6 +25,7 @@ struct Metadata {
     icebin::HntrSpec hspecA, hspecI, hspecI2;
     ibmisc::Indexing indexingI, indexingI2, indexingA, indexingHC, indexingE;
     std::vector<double> hcdefs;
+    std::vector<int16_t> underice_hc;
 
     void ncio(ibmisc::NcIO &ncio);
 };
@@ -34,19 +35,24 @@ inline void Metadata::ncio(ibmisc::NcIO &ncio)
     ibmisc::get_or_put_att_enum(*ncio.nc, ncio.rw, "gcm_grid_option", gcm_grid_option);
     ibmisc::get_or_put_att(*ncio.nc, ncio.rw, "eq_rad", "double", &eq_rad, 1);
 
-    hspecA.ncio(ncio, "hspecA");
+    std::string const &hspecA_name
+        (gcm_grid_option == GCMGridOption::ocean ? "hspecO" : "hspecA");
+    std::string const &indexingA_name
+        (gcm_grid_option == GCMGridOption::ocean ? "indexingO" : "indexingA");
+
+    hspecA.ncio(ncio, hspecA_name);
     hspecI.ncio(ncio, "hspecI");
     hspecI2.ncio(ncio, "hspecI2");
 
     indexingI.ncio(ncio, "indexingI");
     indexingI2.ncio(ncio, "indexingI2");
-    indexingA.ncio(ncio, "indexingA");
+    indexingA.ncio(ncio, indexingA_name);
     indexingHC.ncio(ncio, "indexingHC");
     indexingE.ncio(ncio, "indexingE");
 
-    ncio_vector(ncio, hcdefs, true, "hcdefs", "double",
-        get_or_add_dims(ncio, {"nhc"}, {hcdefs.size()}));
-
+    auto _nhc(get_or_add_dims(ncio, {"nhc"}, {hcdefs.size()}));
+    ncio_vector(ncio, hcdefs, true, "hcdefs", "double", _nhc);
+    ncio_vector(ncio, underice_hc, true, "underice_hc", "short", _nhc);  // Must be short for NetCDF3
 }
 
 }}}    // namespace

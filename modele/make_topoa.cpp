@@ -115,14 +115,14 @@ int main(int argc, char **argv)
     icebin::HntrSpec hspecO;
     ibmisc::Indexing indexingHC;
     std::vector<double> hcdefs;
-    std::vector<uint16_t> underice_hc;
+    std::vector<int16_t> underice_hc;
     {NcIO ncio(args.global_ecO_fname, 'r');
     ZArray<int,double,2> EOpvAOp_s;
 
         hspecO.ncio(ncio, "hspecO");    // Actually ocean grid
         indexingHC.ncio(ncio, "indexingHC");
         ncio_vector(ncio, hcdefs, true, "hcdefs", "double", {});
-        ncio_vector(ncio, underice_hc, true, "underice_hc", "short", {});
+        ncio_vector(ncio, underice_hc, true, "underice_hc", "short", {});  // Must be short for NetCDF3
 
         EOpvAOp_s.ncio(ncio, "EvO.M");
         EOpvAOp.reset(new EigenSparseMatrixT(

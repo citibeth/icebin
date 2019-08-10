@@ -408,7 +408,7 @@ Indexing const &indexingHC0)
         int const iEO0 = dims0[0]->to_sparse(ii->index(0));
         indexingHC0.index_to_tuple(&iTuple[0], iEO0);
         int const ihc1 = to_new[ihc0];
-        int const iE1 = indexingHC0.tuple_to_index(std::array<long,2>{iAO0,ihc1});
+        int const iE1 = ret.indexingHC.tuple_to_index(std::array<long,2>{iAO0,ihc1});
 
         // Separate ice sheet ECs from global ECs
         EOpvAOp_accum.add({iE1, ii->index(1)}, ii->value());

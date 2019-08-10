@@ -95,13 +95,16 @@ void combine_chunks(
     std::vector<std::string> const &ifnames,    // Names of input chunks
     std::string const &ofname,
     char ofmode,    // 'w' or 'a' for write mode of output file
-    std::array<std::string,2> const &sgrids,    // {"B", "A"} --> matrix BvA
+    std::array<std::string,2> const &_sgrids,    // {"B", "A"} --> matrix BvA
     bool scale)
 {
-    printf("======== BEGIN combine_chunks(%sv%s)\n", sgrids[0].c_str(), sgrids[1].c_str());
 
-    // Names of the variables we will read/write
-    std::string BvA = sgrids[0] + "v" + sgrids[1];
+
+    printf("======== BEGIN combine_chunks(%sv%s)\n", _sgrids[0].c_str(), _sgrids[1].c_str());
+
+    // Filled in below
+    std::array<std::string,2> sgrids;
+    std::string BvA;
 
     // Get total sizes
     int nnz = 0;        // = number non-zero]
@@ -112,11 +115,20 @@ void combine_chunks(
     global_ec::Metadata meta;
     for (size_t i=0; i<ifnames.size(); ++i) {
         std::string const &ifname(ifnames[i]);
-
         NcIO ncio(ifname, 'r');
-        if (i == 0) meta.ncio(ncio);
+        if (i == 0) {
+            meta.ncio(ncio);
 
-        size_t sz = ncio.nc->getDim(BvA+".M.nnz").getSize();
+            // Names of the variables we will read/write
+            // Use Ocean grid instead of Atmosphere grid if this is really an ocean file
+            sgrids = _sgrids;
+            std::replace(sgrids[0].begin(), sgrids[0].end(), 'A', 'O');
+            std::replace(sgrids[1].begin(), sgrids[1].end(), 'A', 'O');
+            BvA = sgrids[0] + "v" + sgrids[1];
+        }
+
+        netCDF::NcDim sz_nc = ncio.nc->getDim(BvA+".M.nnz");
+        size_t sz = sz_nc.getSize();
         nnz += sz;
         sizes.push_back(sz);
 

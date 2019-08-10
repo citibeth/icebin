@@ -148,7 +148,7 @@ public:
 
     /** Determines whether an elevation class is handled by IceBin or
     ModelE push-down */
-    uint16_t underice(int ihc)
+    int16_t underice(int ihc)
         { return (ihc < gcmO->nhc() ? UI_ICEBIN : UI_NOTHING); }
 
     // ------------------------------------------------------------

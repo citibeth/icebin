@@ -480,7 +480,7 @@ int const nhc_gcm)
             d.meta.sdims,
             std::vector<std::pair<std::string, std::string>>(d.meta.attr)));
     }
-    this->a.allocate(std::array<int,2>{hspecA.jm, hspecA.im}, {"jm","im"}, true);    // check=true
+    this->a.allocate(std::array<int,2>{hspecA.jm, hspecA.im}, {"jm","im"}, false);    // check=false
 
 
     // --------------- Allocate 3D arrays to go in TOPOA file
@@ -510,7 +510,7 @@ void TopoABundles::ncio(NcIO &ncio, std::vector<netCDF::NcDim> const &ncdims)
 
     this->a.ncio(ncio, {}, "", "double", {jm, im});
     this->a3.ncio(ncio, {}, "", "double", ncdims);
-    this->a3_i.ncio(ncio, {}, "", "int16", ncdims);
+    this->a3_i.ncio(ncio, {}, "", "short", ncdims);  // Must be short for NetCDF3
 }
 
 // ------------------------------------------------------------------------
@@ -530,7 +530,7 @@ HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec)
 HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
 ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
 std::vector<double> const &hcdefs,        // gcmA->hcdefs()
-std::vector<uint16_t> const &underice_hc,    // gcmA->underice
+std::vector<int16_t> const &underice_hc,    // gcmA->underice
 //
 linear::Weighted_Tuple const &AAmvEAm,
 // ----- Outputs

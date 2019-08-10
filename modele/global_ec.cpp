@@ -37,6 +37,7 @@ Regular earth has
 #include <ibmisc/stdio.hpp>
 #include <ibmisc/filesystem.hpp>
 #include <ibmisc/string.hpp>
+#include <ibmisc/iostream.hpp>
 #include <spsparse/eigen.hpp>
 #include <spsparse/SparseSet.hpp>
 
@@ -532,35 +533,38 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
 
 
     {NcIO ncio(ofname, 'w', "nc4", nocompress);
-        printf("---- Saving metadata\n");
-        get_or_put_att_enum(*ncio.nc, ncio.rw, "gcm_grid_option", args.gcm_grid_option);
-        get_or_put_att(*ncio.nc, ncio.rw, "eq_rad", "double", &args.eq_rad, 1);
-
-        hspecI.ncio(ncio, "hspecI");
-        hspecI2.ncio(ncio, "hspecI2");
-        hspecA.ncio(ncio, "hspecA");
-
-        gcmA.ice_regridders()[0]->agridI.indexing.ncio(ncio, "indexingI");
+        global_ec::Metadata meta;
+        meta.eq_rad = args.eq_rad;
+        meta.gcm_grid_option = args.gcm_grid_option;
+        meta.hspecA = hspecA;
+        meta.hspecI = hspecI;
+        meta.hspecI2 = hspecI2;
+        meta.indexingI = gcmA.ice_regridders()[0]->agridI.indexing;
         {HntrGrid hgridI2(hspecI2);
-            hgridI2.indexing.ncio(ncio, "indexingI2");
+            meta.indexingI2 = hgridI2.indexing;
         }
-        gcmA.agridA.indexing.ncio(ncio, "indexingA");
-        gcmA.indexingHC.ncio(ncio, "indexingHC");
-        gcmA.indexingE.ncio(ncio, "indexingE");
-
-        ncio_vector(ncio, gcmA._hcdefs, false, "hcdefs", "double",
-            get_or_add_dims(ncio, {"nhc"}, {gcmA._hcdefs.size()}));
+        meta.indexingA = gcmA.agridA.indexing;
+        meta.indexingHC = gcmA.indexingHC;
+        meta.indexingE = gcmA.indexingE;
+        meta.hcdefs = gcmA._hcdefs;
+        for (size_t i=0; i<meta.hcdefs.size(); ++i)
+            meta.underice_hc.push_back(UI_NOTHING);
+        printf("---- Saving metadata\n");
+        meta.ncio(ncio);
+        ncio.close();   // Ensure meta lasts longer than ncio
     }
 
     std::set<string> matrix_names_set = std::set<std::string>(matrix_names.begin(), matrix_names.end());
 
 
+    std::string const &Achar (args.gcm_grid_option == GCMGridOption::ocean ? "O" : "A");
+
     if (matrix_names_set.find("AvI") != matrix_names_set.end()) {
         NcIO ncio(ofname, 'a', "nc4", nocompress);
         printf("---- Generating AvI\n");
         auto mat(rm->matrix_d("AvI", {&dimA, &dimI}, params));
-        check_negative(*mat, "EvI");
-        mat->ncio(ncio, "AvI", {"dimA", "dimI"});
+        check_negative(*mat, "AvI");
+        mat->ncio(ncio, Achar+"vI", {"dim"+Achar, "dimI"});
         ncio.flush();
     }
 
@@ -594,13 +598,13 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> mat(
             rm->matrix_d("IvA", {&dimI, &dimA}, params));
         check_negative(*mat, "IvA");
-        mat->ncio(ncio, "IvA", {"dimI", "dimA"});
+        mat->ncio(ncio, "Iv"+Achar, {"dimI", "dim"+Achar});
         ncio.flush();
 
         // Save smaller / more wieldly display version of the matrix
         auto mat2(make_I2vX(*mat, args, reshape1(elevmaskI), dimI2, dimI, dimA, params));
         mat.release();
-        mat2.ncio(ncio, "I2vA", {"dimI2", "dimA"});
+        mat2.ncio(ncio, "I2v"+Achar, {"dimI2", "dim"+Achar});
         ncio.flush();
     }
 
@@ -609,7 +613,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         printf("---- Generating AvE\n");
         auto mat(rm->matrix_d("AvE", {&dimA, &dimE}, params));
         check_negative(*mat, "AvE");
-        mat->ncio(ncio, "AvE", {"dimA", "dimE"});
+        mat->ncio(ncio, Achar+"vE", {"dim"+Achar, "dimE"});
         ncio.flush();
     }
 
@@ -618,7 +622,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         printf("---- Generating EvA\n");
         auto mat(rm->matrix_d("EvA", {&dimE, &dimA}, params));
         check_negative(*mat, "EvA");
-        mat->ncio(ncio, "EvA", {"dimE", "dimA"});
+        mat->ncio(ncio, "Ev"+Achar, {"dimE", "dim"+Achar});
         ncio.flush();
     }
 
@@ -627,10 +631,10 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
     {NcIO ncio(ofname, 'a', "nc4", nocompress);
         NcVar ncv;
 
-        ncv = dimA.ncio(ncio, "dimA");
+        ncv = dimA.ncio(ncio, "dim"+Achar);
         get_or_put_att(ncv, 'w', "shape", 
             &std::vector<int>{hspecA.jm, hspecA.im}[0], 2);
-        ncv.putAtt("description", "GCM ('Atmosphere') Grid");
+        ncv.putAtt("description", "GCM ('Atmosphere' or 'Ocean') Grid");
 
         ncv = dimE.ncio(ncio, "dimE");
         get_or_put_att(ncv, 'w', "shape", 
