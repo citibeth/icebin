@@ -396,7 +396,7 @@ std::unique_ptr<ibmisc::linear::Weighted> RegridMatrices_Dynamic::matrix(
     std::unique_ptr<ibmisc::linear::Weighted_Eigen>
         M(matrix_d(spec_name, {&dims[0], &dims[1]}, params()));
 
-    M->tmp.merge(std::move(tmp));
+    M->tmp.merge(std::move(tmp));   // Take ownership of things we allocated above
     return std::unique_ptr<ibmisc::linear::Weighted>(M.release());
 }
 // -----------------------------------------------------------------------
