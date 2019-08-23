@@ -566,7 +566,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
         Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
 linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
     std::vector<blitz::Array<double,1>> const &emI_lands,
-    std::vector<blitz::Array<double,1>> const &emI_ices) const
+    std::vector<blitz::Array<double,1>> const &emI_ices,
     blitz::Array<double,2> const &foceanAOp,
     blitz::Array<double,2> const &foceanAOm) const
 {

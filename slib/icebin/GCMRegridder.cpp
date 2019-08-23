@@ -157,15 +157,14 @@ void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 // RegridMatrices const GCMRegridder_Standard::regrid_matrices(std::string const &sheet_name) const
 //        ---> see RegridMatrices_Dynamic.cpp
 // ---------------------------------------------------------------------
-
+#if 0
 /** Default implementation. */
-linear::Weighted_Tuple GCMRegridder::global_unscaled_AvE(
+linear::Weighted_Tuple GCMRegridder_Standard::global_unscaled_AvE(
     std::vector<blitz::Array<double,1>> const &emI_lands,
     std::vector<blitz::Array<double,1>> const &emI_ices,
     RegridParams const &params) const
 {
     (*icebin_error)(-1, "Generic GCMRegridder::global_unscaled_AvE() has not been tested; but it should be close to correct, if needed.");
-#if 0
     linear::WeightedTuple AvE_g;    // _g = global
 
 
@@ -198,18 +197,18 @@ linear::Weighted_Tuple GCMRegridder::global_unscaled_AvE(
 
     ret->set_shape(std::array<long,2>{nA(), nE()});
     return AvE;
-#endif
 }
+#endif
 // ------------------------------------------------------------
-virtual linear::Weighted_Tuple GCMRegridder::global_unscaled_E1vE0(
-    std::vector<linear::WeightedEigen *> const &E1vIs_unscaled, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) UNSCALED matrix
-    std::vector<linear::WeightedEigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+linear::Weighted_Tuple GCMRegridder_Standard::global_unscaled_E1vE0(
+    std::vector<linear::Weighted_Eigen *> const &E1vIs_unscaled, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) UNSCALED matrix
+    std::vector<linear::Weighted_Eigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
     std::vector<SparseSetT *> const &dimE0s) const    // dimE0 accompanying IvE0
 {
-    linear::WeightedTuple E1vE0_g;    // _g = global
+    linear::Weighted_Tuple E1vE0_g;    // _g = global
 
     // ---------- Compute each E1vE0 and merge...
-    for (size_t sheet_index=0; sheet_index < ice_couplers.size(); ++sheet_index) {
+    for (size_t sheet_index=0; sheet_index < ice_regridders().size(); ++sheet_index) {
         auto &E1vI_unscaled(*E1vIs_unscaled[sheet_index]);
         auto &IvE0(*IvE0s[sheet_index]);
         auto &dimE0(*dimE0s[sheet_index]);
@@ -217,19 +216,19 @@ virtual linear::Weighted_Tuple GCMRegridder::global_unscaled_E1vE0(
         // Don't do this on the first round, since we don't yet have an IvE0
         EigenSparseMatrixT E1vE0(*E1vI_unscaled.M * *IvE0.M);    // UNSCALED
         spcopy(
-            accum::to_sparse(make_array(E1vI.dims[0]),
+            accum::to_sparse(make_array(E1vI_unscaled.dims[0]),
             accum::ref(E1vE0_g.wM)),    // Output
-            E1vE0.wM);   // Input
+            E1vI_unscaled.wM);   // Input
 
         spcopy(
-            accum::to_sparse(make_array(E1vI.dims[0], &dimE0),
+            accum::to_sparse(make_array(E1vI_unscaled.dims[0], &dimE0),
             accum::ref(E1vE0_g.M)),
             E1vE0);
 
         spcopy(
             accum::to_sparse(make_array(&dimE0),
             accum::ref(E1vE0_g.Mw)),
-            E1vE0.Mw);
+            IvE0.Mw);
     }    // Flush accumulators
 
     E1vE0_g.set_shape(std::array<long,2>{nE(), nE()});

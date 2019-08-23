@@ -8,6 +8,9 @@
 namespace icebin {
 namespace modele {
 
+/** Casts to a Grid_Lonlat, which is what we know is used by ModelE */
+GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO);
+
 /** This class produces regridding matrices between the grids (AAm,
 EAm, Ip).
 
@@ -101,7 +104,6 @@ class GCMRegridder_ModelE : public GCMRegridder {
 
 public:
 
-
     /** Name of file created by global_ec, used for matrices on global
     (non-ice shet) ice with elevation classes.  Generating those
     matrices on-the-fly is not practical because the global ice grid
@@ -120,29 +122,13 @@ public:
 
     std::vector<double> global_hcdefs;
 
-public:
+
     /** A GCMRegridder_Standard that regrids between AOp,EOp,Ip for ice sheets.
     This is typically loaded directly from a NetCDF file. */
     std::shared_ptr<icebin::GCMRegridder> const gcmO;
 
     /** Base EOpvAOp matrix, laoded from TOPO_OC file */
-    ibmisc::ZArray<int,double,2> EOpvAOp_base,    // from linear::Weighted_Compressed
-
-#if 0
-    /** ModelE ocean cover, on the Ocean grid, as seen by the ice
-    model (sparse indexing).  Ocean grid cells can contain fractional
-    ocean cover.  foceanAOp can change over the course of a ModelE
-    run, as the ice model's ice extent changes.
-    @see ModelE FOCEAN or FOCEN */
-    blitz::Array<double,1> foceanAOp;
-
-    /** ModelE ocean cover, on the Ocean grid, as seen by ModelE
-    (sparse indexing).  Cells are either all ocean (==1.0) or all
-    continent (==0.0).  foceanAOm does NOT change over the course of a
-    ModelE run, because the ModelE ocean is not able to change shape
-    mid-run. */
-    blitz::Array<double,1> foceanAOm;
-#endif
+    ibmisc::ZArray<int,double,2> EOpvAOp_base;    // from linear::Weighted_Compressed
 
     /** Constructor used in coupler: create the GCMRegridder first,
         then fill in foceanAOp and foceanAOm later.
@@ -152,13 +138,13 @@ public:
         std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
 
     HntrSpec const &hspecO()
-        { return cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr; }
+        { return cast_GridSpec_LonLat(*gcmO->agridA.spec).hntr; }
     HntrSpec const &hspecA()
-        { return cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr; }
+        { return cast_GridSpec_LonLat(*agridA.spec).hntr; }
     GridSpec_LonLat const &specO()
         { return cast_GridSpec_LonLat(*gcmO->agridA.spec); }
 
-TODO: get rid of eq_rad in metaO
+// TODO: get rid of eq_rad in metaO
 
     /** Determines whether an elevation class is handled by IceBin or
     ModelE push-down */
@@ -180,15 +166,19 @@ TODO: get rid of eq_rad in metaO
         blitz::Array<double,1> const &elevmaskI,
         RegridParams const &params = RegridParams()) const;
 
-    linear::Weighted_Tuple global_AvE(
-        std::vector<blitz::Array<double,1>> const &emI_lands,
-        std::vector<blitz::Array<double,1>> const &emI_ices,
-        RegridParams const &params) const;
+        /** Computes global AvE, including any base ice, etc.
+            @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
+            @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
+            @param params Parameters to use in generating regridding matrices.
+                Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
+        linear::Weighted_Tuple global_unscaled_AvE(
+            std::vector<blitz::Array<double,1>> const &emI_lands,
+            std::vector<blitz::Array<double,1>> const &emI_ices,
+            blitz::Array<double,2> const &foceanAOp,
+            blitz::Array<double,2> const &foceanAOm) const;
 
 };
 
-/** Casts to a Grid_Lonlat, which is what we know is used by ModelE */
-GridSpec_LonLat const &cast_GridSpec_LonLat(GridSpec const &_specO);
 
 
 // ====================================================================

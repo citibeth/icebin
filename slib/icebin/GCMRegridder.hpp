@@ -26,6 +26,7 @@
 #include <ibmisc/memory.hpp>
 #include <ibmisc/IndexSet.hpp>
 #include <spsparse/eigen.hpp>
+#include <ibmisc/linear/tuple.hpp>
 
 #include <icebin/IceRegridder.hpp>
 #include <icebin/RegridMatrices.hpp>
@@ -295,6 +296,11 @@ public:
     // "Extra" operations; such as adding legacy ice, ECs (for legacy ice), etc.
     // can happen here.
 
+    /** Produces merged regridding matrix AvE (AAmvEAm) */
+    virtual ibmisc::linear::Weighted_Tuple global_unscaled_AvE(
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        RegridParams const &params) const = 0;
 
     /** Produces regridding matrix from last coupling timestep's ECs to this timestep's.
     Includes any extra ECs, etc. added in global_AvE()
@@ -303,9 +309,9 @@ public:
         NOTE: dimI is not needed because I always uses identity index mapping.
     @param params Parameters to use in generating regridding matrices.
         Should be RegridParams(true, false, {0,0,0}) to give conservative matrix. */
-    virtual linear::Weighted_Tuple global_unscaled_E1vE0(
-        std::vector<linear::WeightedEigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
-        std::vector<linear::WeightedEigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+    virtual ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
+        std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
+        std::vector<ibmisc::linear::Weighted_Eigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
         std::vector<SparseSetT *> const &dimE0s) const = 0;    // dimE0 accompanying IvE0
 
 
@@ -413,6 +419,18 @@ public:
         const IceRegridder,
         typename std::vector<std::unique_ptr<IceRegridder>>::const_iterator
     > const_iterator;
+
+    ibmisc::linear::Weighted_Tuple global_unscaled_AvE(
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        RegridParams const &params) const;
+
+    ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
+        std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
+        std::vector<ibmisc::linear::Weighted_Eigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+        std::vector<SparseSetT *> const &dimE0s) const;    // dimE0 accompanying IvE0
+
+
 
     // -----------------------------------------
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
