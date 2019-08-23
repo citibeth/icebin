@@ -43,34 +43,7 @@ namespace icebin {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 // ==========================================================
-HCSegmentData &get_segment(std::vector<HCSegmentData> &hc_segments, std::string const &name)
-{
-    for (size_t i=0; i<hc_segments.size(); ++i)
-        if (hc_segments[i].name == name) return hc_segments[i];
-    (*icebin_error)(-1, "Cannot find segment named %s", name.c_str());
-}
 
-
-std::vector<HCSegmentData> parse_hc_segments(std::string const &str)
-{
-    std::vector<HCSegmentData> ret;
-
-    // TDOO: Parse for real later
-    std::vector<std::string> segment_names;
-    boost::algorithm::split(segment_names, str, boost::is_any_of(","));
-    int base = 0;
-    for (auto &seg : segment_names) {
-        boost::algorithm::trim(seg);
-        int len;
-        if (seg == "legacy") len = 1;
-        else if (seg == "sealand") len = 2;
-        else len = -1;
-
-        ret.push_back(HCSegmentData(seg, base, len));
-        base += len;
-    }
-    return ret;
-}
 
 GCMParams::GCMParams(MPI_Comm _gcm_comm, int _gcm_root) :
     gcm_comm(_gcm_comm),
