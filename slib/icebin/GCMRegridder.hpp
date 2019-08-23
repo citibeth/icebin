@@ -275,23 +275,6 @@ public:
     template<class AccumT>
     void wA(AccumT &&accum, std::string const &ice_sheet_name, bool native);
 
-
-    /** Produce regridding matrices for this setup. */
-    virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
-        int sheet_index,
-        blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params = RegridParams()) const = 0;
-
-
-    inline std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
-        std::string const &sheet,
-        blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params) const
-    {
-        int sheet_ix = ice_regridders().index.at(sheet);
-        return regrid_matrices(sheet_ix, elevmaskI);
-    }
-
     // ==================== Compute merged matrices for all ice sheets
     // "Extra" operations; such as adding legacy ice, ECs (for legacy ice), etc.
     // can happen here.

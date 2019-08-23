@@ -186,6 +186,8 @@ struct ComputeXAmvIp_Helper {
         std::array<SparseSetT *,2> dims,
         RegridParams const &paramsA,
         GCMRegridder_ModelE const *gcmA,
+        blitz::Array<double,1> const &foceanAOp,
+        blitz::Array<double,1> const &foceanAOm,
         char X,    // Either 'A' or 'E', determines the destination matrix.
         double const eq_rad,    // Radius of the earth
         RegridMatrices_Dynamic const *rmO);
@@ -195,6 +197,8 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
+    blitz::Array<double,1> const &foceanAOp,
+    blitz::Array<double,1> const &foceanAOm,
     char X,    // Either 'A' or 'E', determines the destination matrix.
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
@@ -340,6 +344,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
+    blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
+    blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
     char X,    // Either 'A' or 'E', determines the destination matrix.
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
@@ -348,7 +354,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
-    ComputeXAmvIp_Helper hh(dims, paramsA, gcmA, X, eq_rad, rmO);
+    ComputeXAmvIp_Helper hh(dims, paramsA, gcmA, foceanAOp, foceanAOm, X, eq_rad, rmO);
     ret->tmp = std::move(hh.tmp);
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
@@ -396,6 +402,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
+    blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
+    blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
     char X,    // Either 'A' or 'E', determines the destination matrix.
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
@@ -404,7 +412,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
-    ComputeXAmvIp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, X, eq_rad, rmO);
+    ComputeXAmvIp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, foceanAOp, foceanAOm, X, eq_rad, rmO);
     ret->tmp = std::move(hh.tmp);
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
@@ -467,10 +475,6 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
     indexingE = derive_indexingE(agridA.indexing, indexingHC);
 
-    auto const nO = gcmO->nA();
-    foceanAOp.reference(blitz::Array<double,1>(nO));
-    foceanAOm.reference(blitz::Array<double,1>(nO));
-
     // Read number of global EC's out of global EC matrix file.
     if (global_ecO == "") {
         global_hcdefs.clear();
@@ -499,6 +503,8 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 
 std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     int sheet_index,
+    blitz::Array<double,1> const &foceanAOp,
+    blitz::Array<double,1> const &foceanAOm,
     blitz::Array<double,1> const &elevmaskI,
     RegridParams const &params) const
 {
@@ -567,8 +573,8 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
     std::vector<blitz::Array<double,1>> const &emI_lands,
     std::vector<blitz::Array<double,1>> const &emI_ices,
-    blitz::Array<double,2> const &foceanAOp,
-    blitz::Array<double,2> const &foceanAOm) const
+    blitz::Array<double,1> const &foceanAOp,
+    blitz::Array<double,1> const &foceanAOm) const
 {
 
     // --------------------- Compute EOpvAOp (merged global + local ice)

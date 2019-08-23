@@ -174,8 +174,8 @@ public:
         linear::Weighted_Tuple global_unscaled_AvE(
             std::vector<blitz::Array<double,1>> const &emI_lands,
             std::vector<blitz::Array<double,1>> const &emI_ices,
-            blitz::Array<double,2> const &foceanAOp,
-            blitz::Array<double,2> const &foceanAOm) const;
+            blitz::Array<double,1> const &foceanAOp,
+            blitz::Array<double,1> const &foceanAOm) const;
 
 };
 
