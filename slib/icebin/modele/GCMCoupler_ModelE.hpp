@@ -157,7 +157,16 @@ public:
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 
-    void update_topo(double time_s, bool initial_timestep);
+    /**
+    @param out Add TOPO stuff here (see IndexAE::TOPOA, IndexAE::TOPOE) */
+    void update_topo(
+    double time_s,    // Simulation time
+    std::vector<blitz::Array<double,1>> const &emI_lands,
+    std::vector<blitz::Array<double,1>> const &emI_ices,
+    // ---------- Input & Output
+    // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
+    GCMInput &out);
+
 
     int _read_nhc_gcm();
 

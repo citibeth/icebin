@@ -34,7 +34,6 @@
 
 namespace icebin {
 
-
 template<int RANK>
     using TupleListLT = spsparse::TupleList<long,double,RANK>;
 
@@ -44,59 +43,32 @@ struct GCMInput {
 
     // Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
     // _s = sparse indexing
+    /** Contract inputs for the GCM on the A and E grid (See IndexAE) */
     std::vector<VectorMultivec> gcm_ivalss_s;
     std::vector<std::vector<double>> gcm_ivalss_weight_s;
 
-    // Output fields from coupling back into GCM
-    //    * Computed by merging from IceCoupler::couple()
-    //    * UNSCALED: values must be divided by last column (the weight)
-//    VectorMultivec gcm_ivalsA_s;
-//    VectorMultivec gcm_ivalsE_s;
-
-
-    // This is all for elevation classes in ICE space (ice_nhc, not gcm_nhc)
-
-    // Values required to update TOPO, etc. in ModelE
-    // (see add_fhc.py for how these are to be used)
-    // We can get these from AvE
-    // TupleList<1> wAvE;     // Area of A grid cells that overlap ice
-    //TupleList<1> areaA;    // Total (native) area of A grid cells
-    //TupleList<1> elevA;    // Used for atmosphere orography (ZATMO in ModelE)
-
-
-    // _s means these matrices and vectors all use sparse indexing
-
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
+    ibmisc::linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
 
-//    linear::Weighted_Tuple AvE_unscaled;    // Sparse indexing
-
-    // Regrid matrix to convert to atmosphere.
-    // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
-//    linear::Weighted_Tuple AvE1_unscaled;
-
-Root arrays should be returned...
-
-
+    /** @param nvar Array specifying number of variables for each segment. */
     GCMInput(std::vector<int> const &nvar) {
-        for (int nv : nvar) gcm_ivals_s.push_back(VectorMultivec(nv));
+        for (int nv : nvar) gcm_ivalss_s.push_back(VectorMultivec(nv));
     }
 
-    std::array<int, GridAE::count> nvar() const
+    std::vector<int> nvar() const
     {
-        std::array<int, GridAE::count> ret;
-        for (int i=0; i<GridAE::count; ++i) ret[i] = gcm_ivalsAE_s[i].nvar;
+        std::vector<int> ret;
+        ret.reserve(gcm_ivalss_s.size());
+        for (size_t i=0; i<gcm_ivalss_s.size(); ++i) ret.push_back(gcm_ivalss_s[i].nvar);
         return ret;
     }
 
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
     {
-        ar & gcm_ivalsAE_s;
-        ar & E1vE0_s;
-        ar & AvE1_s;
-        ar & wAvE1_s;
+        ar & gcm_ivalss_s;
+        ar & E1vE0_unscaled;
     }
 };
 // =============================================================================
@@ -251,23 +223,13 @@ public:
         double time_start_s);
 
     /** Top level method to re-compute values originally loaded from the TOPO file. */
-    void GCMCoupler_ModelE::update_topo(
+    virtual void update_topo(
         double time_s,    // Simulation time
         std::vector<blitz::Array<double,1>> const &emI_lands,
         std::vector<blitz::Array<double,1>> const &emI_ices,
         // ---------- Input & Output
         // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
-        GCMInput &out);
-
-    /** @param am_i_root
-        Call with true if calling from MPI root; false otherwise.
-        The core coupling/regridding computation only runs on root.
-        But other MPI ranks need to go along for the ride, assuming that
-        the ice model uses MPI. */
-    GCMInput couple(
-        double time_s,        // Simulation time [s]
-        VectorMultivec const &gcm_ovalsE,
-        bool run_ice);
+        GCMInput &out) = 0;
 
     /** Top-level ncio() to log output from coupler. (coupler->GCM) */
     void ncio_gcm_input(ibmisc::NcIO &ncio,

@@ -340,7 +340,7 @@ bool run_ice)
 
     // Check that elevmaskI is an alias for variable #elevmaskI_ix in ice_ovalsI
     if (&ice_ovalsI(emI_ice_ix,0) != &out_emI_ice(0)) (*icebin_error)(-1,
-        "ice_ovalsI <%p> != emI_ice <%p>\n", &ice_ovalsI(emI_ice_ix,0), &out_emI_ice(0));
+        "ice_ovalsI <%p> != emI_ice <%p>\n", &ice_ovalsI(emI_ice_ix1,0), &out_emI_ice(0));
     if (&ice_ovalsI(emI_land_ix,0) != &out_emI_land(0)) (*icebin_error)(-1,
         "ice_ovalsI <%p> != emI_land <%p>\n", &ice_ovalsI(emI_land_ix,0), &out_emI_land(0));
 
@@ -455,7 +455,7 @@ bool run_ice)
     // Record our matrices for posterity
     {auto fname(
         boost::filesystem::path(output_dir) / 
-        ("regrids-" + gcm_coupler->sdate(time_s) + ".nc"));
+        ("regrids-" + ice_regridder->name() + "-" + gcm_coupler->sdate(time_s) + ".nc"));
     NcIO ncio(fname.string(), NcFile::replace);
 
         // Write matrices as their dense subspace versions, not the sparsified versions.
@@ -463,9 +463,8 @@ bool run_ice)
         dimA1.ncio(ncio, "dimA");
         dimE1.ncio(ncio, "dimE");
 
-        AvE1->ncio(ncio, "AvE", {"dimA", "dimE"});
-        E1vI_nc->ncio(ncio, "EvI_nc", {"dimE", "dimI"});
-        A1vI->ncio(ncio, "AvI", {"dimA", "dimI"});
+        AE1vIs[GridAE::E]->ncio(ncio, "EvI_unscaled_nc", {"dimE", "dimI"});
+        AE1vIs[GridAE::A]->ncio(ncio, "AvI_unscaled", {"dimA", "dimI"});
         IvE1->ncio(ncio, "IvE", {"dimI", "dimE"});
     }
 
@@ -479,12 +478,6 @@ bool run_ice)
     return ret;
 }
 
-IceModel::update_AvE(
-TupleListLT<2> &AvE1_s,    // OUT: Put fully merged AvE here (sparse indexing)
-TupleListLT<1> wAvE1_s)
-{
-
-}
 // =======================================================
 /** Specialized init signature for IceWriter */
 IceWriter::IceWriter(
