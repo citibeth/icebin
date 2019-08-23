@@ -147,12 +147,12 @@ INTERFACE
 
     subroutine gcmce_reference_globals(api, &
         fhc, underice, elevE, &
-        focean, flake, fgrnd, fgice, zatmo) bind(c)
+        fland, focean, flake, fgrnd, fgice, zatmo, zlake) bind(c)
     use iso_c_binding
     use icebin_f90blitz
         type(c_ptr), value :: api
         type(arr_spec_3) :: fhc, underice, elevE
-        type(arr_spec_2) :: focean, flake, fgrnd, fgice, zatmo
+        type(arr_spec_2) :: fland, focean, flake, fgrnd, fgice, zatmo, zlake
     end subroutine gcmce_reference_globals
 
     subroutine gcmce_io_rsf(api, &

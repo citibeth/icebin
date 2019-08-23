@@ -42,8 +42,17 @@ struct GCMInput {
     // http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/serialization.html#constructors
     friend class boost::serialization::access;
 
+    // Contract inputs for the GCM on the A nad E grid, respectively (1D indexing).
     // _s = sparse indexing
-    std::array<VectorMultivec, GridAE::count> gcm_ivalsAE_s;
+    std::vector<VectorMultivec> gcm_ivalss_s;
+    std::vector<std::vector<double>> gcm_ivalss_weight_s;
+
+    // Output fields from coupling back into GCM
+    //    * Computed by merging from IceCoupler::couple()
+    //    * UNSCALED: values must be divided by last column (the weight)
+//    VectorMultivec gcm_ivalsA_s;
+//    VectorMultivec gcm_ivalsE_s;
+
 
     // This is all for elevation classes in ICE space (ice_nhc, not gcm_nhc)
 
@@ -59,19 +68,20 @@ struct GCMInput {
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    TupleListLT<2> E1vE0_s;
+    linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
+
+//    linear::Weighted_Tuple AvE_unscaled;    // Sparse indexing
 
     // Regrid matrix to convert to atmosphere.
     // (EvA is assumed by GCM, as long as AvE is local; see Fischer&Nowicki 2014)
-    TupleListLT<2> AvE1_s;
-    TupleListLT<1> wAvE1_s;
+//    linear::Weighted_Tuple AvE1_unscaled;
 
-    GCMInput(std::array<int, GridAE::count> const &nvar) :
-        gcm_ivalsAE_s({
-            VectorMultivec(nvar[0]),
-            VectorMultivec(nvar[1]),
-        })
-    {}
+Root arrays should be returned...
+
+
+    GCMInput(std::vector<int> const &nvar) {
+        for (int nv : nvar) gcm_ivals_s.push_back(VectorMultivec(nv));
+    }
 
     std::array<int, GridAE::count> nvar() const
     {
@@ -130,17 +140,7 @@ struct GCMParams {
     // Should IceBin update topography?
     bool dynamic_topo = false;
 
-    std::vector<HCSegmentData> hc_segments {    // 0-based
-        HCSegmentData("legacy", 0, 1),
-        HCSegmentData("sealand", 1, 2),
-        HCSegmentData("ec", 3, -1)};    // Last segment must be called ec
-    int icebin_base_hc;    // First GCM elevation class that is an IceBin class (0-based indexing)
-    std::string primary_segment = "ec";
-
-    HCSegmentData &segment(std::string const &name)
-        { return get_segment(hc_segments, name); }
-    HCSegmentData const &segment(std::string const &name) const
-        { return get_segment(hc_segments, name); }
+    int const icebin_base_hc = 0;    // First GCM elevation class that is an IceBin class (0-based indexing)
 
     GCMParams(MPI_Comm _gcm_comm, int _gcm_root);
 };
@@ -206,7 +206,9 @@ public:
     VarSet gcm_outputsE;
 
     /** Description of fields to send back to the GCM; some on E, some on A */
-    std::array<VarSet, GridAE::count> gcm_inputsAE;    // gcm_inputsE, gcm_inputsA
+    std::vector<VarSet> gcm_inputs;
+    /** Tells whether each gcm_inputs is on A or E grid */
+    std::vector<char> gcm_inputs_grid;
 
     /** Names of items used in the SCALARS dimension of VarTranslator.
     Used for ice_input and gcm_inputs.
@@ -248,9 +250,14 @@ public:
         ibmisc::Datetime _time_base,
         double time_start_s);
 
-    /** Top level method to compute (or re-compute) the TOPO parameters.
-    @param initial_timestep True if this is the initialization timestep. */
-    virtual void update_topo(double time_s, bool initial_timestep) = 0;
+    /** Top level method to re-compute values originally loaded from the TOPO file. */
+    void GCMCoupler_ModelE::update_topo(
+        double time_s,    // Simulation time
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        // ---------- Input & Output
+        // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
+        GCMInput &out);
 
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.

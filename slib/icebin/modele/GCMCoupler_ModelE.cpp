@@ -103,6 +103,15 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
     // be placed directly into the VarTransformer.
 
     scalars.add("by_dt", nan, "s-1", 1., "Inverse of coupling timestep");
+
+
+    // Set up gcm_inputs array   (see IndexAE:  enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;)
+    gcm_inputs_grid = std::vector<char> {'A','E','A','E'};
+    for (int i=0; i<InputAE::COUNT; ++i) {
+        gcm_inputs.push_back(VarSet());
+        gcm_ivalssA.push_back({});
+        gcm_ivalssE.push_back({});
+    }
 }
 // -----------------------------------------------------
 void GCMCoupler_ModelE::_ncread(
@@ -114,6 +123,13 @@ void GCMCoupler_ModelE::_ncread(
     auto config_info(get_or_add_var(ncio_config, vname + ".info", "int", {}));
     // Retrieve name of TOPO file (without Greenland, and on Ocean grid)
     get_or_put_att(config_info, ncio_config.rw, "topo_ocean", topoO_fname);
+    get_or_put_att(config_info, ncio_config.rw, "global_ec", global_ecO_fname);  // Must contain EvA at the very least
+
+    /** EOpvAOp matrix for global (base) ice */
+    ibmisc::ZArray<int,double,2> EOpvAOp_base;
+    /** Metadata read from GLOBAL_EC file along with EOpvAOp_base */
+    global_ec::Metadata metaO;
+
 
     // Let's assume that the EOvAO matrix is included in topoO_fname
 
@@ -280,12 +296,17 @@ char const *long_name_f, int long_name_len)
 extern "C"
 void gcmce_add_gcm_inputa(
 GCMCoupler_ModelE *self,
+int index_ae,
 F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 bool initial,    // bool
 char const *long_name_f, int long_name_len)
 {
+    if (gcm_inputs_grid[index_ae] != 'E') (*icebin_error)(-1,
+        "gcmce_add_gcm_inpute() trying to add to VarSet on grid '%c'",
+        gcm_inputs_grid[index_ae]);
+
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
@@ -296,21 +317,26 @@ char const *long_name_f, int long_name_len)
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    self->gcm_inputsAE[GridAE::A].add(
+    self->gcm_inputs[index_ae].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivalsA.push_back(std::move(var));
+    self->modele_inputs.gcm_ivalssA[index_ae].push_back(std::move(var));
 }
 // -----------------------------------------------------
 extern "C"
 void gcmce_add_gcm_inpute(
 GCMCoupler_ModelE *self,
+int index_ae,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
 int initial,    // bool
 char const *long_name_f, int long_name_len)
 {
+    if (gcm_inputs_grid[index_ae] != 'E') (*icebin_error)(-1,
+        "gcmce_add_gcm_inpute() trying to add to VarSet on grid '%c'",
+        gcm_inputs_grid[index_ae]);
+
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
@@ -321,38 +347,12 @@ char const *long_name_f, int long_name_len)
     if (initial) flags |= contracts::INITIAL;
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
-    self->gcm_inputsAE[GridAE::E].add(
+    self->gcm_inputs[index_ae].add(
         field_name, xnan, units, flags, long_name);
 
-    self->modele_inputs.gcm_ivalsE.push_back(std::move(var));
+    self->modele_inputs.gcm_ivalssE[index_ae].push_back(std::move(var));
 }
 // -----------------------------------------------------
-// ==========================================================
-// Called from LIShetIceBin::reference_globals()
-
-extern "C"
-void gcmce_reference_globals(
-    GCMCoupler_ModelE *self,
-    F90Array<double, 3> fhc,
-    F90Array<int, 3> underice,
-    F90Array<double, 3> elevE,
-    F90Array<double, 2> focean,
-    F90Array<double, 2> flake,
-    F90Array<double, 2> fgrnd,
-    F90Array<double, 2> fgice,
-    F90Array<double, 2> zatmo)
-{
-    Topos *topos(&self->modele_inputs);
-    topos->fhc.reference(f_to_c(fhc.to_blitz()));
-    topos->underice.reference(f_to_c(underice.to_blitz()));
-    topos->elevE.reference(f_to_c(elevE.to_blitz()));
-    topos->focean.reference(f_to_c(focean.to_blitz()));
-    topos->flake.reference(f_to_c(flake.to_blitz()));
-    topos->fgrnd.reference(f_to_c(fgrnd.to_blitz()));
-    topos->fgice.reference(f_to_c(fgice.to_blitz()));
-    topos->zatmo.reference(f_to_c(zatmo.to_blitz()));
-}
-
 // ===========================================================
 // Called from LISheetIceBin::io_rsf()   (warm starts)
 
@@ -363,6 +363,7 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
     std::string fname(fname_c, fname_n);
     // TODO: Get ice model to save/restore state
     // We must figure out how to get an appropriate filename
+    // Must also save/restore state of self->modele_inputs (somewhere; here or in Fortran code)
     if (self->am_i_root()) {
     }
 }
@@ -385,9 +386,11 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
     self->cold_start(
         ibmisc::Datetime(yeari,1,1), time_s);
 
+    // NOTE: Not needed because these things MUST be properly computed
+    //       in the initial conditions TOPO file loaded by ModelE
     // b) Compute fhc, elevE
     // c) Compute ZATMO, FGICE, etc.
-    self->update_topo(time_s, true);    // initial_timestep=true
+    //    self->update_topo(time_s);    // initial_timestep=true
 
     // d) Sync with dynamic ice model
     gcmce_couple_native(self, itimei, false);    // run_ice=false
@@ -472,7 +475,10 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
     // Gather it to root
     // boost::mpi::communicator &gcm_world(world);
     // Init our output struct based on number of A and E variables.
-    GCMInput out({self->gcm_inputsAE[0].size(), self->gcm_inputsAE[1].size()});
+    std::vector<int> sizes;
+    for (VarSet const &vs : gcm_inputs) sizes.push_back(vs.size());
+    GCMInput out(sizes);
+
     if (self->am_i_root()) {
         // =================== MPI ROOT =============================
         std::vector<VectorMultivec> every_gcm_ovalsE_s;
@@ -498,20 +504,13 @@ printf("END gcm_ovalsE_s\n");
             self->couple(time_s,
                 gcm_ovalsE_s, run_ice));
 
+        // Add new TOPO file to out
+        
+
         // Split up the output (and 
         std::vector<GCMInput> every_outs(
             split_by_domain<DomainDecomposer_ModelE>(out,
                 *self->domains, *self->domains));
-#if 0
-printf("BEGIN gcmce_couple_native() every_outs\n");
-for (size_t i=0; i<every_outs.size(); ++i) {
-    auto &gcmo(every_outs[i]);
-    printf("    every_outs[%ld]: |gcm_ivalsA_s|=%ld, |gcm_ivalsE_s|=%ld\n", i,
-        gcmo.gcm_ivalsAE_s[GridAE::A].size(),
-        gcmo.gcm_ivalsAE_s[GridAE::E].size());
-}
-printf("END gcmce_couple_native() every_outs\n");
-#endif
 
         // Scatter!
         boost::mpi::scatter(self->gcm_params.world, every_outs, out, self->gcm_params.gcm_root);
@@ -523,31 +522,24 @@ printf("END gcmce_couple_native() every_outs\n");
         boost::mpi::gather(self->gcm_params.world, gcm_ovalsE_s, self->gcm_params.gcm_root);
 
         // Let root do the work...
+        // update_topo() is built into this
         self->couple(time_s, gcm_ovalsE_s, run_ice);
 
         // Receive our output back from root
         boost::mpi::scatter(self->gcm_params.world, out, self->gcm_params.gcm_root);
     }
 
-    // 1. Copies values back into modele.gcm_ivals
-    self->update_gcm_ivals(out);
-    // 2. Sets icebin_nhc, 
-    // 3. Updates FHC, ZATMO, etc.
-    self->update_topo(time_s, false);    // initial_timestep=false
+    // 1. Copies values back into modele.gcm_ivals from scatterd MPI stuff
+    self->apply_gcm_ivals(out);
 }
 // =======================================================
-/** Called from MPI rank */
-void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
-{
-    printf("BEGIN GCMCoupler_ModelE::update_gcm_ivals\n");
-    auto nvar(out.nvar());    // A and E
 
-    // Update gcm_ivalA variables...
-    // Read from here...
-    VectorMultivec const &gcm_ivalsA_s(out.gcm_ivalsAE_s[GridAE::A]);
-    std::vector<std::unique_ptr<blitz::Array<double,2>>> &gcm_ivalsA(modele_inputs.gcm_ivalsA);
-    if (gcm_ivalsA.size() != nvar[GridAE::A]) (*icebin_error)(-1,
-        "gcm_ivalsA is wrong size: %ld vs. %d", gcm_ivalsA.size(), nvar[GridAE::A]);
+/** Called from MPI rank.  Copies output of coupling back into
+appropriate dense-indexing ModelE variables. */
+void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
+{
+    printf("BEGIN GCMCoupler_ModelE::apply_gcm_ivals\n");
+    auto nvar(out.nvar());    // A and E
 
     // Write to here...
     for (int iAE=0; iAE<GridAE::count; ++iAE) {
@@ -555,48 +547,264 @@ void GCMCoupler_ModelE::update_gcm_ivals(GCMInput const &out)
             "nvar[%d]=%d < 0, it should not be\n", iAE, nvar[iAE]);
     }
 
-    for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) (*gcm_ivalsA[ivar]) = 0;
-    for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
-        long iA = gcm_ivalsA_s.index[ix];
-        auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
-        int const i = ij[0];
-        int const j = ij[1];
-        for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
-            (*gcm_ivalsA[ivar])(j,i) +=
-                gcm_ivalsA_s.vals[i*nvar[GridAE::A] + ivar];
-        }
-    }
+    for (size_t index_ae=0; index_ae < gcm_inputs.size(); ++index_ae) {
+    switch(gcm_inputs_grid[index_ae]) {
+        case 'A' : {
+            VectorMultivec const &gcm_ivalsA_s(out.gcm_ivals_s[index_ae]);    // src
+            std::vector<std::unique_ptr<blitz::Array<double,2>>> const &gcm_ivalsA(gcm_ivalssA[index_ae]); // dest
 
-    // Update gcm_ivalE variables...
-    // Read from here...
-    VectorMultivec const &gcm_ivalsE_s(out.gcm_ivalsAE_s[GridAE::E]);
-    std::vector<std::unique_ptr<blitz::Array<double,3>>> &gcm_ivalsE(modele_inputs.gcm_ivalsE);
-    if (gcm_ivalsE.size() != nvar[GridAE::E]) (*icebin_error)(-1,
-        "gcm_ivalsE is wrong size: %ld vs. %d", gcm_ivalsE.size(), nvar[GridAE::E]);
+            // ================================= A
 
-    // Write to here...
-    for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) (*gcm_ivalsE[ivar]) = 0;
-    for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
-        long iE = gcm_ivalsE_s.index[ix];
-        auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
-        int const i = ijk[0];
-        int const j = ijk[1];
-        int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
-        int const ihc_gcm = gcm_params.icebin_base_hc + ihc_ice;
+            // Update gcm_ivalA variables...
+            // Read from here...
+            if (gcm_ivalsA.size() != gcm_inputs[index_ae].size()) (*icebin_error)(-1,
+                "gcm_ivalsA is wrong size: %ld vs. %ld", gcm_ivalsA.size(), gcm_inputs[index_ae].size());
 
-        for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
-            (*gcm_ivalsE[ivar])(ihc_gcm,j,i) +=
-                gcm_ivalsE_s.vals[i*nvar[GridAE::E] + ivar];
-        }
-    }
-    printf("END GCMCoupler_ModelE::update_gcm_ivals\n");
+            // Clear output: because non-present elements in sparse gcm_ivalsA are 0
+            for (auto &gcm_ivalA : gcm_ivalsA) gcm_ivalA = 0;
+
+            // Create summed weights
+            blitz::Array<double,1> sA_s(nA());
+            sA_s = 0;
+            for (int iA_d=0; iA_d<gcm_ivalsA_s.size(); ++iA_d) {
+                auto iA_s(gcm_ivalsA_s.index[iA_d]);
+                sA_s[iA_s] += gcm_ivalsA_s.vals[iA_d];
+            }
+            for (int iA_s=0; iA_s<sA_s.shape(0); ++iA_s) {
+                sA_s(iA_s) = 1. / sA_s(iA_s);    // Will create NaNs but we dont care...
+            }
+
+            // Copy sparse arrays to output
+            int const nvar = gcm_inputs[index_ae].size();
+            for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
+                long iA = gcm_ivalsA_s.index[ix];
+                auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
+                int const i = ij[0];
+                int const j = ij[1];
+                for (int ivar=0; ivar<nvar[GridAE::A]; ++ivar) {
+                    // Original Fortran (partial) arrays have been converted to
+                    // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
+                    (*gcm_ivalsA[ivar])(j,i) +=
+                        gcm_ivalsA_s.vals[i*nvar + ivar] * sA_s(iA);
+                }
+            }
+        } break;
+        case 'E' : {
+            // ================================= E
+            VectorMultivec const &gcm_ivalsE_s(out.gcm_ivals_s[index_ae]);    // src
+            std::vector<std::unique_ptr<blitz::Array<double,2>>> const &gcm_ivalsE(gcm_ivalssE[index_ae]); // dest
+
+            // Update gcm_ivalE variables...
+            // Read from here...
+            if (gcm_ivalsE.size() != gcm_inputs[index_ae].size()) (*icebin_error)(-1,
+                "gcm_ivalsE is wrong size: %ld vs. %ld", gcm_ivalsE.size(), gcm_inputs[index_ae].size());
+
+            // Clear output: because non-present elements in sparse gcm_ivalsA are 0
+            for (auto &gcm_ivalE : gcm_ivalsE) gcm_ivalE = 0;
+
+            // Create summed weights
+            blitz::Erray<double,1> sE_s(nE());
+            sE_s = 0;
+            for (int iE_d=0; iE_d<gcm_ivalsE_s.size(); ++iE_d) {
+                auto iE_s(gcm_ivalsE_s.index[iE_d]);
+                sE_s[iE_s] += gcm_ivalsE_s.vals[iE_d];
+            }
+            for (int iE_s=0; iE_s<sE_s.shape(0); ++iE_s) {
+                sE_s(iE_s) = 1. / sE_s(iE_s);    // Will create NaNs but we dont care...
+            }
+
+            // Copy sparse arrays to output
+            for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
+                long iE = gcm_ivalsE_s.index[ix];
+                auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
+                int const i = ijk[0];
+                int const j = ijk[1];
+                int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
+                int const ihc_gcm = gcm_params.icebin_base_hc + ihc_ice;
+
+                for (int ivar=0; ivar<nvar[GridAE::E]; ++ivar) {
+                    // Original Fortran (partial) arrays have been converted to
+                    // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
+                    (*gcm_ivalsE[ivar])(ihc_gcm,j,i) +=
+                        gcm_ivalsE_s.vals[i*gcm_inputs[index_ae].size() + ivar] * sE_s(iE);
+                }
+            }
+        } break;
+        default :
+            (*icebin_error)(-1, "Illegal gcm_inputs_grid of '%c'", gcm_inputs_grid[index_ae]);
+    }}
+
+    printf("END GCMCoupler_ModelE::apply_gcm_ivals\n");
 }
 // ============================================================================
 // Update TOPO file during a coupled run
 
 
+void GCMCoupler_ModelE::update_topo(
+double time_s,    // Simulation time
+std::vector<blitz::Array<double,1>> const &emI_lands,
+std::vector<blitz::Array<double,1>> const &emI_ices,
+// ---------- Input & Output
+// Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
+GCMInput &out)
+{
+    GCMRegridder_ModelE const *gcmA(
+        dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
+
+    // Read from TOPOO file
+    ibmisc::ArrayBundle<double,2> topoo(topoo_bundle(BundleOType::MERGEO, topoO_fname));
+        auto &foceanOp(topoo.array("FOCEANF"));
+        auto &fgiceOp(topoo.array("FGICEF"));
+        auto &zatmoOp(topoo.array("ZATMOF"));
+        auto &foceanOm(topoo.array("FOCEAN"));
+        auto &flakeOm(topoo.array("FLAKE"));
+        auto &fgrndOm(topoo.array("FGRND"));
+        auto &fgiceOm(topoo.array("FGICE"));
+        auto &zatmoOm(topoo.array("ZATMO"));
+        auto &zlakeOm(topoo.array("ZLAKE"));
+        auto &zicetopO(topoo.array("ZICETOP"));
+
+    // Allocate space for TOPOA output variables
+    TopoABundles topoa(this->hspecA(), topoo);
+        auto &foceanA(topoa.a.array("focean"));
+        auto &flakeA(topoa.a.array("flake"));
+        auto &fgrndA(topoa.a.array("fgrnd"));
+        auto &fgiceA(topoa.a.array("fgice"));
+        auto &zatmoA(topoa.a.array("zatmo"));
+        auto &hlakeA(topoa.a.array("hlake"));
+        auto &zicetopA(topoa.a.array("zicetop"));
+
+        auto &fhc(topoa.a3.array("fhc"));
+        auto &elevE(topoa.a3.array("elevE"));
+
+        auto &underice_i(topoa.a3_i.array("underice"));
+
+    // ------------------ Create merged TOPOO file (in RAM)
+    // We need correctA=true here to get FOCEANF, etc.
+    merge_topoO(
+        foceanOp, fgiceOp, zatmoOp,  // Our own bundle
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, gcmO,
+        RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
+        emI_lands, emI_ices, args.eq_rad, errors);
+
+
+    // Print sanity check errors to STDERR
+    for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
+
+    if (errors.size() > 0) (*icebin_error)(-1,
+        "Errors in TOPO merging or regridding; halting!");
+
+    // ---------------- Compute AAmvEAm (requires merged foceanOp, foceanOm)
+    linear::Weighted_Tuple AAmvEAm(gcmA->global_unscaled_AvE(emI_lands, emI_ices, foceanOp, foceanOm));
+
+    // ---------------- Create TOPOA file (in RAM)
+    std::vector<std::string> errors(make_topoA(
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
+        gcmA->hspecO(), gcmA->hspecA(), gcmA->indexingHC, gcmA->hcdefs(), gcmA->underice,
+        AAmvEAm,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
+        fhc, elevE, underice_i));
+
+    // Print sanity check errors to STDERR
+    for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
+
+    if (errors.size() > 0) (*icebin_error)(-1,
+        "Errors in TOPO merging or regridding; halting!");
+
+    // ------------------ Deallocate stuff we no longer need
+    AAmvEAm.clear();
+    topoo.free();
+
+    // ------------------- Convert underice to double and store in topoa
+    auto &hspecA(gcmA->hspecA());
+    auto const nhc(gcmA->nhc());
+    std::array<int,3> shape3 {nhc, hspecA.jm, hspecA.im};
+    topoa.a3.add("underice", {});
+    topoa.a3.at("underice").allocate(true, shape3);
+    auto &underice(topoa.a3.array("underice"));
+    underice = underice_i;
+    
+
+    // ------------------ Pack TOPOA stuff into output variables
+    {
+        // See LISheetIceBin.F90 (modelE); same as variables found in classic TOPO file
+        // These variables should be: "focean", "flake", "fgrnd", "fgice", "zatmo", "hlake"
+        VarSet &gcm_inputsA(this->gcm_inputs[IndexAE::ATOPO]);
+        VectorMultivec &gcm_ivalsA_s(this->gcm_ivalss_s[IndexAE::ATOPO]);
+
+        // Map between contract and TOPOA variables
+        std::vector<blitz::Array<double,2>> iarrays;
+        for (size_t k=0; k<gcm_inputsA.index.size(); ++i) {
+            // k = index in contract
+            // ivaris_ix = Index in topoa.a
+            iarrays.push_back(&topoa.a.array(topoa.a.index.at(name)));
+        }
+
+        // Copy every element
+        std::vector val(gcm_ivalsA_s.nvar);
+        for (int j=0; j<hspecA.jm; ++j) {
+        for (int i=0; i<hspecA.im; ++i) {
+            for (int k=0; k<gcm_ivalsA_s.size(); ++k) {
+                val[k] = (*iarrays(k))(j,i);
+            }
+            auto ij = gcmA->indexing.tuple_to_index(std::array<int,2>{i,j});
+            gcm_ivalsA_s.add(ij, val);
+        }}
+    }
+
+    // ------------------ Pack TOPOE stuff into output variables
+    {
+        // See LISheetIceBin.F90 (modelE); same as variables found in classic TOPO file
+        // These variables should be: fhc, elevE, underice
+        VarSet &gcm_inputsE(this->gcm_inputs[IndexAE::ETOPO]);
+        VectorMultivec &gcm_ivalsE_s(this->gcm_ivalss_s[IndexAE::ETOPO]);
+
+        // Map between contract and TOPOE variables
+        std::vector<blitz::Array<double,3> *> iarrays;
+        for (size_t k=0; k<gcm_inputsE.index.size(); ++i) {
+            // k = index in contract
+            // ivaris_ix = Index in topoa.a3
+            iarrays.push_back(&topoa.a3.array(topoa.a3.index.at(name)));
+        }
+
+        // Copy every element
+        std::vector val(gcm_ivalsE_s.nvar);
+        for (int ihc=0; ihc<nhc; ++ihc) {
+        for (int j=0; j<hspecA.jm; ++j) {
+        for (int i=0; i<hspecA.im; ++i) {
+            for (int k=0; k<gcm_ivalsE_s.size(); ++k) {
+                val[k] = (*iarrays(k))(ihc,j,i);
+            }
+            auto ij = gcmE->indexing.tuple_to_index(std::array<int,2>{i,j,ihc});
+            gcm_ivalsE_s.add(ij, val);
+        }}}
+    }
+
+
+
+
+TODO: Take care of FLAND, which was not computed by make_topoa
+
+
+
+  
+}));
+
+
+
+
+
+
+
+
+***** TODO: Try to make a GCMRegridder_Merged_ModelE that handles everything including mismatched regridding on O, loading unmerged TOPOO file, ultimate conversion to A; and even producing a global AvE.
+
+
+
 /** This needs to be run at least once before matrices can be generated. */
-void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
+void GCMCoupler_ModelE::update_topo(double time_s
+TupleListLT<2> &AvE1_s,    // OUT: Put fully merged AvE here (sparse indexing)
+TupleListLT<1> wAvE1_s)
 {
 
 (*icebin_error)(-1, "update_topo() still needs to be written; and should do the same thing as the command-line version.  The old (pre-merge) update_topo() is in the source code currently.");
@@ -605,11 +813,12 @@ void GCMCoupler_ModelE::update_topo(double time_s, bool initial_timestep)
     GCMRegridder_ModelE *gcmA = dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder);
 
     // Transfer elemask and sigma parameters from each ice coupler
-    std::vector<ElevMask<1>> elevmasks;
+    std::vector<ElevMask<1>> emI_ices, emI_lands;
     std::vector<std::array<double,3>> sigmas;
     for (size_t sheet_index=0; sheet_index < gcmA->ice_regridders().index.size(); ++sheet_index) {
         IceCoupler *icec(&*ice_couplers[sheet_index]);
-        elevmasks.push_back(ElevMask<1>(icec->elevmaskI, icec->maskI));
+        emI_ices.push_back(ElevMask<1>(icec->emI_ice, icec->maskI));
+        emI_lands.push_back(ElevMask<1>(icec->emI_land, icec->maskI));
         sigmas.push_back(icec->sigma);
     }
 

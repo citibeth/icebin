@@ -237,7 +237,7 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // Rename certain outputs with "standard" names that other parts of the
     // coupling can count on, regardless of specifics of this ice model.
     // Example of use:
-    //    standard_names["elevmaskI"] =
+    //    standard_names["elevmask_land"] =
     //    ice_output.add("ice_top_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
     auto &standard_names(ice_coupler->standard_names[IceCoupler::OUTPUT]);
 
@@ -250,9 +250,13 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
 
     ice_output.add("mask", nan, "", contracts::INITIAL, "PISM land surface type");
 
-    standard_names["elevmaskI"] =
-    ice_output.add("elevmaskI", nan, "", contracts::INITIAL | contracts::ALLOW_NAN,
-        "Elevation; nan for grid cells off ice sheet.");
+    standard_names["elevmask_ice"] =
+    ice_output.add("elevmask_ice", nan, "", contracts::INITIAL | contracts::ALLOW_NAN,
+        "Elevation of ice sheet; nan for grid cells off ice sheet.");
+
+    standard_names["elevmask_land"] =
+    ice_output.add("elevmask_land", nan, "", contracts::INITIAL | contracts::ALLOW_NAN,
+        "Elevation of bare land+ice; nan for grid cells off land or ice (eg ocean).");
 
     ice_output.add("ice_top_senth", nan, "J kg-1", contracts::INITIAL, "");
 
@@ -304,8 +308,7 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // Commented out because this needs to be regridded with correctA=False
     // For that, we need to add a third segment to GridAE.  For now, that's
     // just not worth the effort.
-    // ok = ok && vtA.set("elevA", "elevmaskI", UNIT, 1.0);
-    ok = ok && vtE_nc.set("elevE", "elevmaskI", UNIT, 1.0);
+//    ok = ok && vtE_nc.set("elevE", "elevmask_ice", UNIT, 1.0);
 
     // Top layer state from ice model
     ok = ok && vtE_nc.set("ice_top_senth", "ice_top_senth", UNIT, 1.0);
