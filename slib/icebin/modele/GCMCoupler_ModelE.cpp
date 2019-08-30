@@ -398,6 +398,95 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
     printf("END gcmce_cold_start()\n");
 }
 
+
+/** Helper function: Scales and merges (unscaled) matrices stored in WTs */
+static TupleListLT<2> merge_scale(std::vector<WeightedTuple const *> const &WTs)
+{
+    auto shape(WTs[0].shape());
+
+    // Create weight array by merging weights in the tuples
+    blitz::Array<double,1> wM(shape[0]);
+        wM = 0;
+    for (TupeListLT<2> const *Mi : M0) {
+    for (auto &tp : Mi->wM.tuples) {
+        wM(tp.index(0)) += tp.value();
+    }}
+
+    // Convert weights to scale factors
+    for (int i=0; i<wM.extent(0); ++i) {
+        wM(i) = 1. / wM(i);    // Will produce Inf where unused
+    }
+
+    // Rename wM to sM to reflect change of meaning
+    blitz::Array<double,1> sM;
+    sM.reference(wM);
+
+    // Copy the main matrix, scaling!
+    TupeListLT<2> M;    // Output
+    M.set_shape(shape);
+    for (TupeListLT<2> const *Mi : M0) {
+    for (auto &tp : Mi->tuples) {
+        M.add(tp.index(), tp.value() * sM(tp.index(0)));
+    }}
+
+TODO: Need to split by domain, don't just add to M.
+
+    return M;
+}
+
+/** Helper function: splits a single GCMInput struct into per-domain GCMInput structs */
+std::vector<GCMInput> split_by_domain(
+    GCMInput const &out,
+    DomainDecomposer_ModelE const &domainsA,
+    DomainDecomposer_ModelE const &domainsE)
+{
+    using namespace spsparse;
+
+    // Put domain decomposers in a nice array
+    std::array<DomainDecomposer_ModelE const *, GridAE::count> domainsAE
+        {&domainsA, &domainsE};
+    int ndomains = domainsA.size();
+
+    // Construct the output
+    std::array<int, GridAE::count> nvar(out.nvar());
+
+    std::vector<GCMInput> outs;
+    outs.reserve(ndomains);
+    for (size_t i=0; i<ndomains; ++i)
+        outs.push_back(GCMInput(nvar));
+
+    size_t strideb = sizeof(GCMInput);
+
+    // Split each element of parallel sparse vectors
+    for (int iAE=0; iAE != (int)IndexAE::COUNT; ++iAE) {
+        auto &gcm_ivalsX(out.gcm_ivalss_s[iAE]);
+        DomainDecomposer_ModelE const &domainsX(*domainsAE[iAE]);
+
+        for (size_t i=0; i<out.gcm_ivalss_s[iAE].index.size(); ++i) {
+            // Convert from index to tuple
+            long const iA(gcm_ivalsX.index[i]);
+
+            // Figure out MPI domain of the resulting tuple
+            int idomain = domainsX.get_domain(iA);
+
+            // Add our values to the appropriate MPI domain
+            outs[idomain].gcm_ivalss_s[iAE].add(iA, &gcm_ivalsX.vals[i*nvar[iAE]]);
+        }
+    }
+
+    // Split the standard sparse vectors and matrices
+    // Copying a TupleListLT<2>
+    std::vector WTs;
+
+    spcopy(
+        accum::domain(strideb, &domainsE,
+        &outs.front().E1vE0_s),
+        out.E1vE0_s)
+
+    return outs;
+}
+
+
 // =======================================================
 // Called from LISheetIceBin::couple()
 /**
@@ -640,8 +729,28 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
 // Update TOPO file during a coupled run
 
 
+/** Produce regridding matrices for this setup.
+(To be run on root MPI node)
+Needs to include _foceanAOp and _foceanAOm */
+std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(    // virtual
+    int sheet_index,
+    blitz::Array<double,1> const &elevmaskI,
+    RegridParams const &params) const
+{
+    GCMRegridder_ModelE const *gcmA(
+        dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
+
+    return gcmA->regrid_matrices(
+        sheet_index,
+        _foceanAOp, _foceanAOm,
+        elevmaskI, params);
+}
+
+
+
 void GCMCoupler_ModelE::update_topo(
 double time_s,    // Simulation time
+bool run_ice,     // false for initialization
 std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
 // ---------- Input & Output
@@ -681,12 +790,19 @@ GCMInput &out)
 
     // ------------------ Create merged TOPOO file (in RAM)
     // We need correctA=true here to get FOCEANF, etc.
+    // merge_topoO() merges PISM ice sheets (emI_ices, etc) into foceanOp / foceanOm
     merge_topoO(
         foceanOp, fgiceOp, zatmoOp,  // Our own bundle
         foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, gcmO,
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, args.eq_rad, errors);
 
+    // Copy FOCEAN to internal GCMCoupler_ModelE state
+    _foceanAOp = reshape1(foceanOp);
+    // Only copy foceanAOm the first time.  It NEVER changes after that.
+    if (!run_ice) {
+        _foceanAOm = reshape1(foceanOm);
+    }
 
     // Print sanity check errors to STDERR
     for (std::string const &err : errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
@@ -813,12 +929,12 @@ TupleListLT<1> wAvE1_s)
     GCMRegridder_ModelE *gcmA = dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder);
 
     // Transfer elemask and sigma parameters from each ice coupler
-    std::vector<ElevMask<1>> emI_ices, emI_lands;
+    std::vector<ElevMask<1>> emI_lands, emI_ices;
     std::vector<std::array<double,3>> sigmas;
     for (size_t sheet_index=0; sheet_index < gcmA->ice_regridders().index.size(); ++sheet_index) {
         IceCoupler *icec(&*ice_couplers[sheet_index]);
-        emI_ices.push_back(ElevMask<1>(icec->emI_ice, icec->maskI));
         emI_lands.push_back(ElevMask<1>(icec->emI_land, icec->maskI));
+        emI_ices.push_back(ElevMask<1>(icec->emI_ice, icec->maskI));
         sigmas.push_back(icec->sigma);
     }
 

@@ -55,9 +55,6 @@ struct ModelEParams
 // ---------------------------------------------
 
 
-/** Different indices into gcm_inputs (see INDEXAE_* in LISheetIceBin.F90)*/
-enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;
-
 class DomainDecomposer_ModelE {
     ibmisc::Domain domainA_global;
     size_t ndomain;
@@ -140,8 +137,20 @@ public:
     /** Name of file on ocean grid containing the EvA matrix for global (non-IceBin) ice. */
     std::string global_ecO_fname;
 
-    // Initial ModelE state of foceanO; this cannot change.
-    blitz::Array<double,2> foceanOm0;
+    /** ModelE ocean cover, on the Ocean grid, as seen by the ice
+    model (sparse indexing).  Ocean grid cells can contain fractional
+    ocean cover.  foceanAOp can change over the course of a ModelE
+    run, as the ice model's ice extent changes.
+    @see ModelE FOCEAN or FOCEN */
+    blitz::Array<double,1> _foceanAOp;
+
+    /** ModelE ocean cover, on the Ocean grid, as seen by ModelE
+    (sparse indexing).  Cells are either all ocean (==1.0) or all
+    continent (==0.0).  foceanAOm does NOT change over the course of a
+    ModelE run, because the ModelE ocean is not able to change shape
+    mid-run. */
+    blitz::Array<double,1> _foceanAOm;
+
 
 public:
     virtual ~GCMCoupler_ModelE() {}
@@ -157,10 +166,18 @@ public:
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 
+    /** Produce regridding matrices for this setup.
+    Needs to include _foceanAOp and _foceanAOm */
+    std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(    // virtual
+        int sheet_index,
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params = RegridParams()) const = 0;
+
     /**
     @param out Add TOPO stuff here (see IndexAE::TOPOA, IndexAE::TOPOE) */
     void update_topo(
     double time_s,    // Simulation time
+    bool run_ice,     // false for initialization
     std::vector<blitz::Array<double,1>> const &emI_lands,
     std::vector<blitz::Array<double,1>> const &emI_ices,
     // ---------- Input & Output
@@ -174,8 +191,8 @@ public:
     // because everything in this class is public.
 
 
-    // 1. Copies values back into modele_inputs.gcm_ivals
-    void update_gcm_ivals(GCMInput_ModelE const &out);
+//    // 1. Copies values back into modele_inputs.gcm_ivals
+//    void update_gcm_ivals(GCMInput const &out);
 
 };    // class GCMCouler_ModelE
 

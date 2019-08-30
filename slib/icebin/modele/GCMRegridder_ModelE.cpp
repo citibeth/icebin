@@ -4,6 +4,7 @@
 #include <ibmisc/linear/compressed.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
 #include <icebin/modele/hntr.hpp>
+#include <icebin/modele/merge_topo.hpp>
 #include <icebin/gridgen/GridGen_LonLat.hpp>
 
 using namespace icebin;
@@ -99,8 +100,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 
 
     // Obtain hntrA and hntrO for process below.
-    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec));
-    GridSpec_LonLat const &specA(cast_GridSpec_LonLat(*gcmA->agridA.spec));
+    GridSpec_LonLat const &specO(gcmA->specO());
+    GridSpec_LonLat const &specA(gcmA->specA());
 
     Hntr hntr_XOmvXAm(17.17, specO.hntr, specA.hntr);
 
@@ -216,7 +217,7 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
         "AvI", {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
-    EigenColVectorT wAOm_e(compute_wAOm(gcmA->foceanAOp, gcmA->foceanAOm, wAOp, dimAOp, dimAOm));
+    EigenColVectorT wAOm_e(compute_wAOm(foceanAOp, foceanAOm, wAOp, dimAOp, dimAOm));
 
     HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
     HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
@@ -368,8 +369,9 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
 
     // ----------- Put it all together (XAmvIp)
     blitz::Array<double,1> sXOpvIp(1. / XOpvIp->wM);
-    ret->wM.reference(to_blitz(wXAm_e));    // wAAm_e or wEAm_e
-    auto sXAm(sum(*XAmvXOm, 0, '-'));
+    blitz::Array<double,1> wXAm(to_blitz(wXAm_e));
+    ret->wM.reference(wXAm);    // wAAm_e or wEAm_e
+    blitz::Array<double,1> sXAm(sum(*XAmvXOm, 0, '-'));
     if (paramsA.scale) {
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(sXAm) *  *XAmvXOm *
@@ -378,7 +380,8 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     } else {
         // Apply fixes done for scaled version (2017-10-15) to unscaled
         // see 5e0f7d79.  Ensure that M_unscaled = wM * M_scaled
-        blitz::Array<double,1> scale(wXAm_e * sXAm);
+        blitz::Array<double,1> scale(sXAm.extent(0));
+        for (int i=0; i<sXAm.extent(0); ++i) scale(i) = wXAm(i) * sXAm(i);
         ret->M.reset(new EigenSparseMatrixT(
             map_eigen_diagonal(scale) *  *XAmvXOm *
             crop_mvp(dimXOm, dimXOp, 0,
@@ -459,7 +462,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
         This is typically loaded directly from a NetCDF file. */
 GCMRegridder_ModelE::GCMRegridder_ModelE(
     std::string const &_global_ecO,
-    std::shared_ptr<icebin::GCMRegridder> const &_gcmO)
+    std::shared_ptr<icebin::GCMRegridder_Standard> const &_gcmO)
     :  global_ecO(_global_ecO), gcmO(_gcmO)
 {
     // Initialize superclass member
@@ -491,9 +494,11 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 
     // Read EOpvAOp_base from global_ec file
     // Read metadata and global EOpvAOp matrix (from output of global_ec.cpp)
-    {NcIO ncio(global_ecO_fname, 'r');
-        metaO.ncio(ncio);
-        EOpvAOp_base.ncio(ncio, "EvA.M");
+    if (global_ecO != "") {
+        {NcIO ncio(global_ecO, 'r');
+            // metaO.ncio(ncio);   // no metaO in this class
+            EOpvAOp_base.ncio(ncio, "EvA.M");
+        }
     }
 
 }
@@ -510,7 +515,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 {
     IceRegridder const *regridder = &*ice_regridders()[sheet_index];
     std::unique_ptr<RegridMatrices_Dynamic> rm(new RegridMatrices_Dynamic(regridder, params));
-    GridSpec_LonLat const &specO(cast_GridSpec_LonLat(*gcmO->agridA.spec));
+    GridSpec_LonLat const &specO(this->specO());
 
     // Per-ice sheet matrix, makes sense either for:
     //    (a) A matrix involving ice sheet (eg AvI,IvA,EvI,IvE)
@@ -525,9 +530,11 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     auto &rmO(rm->tmp.take(std::move(*_rmO)));
 
     rm->add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'E', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'E', specO.eq_rad, &rmO));
     rm->add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'A', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'A', specO.eq_rad, &rmO));
 
 // We never need this.
 //    rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm_rmO, _1, _2,
@@ -535,16 +542,20 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 
 
     rm->add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'E', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'E', specO.eq_rad, &rmO));
     rm->add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'A', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'A', specO.eq_rad, &rmO));
 
 
     // --------------- Simply-named aliases
     rm->add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'E', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'E', specO.eq_rad, &rmO));
     rm->add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
-        this, 'A', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'A', specO.eq_rad, &rmO));
 
 
 //    rm->add_regrid("AvE", std::bind(&compute_AAmvEAm_rmO, _1, _2,
@@ -552,9 +563,11 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 
 
     rm->add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'E', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'E', specO.eq_rad, &rmO));
     rm->add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
-        this, 'A', specO.eq_rad, &rmO));
+        this, foceanAOp, foceanAOm,
+        'A', specO.eq_rad, &rmO));
 
     // For testing
     rm->add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,
@@ -576,6 +589,7 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
     blitz::Array<double,1> const &foceanAOp,
     blitz::Array<double,1> const &foceanAOm) const
 {
+    GridSpec_LonLat const &specO(this->specO());
 
     // --------------------- Compute EOpvAOp (merged global + local ice)
 
@@ -590,9 +604,10 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
     SparseSetT dimAOp;
     EOpvAOpResult eam(compute_EOpvAOp_merged(
         dimAOp, EOpvAOp_base,
-        &*gcmO, metaO.eq_rad, emI_ices,
+        RegridParams(false, false, {0.,0.,0.}),  // (scale, correctA, sigma)
+        &*gcmO, specO.eq_rad, emI_ices,
         true, true,    // use_global_ice=t, use_local_ice=t
-        metaO.hcdefs, metaO.indexingHC, false, errors));
+        hcdefs(), indexingHC, false, errors));
 
 
     // Print sanity check errors to STDERR
@@ -603,8 +618,9 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
 
 
     // ----------------- Compute AAMvEAm
+    auto wAOp(sum(*eam.EOpvAOp, 1, '+'));
     SparseSetT dimAAm, dimEAm;
-    std::unique_ptr<linear::Weighted_Eigen> AAmvEAm(_compute_AAmvEAm(
+    return _compute_AAmvEAm(
         false,    // scale=false
         specO.eq_rad,
         cast_GridSpec_LonLat(*this->gcmO->agridA.spec).hntr,
@@ -613,9 +629,7 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
         this->indexingHC,
         foceanAOp,
         foceanAOm,
-        *eam.EOpvAOp->M, eam.dimEOp, dimAOp, eam.EOpAOp->Mw));
-
-    return linear::to_weighted_tuple(*AAmvEAm);
+        *eam.EOpvAOp, eam.dimEOp, dimAOp, wAOp);
 
 
 #if 0

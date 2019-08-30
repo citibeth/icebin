@@ -217,7 +217,7 @@ ibmisc::TmpAlloc &tmp)
 
     // Ice inputs calculated as the result of a matrix multiplication
     // ice_ivalsI_e is |i| x |k|
-    ice_ivalsI_e = (*IvE0) * (
+    ice_ivalsI_e = (*IvE0->M) * (
         gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
 
     // Alias the Eigen matrix to blitz array
@@ -225,23 +225,6 @@ ibmisc::TmpAlloc &tmp)
         ice_ivalsI_e.data(),
         blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
         blitz::neverDeleteData);
-
-
-
-#if 0
-// Mask out the nullsapce of IvE0
-blitz::Array<int,1> keep(nI());
-keep = 0;
-for (auto ii(begin(*IvE0)); ii != end(*IvE0); ++ii) {
-    keep(ii->row()) = 1;
-}
-double const fill = 0;
-int nvar = ice_ivalsI.extent(0);
-for (int i=0; i<nvar; ++i) {
-for (int j=0; j<nI(); ++j) {
-    if (!keep(j)) ice_ivalsI(i,j) = fill;
-}}
-#endif
 
     // Continue construction in a contract-specific manner
     reconstruct_ice_ivalsI(ice_ivalsI, dt);
@@ -258,9 +241,9 @@ IceCoupler::CoupleOut IceCoupler::couple(
 double time_s,
 // Values from GCM, passed GCM -> Ice
 VectorMultivec const &gcm_ovalsE_s,
-// ------- Output Variables
-std::array<VectorMultivec, GridAE::count> &gcm_ivalsAE_s,    // (accumulate over many ice sheets)
-//GCMInput &out,    // Accumulate matrices here...
+// ------- Output Variables (Uses IndexAE::A and IndexAE::E in them)
+std::vector<VectorMultivec> &gcm_ivalss_s,                // (accumulate over many ice sheets)
+std::vector<std::vector<double>> &gcm_ivalss_weight_s,    // (accumulate over many ice sheets)
 // ------- Flags
 bool run_ice)
 {
@@ -303,7 +286,7 @@ bool run_ice)
     gcm_ovalsE0 = 0;
     for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
         long iE_s(gcm_ovalsE_s.index[i]);
-        int iE0(dimE0.to_dense(iE_s));
+        int iE0(dimE0.to_dense(iE_s));   // Can raise error if iE_s not found
         for (int ivar=0; ivar<gcm_ovalsE_s.nvar; ++ivar) {
             gcm_ovalsE0(ivar, iE0) += gcm_ovalsE_s.val(ivar, i);
         }
@@ -340,7 +323,7 @@ bool run_ice)
 
     // Check that elevmaskI is an alias for variable #elevmaskI_ix in ice_ovalsI
     if (&ice_ovalsI(emI_ice_ix,0) != &out_emI_ice(0)) (*icebin_error)(-1,
-        "ice_ovalsI <%p> != emI_ice <%p>\n", &ice_ovalsI(emI_ice_ix1,0), &out_emI_ice(0));
+        "ice_ovalsI <%p> != emI_ice <%p>\n", &ice_ovalsI(emI_ice_ix,0), &out_emI_ice(0));
     if (&ice_ovalsI(emI_land_ix,0) != &out_emI_land(0)) (*icebin_error)(-1,
         "ice_ovalsI <%p> != emI_land <%p>\n", &ice_ovalsI(emI_land_ix,0), &out_emI_land(0));
 
@@ -348,7 +331,7 @@ bool run_ice)
     emI_land = out_emI_land;    // Copy
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
-    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, emI_ice));
+    std::unique_ptr<RegridMatrices_Dynamic> rm(gcm_coupler->regrid_matrices(sheet_index, emI_ice));
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)
@@ -357,18 +340,21 @@ bool run_ice)
 
     // _nc means "No Correct" for changes in area due to projections
     // See commit d038e5cb for deeper explanation
+    SparseSetT dimE1;
     ret.E1vI_unscaled_nc = rm->matrix_d("EvI", {&dimE1, &dimI},
         RegridParams(false, false, {0,0,0}));    // scale=f, correctA=f
 
     // ========= Compute gcm_ivalsE
+    SparseSetT dimA1;
     auto A1vI_unscaled(rm->matrix_d("AvI", {&dimA1, &dimI},
-        RegridParams(false, true, {0,0,0}));    // scale=f, correctA=t
+        RegridParams(false, true, {0,0,0})));    // scale=f, correctA=t
 
     // Do it once for _E variables and once for _A variables.
-    std::array<linear::Weighted_Eigen * const, GridAE::count> AE1vIs
-        {&*A1vI_unscaled, &*E1vI_unscaled_nc};
+    std::vector<linear::Weighted_Eigen *> AE1vIs(gcm_ivalss_s.size());
+        AE1vIs[(int)IndexAE::A] = &*A1vI_unscaled;
+        AE1vIs[(int)IndexAE::E] = &*ret.E1vI_unscaled_nc;
 
-    for (int iAE=0; iAE < GridAE::count; ++iAE) {
+    for (int iAE=(int)IndexAE::A; iAE <= (int)IndexAE::E; ++iAE) {
 
         // Assuming column-major matrices...
         // gcm_ivalsX{jn} = X1vI{ji} * (ice_ovalsI{im} * gvi.M{mn} + gvi.b{in})
@@ -433,14 +419,14 @@ bool run_ice)
             ice_ovalsI_e * gcmi_v_iceo_T.M + gcmi_v_iceo_T.b.replicate(nI(),1) ));
         // Sparsify while appending to the global VectorMultivec
         // (Transposes order in memory)
-        std::vector<double> vals(gcm_ivalsAE_s[iAE].size()); // Extra col for weight
+        std::vector<double> vals(gcm_ivalss_s[iAE].size()); // Extra col for weight
         for (int jj=0; jj < gcm_ivalsX.rows(); ++jj) {
             auto jj_s(AE1vIs[iAE]->dims[0]->to_sparse(jj));
             int nn = 0;
             for (; nn < gcm_ivalsX.cols(); ++nn)
                 vals[nn] = gcm_ivalsX(jj,nn);
-            gcm_ivalsAE_s[iAE].add(jj_s, vals);
-            gcm_ivalsAE_weight_s[iAE].push_back(AE1vIs[iAE]->wM(jj))   // Add weight as separate vector
+            gcm_ivalss_s[iAE].add(jj_s, vals);
+            gcm_ivalss_weight_s[iAE].push_back(AE1vIs[iAE]->wM(jj));   // Add weight as separate vector
         }
     }        // iAE
 
@@ -469,8 +455,8 @@ bool run_ice)
     }
 
     // Save stuff for next time around
-    ret.dimE0 = set::move(dimE0);
-    ret.IvE0 = std::move(IvE0);
+    ret.dimE0 = std::move(dimE0);
+    ret.IvE0 = std::move(IvE0->M);
     dimE0 = std::move(dimE1);
     IvE0 = std::move(IvE1);
 

@@ -294,7 +294,7 @@ public:
         Should be RegridParams(true, false, {0,0,0}) to give conservative matrix. */
     virtual ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
         std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
-        std::vector<ibmisc::linear::Weighted_Eigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+        std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
         std::vector<SparseSetT *> const &dimE0s) const = 0;    // dimE0 accompanying IvE0
 
 
@@ -410,7 +410,7 @@ public:
 
     ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
         std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
-        std::vector<ibmisc::linear::Weighted_Eigen *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+        std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
         std::vector<SparseSetT *> const &dimE0s) const;    // dimE0 accompanying IvE0
 
 

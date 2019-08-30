@@ -34,6 +34,19 @@
 
 namespace icebin {
 
+/** Different indices into gcm_inputs (see INDEXAE_* in LISheetIceBin.F90)*/
+#if 0
+BOOST_ENUM_VALUES( IndexAE, int,
+    (A) (0)
+    (E) (1)
+    (ATOPO) (2)
+    (ETOPO) (3)
+)
+#else
+enum class IndexAE { A, E, ATOPO, ETOPO, COUNT};
+static std::array<std::string, (unsigned)IndexAE::COUNT> const IndexAE_labels {"A", "E", "ATOPO", "ETOPO"};
+#endif
+
 template<int RANK>
     using TupleListLT = spsparse::TupleList<long,double,RANK>;
 
@@ -197,6 +210,19 @@ public:
 
     bool am_i_root() const { return gcm_params.am_i_root(); }
 
+
+    /** Produce regridding matrices for this setup.
+    Do not change elevmaskI to dense indexing.  That would require a
+    SparseSet dim variable, plus a dense-indexed elevation.  In the end,
+    too much complication and might not even save RAM.
+
+    This is virtual beause there is no longe a standard
+    GCMRegridder::regrid_matrices() function. */
+    virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
+        int sheet_index,
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params = RegridParams()) const = 0;
+
 protected:
     virtual void _ncread(
         ibmisc::NcIO &ncio_config,
@@ -225,11 +251,22 @@ public:
     /** Top level method to re-compute values originally loaded from the TOPO file. */
     virtual void update_topo(
         double time_s,    // Simulation time
+        bool run_ice,     // false for initialization
         std::vector<blitz::Array<double,1>> const &emI_lands,
         std::vector<blitz::Array<double,1>> const &emI_ices,
         // ---------- Input & Output
         // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
         GCMInput &out) = 0;
+
+    /** @param am_i_root
+        Call with true if calling from MPI root; false otherwise.
+        The core coupling/regridding computation only runs on root.
+        But other MPI ranks need to go along for the ride, assuming that
+        the ice model uses MPI. */
+    GCMInput couple(
+        double time_s,        // Simulation time [s]
+        VectorMultivec const &gcm_ovalsE,
+        bool run_ice);    // if false, only initialize
 
     /** Top-level ncio() to log output from coupler. (coupler->GCM) */
     void ncio_gcm_input(ibmisc::NcIO &ncio,

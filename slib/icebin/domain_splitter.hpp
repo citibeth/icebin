@@ -21,63 +21,39 @@ namespace icebin {
 // split_by_domain() implementation...
 //
 
-namespace accum {
-
-
-/* This accumulator splits between domains based on the first dimension (0) of AccumulatorT.
-Used to distribute a sparse matrix across MPI nodes. */
-template<class AccumulatorT, class DomainDecomposerT>
-class Domain {
-    std::vector<AccumulatorT *> subs;    // One per domain
-    DomainDecomposerT *domain_splitter;
-
-public:
-    SPSPARSE_LOCAL_TYPES(AccumulatorT);    // Must be rank=1
-
-    Domain(
-        std::vector<AccumulatorT *> &&_subs,
-            DomainDecomposerT *_domain_splitter)
-        : subs(std::move(_subs)), domain_splitter(_domain_splitter)
-    {
-#if 0
-        if (rank != 1) (*icebin_error)(-1,
-            "accum::Domain must be instantiated with AccumulatorT of rank=1 (it has rank %d instead)", (int)rank);
-#endif
-
-    }
-
-    void set_shape(std::array<long, AccumulatorT::rank> const &shape)
-    {
-        for (size_t i=0; i<subs.size(); ++i) subs[i]->set_shape(shape);
-    }
-
-    void add(std::array<long, AccumulatorT::rank> iA, val_type const &val)
-    {
-        int iDomain = domain_splitter->get_domain(iA[0]);
-        subs[iDomain]->add(iA, val);
-    }
-};
-// ----------------------------------------------------------------
-
-/** @param sub0 Fist sub-accumulator in array of accumulators
-@param strideb Stride (in bytes) between first and next accumulator in non-dense. */
-template<class AccumulatorT, class DomainDecomposerT>
-Domain<AccumulatorT,DomainDecomposerT> domain(
-    size_t strideb,
-    DomainDecomposerT *domains,
-    AccumulatorT *sub0)
+// ----------------------------------------------------------------------
+/** Scales and merges (unscaled) matrices stored in WTs */
+TupleListLT<2> merge_scale(std::vector<WeightedTuple const *> const &WTs)
 {
-    std::vector<AccumulatorT *> subs;
-    for (size_t i=0; i < domains->size(); ++i) {
-        subs.push_back(reinterpret_cast<AccumulatorT *>(
-            reinterpret_cast<char *>(sub0) + strideb));
-    }
-printf("domain() template created %ld sub-domains\n", subs.size());
-    return Domain<AccumulatorT,DomainDecomposerT>(
-        std::move(subs), domains);
-}
+    auto shape(WTs[0].shape());
 
-}    // namespace accum
+    // Create weight array by merging weights in the tuples
+    blitz::Array<double,1> wM(shape[0]);
+        wM = 0;
+    for (TupeListLT<2> const *Mi : M0) {
+    for (auto &tp : Mi->wM.tuples) {
+        wM(tp.index(0)) += tp.value();
+    }}
+
+    // Convert weights to scale factors
+    for (int i=0; i<wM.extent(0); ++i) {
+        wM(i) = 1. / wM(i);    // Will produce Inf where unused
+    }
+
+    // Rename wM to sM to reflect change of meaning
+    blitz::Array<double,1> sM;
+    sM.reference(wM);
+
+    // Copy the main matrix, scaling!
+    TupeListLT<2> M;    // Output
+    M.set_shape(shape);
+    for (TupeListLT<2> const *Mi : M0) {
+    for (auto &tp : Mi->tuples) {
+        M.add(tp.index(), tp.value() * sM(tp.index(0)));
+    }}
+
+    return M;
+}
 // ----------------------------------------------------------------------
 template<class DomainDecomposerT>
 std::vector<GCMInput> split_by_domain(
@@ -87,7 +63,7 @@ std::vector<GCMInput> split_by_domain(
 
 template<class DomainDecomposerT>
 std::vector<GCMInput> split_by_domain(
-    GCMInput_ModelE const &out,
+    GCMInput const &out,
     DomainDecomposerT const &domainsA,
     DomainDecomposerT const &domainsE)
 {
@@ -109,11 +85,11 @@ std::vector<GCMInput> split_by_domain(
     size_t strideb = sizeof(GCMInput);
 
     // Split each element of parallel sparse vectors
-    for (int iAE=0; iAE != GridAE::count; ++iAE) {
-        auto &gcm_ivalsX(out.gcm_ivalsAE_s[iAE]);
+    for (int iAE=0; iAE != (int)IndexAE::COUNT; ++iAE) {
+        auto &gcm_ivalsX(out.gcm_ivalss_s[iAE]);
         DomainDecomposerT const &domainsX(*domainsAE[iAE]);
 
-        for (size_t i=0; i<out.gcm_ivalsAE_s[iAE].index.size(); ++i) {
+        for (size_t i=0; i<out.gcm_ivalss_s[iAE].index.size(); ++i) {
             // Convert from index to tuple
             long const iA(gcm_ivalsX.index[i]);
 
@@ -123,24 +99,16 @@ std::vector<GCMInput> split_by_domain(
             // Add our values to the appropriate MPI domain
 //printf("domain1 outs %ld %ld %d %d\n", iA, outs.size(), idomain, nvar[iAE]);
 //printf("domain1 %d %ld", iAE, iA, 
-            outs[idomain].gcm_ivalsAE_s[iAE].add(iA, &gcm_ivalsX.vals[i*nvar[iAE]]);
+            outs[idomain].gcm_ivalss_s[iAE].add(iA, &gcm_ivalsX.vals[i*nvar[iAE]]);
         }
     }
 
     // Split the standard sparse vectors and matrices
     // Copying a TupleListLT<2>
-#   define SPCOPY(MATRIX, DOMAINSX) \
-    spcopy( \
-        accum::domain(strideb, &DOMAINSX, \
-        &outs.front().MATRIX), \
-        out.MATRIX)
-
-// Yes split / distribute E1vE0_s
-    SPCOPY(E1vE0_s, domainsE);
-    SPCOPY(AvE1_s, domainsA);
-    SPCOPY(wAvE1_s, domainsA);
-
-#   undef SPCOPY
+    spcopy(
+        accum::domain(strideb, &domainsE,
+        &outs.front().E1vE0_s),
+        out.E1vE0_s)
 
     return outs;
 }

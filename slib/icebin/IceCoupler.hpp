@@ -50,7 +50,7 @@ public:
 
     // Densified regridding matrix, and dimension, from previous call
     // Used to interpret GCM output
-    std::unique_ptr<EigenSparseMatrixT> IvE0;   // SCALED
+    std::unique_ptr<ibmisc::linear::Weighted_Eigen> IvE0;   // SCALED
     // DenseArrayT<1> wIvE0;    // Provides the mask for I; for debugging only.
     SparseSetT dimE0;
 
@@ -148,19 +148,12 @@ public:
     This defaults to NOP, and is set by the coupling contract. */
     std::function<void(blitz::Array<double,2> &, double)> reconstruct_ice_ivalsI;
 
-#if 0
-    struct CoupleOut {
-        std::unique_ptr<linear::Weighted_Eigen> E1vE0;
-
-    };
-#endif
-
     struct CoupleOut {
         // Moved from IceCoupler before they were replaced w/ updated versions
         SparseSetT dimE0;
-        EigenSparseMatrixT const *IvE0;    // SCALED
+        std::unique_ptr<EigenSparseMatrixT> IvE0;    // SCALED
         // Additional stuff from coupling
-        std::unique_ptr<ibmisc::linear::Weighted_Eigen> &E1vI_unscaled_nc;    // UNSCALED
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_unscaled_nc;    // UNSCALED
     };
 
     /** (4) Run the ice model for one coupling timestep.
@@ -171,9 +164,11 @@ public:
     CoupleOut couple(
         double time_s,
         // Values from GCM, passed GCM -> Ice
-        VectorMultivec const &gcm_ovalsE,
-        std::array<VectorMultivec, GridAE::count> &gcm_ivalsAE_s,    // (accumulate many ice sheets)
-//        std::unique_ptr<ibmisc::linear::Weighted_Eigen> &E1vI_nc,    // OUT
+        VectorMultivec const &gcm_ovalsE_s,
+        // ------- Output Variables (Uses IndexAE::A and IndexAE::E in them)
+        std::vector<VectorMultivec> &gcm_ivalss_s,                // (accumulate over many ice sheets)
+        std::vector<std::vector<double>> &gcm_ivalss_weight_s,    // (accumulate over many ice sheets)
+        // ------- Flags
         bool run_ice);
 
     /** (4.1) @param index Index of each grid value.

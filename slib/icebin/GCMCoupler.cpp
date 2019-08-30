@@ -125,12 +125,6 @@ void GCMCoupler::_ncread(
         std::cout << gcm_inputs_grid[i] << ':' << gcm_inputs[i];
     }
 
-    // Read m.segments
-    std::string segments;
-    get_or_put_att(config_info, ncio_config.rw, "segments", segments);
-    gcm_params.hc_segments = parse_hc_segments(segments);
-    gcm_params.icebin_base_hc = get_segment(gcm_params.hc_segments, "ec").base;
-
     ice_couplers.clear();
     for (size_t i=0; i < gcm_regridder->ice_regridders().size(); ++i) {
         std::string const &sheet_name(gcm_regridder->ice_regridders()[i]->name());
@@ -176,15 +170,15 @@ void GCMCoupler::cold_start(
 GCMInput GCMCoupler::couple(
 double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
-bool run_ice)
+bool run_ice)    // if false, only initialize
 {
 printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     // ------------------------ Most MPI Nodes
     if (!gcm_params.am_i_root()) {
-        GCMInput out({0,0});
+        GCMInput out({0,0,0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);
-            ice_coupler->couple(time_s, gcm_ovalsE, out, run_ice);
+            ice_coupler->couple(time_s, gcm_ovalsE, out.gcm_ivalss_s, out.gcm_ivalss_weight_s, run_ice);
         }
         return out;
     }
@@ -205,9 +199,11 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     }
 
     // Initialize output: A and E
-    GCMInput out({gcm_inputsAE[0].size(), gcm_inputsAE[1].size()});
+    std::vector<int> nvars;
+    for (auto &gcmi : gcm_inputs) nvars.push_back(gcmi.size());
+    GCMInput out(nvars);
 
-    std::vector<CoupleOut> couts;
+    std::vector<IceCoupler::CoupleOut> couts;
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         IceCoupler::CoupleOut cout;
         auto &ice_coupler(ice_couplers[sheetix]);
@@ -216,38 +212,40 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_ptr;
         couts.push_back(ice_coupler->couple(
             time_s, gcm_ovalsE,
-            out.gcm_ivalsAE_s, run_ice));
+            out.gcm_ivalss_s, out.gcm_ivalss_weight_s, run_ice));
     }
 
     // Compute E1vE0, to allow for updating elevation classes
     // NOTE: ECs in the nullspace of E0 and E1 will NOT be touched.
     {
-        std::vector<linear::WeightedEigen *> const &E1vIs;
-        std::vector<linear::WeightedEigen *> const &IvE0s;
-        std::vector<SparseSetT *> const &dimE0s;
+        std::vector<linear::Weighted_Eigen *> E1vIs_unscaled;
+        std::vector<EigenSparseMatrixT *> IvE0s;
+        std::vector<SparseSetT *> dimE0s;
 
         for (auto &cout : couts)  {
-            E1vIs.push_back(&*cout.E1vI_nc);
+            E1vIs_unscaled.push_back(&*cout.E1vI_unscaled_nc);
             IvE0s.push_back(&*cout.IvE0);
             dimE0s.push_back(&cout.dimE0);
         }
 
-        out.E1vE0_unscaled = gcm_regridder.global_unscaled_E1vE0(
-            E1vIs, IvE0s, dimE0s);
+        out.E1vE0_unscaled = gcm_regridder->global_unscaled_E1vE0(
+            E1vIs_unscaled, IvE0s, dimE0s);
     }
 
 
     // Run update_topo()
     {
-        std::vector<blitz::Array<double,1> *> emI_ices, emI_lands;
+        std::vector<blitz::Array<double,1>> emI_lands, emI_ices;
+        emI_ices.reserve(ice_couplers.size());
+        emI_lands.reserve(ice_couplers.size());
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);
 
-            emI_ices.push_back(&ice_coupler->emI_ice);
-            emI_lands.push_back(&ice_coupler->emI_land);
+            emI_ices.push_back(ice_coupler->emI_ice);
+            emI_lands.push_back(ice_coupler->emI_land);
         }
 
-        update_topo(time_s, emI_lands, emI_ices, out);
+        update_topo(time_s, run_ice, emI_lands, emI_ices, out);
     }
 
     // Log the results
@@ -397,15 +395,19 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
 {
     ibmisc::ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
 
-TODO: Fix this
-    for (int iAE=0; iAE<GridAE::count; ++iAE) {
-        ncio_dense(ncio, out.gcm_ivalsAE_s[iAE], gcm_inputsAE[iAE],
+    for (int iAE=0; iAE<(int)IndexAE::COUNT; ++iAE) {
+        ncio_dense(ncio, out.gcm_ivalss_s[iAE], gcm_inputs[iAE],
             gcm_regridder->indexing(iAE), vname_base);
+
+        auto dims(get_or_add_dims(ncio,
+            {"gcm_ivalss_weight_"+IndexAE_labels[iAE]+"_len"},
+            {out.gcm_ivalss_weight_s[iAE].size()}));
+        ncio_vector(ncio, out.gcm_ivalss_weight_s[iAE], false,
+            "gcm_ivalss_weight_s", "double", dims);
     }
 
-    ncio_spsparse(ncio, out.E1vE0_s, false, vname_base+"E1vE0");
-//    ncio_spsparse(ncio, out.AvE1_s, false, vname_base+"AvE1");
-//    ncio_spsparse(ncio, out.wAvE1_s, false, vname_base+"wAvE1");
+//    ncio_spsparse(ncio, out.E1vE0_unscaled, false, vname_base+"E1vE0_unscaled");
+    out.E1vE0_unscaled.ncio(ncio, vname_base+"E1vE0_unscaled");
 }
 
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */

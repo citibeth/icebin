@@ -125,7 +125,7 @@ public:
 
     /** A GCMRegridder_Standard that regrids between AOp,EOp,Ip for ice sheets.
     This is typically loaded directly from a NetCDF file. */
-    std::shared_ptr<icebin::GCMRegridder> const gcmO;
+    std::shared_ptr<icebin::GCMRegridder_Standard> const gcmO;
 
     /** Base EOpvAOp matrix, laoded from TOPO_OC file */
     ibmisc::ZArray<int,double,2> EOpvAOp_base;    // from linear::Weighted_Compressed
@@ -135,14 +135,16 @@ public:
     @param _gcmO Underlying regridder for the Ocean Grid Regime. */
     GCMRegridder_ModelE(
         std::string const &_global_ecO,
-        std::shared_ptr<icebin::GCMRegridder> const &_gcmO);
+        std::shared_ptr<icebin::GCMRegridder_Standard> const &_gcmO);
 
-    HntrSpec const &hspecO()
+    HntrSpec const &hspecO() const
         { return cast_GridSpec_LonLat(*gcmO->agridA.spec).hntr; }
-    HntrSpec const &hspecA()
+    HntrSpec const &hspecA() const
         { return cast_GridSpec_LonLat(*agridA.spec).hntr; }
-    GridSpec_LonLat const &specO()
+    GridSpec_LonLat const &specO() const
         { return cast_GridSpec_LonLat(*gcmO->agridA.spec); }
+    GridSpec_LonLat const &specA() const
+        { return cast_GridSpec_LonLat(*agridA.spec); }
 
 // TODO: get rid of eq_rad in metaO
 
@@ -163,6 +165,8 @@ public:
        2. It can also generate AOmvAAm and AAmvAOm, for testing purposes. */
     std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
+        blitz::Array<double,1> const &foceanAOp,
+        blitz::Array<double,1> const &foceanAOm,
         blitz::Array<double,1> const &elevmaskI,
         RegridParams const &params = RegridParams()) const;
 
@@ -171,7 +175,7 @@ public:
             @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
             @param params Parameters to use in generating regridding matrices.
                 Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
-        linear::Weighted_Tuple global_unscaled_AvE(
+        ibmisc::linear::Weighted_Tuple global_unscaled_AvE(
             std::vector<blitz::Array<double,1>> const &emI_lands,
             std::vector<blitz::Array<double,1>> const &emI_ices,
             blitz::Array<double,1> const &foceanAOp,
