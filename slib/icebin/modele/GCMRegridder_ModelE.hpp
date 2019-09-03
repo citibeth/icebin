@@ -128,7 +128,7 @@ public:
     std::shared_ptr<icebin::GCMRegridder_Standard> const gcmO;
 
     /** Base EOpvAOp matrix, laoded from TOPO_OC file */
-    ibmisc::ZArray<int,double,2> EOpvAOp_base;    // from linear::Weighted_Compressed
+    ibmisc::ZArray<int,double,2> EOpvAOp_base;    // from linear::Weighted_Compressed; UNSCALED
 
     /** Constructor used in coupler: create the GCMRegridder first,
         then fill in foceanAOp and foceanAOm later.
@@ -170,16 +170,19 @@ public:
         blitz::Array<double,1> const &elevmaskI,
         RegridParams const &params = RegridParams()) const;
 
-        /** Computes global AvE, including any base ice, etc.
-            @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
-            @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
-            @param params Parameters to use in generating regridding matrices.
-                Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
-        ibmisc::linear::Weighted_Tuple global_unscaled_AvE(
-            std::vector<blitz::Array<double,1>> const &emI_lands,
-            std::vector<blitz::Array<double,1>> const &emI_ices,
-            blitz::Array<double,1> const &foceanAOp,
-            blitz::Array<double,1> const &foceanAOm) const;
+    /** Computes global AvE, including any base ice, etc.
+        @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
+        @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
+        @param params Parameters to use in generating regridding matrices.
+            Should be RegridParams(true, true, {0,0,0}) to give conservative matrix.
+        @param offsetE Offset (in sparse E space) added to base EC indices */
+    ibmisc::linear::Weighted_Tuple global_unscaled_AvE(
+        std::vector<blitz::Array<double,1>> const &emI_lands,
+        std::vector<blitz::Array<double,1>> const &emI_ices,
+        blitz::Array<double,1> const &foceanAOp,
+        blitz::Array<double,1> const &foceanAOm,
+        // ----------- Output vars
+        long &offsetE) const;
 
 };
 

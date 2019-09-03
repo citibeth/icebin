@@ -60,6 +60,7 @@ std::vector<std::string> &errors);
 struct EOpvAOpResult {
     SparseSetT dimEOp;    // dimEOp is set and returned; dimAOp is appended
     std::unique_ptr<EigenSparseMatrixT> EOpvAOp;
+    long offsetE;    // Offset (in sparse E space) added to base EC indices
     std::vector<double> hcdefs; // OUT:  Elev class definitions for merged ice
     ibmisc::Indexing indexingHC;
     std::vector<int16_t> underice_hc;

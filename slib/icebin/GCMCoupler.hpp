@@ -64,6 +64,8 @@ struct GCMInput {
     // step's elevation classes.
     ibmisc::linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
 
+    ibmisc::linear::Weighted_Tuple::TupleListLT E1vE0_scaled;    // domain-split version
+
     /** @param nvar Array specifying number of variables for each segment. */
     GCMInput(std::vector<int> const &nvar) {
         for (int nv : nvar) gcm_ivalss_s.push_back(VectorMultivec(nv));
@@ -247,16 +249,6 @@ public:
     void cold_start(
         ibmisc::Datetime _time_base,
         double time_start_s);
-
-    /** Top level method to re-compute values originally loaded from the TOPO file. */
-    virtual void update_topo(
-        double time_s,    // Simulation time
-        bool run_ice,     // false for initialization
-        std::vector<blitz::Array<double,1>> const &emI_lands,
-        std::vector<blitz::Array<double,1>> const &emI_ices,
-        // ---------- Input & Output
-        // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
-        GCMInput &out) = 0;
 
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.

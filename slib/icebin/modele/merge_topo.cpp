@@ -297,7 +297,7 @@ std::vector<std::string> &errors)
     // Merge in local matrices
     paramsO.scale = false;
     std::array<long,2> EOpvAOp_sheet_shape {0,0};
-    long offsetE = 0;
+    ret.offsetE = 0;
     if (use_local_ice) {
         for (size_t sheet_index=0; sheet_index < gcmO->ice_regridders().index.size(); ++sheet_index) {
             // Get local EOpvAOp matrix
@@ -327,7 +327,7 @@ std::vector<std::string> &errors)
 
     std::array<long,2> EOpvAOp_base_shape {0,0};
     if (use_global_ice) {
-        offsetE = gcmO->indexingE.extent();
+        ret.offsetE = gcmO->indexingE.extent();
         // Merge in global matrix (compressed format; sparse indexing)
         EOpvAOp_base_shape = EOpvAOp_base.shape();  // sparse shape of ZArray
 
@@ -338,7 +338,7 @@ std::vector<std::string> &errors)
             auto iE(ii->index(0));   // In case iE occurs more than once in M
 
             // Stack global EC's on top of local EC's.
-            EOpvAOp_accum.add({ii->index(0)+offsetE, ii->index(1)}, ii->value());
+            EOpvAOp_accum.add({ii->index(0)+ret.offsetE, ii->index(1)}, ii->value());
         }
         ret.hcdefs.insert(ret.hcdefs.end(), hcdefs_base.begin(), hcdefs_base.end());
         for (size_t i=0; i<hcdefs_base.size(); ++i)
@@ -347,7 +347,7 @@ std::vector<std::string> &errors)
 
 
     // Set overall size
-    ret.dimEOp.set_sparse_extent(offsetE + EOpvAOp_base_shape[0]);
+    ret.dimEOp.set_sparse_extent(ret.offsetE + EOpvAOp_base_shape[0]);
     dimAOp.set_sparse_extent(EOpvAOp_base_shape[1]);
 
     // Convert to Eigen

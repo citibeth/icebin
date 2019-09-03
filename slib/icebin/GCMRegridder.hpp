@@ -279,12 +279,6 @@ public:
     // "Extra" operations; such as adding legacy ice, ECs (for legacy ice), etc.
     // can happen here.
 
-    /** Produces merged regridding matrix AvE (AAmvEAm) */
-    virtual ibmisc::linear::Weighted_Tuple global_unscaled_AvE(
-        std::vector<blitz::Array<double,1>> const &emI_lands,
-        std::vector<blitz::Array<double,1>> const &emI_ices,
-        RegridParams const &params) const = 0;
-
     /** Produces regridding matrix from last coupling timestep's ECs to this timestep's.
     Includes any extra ECs, etc. added in global_AvE()
     @param dimE0s Dimension mapping for E0 dimension of each matrix in IvE0s.

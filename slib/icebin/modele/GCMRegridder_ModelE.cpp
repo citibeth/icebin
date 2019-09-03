@@ -582,12 +582,15 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     @param emI_lands One emI_land array per ice sheet (elevation on continent, NaN in ocean).
     @param emI_ices One emI_ice array per ice sheet (elevation on ice, NaN off ice).
     @param params Parameters to use in generating regridding matrices.
-        Should be RegridParams(true, true, {0,0,0}) to give conservative matrix. */
+        Should be RegridParams(true, true, {0,0,0}) to give conservative matrix.
+    @param offsetE Offset (in sparse E space) added to base EC indices */
 linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
     std::vector<blitz::Array<double,1>> const &emI_lands,
     std::vector<blitz::Array<double,1>> const &emI_ices,
     blitz::Array<double,1> const &foceanAOp,
-    blitz::Array<double,1> const &foceanAOm) const
+    blitz::Array<double,1> const &foceanAOm,
+    // ----------- Output vars
+    long &offsetE) const
 {
     GridSpec_LonLat const &specO(this->specO());
 
@@ -608,7 +611,7 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
         &*gcmO, specO.eq_rad, emI_ices,
         true, true,    // use_global_ice=t, use_local_ice=t
         hcdefs(), indexingHC, false, errors));
-
+    offsetE = eam.offsetE;   // Return offsetE value
 
     // Print sanity check errors to STDERR
     if (errors.size() > 0) {

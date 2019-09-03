@@ -304,7 +304,7 @@ std::unique_ptr<linear::Weighted_Eigen> _compute_AAmvEAm_EIGEN(
     auto wEOm(to_blitz(wEOm_e));
 
     // ------------ Compute EOmvEAm
-    EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EAvEO, since it's the same 'm' or 'p'
+    EigenSparseMatrixT EOmvEAm(MakeDenseEigenT(    // TODO: Call this EOvEA, since it's the same 'm' or 'p'
         std::bind(&raw_EOvEA, _1,
             hntrO, hntrA,
             eq_rad, &dimAOm, wEOm,

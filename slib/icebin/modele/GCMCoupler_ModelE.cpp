@@ -398,42 +398,6 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
     printf("END gcmce_cold_start()\n");
 }
 
-
-/** Helper function: Scales and merges (unscaled) matrices stored in WTs */
-static TupleListLT<2> merge_scale(std::vector<WeightedTuple const *> const &WTs)
-{
-    auto shape(WTs[0].shape());
-
-    // Create weight array by merging weights in the tuples
-    blitz::Array<double,1> wM(shape[0]);
-        wM = 0;
-    for (TupeListLT<2> const *Mi : M0) {
-    for (auto &tp : Mi->wM.tuples) {
-        wM(tp.index(0)) += tp.value();
-    }}
-
-    // Convert weights to scale factors
-    for (int i=0; i<wM.extent(0); ++i) {
-        wM(i) = 1. / wM(i);    // Will produce Inf where unused
-    }
-
-    // Rename wM to sM to reflect change of meaning
-    blitz::Array<double,1> sM;
-    sM.reference(wM);
-
-    // Copy the main matrix, scaling!
-    TupeListLT<2> M;    // Output
-    M.set_shape(shape);
-    for (TupeListLT<2> const *Mi : M0) {
-    for (auto &tp : Mi->tuples) {
-        M.add(tp.index(), tp.value() * sM(tp.index(0)));
-    }}
-
-TODO: Need to split by domain, don't just add to M.
-
-    return M;
-}
-
 /** Helper function: splits a single GCMInput struct into per-domain GCMInput structs */
 std::vector<GCMInput> split_by_domain(
     GCMInput const &out,
@@ -474,15 +438,27 @@ std::vector<GCMInput> split_by_domain(
         }
     }
 
-    // Split the standard sparse vectors and matrices
-    // Copying a TupleListLT<2>
-    std::vector WTs;
+    // Split E1vE0, while scaling also
+    {
+        auto shape(out.E1vE0_unscaled.shape());
 
-    spcopy(
-        accum::domain(strideb, &domainsE,
-        &outs.front().E1vE0_s),
-        out.E1vE0_s)
+        // Create scale array by merging weights in the tuples, then
+        // inverting to scale factors
+        blitz::Array<double,1> sM(shape[0]);
+        sM = 0;
+        for (auto &tp : out.E1vE0_unscaled.wM.tuples) sM(tp.index(0)) += tp.value();
+        for (int i=0; i<sM.extent(0); ++i) sM(i) = 1. / sM(i);    // Will produce Inf where unused
 
+        // Initialize output matrices
+        for (size_t i=0; i<outs.size(); ++i) outs[i].E1vE0_scaled.set_shape(shape);
+
+        // Copy the main matrix, scaling!
+        // Works for matrix in A or E
+        for (auto &tp : out.E1vE0_unscaled->tuples) {
+            int const domain = domainsE.get_domain(tp.index(0));
+            outs[domain].E1vE0_scaled.add(tp.index(), tp.value() * sM(tp.index(0)));
+        }
+    }
     return outs;
 }
 
@@ -755,7 +731,8 @@ std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
 // ---------- Input & Output
 // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
-GCMInput &out)
+GCMInput &out,
+TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
 {
     GCMRegridder_ModelE const *gcmA(
         dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
@@ -811,7 +788,19 @@ GCMInput &out)
         "Errors in TOPO merging or regridding; halting!");
 
     // ---------------- Compute AAmvEAm (requires merged foceanOp, foceanOm)
-    linear::Weighted_Tuple AAmvEAm(gcmA->global_unscaled_AvE(emI_lands, emI_ices, foceanOp, foceanOm));
+    long offsetE;  // Offset (in sparse E space) added to base EC indices
+    linear::Weighted_Tuple AAmvEAm(gcmA->global_unscaled_AvE(
+        emI_lands, emI_ices, foceanOp, foceanOm, offsetE));
+
+    // ---------------- Compute wAEm_base (weight of JUST base-ice ECs)
+    // Base ice ECs are distinguished because they've been offsetted ("stacked")
+    // in compute_EOpvAOp_merged() (merge_topo.cpp; squash_ecs=false)
+    wEAm_base.clear();
+    for (auto ii=AAmvEAm.Mw.begin(); ii != AAmvEAm.Mw.end(); ++ii) {
+        if (ii->index(0) >= offsetE) {  // Only copy weight of base ECs
+            wEAm_base.add(ii->index(), ii->value());
+        }
+    }
 
     // ---------------- Create TOPOA file (in RAM)
     std::vector<std::string> errors(make_topoA(
@@ -828,6 +817,9 @@ GCMInput &out)
         "Errors in TOPO merging or regridding; halting!");
 
     // ------------------ Deallocate stuff we no longer need
+
+    // Compute wEAm_base
+    wEAm = std::move(AAmvEAm.Mw);   // Keep wEAM, which is needed to compute E1vE0 (on base ice)
     AAmvEAm.clear();
     topoo.free();
 
@@ -895,63 +887,118 @@ GCMInput &out)
             gcm_ivalsE_s.add(ij, val);
         }}}
     }
+}
 
+// ----------------------------------------------------------------------
+GCMInput GCMCoupler::couple(
+double time_s,        // Simulation time [s]
+VectorMultivec const &gcm_ovalsE,
+bool run_ice)    // if false, only initialize
+{
+    GCMRegridder_ModelE const *gcmA(
+        dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
 
+printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
+    // ------------------------ Most MPI Nodes
+    if (!gcm_params.am_i_root()) {
+        GCMInput out({0,0,0,0});
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
+            ice_coupler->couple(time_s, gcm_ovalsE, out.gcm_ivalss_s, out.gcm_ivalss_weight_s, run_ice);
+        }
+        return out;
+    }
+
+    // ----------------------- Root MPI Node
+    std::array<double,2> timespan{last_time_s, time_s};
+
+    // Figure out our calendar day to format filenames
+    auto sdate(this->sdate(time_s));
+    std::string log_dir = "icebin";
+
+    if (gcm_params.icebin_logging) {
+        std::string fname = "gcm-out-" + sdate + ".nc";
+        NcIO ncio(fname, 'w');
+        ncio_gcm_output(ncio, gcm_ovalsE, timespan,
+            time_unit, "");
+        ncio();
+    }
+
+    // Initialize output: A and E
+    std::vector<int> nvars;
+    for (auto &gcmi : gcm_inputs) nvars.push_back(gcmi.size());
+    GCMInput out(nvars);
+
+    std::vector<IceCoupler::CoupleOut> couts;
+    for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+        IceCoupler::CoupleOut cout;
+        auto &ice_coupler(ice_couplers[sheetix]);
+
+//        ibmisc::linear::Weighted_Eigen *E1vI_nc;
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_ptr;
+        couts.push_back(ice_coupler->couple(
+            time_s, gcm_ovalsE,
+            out.gcm_ivalss_s, out.gcm_ivalss_weight_s, run_ice));
+    }
+
+    // Run update_topo()
+    TupleListLT<1> wEAm_base;  // set by update_topo()
+    {
+        std::vector<blitz::Array<double,1>> emI_lands, emI_ices;
+        emI_ices.reserve(ice_couplers.size());
+        emI_lands.reserve(ice_couplers.size());
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
+
+            emI_ices.push_back(ice_coupler->emI_ice);
+            emI_lands.push_back(ice_coupler->emI_land);
+        }
+
+        update_topo(time_s, run_ice, emI_lands, emI_ices, out, wEAm_base);
+    }
+
+    // Compute E1vE0, to allow for updating elevation classes
+    // NOTE: ECs in the nullspace of E0 and E1 will NOT be touched.
+    {
+        std::vector<linear::Weighted_Eigen *> E1vIs_unscaled;
+        std::vector<EigenSparseMatrixT *> IvE0s;
+        std::vector<SparseSetT *> dimE0s;
+
+        for (auto &cout : couts)  {
+            E1vIs_unscaled.push_back(&*cout.E1vI_unscaled_nc);
+            IvE0s.push_back(&*cout.IvE0);
+            dimE0s.push_back(&cout.dimE0);
+        }
+
+        out.E1vE0_unscaled = gcmA->global_unscaled_E1vE0(
+            E1vIs_unscaled, IvE0s, dimE0s, wEAm_base);
+    }
+
+    // Add identity I matrix to E1vE0_unscaled for base ice
+    // This will keep all the legacy ice ECs in place
+    for (auto ii=wEAm_base.begin(); ii != wEAm_base.end(); ++ii) {
+        auto iE(ii->index(0));
+        out.E1vE0_unscaled.add({iE,iE}, ii->value());
+    }
+
+    // Log the results
+    if (gcm_params.icebin_logging) {
+        std::string fname = "gcm-in-" + sdate + ".nc";
+        NcIO ncio(fname, 'w');
+        auto one_dims(get_or_add_dims(ncio, {"one"}, {1}));
+        NcVar info_var = get_or_add_var(ncio, "info", ibmisc::get_nc_type<double>(), one_dims);
+        info_var.putAtt("notes", "Elevation classes (HC) are just those known to IceBin.  No legacy or sea-land elevation classes included.");
+        ncio_gcm_input(ncio, out, timespan, time_unit, "");
+        ncio();
+    }
+
+printf("END GCMCoupler::couple()\n");
+    return out;
+}
+// ------------------------------------------------------------
 
 
 TODO: Take care of FLAND, which was not computed by make_topoa
-
-
-
-  
-}));
-
-
-
-
-
-
-
-
-***** TODO: Try to make a GCMRegridder_Merged_ModelE that handles everything including mismatched regridding on O, loading unmerged TOPOO file, ultimate conversion to A; and even producing a global AvE.
-
-
-
-/** This needs to be run at least once before matrices can be generated. */
-void GCMCoupler_ModelE::update_topo(double time_s
-TupleListLT<2> &AvE1_s,    // OUT: Put fully merged AvE here (sparse indexing)
-TupleListLT<1> wAvE1_s)
-{
-
-(*icebin_error)(-1, "update_topo() still needs to be written; and should do the same thing as the command-line version.  The old (pre-merge) update_topo() is in the source code currently.");
-
-#if 0
-    GCMRegridder_ModelE *gcmA = dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder);
-
-    // Transfer elemask and sigma parameters from each ice coupler
-    std::vector<ElevMask<1>> emI_lands, emI_ices;
-    std::vector<std::array<double,3>> sigmas;
-    for (size_t sheet_index=0; sheet_index < gcmA->ice_regridders().index.size(); ++sheet_index) {
-        IceCoupler *icec(&*ice_couplers[sheet_index]);
-        emI_lands.push_back(ElevMask<1>(icec->emI_land, icec->maskI));
-        emI_ices.push_back(ElevMask<1>(icec->emI_ice, icec->maskI));
-        sigmas.push_back(icec->sigma);
-    }
-
-    Topos &topoA(modele_inputs);
-    icebin::modele::update_topo(
-        gcmA, topoO_fname, elevmasks, sigmas,
-        initial_timestep, gcm_params.hc_segments, gcm_params.primary_segment,
-        topoA, foceanOm0);
-#endif
-}
-
-
-
-// NetCDF Logging Stuff
-
-
-
 
 
 }}

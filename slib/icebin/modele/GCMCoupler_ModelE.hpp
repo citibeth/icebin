@@ -66,7 +66,7 @@ public:
     /** Number of domains */
     size_t size() const { return ndomain; }
 
-    /** Returns the MPI rank of grid cell */
+    /** Returns the MPI rank of grid cell.  Works if ix is iA (atmosphere grid) or iE (elevation grid) */
     int get_domain(long ix) const {    // zero-based
         auto im_world(domainA_global[0].end);
         auto jm_world(domainA_global[1].end);
@@ -182,7 +182,8 @@ public:
     std::vector<blitz::Array<double,1>> const &emI_ices,
     // ---------- Input & Output
     // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
-    GCMInput &out);
+    GCMInput &out,
+    TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
 
 
     int _read_nhc_gcm();
