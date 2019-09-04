@@ -176,13 +176,6 @@ public:
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name);        // eg: pism_Greenland_5km_v1.1.nc
 
-    /** Produce regridding matrices for this setup.
-    Needs to include _foceanAOp and _foceanAOm */
-    std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(    // virtual
-        int sheet_index,
-        blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params = RegridParams()) const;
-
     /**
     @param out Add TOPO stuff here (see IndexAE::TOPOA, IndexAE::TOPOE) */
     void update_topo(

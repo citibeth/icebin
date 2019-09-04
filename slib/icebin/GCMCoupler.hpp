@@ -212,19 +212,6 @@ public:
 
     bool am_i_root() const { return gcm_params.am_i_root(); }
 
-
-    /** Produce regridding matrices for this setup.
-    Do not change elevmaskI to dense indexing.  That would require a
-    SparseSet dim variable, plus a dense-indexed elevation.  In the end,
-    too much complication and might not even save RAM.
-
-    This is virtual beause there is no longe a standard
-    GCMRegridder::regrid_matrices() function. */
-    virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
-        int sheet_index,
-        blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params = RegridParams()) const = 0;
-
 protected:
     virtual void _ncread(
         ibmisc::NcIO &ncio_config,

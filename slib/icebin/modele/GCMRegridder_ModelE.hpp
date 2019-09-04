@@ -157,6 +157,16 @@ public:
     // Override virtual functions
     IceRegridder *ice_regridder(std::string const &name) const;
 
+    /* Fulfills the virtual method */
+    std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
+        int sheet_index,
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params)
+    {
+        (*icebin_error)(-1, "GCMRegridder_ModelE::regrid_matrices() without focean is not implemented.  Use class GCMRegridder_WrapE instead");
+    }
+
+
     /** Constructs the top-level transformations this regrid generator
     knows how to make.  They are: EAmvIp, AAmvIp, AAmvEAm, IpvEAm, IpvAAm.
     NOTES:
@@ -190,6 +200,57 @@ public:
         std::vector<SparseSetT *> const &dimE0s) const;    // dimE0 accompanying IvE0
 
 
+};
+
+
+class GCMRegridder_WrapE : public GCMRegridder {
+public:
+    std::unique_ptr<GCMRegridder_ModelE> gcmA;
+
+    /** ModelE ocean cover, on the Ocean grid, as seen by the ice
+    model (sparse indexing).  Ocean grid cells can contain fractional
+    ocean cover.  foceanAOp can change over the course of a ModelE
+    run, as the ice model's ice extent changes.
+    @see ModelE FOCEAN or FOCEN */
+    blitz::Array<double,1> foceanOp;
+
+    /** ModelE ocean cover, on the Ocean grid, as seen by ModelE
+    (sparse indexing).  Cells are either all ocean (==1.0) or all
+    continent (==0.0).  foceanAOm does NOT change over the course of a
+    ModelE run, because the ModelE ocean is not able to change shape
+    mid-run. */
+    blitz::Array<double,1> foceanOm;
+
+
+    GCMRegridder_WrapE(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA)
+        : gcmA(std::move(_gcmA))
+    {
+        auto const nO = gcmA->gcmO->nA();
+        foceanOp.reference(blitz::Array<double,1>(nO));
+        foceanOm.reference(blitz::Array<double,1>(nO));
+    }
+
+    GCMRegridder_WrapE(
+        std::unique_ptr<GCMRegridder_ModelE> &&_gcmA,
+        blitz::Array<double,1> _foceanOp,
+        blitz::Array<double,1> _foceanOm)
+    : gcmA(std::move(_gcmA)), foceanOp(_foceanOp), foceanOm(foceanOm)
+    {}
+
+    // -------------- Implement the Virtual Functions
+
+    virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
+        int sheet_index,
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params = RegridParams()) const
+    {
+        return gcmA->regrid_matrices(sheet_index,
+            foceanOp, foceanOm,
+            elevmaskI, params);
+    }
+
+    virtual void ncio(ibmisc::NcIO &ncio, std::string const &vname)
+        { gcmA->ncio(ncio, vname); }
 };
 
 

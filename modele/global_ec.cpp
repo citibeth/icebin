@@ -475,9 +475,12 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
 
     // Create a mismatched regridder, to mediate between different ice
     // extent of GCM vs. IceBin
-    std::unique_ptr<modele::GCMRegridder_ModelE> gcmA(
-        new modele::GCMRegridder_ModelE("",
-            std::shared_ptr<GCMRegridder>(gcmO.release())));
+    std::unique_ptr<modele::GCMRegrider_WrapE> gcmA(
+        new modele::GCMRegridder_WrapE(
+            std::unique_ptr<modele::GCMRegridder_ModelE>(
+                new modele::GCMRegridder_ModelE("",
+                    std::shared_ptr<GCMRegridder>(gcmO.release())))));
+
 
     HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
 
@@ -493,8 +496,8 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
         ncio_blitz(ncio, foceanfO, "FOCEANF", "double", {});
 
 
-        gcmA->foceanAOp = reshape1(foceanfO);  // COPY: FOCEANF 
-        gcmA->foceanAOm = reshape1(foceanO);   // COPY: FOCEAN
+        gcmA->foceanOp = reshape1(foceanfO);  // COPY: FOCEANF 
+        gcmA->foceanOm = reshape1(foceanO);   // COPY: FOCEAN
     }
 
     return std::unique_ptr<GCMRegridder>(gcmA.release());

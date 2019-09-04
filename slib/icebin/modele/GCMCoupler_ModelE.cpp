@@ -702,7 +702,7 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
 // ============================================================================
 // Update TOPO file during a coupled run
 
-
+#if 0
 /** Produce regridding matrices for this setup.
 (To be run on root MPI node)
 Needs to include _foceanAOp and _foceanAOm */
@@ -719,7 +719,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMCoupler_ModelE::regrid_matrices(    /
         _foceanAOp, _foceanAOm,
         elevmaskI, params);
 }
-
+#endif
 
 
 void GCMCoupler_ModelE::update_topo(

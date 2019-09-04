@@ -279,6 +279,16 @@ public:
     // "Extra" operations; such as adding legacy ice, ECs (for legacy ice), etc.
     // can happen here.
 
+
+    /** Produce regridding matrices for this setup.
+    Do not change elevmaskI to dense indexing.  That would require a
+    SparseSet dim variable, plus a dense-indexed elevation.  In the end,
+    too much complication and might not even save RAM. */
+    virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
+        int sheet_index,
+        blitz::Array<double,1> const &elevmaskI,
+        RegridParams const &params) const = 0;
+
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we
                    are using MPI and this is not the root), then avoid reading
