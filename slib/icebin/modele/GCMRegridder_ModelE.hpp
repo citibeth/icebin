@@ -161,7 +161,7 @@ public:
     std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params)
+        RegridParams const &params = RegridParams()) const
     {
         (*icebin_error)(-1, "GCMRegridder_ModelE::regrid_matrices() without focean is not implemented.  Use class GCMRegridder_WrapE instead");
     }
@@ -239,7 +239,7 @@ public:
 
     // -------------- Implement the Virtual Functions
 
-    virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
+    std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
         RegridParams const &params = RegridParams()) const

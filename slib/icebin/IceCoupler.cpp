@@ -331,7 +331,7 @@ bool run_ice)
     emI_land = out_emI_land;    // Copy
     GCMRegridder *gcmr(&*gcm_coupler->gcm_regridder);
     int sheet_index = gcmr->ice_regridders().index.at(name());
-    std::unique_ptr<RegridMatrices_Dynamic> rm(gcm_coupler->regrid_matrices(sheet_index, emI_ice));
+    std::unique_ptr<RegridMatrices_Dynamic> rm(gcmr->regrid_matrices(sheet_index, emI_ice));
 
     // ------ Update E1vE0 translation between old and new elevation classes
     //        (global for all ice sheets)

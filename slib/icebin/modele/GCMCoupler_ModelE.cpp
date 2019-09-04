@@ -133,9 +133,12 @@ void GCMCoupler_ModelE::_ncread(
 
     // Replace the GCMRegridder with a wrapped version that understands
     // the ocean-vs-atmosphere grid complexity of ModelE
-    GCMRegridder_ModelE *gcmA = new GCMRegridder_ModelE(
-        topoO_fname, std::static_pointer_cast<GCMRegridder_Standard>(gcm_regridder));
-    gcm_regridder.reset(gcmA);
+    gcm_regridder.reset(
+        new modele::GCMRegridder_WrapE(    // allocates foceanOp and foceanOm
+            std::unique_ptr<modele::GCMRegridder_ModelE>(
+                new modele::GCMRegridder_ModelE(
+                    topoO_fname,
+                    std::static_pointer_cast<GCMRegridder_Standard>(gcm_regridder)))));
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()
@@ -712,7 +715,7 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMCoupler_ModelE::regrid_matrices(    /
     RegridParams const &params) const
 {
     GCMRegridder_ModelE const *gcmA(
-        dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
+        dynamic_cast<GCMRegridder_WrapE *>(&*gcm_regridder)->gcmA.get());
 
     return gcmA->regrid_matrices(
         sheet_index,
@@ -735,8 +738,9 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
     auto const &indexingA(gcm_regridder->agridA.indexing);
     auto const &indexingE(gcm_regridder->indexingE);
 
-    GCMRegridder_ModelE const *gcmA(
-        dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
+    GCMRegridder_WrapE *gcmW(
+        dynamic_cast<GCMRegridder_WrapE *>(&*gcm_regridder));
+    GCMRegridder_ModelE const *gcmA(gcmW->gcmA.get());
 
     // Read from TOPOO file
     ibmisc::ArrayBundle<double,2> topoo(topoo_bundle(BundleOType::MERGEO, topoO_fname));
@@ -777,11 +781,11 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, gcmA->specO().eq_rad, errors);
 
-    // Copy FOCEAN to internal GCMCoupler_ModelE state
-    _foceanAOp = reshape1(foceanOp);
+    // Copy FOCEAN to internal GCMRegridder_WrapE state
+    gcmW->foceanOp = reshape1(foceanOp);
     // Only copy foceanAOm the first time.  It NEVER changes after that.
     if (!run_ice) {
-        _foceanAOm = reshape1(foceanOm);
+        gcmW->foceanOm = reshape1(foceanOm);
     }
 
     // Print sanity check errors to STDERR
@@ -908,9 +912,8 @@ double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
 bool run_ice)    // if false, only initialize
 {
-
     GCMRegridder_ModelE const *gcmA(
-        dynamic_cast<GCMRegridder_ModelE *>(&*gcm_regridder));
+        dynamic_cast<GCMRegridder_WrapE *>(&*gcm_regridder)->gcmA.get());
 
 printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     // ------------------------ Most MPI Nodes

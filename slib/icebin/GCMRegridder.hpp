@@ -287,7 +287,7 @@ public:
     virtual std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params) const = 0;
+        RegridParams const &params = RegridParams()) const = 0;
 
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we
