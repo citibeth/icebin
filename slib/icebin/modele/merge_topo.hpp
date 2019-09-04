@@ -49,7 +49,7 @@ blitz::Array<double,2> &zatmoOm2,
 // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
 // ------ Local ice to merge in...
-GCMRegridder *gcmO,
+GCMRegridder_Standard *gcmO,
 RegridParams const &paramsA,
 std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
@@ -93,7 +93,7 @@ EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
 SparseSetT &dimAOp,    // dimAOp is appended
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed
 RegridParams paramsO,
-GCMRegridder const *gcmO,     // A bunch of local ice sheets
+GCMRegridder_Standard const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emI_ices,
 bool use_global_ice,

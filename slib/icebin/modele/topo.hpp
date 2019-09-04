@@ -189,7 +189,7 @@ HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec)
 HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
 ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
 std::vector<double> const &hcdefs,        // gcmA->hcdefs()
-std::vector<int16_t> const &underice_hc,    // gcmA->underice
+std::vector<int16_t> const &underice_hc,    // contructed from gcmA->underice()
 //
 linear::Weighted_Tuple const &AAmvEAm,
 //

@@ -64,7 +64,7 @@ struct GCMInput {
     // step's elevation classes.
     ibmisc::linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
 
-    ibmisc::linear::Weighted_Tuple::TupleListLT E1vE0_scaled;    // domain-split version
+    ibmisc::linear::Weighted_Tuple::TupleListLT<2> E1vE0_scaled;    // domain-split version
 
     /** @param nvar Array specifying number of variables for each segment. */
     GCMInput(std::vector<int> const &nvar) {
@@ -192,7 +192,7 @@ public:
     /** Description of fields we receive from the GCM; all on the E grid. */
     VarSet gcm_outputsE;
 
-    /** Description of fields to send back to the GCM; some on E, some on A */
+    /** Description of fields to send back to the GCM; some VarSets are on E, some on A */
     std::vector<VarSet> gcm_inputs;
     /** Tells whether each gcm_inputs is on A or E grid */
     std::vector<char> gcm_inputs_grid;
@@ -249,16 +249,6 @@ public:
     void cold_start(
         ibmisc::Datetime _time_base,
         double time_start_s);
-
-    /** @param am_i_root
-        Call with true if calling from MPI root; false otherwise.
-        The core coupling/regridding computation only runs on root.
-        But other MPI ranks need to go along for the ride, assuming that
-        the ice model uses MPI. */
-    GCMInput couple(
-        double time_s,        // Simulation time [s]
-        VectorMultivec const &gcm_ovalsE,
-        bool run_ice);    // if false, only initialize
 
     /** Top-level ncio() to log output from coupler. (coupler->GCM) */
     void ncio_gcm_input(ibmisc::NcIO &ncio,

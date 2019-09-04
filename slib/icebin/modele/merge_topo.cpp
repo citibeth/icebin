@@ -30,7 +30,7 @@ public:
     =elev or NaN; for either all land, or ice-covered land, depending
     on desired result. */
 static GetSheetElevO get_sheet_elevO(
-GCMRegridder *gcmO,
+GCMRegridder_Standard *gcmO,
 RegridParams const &paramsO,
 int sheet_index,
 blitz::Array<double,1> const &elevmaskI)
@@ -43,7 +43,7 @@ blitz::Array<double,1> const &elevmaskI)
     // Obtain the OvI matrix
     SparseSetT dimI;
     std::unique_ptr<RegridMatrices_Dynamic> rmO(
-        gcmO->regrid_matrices(sheet_index, elevmaskI));
+        gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
    std::unique_ptr<ibmisc::linear::Weighted_Eigen> OvI(
         rmO->matrix_d("AvI", {&ret.dimO, &dimI}, paramsO));
 
@@ -91,7 +91,7 @@ blitz::Array<double,2> &zatmoOm2,
 // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
 // ------ Local ice sheets to merge in...
-GCMRegridder *gcmO,    // Multiple IceRegridders
+GCMRegridder_Standard *gcmO,    // Multiple IceRegridders
 RegridParams const &paramsA,
 std::vector<blitz::Array<double,1>> const &emI_lands,
 std::vector<blitz::Array<double,1>> const &emI_ices,
@@ -273,7 +273,7 @@ EOpvAOpResult compute_EOpvAOp_merged(  // (generates in dense indexing)
 SparseSetT &dimAOp,    // dimAOp is appended; dimEOp is returned as part of return variable.
 ibmisc::ZArray<int,double,2> const &EOpvAOp_base,    // from linear::Weighted_Compressed; UNSCALED
 RegridParams paramsO,
-GCMRegridder const *gcmO,     // A bunch of local ice sheets
+GCMRegridder_Standard const *gcmO,     // A bunch of local ice sheets
 double const eq_rad,    // Radius of the earth
 std::vector<blitz::Array<double,1>> const &emIs,
 bool use_global_ice,

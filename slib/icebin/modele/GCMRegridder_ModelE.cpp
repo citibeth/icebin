@@ -123,41 +123,6 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 // ========================================================================
 // ========================================================================
 // ------------------------------------------------------
-#if 0
-/** Computes AAmvEAM (with scaling) FOR A SINGLE ICE SHEET!!!
-@param dims {dimAAm, dimEAm} User-supplied dimension maps, which will be added to.
-@param paramsA Regridding parameters.  NOTE: correctA is ignored.
-@param gcmA Used to obtain access to foceanAOp, foceanAOm, gridA, gridO
-@param eq_rad Radius of the earth.  Must be the same as eq_rad in ModelE.
-@param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
-       NOTE: rmO knows these grids as (A, E, I).
-*/
-static std::unique_ptr<linear::Weighted_Eigen> compute_AAmvEAm_rmO(
-    std::array<SparseSetT *,2> dims,
-    GCMRegridder_ModelE const *gcmA,
-    double const eq_rad,    // Radius of the earth
-    RegridMatrices_Dynamic const *rmO)
-{
-    // ------------ Params for generating sub-matrices
-    RegridParams paramsO(paramsA);
-    paramsO.scale = false;
-    paramsO.correctA = true;
-
-    SparseSetT dimEOp, dimAOp;
-    std::unique_ptr<linear::Weighted_Eigen> EOpvAOp(
-        rmO->matrix_d("EvA", {&dimEOp, &dimAOp}, paramsO));
-
-    return _compute_AAmvEAm_EIGEN(dims, paramsA.scale, eq_rad,
-        cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr,
-        cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr,
-        gcmA->gcmO->indexingHC,
-        gcmA->indexingHC,
-        gcmA->foceanAOp,
-        gcmA->foceanAOm,
-        *EOpvAOp->M, dimEOp, dimAOp, EOpvAOp->Mw);
-}
-#endif
-// -----------------------------------------------------------
 /** Computes some intermediate values used by more than one top-level
     regrid generator */
 struct ComputeXAmvIp_Helper {
@@ -659,6 +624,42 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
 
 }
 
+linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_E1vE0(
+    std::vector<linear::Weighted_Eigen *> const &E1vIs_unscaled, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) UNSCALED matrix
+    std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+    std::vector<SparseSetT *> const &dimE0s) const    // dimE0 accompanying IvE0
+{
+    linear::Weighted_Tuple E1vE0_g;    // _g = global
+
+    // ---------- Compute each E1vE0 and merge...
+    for (size_t sheet_index=0; sheet_index < ice_regridders().size(); ++sheet_index) {
+        auto &E1vI_unscaled(*E1vIs_unscaled[sheet_index]);
+        EigenSparseMatrixT &IvE0(*IvE0s[sheet_index]);
+        auto &dimE0(*dimE0s[sheet_index]);
+
+        // Don't do this on the first round, since we don't yet have an IvE0
+        EigenSparseMatrixT E1vE0(*E1vI_unscaled.M * IvE0);    // UNSCALED
+        spcopy(
+            accum::to_sparse(make_array(E1vI_unscaled.dims[0]),
+            accum::ref(E1vE0_g.wM)),    // Output
+            E1vI_unscaled.wM);   // Input
+
+        spcopy(
+            accum::to_sparse(make_array(E1vI_unscaled.dims[0], &dimE0),
+            accum::ref(E1vE0_g.M)),
+            E1vE0);
+
+#if 0    // Not needed
+        spcopy(
+            accum::to_sparse(make_array(&dimE0),
+            accum::ref(E1vE0_g.Mw)),
+            IvE0.Mw);
+#endif
+    }    // Flush accumulators
+
+    E1vE0_g.set_shape(std::array<long,2>{nE(), nE()});
+    return E1vE0_g;
+}
 
 
 }}    // namespace

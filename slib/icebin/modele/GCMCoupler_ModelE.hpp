@@ -158,6 +158,16 @@ public:
     // Called from LISnow::allocate()
     GCMCoupler_ModelE(GCMParams &&_params);
 
+    /** @param am_i_root
+        Call with true if calling from MPI root; false otherwise.
+        The core coupling/regridding computation only runs on root.
+        But other MPI ranks need to go along for the ride, assuming that
+        the ice model uses MPI. */
+    GCMInput couple(
+        double time_s,        // Simulation time [s]
+        VectorMultivec const &gcm_ovalsE,
+        bool run_ice);    // if false, only initialize
+
     void _ncread(    // virtual
         ibmisc::NcIO &ncio_config,
         std::string const &vname);        // comes from this->gcm_params
@@ -171,7 +181,7 @@ public:
     std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(    // virtual
         int sheet_index,
         blitz::Array<double,1> const &elevmaskI,
-        RegridParams const &params = RegridParams()) const = 0;
+        RegridParams const &params = RegridParams()) const;
 
     /**
     @param out Add TOPO stuff here (see IndexAE::TOPOA, IndexAE::TOPOE) */
@@ -183,10 +193,12 @@ public:
     // ---------- Input & Output
     // Write: gcm_ivalss_s[IndexAE::ATOPO], gcm_ivalss_s[IndexAE::ETOPO]
     GCMInput &out,
-    TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
-
+    TupleListLT<1> &wEAm_base);   // Clear; then store wEAm in here
 
     int _read_nhc_gcm();
+
+    /** Copies GCM inputs back to original GCM-supplied sparse input arrays */
+    void apply_gcm_ivals(GCMInput const &out);
 
     // The gcmce_xxx() functions do not need to be declared here
     // because everything in this class is public.
@@ -242,6 +254,7 @@ char const *long_name_f, int long_name_len);
 extern "C"
 void gcmce_add_gcm_inputa(
 GCMCoupler_ModelE *self,
+int index_ae,
 ibmisc::F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
@@ -251,6 +264,7 @@ char const *long_name_f, int long_name_len);
 extern "C"
 void gcmce_add_gcm_inpute(
 GCMCoupler_ModelE *self,
+int index_ae,
 ibmisc::F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,

@@ -279,19 +279,6 @@ public:
     // "Extra" operations; such as adding legacy ice, ECs (for legacy ice), etc.
     // can happen here.
 
-    /** Produces regridding matrix from last coupling timestep's ECs to this timestep's.
-    Includes any extra ECs, etc. added in global_AvE()
-    @param dimE0s Dimension mapping for E0 dimension of each matrix in IvE0s.
-    @param IvE0s IvE0 of each ice sheet (IvE from past timestep)
-        NOTE: dimI is not needed because I always uses identity index mapping.
-    @param params Parameters to use in generating regridding matrices.
-        Should be RegridParams(true, false, {0,0,0}) to give conservative matrix. */
-    virtual ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
-        std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
-        std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
-        std::vector<SparseSetT *> const &dimE0s) const = 0;    // dimE0 accompanying IvE0
-
-
     /**
     @param rw_full If true, read the entire data structure.  If false (i.e. we
                    are using MPI and this is not the root), then avoid reading
@@ -396,18 +383,6 @@ public:
         const IceRegridder,
         typename std::vector<std::unique_ptr<IceRegridder>>::const_iterator
     > const_iterator;
-
-    ibmisc::linear::Weighted_Tuple global_unscaled_AvE(
-        std::vector<blitz::Array<double,1>> const &emI_lands,
-        std::vector<blitz::Array<double,1>> const &emI_ices,
-        RegridParams const &params) const;
-
-    ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
-        std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
-        std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
-        std::vector<SparseSetT *> const &dimE0s) const;    // dimE0 accompanying IvE0
-
-
 
     // -----------------------------------------
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);

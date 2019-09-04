@@ -150,7 +150,7 @@ public:
 
     /** Determines whether an elevation class is handled by IceBin or
     ModelE push-down */
-    int16_t underice(int ihc)
+    int16_t underice(int ihc) const
         { return (ihc < gcmO->nhc() ? UI_ICEBIN : UI_NOTHING); }
 
     // ------------------------------------------------------------
@@ -183,6 +183,12 @@ public:
         blitz::Array<double,1> const &foceanAOm,
         // ----------- Output vars
         long &offsetE) const;
+
+    ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
+        std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
+        std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
+        std::vector<SparseSetT *> const &dimE0s) const;    // dimE0 accompanying IvE0
+
 
 };
 
