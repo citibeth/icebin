@@ -214,6 +214,7 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
 
     bool ok = true;
 
+    // constants.sea_water.density
     double const RHOW = gcm_coupler->gcm_constants.get_as("constant.rhow", "kg m-3");
     double const byRHOW = 1.0 / RHOW;
 
@@ -296,12 +297,12 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
 
     // NOTE: coupler->gcm_inputs is set up through calls to add_gcm_input_xx() in LANDICE_COM.f
     vtA.set_dims(
-        gcm_coupler->gcm_inputsAE[GridAE::A].keys(),    // outputs
+        gcm_coupler->gcm_inputs[(int)IndexAE::A].keys(),    // outputs
         ice_output.keys(),            // inputs
         gcm_coupler->scalars.keys());    // scalars
 
     vtE_nc.set_dims(
-        gcm_coupler->gcm_inputsAE[GridAE::E].keys(),    // outputs
+        gcm_coupler->gcm_inputs[(int)IndexAE::E].keys(),    // outputs
         ice_output.keys(),            // inputs
         gcm_coupler->scalars.keys());    // scalars
 
