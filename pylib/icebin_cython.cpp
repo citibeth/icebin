@@ -72,34 +72,39 @@ std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
     return cself;
 }
 
-std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
+std::shared_ptr<GCMRegridder> new_GCMRegridder_WrapE(
     std::string const &global_ecO,
     std::shared_ptr<GCMRegridder> const &gcmO)
 {
 #ifdef BUILD_MODELE
-    std::shared_ptr<GCMRegridder_ModelE> gcmA(new GCMRegridder_ModelE(global_ecO, gcmO));
-    return gcmA;
+    std::shared_ptr<GCMRegridder> gcmW(
+        new GCMRegridder_WrapE(
+            std::unique_ptr<GCMRegridder_ModelE>(
+                new GCMRegridder_ModelE(
+                    global_ecO,
+                    std::dynamic_pointer_cast<GCMRegridder_Standard>(gcmO)))));
+    return gcmW;
 #else
-    return std::shared_ptr<GCMRegridder_ModelE>();
+    return std::shared_ptr<GCMRegridder>();
 #endif
 }
 
-void GCMRegridder_ModelE_set_focean(
-    GCMRegridder *_gcmA,
+void GCMRegridder_WrapE_set_focean(
+    GCMRegridder *_gcmW,
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py)
 {
 #ifdef BUILD_MODELE
-    auto gcmA(dynamic_cast<GCMRegridder_ModelE *>(_gcmA));
+    auto gcmW(dynamic_cast<GCMRegridder_WrapE *>(_gcmW));
 
     // Check types and convert Numpy Arrays
-    size_t nO = gcmA->gcmO->nA();
+    size_t nO = gcmW->gcmA->gcmO->nA();
     auto _foceanAOp(np_to_blitz<double,1>(foceanAOp_py, "foceanAOp", {nO}));
     auto _foceanAOm(np_to_blitz<double,1>(foceanAOm_py, "foceanAOm", {nO}));
 
     // Copy values from Python memory to C++ memory
-    gcmA->foceanAOp = _foceanAOp;
-    gcmA->foceanAOm = _foceanAOm;
+    gcmW->foceanOp = _foceanAOp;
+    gcmW->foceanOm = _foceanAOm;
 #endif
 }
 

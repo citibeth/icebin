@@ -138,7 +138,7 @@ void GCMCoupler_ModelE::_ncread(
             std::unique_ptr<modele::GCMRegridder_ModelE>(
                 new modele::GCMRegridder_ModelE(
                     topoO_fname,
-                    std::static_pointer_cast<GCMRegridder_Standard>(gcm_regridder)))));
+                    std::dynamic_pointer_cast<GCMRegridder_Standard>(gcm_regridder)))));
 }
 // -----------------------------------------------------
 // Called from LISnow::allocate()

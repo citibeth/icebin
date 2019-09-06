@@ -380,7 +380,7 @@ linear::Weighted_Eigen make_I2vX(
 }
 
 
-std::unique_ptr<GCMRegridder> new_gcmA_standard(
+std::unique_ptr<GCMRegridder_Standard> new_gcmA_standard(
     HntrSpec const &hspecA,
     std::string const &grid_name,
     ParseArgs const &args, blitz::Array<double,2> const &elevmaskI)
@@ -433,7 +433,8 @@ std::unique_ptr<GCMRegridder> new_gcmA_standard(
 
     gcmA->add_sheet(std::move(ice));
 
-    return std::unique_ptr<GCMRegridder>(gcmA.release());
+    return gcmA;
+//    return std::unique_ptr<GCMRegridder>(gcmA.release());
 }
 // -------------------------------------------------
 void check_negative(linear::Weighted_Eigen const &mat, std::string const &name)
@@ -475,11 +476,11 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
 
     // Create a mismatched regridder, to mediate between different ice
     // extent of GCM vs. IceBin
-    std::unique_ptr<modele::GCMRegrider_WrapE> gcmA(
+    std::unique_ptr<modele::GCMRegridder_WrapE> gcmA(
         new modele::GCMRegridder_WrapE(
             std::unique_ptr<modele::GCMRegridder_ModelE>(
                 new modele::GCMRegridder_ModelE("",
-                    std::shared_ptr<GCMRegridder>(gcmO.release())))));
+                    std::shared_ptr<GCMRegridder_Standard>(gcmO.release())))));
 
 
     HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);

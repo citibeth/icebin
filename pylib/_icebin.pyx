@@ -120,7 +120,7 @@ cdef class GCMRegridder:
         focean: (foceanAOp, foceanAOm) [OPTIONAL]
             Use this ocean in GCMRegridder_ModelE."""
         cdef cibmisc.shared_ptr[cicebin.GCMRegridder] gcm
-        gcm = cicebin.new_GCMRegridder_ModelE(b'', self.cself)
+        gcm = cicebin.new_GCMRegridder_WrapE(b'', self.cself)
         if not gcm.get():
             raise RuntimeError('IceBin must be built with USE_MODELE in order to use ModelE features')
 
@@ -131,7 +131,7 @@ cdef class GCMRegridder:
             foceanAOp,foceanAOm = focean
             foceanAOp = foceanAOp.reshape(-1)
             foceanAOm = foceanAOm.reshape(-1)
-            cicebin.GCMRegridder_ModelE_set_focean(ret.cself.get(), <PyObject *>foceanAOp, <PyObject *>foceanAOm)
+            cicebin.GCMRegridder_WrapE_set_focean(ret.cself.get(), <PyObject *>foceanAOp, <PyObject *>foceanAOm)
 
         return ret
 

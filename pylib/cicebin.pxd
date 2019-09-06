@@ -84,11 +84,11 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         vector[double] &hcdefs,
         bool correctA) except +
 
-    cdef cibmisc.shared_ptr[GCMRegridder] new_GCMRegridder_ModelE(
+    cdef cibmisc.shared_ptr[GCMRegridder] new_GCMRegridder_WrapE(
         string &global_ecO,
         cibmisc.shared_ptr[GCMRegridder] &gcmO) except +
 
-    cdef void GCMRegridder_ModelE_set_focean(
+    cdef void GCMRegridder_WrapE_set_focean(
         GCMRegridder *_gcmA,
         PyObject *foceanAOp_py,
         PyObject *foceanAOm_py) except +

@@ -39,7 +39,7 @@ extern std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
 
 /** Instantiates a new C++ object of type GCMRegridder_ModelE.
 NOTE: This function is only enabled if BUILD_MODELE is enabled in CMake. */
-extern std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
+extern std::shared_ptr<GCMRegridder> new_GCMRegridder_WrapE(
     std::string const &global_ecO,
     std::shared_ptr<GCMRegridder> const &gcmO);
 
@@ -47,8 +47,8 @@ extern std::shared_ptr<GCMRegridder> new_GCMRegridder_ModelE(
 @param _gcmA Must be of type GCMRegridder_ModelE *.  Ocean is set for this regridder.
 @param foceanAOp_py The ocean (on Ocean grid) as seen by the dynamic ice model.
 @param foceanAOm_py The ocean (on Ocean grid) as seen by ModelE. */
-extern void GCMRegridder_ModelE_set_focean(
-    GCMRegridder *_gcmA,
+extern void GCMRegridder_WrapE_set_focean(
+    GCMRegridder *_gcmW,
     PyObject *foceanAOp_py,
     PyObject *foceanAOm_py);
 
