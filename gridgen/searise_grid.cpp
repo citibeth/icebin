@@ -41,7 +41,7 @@ namespace po = boost::program_options;
 
 static const double km = 1000.0;
 
-BOOST_ENUM_VALUES(IceModel, int,
+BOOST_ENUM_VALUES(IndexOrder, int,
     (pism) (0)
     (searise) (1)
 )
@@ -63,7 +63,8 @@ int main(int argc, char **argv)
         ("help", "produce help message")
         ("zone", po::value<std::string>(), "Greenland or Antarctica")
         ("grid", po::value<int>(), "Cell size [km]")
-        ("icemodel", po::value<std::string>(), "Ice model to use (pism or searise)");
+        ("out,o", po::value<std::string>(), "Greenland or Antarctica")
+        ("index_order", po::value<std::string>(), "Ice model to use (pism or searise)");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -83,11 +84,15 @@ int main(int argc, char **argv)
     int grid_size = 20;
     if (vm.count("grid")) grid_size = vm["grid"].as<int>();
 
-    IceModel icemodel = IceModel::pism;
-    if (vm.count("icemodel")) {
-        std::string sicemodel = vm["icemodel"].as<std::string>();
-        icemodel = ibmisc::parse_enum<IceModel>(sicemodel);
+    std::string ofname;
+    if (vm.count("out")) ofname = vm["out"].as<std::string>();
+
+    IndexOrder index_order = IndexOrder::pism;
+    if (vm.count("index_order")) {
+        std::string sindex_order = vm["index_order"].as<std::string>();
+        index_order = ibmisc::parse_enum<IndexOrder>(sindex_order);
     }
+
 
     // ------------------------------------------------------
     double dsize = (double)grid_size;
@@ -98,7 +103,7 @@ int main(int argc, char **argv)
     // NOTE: PISM option is only for the OLD PISM.
     //       More recently, PISM switched their indices to be the same
     //       as SeaRISE and ModelE
-    auto indices(icemodel == IceModel::pism
+    auto indices(index_order == IndexOrder::pism
         ? std::vector<int>{0,1}
         : std::vector<int>{1,0});
 
@@ -118,13 +123,13 @@ int main(int argc, char **argv)
     }
 
     // ------------ Make the grid from the spec
-    std::string name(ibmisc::strprintf("sr_g%d_%s", grid_size, icemodel.str()));
+    std::string name(ibmisc::strprintf("sr_g%d_%s", grid_size, index_order.str()));
     Grid grid(make_grid(name, spec, &EuclidianClip::keep_all));
 
     // ------------- Write it out to NetCDF
-    std::string const fname(strprintf("%s.nc", name.c_str()));    // Using operator+() or append() doesn't work here with GCC 4.9.3
+    if (ofname == "") ofname = strprintf("%s.nc", name.c_str());    // Using operator+() or append() doesn't work here with GCC 4.9.3
 
-    ibmisc::NcIO ncio(fname, netCDF::NcFile::replace);
+    ibmisc::NcIO ncio(ofname, netCDF::NcFile::replace);
     grid.ncio(ncio, "grid");
     ncio.close();
 }

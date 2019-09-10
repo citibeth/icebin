@@ -58,7 +58,8 @@ int main(int argc, char **argv)
     po::options_description desc("Allowed options");
     desc.add_options()
         ("help", "produce help message")
-        ("zone", po::value<std::string>(), "Greenland or Antarctica");
+        ("zone", po::value<std::string>(), "Greenland or Antarctica")
+        ("out,o", po::value<std::string>(), "Greenland or Antarctica");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -74,6 +75,9 @@ int main(int argc, char **argv)
         std::string szone = vm["zone"].as<std::string>();
         zone = ibmisc::parse_enum<Zone>(szone);
     }
+
+    std::string ofname;
+    if (vm.count("out")) ofname = vm["out"].as<std::string>();
 
     // ------------------------------------------------------
     double dsize = 900 * 20.;    // [m]
@@ -109,9 +113,9 @@ int main(int argc, char **argv)
     Grid grid(make_grid(name, spec, &EuclidianClip::keep_all));
 
     // ------------- Write it out to NetCDF
-    std::string const fname(strprintf("%s.nc", name.c_str()));    // Using operator+() or append() doesn't work here with GCC 4.9.3
+    if (ofname == "") ofname = strprintf("%s.nc", name.c_str());    // Using operator+() or append() doesn't work here with GCC 4.9.3
 
-    ibmisc::NcIO ncio(fname, netCDF::NcFile::replace);
+    ibmisc::NcIO ncio(ofname, netCDF::NcFile::replace);
     grid.ncio(ncio, "grid");
     ncio.close();
 }

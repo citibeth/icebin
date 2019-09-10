@@ -73,9 +73,6 @@ changes to the ModelE rundeck:
 #. Build with `modele_control
    <https://github.com/citibeth/modele-control>`.  If not, one must also:
 
-   #. Add ``#define LIPLUGGABLE`` to the ``Preprocessor Options`` section of the rundeck.
-
-
 #. The following rundeck parameters are now enabled.  See
    ``LISnowParams.F90`` for documentation:
 
@@ -141,3 +138,24 @@ Do everything needed for Stieglitz Model above, plus:
 #. Use an appropriate *IceBin* configuration file that links to the
    *PISM* configuration file.
 
+(Where is this found?  How do I create one????)
+
+
+netcdf OZ1QX1N.BS1 {
+dimensions:
+        lono = 288 ;
+        lato = 180 ;
+variables:
+        float lono(lono) ;
+                lono:units = "degrees_east" ;
+        float lato(lato) ;
+                lato:units = "degrees_north" ;
+        float focean(lato, lono) ;
+        float zatmo(lato, lono) ;
+        float zocean(lato, lono) ;
+}
+
+
+Need to create TOPO_OC file for ModelE input from topoo.nc:
+ 1. Convert FOCEAN, ZATMO and dZOCEAN into focean, zatmo and zocean.
+ 2. 

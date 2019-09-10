@@ -2,10 +2,10 @@ include_directories(${PROJECT_SOURCE_DIR}/slib)
 
 
 foreach (GRID
-    searise
+    searise_grid
     overlap
-    pism2
-#    mar
+    pism2_grid
+#    mar_grid
 
     # =========== Grid generators: Spherical Grids (for the GCM)
 #   modele_ll_g2x2_5    # ModelE 2x2.5 grid, in vicinity of Greenland
