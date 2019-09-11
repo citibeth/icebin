@@ -2,9 +2,10 @@ include_directories(${PROJECT_SOURCE_DIR}/slib)
 
 
 foreach (GRID
-    searise_grid
+#    searise_grid
     overlap
-    pism2_grid
+    spec_to_grid
+#    pism2_grid
 #    mar_grid
 
     # =========== Grid generators: Spherical Grids (for the GCM)

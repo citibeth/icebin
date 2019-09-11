@@ -41,6 +41,7 @@ void GridSpec_XY::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 
     NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
     get_or_put_att(info_v, ncio.rw, "sproj", sproj);
+    get_or_put_att(info_v, ncio.rw, "indices", "int", indices);
     if (ncio.rw == 'w') {
         int n;
         n = nx();
@@ -171,6 +172,7 @@ void GridSpec_LonLat::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 
     NcVar info_v = get_or_add_var(ncio, vname + ".info", "int", {});
 
+    get_or_put_att(info_v, ncio.rw, "indices", "int", indices);
     get_or_put_att(info_v, ncio.rw, "eq_rad", "double", &eq_rad, 1);
     if (ncio.rw == 'w') info_v.putAtt("eq_rad.comment",
         "Radius of Earth (m), or whatever planet you're looking at.  "

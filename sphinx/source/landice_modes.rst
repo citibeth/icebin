@@ -133,10 +133,31 @@ Do everything needed for Stieglitz Model above, plus:
 
 #. Set ``LIMODE=twoway`` in rundeck.
 
-#. Spin up an PISM.
+#. Spin up a PISM.  Note the name of its state file ``<pism-state>``
 
-#. Use an appropriate *IceBin* configuration file that links to the
-   *PISM* configuration file.
+#. Createa ModelE run directory:
+
+   .. code-block:: bash
+
+      ectl setup <run-dir> ...
+
+#. Somewhere do ``git clone https://github.com/citibeth/twoway.git``
+
+#. In your ModelE run directory, do:
+
+   .. code-block:: bash
+
+      cd <modele-run-dir>
+      # 20km grid
+      python3 <twoway>/topo/modele_pism_inputs.py --out input --pism <pism-state>
+      cp input/icebin.cdl config
+
+   Try ``python3 <twoway>/topo/modele_pism_inputs.py --help`` for further
+   details if you need something other than the SeaRise-style 20km
+   grid.  (TODO: This program should really determine the grind from the PISM state file)
+
+#. Edit ``config/icebin.cdl`` as appropriate.
+
 
 (Where is this found?  How do I create one????)
 

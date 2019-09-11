@@ -1,9 +1,9 @@
+#ifndef ICEBIN_GRIDSPEC_HPP
+#define ICEBIN_GRIDSPEC_HPP
+
 #include <boost/enum.hpp>
 #include <ibmisc/netcdf.hpp>
 #include <icebin/error.hpp>
-
-#ifndef ICEBIN_GRIDSPEC_HPP
-#define ICEBIN_GRIDSPEC_HPP
 
 namespace icebin {
 
