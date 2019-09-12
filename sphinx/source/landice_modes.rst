@@ -123,17 +123,20 @@ Coupled Mode
 
 Do everything needed for Stieglitz Model above, plus:
 
-#. Build with ``modele-control``.
-
 #. When setting up the Spack environment, make sure that the variants
    ``icebin+coupler+modele+pism`` and ``modele+icebin`` are used.
+
+#. Spin up a PISM.  Note the name of its state file ``<pism-state>``
+
+#. Build with ``modele-control``.
+
+
+
 
 #. Add ``#define USE_ICEBIN`` to the *defines* section.  This enables
    coupled mode, but does not turn it on.
 
 #. Set ``LIMODE=twoway`` in rundeck.
-
-#. Spin up a PISM.  Note the name of its state file ``<pism-state>``
 
 #. Createa ModelE run directory:
 
@@ -180,3 +183,10 @@ variables:
 Need to create TOPO_OC file for ModelE input from topoo.nc:
  1. Convert FOCEAN, ZATMO and dZOCEAN into focean, zatmo and zocean.
  2. 
+
+
+
+Add to rundeck:
+  TOPO
+
+Andd TOPOO rundeck parameter!!!
