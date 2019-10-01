@@ -186,7 +186,11 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
 //    printf("Setting -on_error_mpiabort\n");
 //    PetscOptionsSetValue(NULL, "-on_error_mpiabort", "true");
     printf("Doing -no_signal_handler\n");
+#if PETSC_VERSION_LT(3,7,0)
+    PetscOptionsSetValue("-no_signal_handler", "true");
+#else
     PetscOptionsSetValue(NULL, "-no_signal_handler", "true");
+#endif
     petsc_initializer.reset(new pism::petsc::Initializer(argc, argv, "IceBin GCM Coupler"));
 //    printf("Calling PetscPopErrorHandler()\n");
 //    PetscPopErrorHandler();
