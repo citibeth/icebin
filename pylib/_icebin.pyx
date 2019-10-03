@@ -165,7 +165,7 @@ cdef class GCMRegridder:
 
 def read_elevmask(xfname):
     """Returns: (emI_land, emI_ice)"""
-    return cicebin.read_elevmask(xfname)
+    return cicebin.read_elevmask(xfname.encode())
 
 # ============================================================
 
