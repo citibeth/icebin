@@ -163,6 +163,10 @@ cdef class GCMRegridder:
         rm.cself = crm
         return rm
 
+def read_elevmask(xfname):
+    """Returns: (emI_land, emI_ice)"""
+    return cicebin.read_elevmask(xfname)
+
 # ============================================================
 
 cdef class HntrSpec:

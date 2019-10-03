@@ -17,6 +17,11 @@ void read_elevmask_pism(
     blitz::Array<double,1> &emI_land,
     blitz::Array<double,1> &emI_ice);
 
+/** Reads elevmask from any kind of file */
+void read_elevmask(
+std::string const &xfname,
+blitz::Array<double,1> &emI_land,
+blitz::Array<double,1> &emI_ice);
 
 }    // namespace
 #endif    // guard

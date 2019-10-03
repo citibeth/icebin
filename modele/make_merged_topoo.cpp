@@ -194,22 +194,8 @@ int main(int argc, char **argv)
     // Read per-ice sheet elevmasks (for land+ice and ice only)
     std::vector<blitz::Array<double,1>> emI_lands, emI_ices;
     for (auto const &xfname : args.elevmask_xfnames) {
-        // Parse each spec of the form <format>:<fname>
-        int colon = xfname.find(':');
-        if (colon < 0) (*icebin_error)(-1,
-            "elevmask spec '%s' must be in the format of type:fname", xfname.c_str());
-
-        std::string stype(xfname.substr(0, colon));
-        std::string spec (xfname.substr(colon+1));
-
-        // Dispatch to the read method, based on format.
         blitz::Array<double,1> emI_land, emI_ice;
-        if (stype == "pism") {
-            read_elevmask_pism(spec, 0, emI_land, emI_ice);
-        } else {
-            (*icebin_error)(-1,
-                "Unrecognized elevmask spec type %s", stype.c_str());
-        }
+        read_elevmask(xfname, emI_land, emI_ice);
 
         // Store results
         emI_lands.push_back(emI_land);

@@ -309,7 +309,7 @@ std::vector<std::string> &errors)
             EOpvAOp_sheet_shape = EOpvAOp_sheet->shape();
 
             // Merge it in...
-            // Stack ice sheet ECs on top of global ECs.
+            // ECs are same for local ice in merged vs. unmerged case
             // NOTE: Assumes EC dimension in indexing has largest stride
             for (auto ii(begin(*EOpvAOp_sheet->M)); ii != end(*EOpvAOp_sheet->M); ++ii) {
                 // Separate ice sheet ECs from global ECs

@@ -245,4 +245,19 @@ std::string to_string(PyObject *str, std::string const &vname)
     return std::string(buf, size);
 }
 
+/** Returns: (emI_land, emI_ice) */
+PyObject *read_elevmask(std::string const &xfname)
+{
+    // Read in C++ data structures
+    blitz::Array<double,1> emI_land, emI_ice;   // read_elevmask() allocates
+    icebin::read_elevmask(xfname, emI_land, emI_ice);
+
+    // Convert to tuple of Numpy arrays
+    PyObject *ret = PyTuple_New(2);
+        PyTuple_SetItem(ret, 0, copy_blitz_to_np<double,1>(emI_land));
+        PyTuple_SetItem(ret, 1, copy_blitz_to_np<double,1>(emI_ice));
+
+    return ret;
+}
+
 }}

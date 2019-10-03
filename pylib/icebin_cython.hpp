@@ -22,6 +22,7 @@
 #include <ibmisc/cython.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/modele/hntr.hpp>
+#include <icebin/ElevMask.hpp>
 
 namespace icebin {
 namespace cython {
@@ -84,6 +85,9 @@ RegridMatrices *new_regrid_matrices(
     double sigma_y,
     double sigma_z,
     bool conserve);
+
+PyObject *read_elevmask(
+    std::string const &xfname);
 
 /** Allows Python users access to GCMCoupler_Modele::update_topo().
 Starting from output of Gary's program (on the Ocean grid), this subroutine

@@ -115,6 +115,8 @@ cdef extern from "icebin_cython.hpp" namespace "icebin::cython":
         bool scale, bool correctA,
         double sigma_x, double sigma_y, double sigma_z, bool conserve) except +
 
+    cdef object read_elevmask(string &xfname) except +
+
 cdef extern from "icebin/GridSpec.hpp" namespace "icebin":
     pass
 

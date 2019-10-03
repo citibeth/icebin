@@ -201,13 +201,13 @@ int main(int argc, char **argv)
         get_or_put_att(info, topoa_nc.rw, "segments", sval);
 
         ncio_vector(topoa_nc, lonc, false, "lon", "double",
-            get_or_add_dims(topoa_nc, {"im"}, {lonc.size()}));
+            get_or_add_dims(topoa_nc, {"lon"}, {lonc.size()}));
         ncio_vector(topoa_nc, latc, false, "lat", "double",
-            get_or_add_dims(topoa_nc, {"jm"}, {latc.size()}));
+            get_or_add_dims(topoa_nc, {"lat"}, {latc.size()}));
 
 
         // Write topoA arrays
-        auto nhc_jm_im(get_or_add_dims(topoa_nc, {"nhc", "jm", "im"}, {nhc_gcm, hspecA.jm, hspecA.im}));
+        auto nhc_jm_im(get_or_add_dims(topoa_nc, {"nhc", "lat", "lon"}, {nhc_gcm, hspecA.jm, hspecA.im}));
         topoa.ncio(topoa_nc, nhc_jm_im);
     }
 
