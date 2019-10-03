@@ -225,6 +225,8 @@ public:
     GCMRegridder_WrapE(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA)
         : gcmA(std::move(_gcmA))
     {
+        _ice_regridders = &gcmA->ice_regridders();
+
         auto const nO = gcmA->gcmO->nA();
         foceanOp.reference(blitz::Array<double,1>(nO));
         foceanOm.reference(blitz::Array<double,1>(nO));
