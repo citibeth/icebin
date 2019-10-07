@@ -77,13 +77,7 @@ public:
     double native_area(int id) const
         { return overlaps[id]; }
 
-    void ncio(ibmisc::NcIO &ncio, std::string const &vname)
-    {
-        ncio_vector(ncio, indices, true, vname + ".indices", "int",
-            get_or_add_dims(ncio, indices, {vname + ".nindices"}));
-        ncio_vector(ncio, overlaps, true, vname + ".overlaps", "int",
-            get_or_add_dims(ncio, overlaps, {vname + ".noverlaps"}));
-    }
+    void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 
     /** NOTE: This will result in ExchangeGrid cells being renumbered,
     resulting in different numbering schemes for different processors.

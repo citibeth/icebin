@@ -20,6 +20,15 @@ ExchangeGrid::ExchangeGrid(Grid const &g)
     }
 }
 
+void ExchangeGrid::ncio(ibmisc::NcIO &ncio, std::string const &vname)
+{
+    ncio_vector(ncio, indices, true, vname + ".indices", "int",
+        get_or_add_dims(ncio, indices, {vname + ".nindices"}));
+    ncio_vector(ncio, overlaps, true, vname + ".overlaps", "double",
+        get_or_add_dims(ncio, overlaps, {vname + ".noverlaps"}));
+}
+
+
 /** Filters overlaps based on the destination (BvA = B = index[0]) grid. */
 void ExchangeGrid::filter_cellsB(std::function<bool(long)> const &keep_B_fn)
 {
