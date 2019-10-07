@@ -137,6 +137,10 @@ public:
         std::string const &_global_ecO,
         std::shared_ptr<icebin::GCMRegridder_Standard> const &_gcmO);
 
+    unsigned int nhc() const { return gcmO->nhc(); }
+    unsigned long nA() const { return gcmO->nA() / 4; }
+    unsigned long nE() const { return gcmO->nE() / 4; }
+
     HntrSpec const &hspecO() const
         { return cast_GridSpec_LonLat(*gcmO->agridA.spec).hntr; }
     HntrSpec const &hspecA() const
@@ -240,6 +244,10 @@ public:
     {}
 
     // -------------- Implement the Virtual Functions
+
+    unsigned int nhc() const { return gcmA->nhc(); }
+    unsigned long nA() const { return gcmA->nA(); }
+    unsigned long nE() const { return gcmA->nE(); }
 
     std::unique_ptr<RegridMatrices_Dynamic> regrid_matrices(
         int sheet_index,

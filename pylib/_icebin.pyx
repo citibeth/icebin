@@ -102,6 +102,17 @@ cdef class GCMRegridder:
         else:
             raise ValueError('Invalid arguments: {}'.format(args))
 
+    @property
+    def nA(self):
+        return deref(self.cself).nA()
+    @property
+    def nE(self):
+        return deref(self.cself).nE()
+    @property
+    def nhc(self):
+        return deref(self.cself).nhc()
+
+
     def wA(self, sheet_name, snative, fill=0.):
         """Returns weights (as a vector) of overall grid."""
         if snative == 'native':

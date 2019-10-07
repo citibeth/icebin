@@ -265,11 +265,11 @@ public:
 
     /** @return Number of elevation points for grid cells in general */
     /** @return Number of elevation points for a given grid cell */
-    unsigned int nhc(int i1) const { return (unsigned int)_hcdefs.size(); }
-    unsigned int nhc() const { return nhc(-1); }
+    virtual unsigned int nhc(int i1) const { return (unsigned int)_hcdefs.size(); }
+    virtual unsigned int nhc() const { return nhc(-1); }
 
-    unsigned long nA() const { return agridA.dim.sparse_extent(); }
-    unsigned long nE() const { return nA() * nhc(-1); }
+    virtual unsigned long nA() const { return agridA.dim.sparse_extent(); }
+    virtual unsigned long nE() const { return GCMRegridder::nA() * nhc(-1); }
     size_t nI(int sheet_index) const { return ice_regridders()[sheet_index]->nI(); }
 
     template<class AccumT>
