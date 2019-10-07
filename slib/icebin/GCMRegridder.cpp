@@ -159,4 +159,31 @@ void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 // ---------------------------------------------------------------------
 
 
+// ============================================================
+// Special Debugging Functions
+
+void check_nans(EigenSparseMatrixT const &M, std::string const &label)
+{
+    int nnan = 0;
+    int ninf = 0;
+    int nzero = 0;
+    for (auto ii=begin(M); ii != end(M); ++ii) {
+        if (std::isnan(ii->value())) ++nnan;
+        if (std::isinf(ii->value())) ++ninf;
+        if (ii->value() == 0) ++nzero;
+    }
+    printf("check_nans: Matrix %s has %d NaNs %d Infs %d zeros\n", label.c_str(), nnan, ninf, nzero);
+}
+void check_nans(blitz::Array<double,1> &M, std::string const &label)
+{
+    int nnan = 0;
+    int ninf = 0;
+    for (int i=0; i<M.extent(0); ++i) {
+        if (std::isnan(M(i))) ++ nnan;
+        if (std::isinf(M(i))) ++ninf;
+    }
+    printf("check_nans: Matrix %s has %d NaNs %d Infs\n", label.c_str(), nnan, ninf);
+}
+
+
 }   // namespace icebin

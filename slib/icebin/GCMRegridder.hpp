@@ -399,7 +399,11 @@ public:
 
 };  // class GCMRegridder_Standard
 // ===========================================================
-
+// Special Debugging Functions
+/** Check for NaN, Inf, extra zeros, etc. in a matrix */
+void check_nans(EigenSparseMatrixT const &M, std::string const &label);
+/** Check for NaN, Inf, extra zeros, etc. in a vector */
+void check_nans(blitz::Array<double,1> &M, std::string const &label);
 
 
 }   // namespace
