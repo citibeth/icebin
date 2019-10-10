@@ -137,7 +137,7 @@ void GCMCoupler_ModelE::_ncread(
         new modele::GCMRegridder_WrapE(    // allocates foceanOp and foceanOm
             std::unique_ptr<modele::GCMRegridder_ModelE>(
                 new modele::GCMRegridder_ModelE(
-                    topoO_fname,
+                    global_ecO_fname,
                     std::dynamic_pointer_cast<GCMRegridder_Standard>(gcm_regridder)))));
 }
 // -----------------------------------------------------

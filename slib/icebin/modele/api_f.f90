@@ -107,7 +107,7 @@ INTERFACE
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
     subroutine gcmce_add_gcm_inputA( &
-        api, var_f, &
+        api, index_ae, var_f, &
         field_f, field_len, &
         units_f, units_len, &
         initial, &
@@ -115,6 +115,7 @@ INTERFACE
     use iso_c_binding
     use icebin_f90blitz
         type(c_ptr), value :: api
+        integer(c_int), value :: index_ae
         type(arr_spec_2) :: var_f
         character(c_char) :: field_f(*)
         integer(c_int), value :: field_len
@@ -127,7 +128,7 @@ INTERFACE
 
     ! Called from lisheeticebin%allocate() (via setup_gcm_inputs())
     subroutine gcmce_add_gcm_inputE( &
-        api, var_f, &
+        api, index_ae, var_f, &
         field_f, field_len, &
         units_f, units_len, &
         initial, &
@@ -135,6 +136,7 @@ INTERFACE
     use iso_c_binding
     use icebin_f90blitz
         type(c_ptr), value :: api
+        integer(c_int), value :: index_ae
         type(arr_spec_3) :: var_f
         character(c_char) :: field_f(*)
         integer(c_int), value :: field_len

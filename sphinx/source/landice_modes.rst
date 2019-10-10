@@ -304,11 +304,11 @@ Step-by-step instructions.
 
       python3 ~/git/twoway/stieglitz/gic2stieglitz.py -d test1 GIC -o inputs/
 
-#. Create merged TOPO file (and GIC file)
+#. Create merged TOPO and GIC files
 
    .. code-block:: bash
 
-      python3 ~/git/twoway/topo/modele_pism_inputs.py --pism std-greenland/g20km_10ka.nc --grids grids --run test1
+      python3 ~/git/twoway/topo/modele_pism_inputs.py --pism std-greenland/g20km_10ka.nc --grids grids --gic GIC.144X90.DEC01.1.ext_1.nc --run test1
 
 #. Edit ``test1/rundeck.R``, make the following changes:
 
@@ -321,11 +321,31 @@ Step-by-step instructions.
          ``rundeck_opts.h`` file (done inside the ``modele-control.pyar``
          CMake-based build).
 
+   #. Add ``LI_TWOWAY`` setting in the rundeck ``&&PARAMETERES`` section of the rundeck:
+      .. code-block::
+
+         LI_TWOWAY=1
+
    #. Use the new ``GIC`` file created above:
 
       .. code-block::
 
          ! GIC=GIC.144X90.DEC01.1.ext_1.nc   ! initial ground conditions
-         GIC=inputs/GIC.144X90.DEC01.1.ext_1-stieglitz.nc
+         GIC=inputs/GIC.144X90.DEC01.1.ext_1_merged.nc
+         GIC=inputs/GIC    ! Alternate, use symlink
 
+   #. Use the new ``TOPO`` file created above:
+
+      .. code-block::
+
+         !TOPO=Z2HX2fromZ1QX1N.BS1.nc               ! ocean fraction and surface topography
+         TOPO=inputs/topoa.nc
+
+#. NOTE: The icebin configuration file is in ``test1/config/icebin.cdl``
+
+#. Re-run setup, to make sure
+
+      .. code-block::
+
+         ectl setup test1
 

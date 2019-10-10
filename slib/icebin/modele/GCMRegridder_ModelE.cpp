@@ -447,6 +447,7 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     if (global_ecO == "") {
         global_hcdefs.clear();
     } else {
+printf("Opening global_ecO = %s\n", global_ecO.c_str());
         NcIO ncio(global_ecO, 'r');
         ncio_vector(ncio, global_hcdefs, true, "hcdefs", "double",
             get_or_add_dims(ncio, {"nhc"}, {_hcdefs.size()} ));
@@ -462,7 +463,7 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     if (global_ecO != "") {
         {NcIO ncio(global_ecO, 'r');
             // metaO.ncio(ncio);   // no metaO in this class
-            EOpvAOp_base.ncio(ncio, "EvA.M");
+            EOpvAOp_base.ncio(ncio, "EvO.M");
         }
     }
 
