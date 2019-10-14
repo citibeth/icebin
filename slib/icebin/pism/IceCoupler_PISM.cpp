@@ -118,6 +118,12 @@ void IceCoupler_PISM::_cold_start(
 {
     printf("BEGIN IceCouple_PISM::_cold_start()\n");
 
+#if PETSC_VERSION_LT(3,7,0)
+    printf("Doing -no_signal_handler on command line\n");
+    pism_args.push_back("-no_signal_handler");
+#endif
+
+
     // ------- Now instantiate PISM!
     // Convert PISM arguments to old C style
     int argc = pism_args.size();
@@ -182,18 +188,20 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     //
     // Also see here for proper calling sequence of PetscOptionsSetValue()
     //    http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/Sys/PetscOptionsSetValue.html
-    // petsc_initializer.reset(new pism::petsc::Initializer(pism_comm, argc, argv));
-//    printf("Setting -on_error_mpiabort\n");
-//    PetscOptionsSetValue(NULL, "-on_error_mpiabort", "true");
-    printf("Doing -no_signal_handler\n");
-#if PETSC_VERSION_LT(3,7,0)
-    PetscOptionsSetValue("-no_signal_handler", "true");
-#else
+
+#if PETSC_VERSION_GE(3,7,0)
+    // From Barry Smith (Oct 29, 2015):
+    // I have added in the branch...  the ability to call
+    // PetscOptionsSetValue() before PetscInitialize(). This allows
+    // for the programatic ability to set/change any of the
+    // PetscInitialization() default actions without requiring using
+    // the command line.
+
+    printf("Doing -no_signal_handler as PetscOptionsSetValue()\n");
     PetscOptionsSetValue(NULL, "-no_signal_handler", "true");
 #endif
+
     petsc_initializer.reset(new pism::petsc::Initializer(argc, argv, "IceBin GCM Coupler"));
-//    printf("Calling PetscPopErrorHandler()\n");
-//    PetscPopErrorHandler();
     // ------------------------------------
 
     // verbosityLevelFromOptions();    // https://github.com/pism/pism/commit/3c75fd63
