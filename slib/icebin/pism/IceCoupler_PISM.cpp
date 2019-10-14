@@ -120,7 +120,9 @@ void IceCoupler_PISM::_cold_start(
 
 #if PETSC_VERSION_LT(3,7,0)
     printf("Doing -no_signal_handler on command line\n");
-    pism_args.push_back("-no_signal_handler");
+    // pism_args.push_back("-no_signal_handler");  // alternate way to do the same thing
+    pism_args.push_back("-signal_handler");
+    pism_args.push_back("off");
 #endif
 
 

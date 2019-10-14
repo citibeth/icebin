@@ -272,9 +272,9 @@ void gcmce_set_constant(
     char const *units_f, int units_len,
     char const *description_f, int description_len)
 {
+    std::string const name(name_f, name_len);
     self->gcm_constants.set(
-        std::string(name_f, name_len),
-        val,
+        name, val,
         std::string(units_f, units_len),
         std::string(description_f, description_len));
 }
