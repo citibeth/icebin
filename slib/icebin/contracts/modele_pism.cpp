@@ -68,10 +68,10 @@ static void _reconstruct_ice_ivalsI(
     // kappa: see modelE/model/landice/lisnowsubs.F90
     // Layer 0 = ice borrowed from GCM
     // Layer 1 = top layer of PISM
-    double const RHOI = gcm_coupler->gcm_constants.get_as("constant.rhoi", "kg m-3");
-    double const SHI = gcm_coupler->gcm_constants.get_as("constant.shi", "J kg-1 K-1");
-    double const TF = gcm_coupler->gcm_constants.get_as("constant.tf", "K");
-    double const STIEGLITZ_8B = gcm_coupler->gcm_constants.get_as("constant.stieglitz_8b", "W m-1 K-1");
+    double const RHOI = gcm_coupler->gcm_constants.get_as("constant::rhoi", "kg m-3");
+    double const SHI = gcm_coupler->gcm_constants.get_as("constant::shi", "J kg-1 K-1");
+    double const TF = gcm_coupler->gcm_constants.get_as("constant::tf", "K");
+    double const STIEGLITZ_8B = gcm_coupler->gcm_constants.get_as("constant::stieglitz_8b", "W m-1 K-1");
 
     // PISM will "see" a layer of PISM-style ice, with a certain enthalpy.
     // Make sure that this layer produces ~deltah of heat flux
@@ -144,18 +144,18 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // =========== Transfer  constants from Icebin's gcm_constants --> PISM
     // ice_coupler->transfer_constant(PISM_destionation, icebin_src, multiply_by)
     // (see IceCoupler_PISM.cpp)
-    ice_coupler->transfer_constant("constants.standard_gravity", "constant.grav");
-    ice_coupler->transfer_constant("constants.ice.beta_Clausius_Clapeyron", "seaice.dtdp", -1.0);
-    ice_coupler->transfer_constant("constants.fresh_water.melting_point_temperature", "constant.tf");
-    ice_coupler->transfer_constant("constants.fresh_water.latent_heat_of_fusion", "constant.lhm");
-    ice_coupler->transfer_constant("constants.fresh_water.specific_heat_capacity", "constant.shw");
+    ice_coupler->transfer_constant("constants.standard_gravity", "constant::grav");
+    ice_coupler->transfer_constant("constants.ice.beta_Clausius_Clapeyron", "seaice::dtdp", -1.0);
+    ice_coupler->transfer_constant("constants.fresh_water.melting_point_temperature", "constant::tf");
+    ice_coupler->transfer_constant("constants.fresh_water.latent_heat_of_fusion", "constant::lhm");
+    ice_coupler->transfer_constant("constants.fresh_water.specific_heat_capacity", "constant::shw");
 
-    ice_coupler->transfer_constant("constants.ice.density", "constant.rhoi");
-    ice_coupler->transfer_constant("constants.ice.thermal_conductivity", "seaice.alami0");
-    ice_coupler->transfer_constant("constants.ice.specific_heat_capacity", "constant.shi");
-    ice_coupler->transfer_constant("constants.fresh_water.density", "constant.rhow");
-    ice_coupler->transfer_constant("constants.sea_water.density", "constant.rhows");
-    ice_coupler->transfer_constant("constants.ideal_gas_constant", "constant.gasc");
+    ice_coupler->transfer_constant("constants.ice.density", "constant::rhoi");
+    ice_coupler->transfer_constant("constants.ice.thermal_conductivity", "seaice::alami0");
+    ice_coupler->transfer_constant("constants.ice.specific_heat_capacity", "constant::shi");
+    ice_coupler->transfer_constant("constants.fresh_water.density", "constant::rhow");
+    ice_coupler->transfer_constant("constants.sea_water.density", "constant::rhows");
+    ice_coupler->transfer_constant("constants.ideal_gas_constant", "constant::gasc");
 
     // To set this, see (in ModelE): Function SHCGS in ocnfuntab.f is
     // used for the Russell ocean. I. The simple models use SHW=4185.
@@ -215,7 +215,7 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     bool ok = true;
 
     // constants.sea_water.density
-    double const RHOW = gcm_coupler->gcm_constants.get_as("constant.rhow", "kg m-3");
+    double const RHOW = gcm_coupler->gcm_constants.get_as("constant::rhow", "kg m-3");
     double const byRHOW = 1.0 / RHOW;
 
 
