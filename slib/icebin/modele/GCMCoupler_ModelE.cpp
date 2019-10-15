@@ -525,7 +525,7 @@ bool run_ice)    // if false, only initialize
     const auto nhc_ice(self->gcm_regridder->nhc());
 
     // Lookup underice (C-style order and indexing base)
-    int const i_underice = self->gcm_inputs[(int)IndexAE::ETOPO].index.at("underice");
+    int const i_underice = self->gcm_inputs[(int)IndexAE::ETOPO].index.at("underice_d");
     blitz::Array<double,3> &underice(*self->gcm_ivalssE[(int)IndexAE::ETOPO][i_underice]);
     
 
