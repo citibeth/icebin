@@ -662,5 +662,40 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_E1vE0(
     return E1vE0_g;
 }
 
+// ==============================================================
+
+void GCMRegridder_WrapE::_init(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA)
+{
+    gcmA = std::move(_gcmA);
+    _ice_regridders = &gcmA->ice_regridders();
+
+    // Copy assorted stuff over
+    // agridA = gcmA->agridA;    // hopefully we don't have to copy this
+    correctA = gcmA->correctA;
+    indexingHC = gcmA->indexingHC;
+    indexingE = gcmA->indexingE;
+    _hcdefs = gcmA->_hcdefs;
+}
+
+
+GCMRegridder_WrapE::GCMRegridder_WrapE(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA)
+{
+    _init(std::move(_gcmA));
+
+    auto const nO = gcmA->gcmO->nA();
+    foceanOp.reference(blitz::Array<double,1>(nO));
+    foceanOm.reference(blitz::Array<double,1>(nO));
+}
+
+GCMRegridder_WrapE::GCMRegridder_WrapE(
+    std::unique_ptr<GCMRegridder_ModelE> &&_gcmA,
+    blitz::Array<double,1> _foceanOp,
+    blitz::Array<double,1> _foceanOm)
+: foceanOp(_foceanOp), foceanOm(foceanOm)
+{
+    _init(std::move(_gcmA));
+}
+
+
 
 }}    // namespace

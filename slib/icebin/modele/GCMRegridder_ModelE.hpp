@@ -226,22 +226,16 @@ public:
     blitz::Array<double,1> foceanOm;
 
 
-    GCMRegridder_WrapE(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA)
-        : gcmA(std::move(_gcmA))
-    {
-        _ice_regridders = &gcmA->ice_regridders();
+private:
+    void _init(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA);
+public:
 
-        auto const nO = gcmA->gcmO->nA();
-        foceanOp.reference(blitz::Array<double,1>(nO));
-        foceanOm.reference(blitz::Array<double,1>(nO));
-    }
+    GCMRegridder_WrapE(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA);
 
     GCMRegridder_WrapE(
         std::unique_ptr<GCMRegridder_ModelE> &&_gcmA,
         blitz::Array<double,1> _foceanOp,
-        blitz::Array<double,1> _foceanOm)
-    : gcmA(std::move(_gcmA)), foceanOp(_foceanOp), foceanOm(foceanOm)
-    {}
+        blitz::Array<double,1> _foceanOm);
 
     // -------------- Implement the Virtual Functions
 
