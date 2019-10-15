@@ -419,17 +419,17 @@ bool run_ice)
             ice_ovalsI_e * gcmi_v_iceo_T.M + gcmi_v_iceo_T.b.replicate(nI(),1) ));
         // Sparsify while appending to the global VectorMultivec
         // (Transposes order in memory)
-        std::vector<double> vals(gcm_ivalss_s[iAE].size()); // Extra col for weight
+        std::vector<double> vals(gcm_ivalss_s[iAE].nvar);
         for (int jj=0; jj < gcm_ivalsX.rows(); ++jj) {
             auto jj_s(AE1vIs[iAE]->dims[0]->to_sparse(jj));
             int nn = 0;
-            for (; nn < gcm_ivalsX.cols(); ++nn)
+            for (; nn < gcm_ivalsX.cols(); ++nn) {
                 vals[nn] = gcm_ivalsX(jj,nn);
+            }
             gcm_ivalss_s[iAE].add(jj_s, vals);
             gcm_ivalss_weight_s[iAE].push_back(AE1vIs[iAE]->wM(jj));   // Add weight as separate vector
         }
     }        // iAE
-
     // Compute IvE (for next timestep)
     std::unique_ptr<linear::Weighted_Eigen> IvE1(
         rm->matrix_d("IvE", {&dimI, &dimE1},
@@ -455,8 +455,10 @@ bool run_ice)
     }
 
     // Save stuff for next time around
-    ret.dimE0 = std::move(dimE0);
-    ret.IvE0 = std::move(IvE0->M);
+    if (run_ice) {    // But not if first time
+        ret.dimE0 = std::move(dimE0);
+        ret.IvE0 = std::move(IvE0->M);
+    }
     dimE0 = std::move(dimE1);
     IvE0 = std::move(IvE1);
 

@@ -54,6 +54,24 @@ GCMParams::GCMParams(MPI_Comm _gcm_comm, int _gcm_root) :
 }
 
 // ==========================================================
+/** @param nvar Array specifying number of variables for each segment. */
+GCMInput::GCMInput(std::vector<int> const &nvar) {
+    for (int nv : nvar) {
+        gcm_ivalss_s.push_back(VectorMultivec(nv));
+        gcm_ivalss_weight_s.push_back(std::vector<double>());
+    }
+}
+
+std::vector<int> GCMInput::nvar() const
+{
+    std::vector<int> ret;
+    ret.reserve(gcm_ivalss_s.size());
+    for (size_t i=0; i<gcm_ivalss_s.size(); ++i) ret.push_back(gcm_ivalss_s[i].nvar);
+    return ret;
+}
+
+
+// ==========================================================
 
 GCMCoupler::GCMCoupler(Type _type, GCMParams &&_gcm_params) :
     type(_type),

@@ -66,18 +66,10 @@ struct GCMInput {
 
     ibmisc::linear::Weighted_Tuple::TupleListLT<2> E1vE0_scaled;    // domain-split version
 
-    /** @param nvar Array specifying number of variables for each segment. */
-    GCMInput(std::vector<int> const &nvar) {
-        for (int nv : nvar) gcm_ivalss_s.push_back(VectorMultivec(nv));
-    }
-
-    std::vector<int> nvar() const
-    {
-        std::vector<int> ret;
-        ret.reserve(gcm_ivalss_s.size());
-        for (size_t i=0; i<gcm_ivalss_s.size(); ++i) ret.push_back(gcm_ivalss_s[i].nvar);
-        return ret;
-    }
+    /** @param nvar Array specifying number of variables for each segment (A,E,ATOPO,ETOPO). */
+    GCMInput(std::vector<int> const &nvar);
+    /** @return Number of variables for each segment. */
+    std::vector<int> nvar() const;
 
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
