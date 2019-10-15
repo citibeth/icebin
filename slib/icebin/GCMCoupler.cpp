@@ -174,7 +174,7 @@ static void ncwrite_dense_VectorMultivec(
     ibmisc::Indexing const *indexing,
     std::string const &vname_base)
 {
-printf("BEGIN ncwrite_dense()\n");
+printf("BEGIN ncwrite_dense_VectorMultivec()\n");
     // im,jm,ihc  0-based
     long nE = indexing->extent();
     blitz::Array<double,1> denseE(nE);    // All dims
@@ -217,7 +217,7 @@ static void ncio_dense(
     ibmisc::Indexing const &indexing,
     std::string const &vname_base = "")
 {
-printf("BEGIN ncio_dense()\n");
+printf("BEGIN ncio_dense1('%s')\n", ncio.fname.c_str());
     if (ncio.rw != 'w') (*icebin_error)(-1,
         "ncio_dense(VectorMultivec) only writes, no read.");
 
@@ -274,7 +274,7 @@ static void ncio_dense(
     ibmisc::Indexing const &indexing,
     std::string const &vname)
 {
-printf("BEGIN ncio_dense()\n");
+printf("BEGIN ncio_dense2('%s')\n", ncio.fname.c_str());
     if (ncio.rw != 'w') (*icebin_error)(-1,
         "ncio_dense(TupleListT<1>) only writes, no read.");
 
@@ -321,7 +321,7 @@ void GCMCoupler::ncio_gcm_output(NcIO &ncio,
     ibmisc::TimeUnit const &time_unit,
     std::string const &vname_base)
 {
-printf("BEGIN GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
+printf("BEGIN GCMCoupler::ncio_gcm_output('%s' '%s')\n", ncio.fname.c_str(), vname_base.c_str());
     ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
     ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
         gcm_regridder->indexingE, vname_base);
