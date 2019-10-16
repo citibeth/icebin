@@ -550,11 +550,12 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
     @param params Parameters to use in generating regridding matrices.
         Should be RegridParams(true, true, {0,0,0}) to give conservative matrix.
     @param offsetE Offset (in sparse E space) added to base EC indices */
-linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
+linear::Weighted_Tuple GCMRegridder_ModelE::global_AvE(
     std::vector<blitz::Array<double,1>> const &emI_lands,
     std::vector<blitz::Array<double,1>> const &emI_ices,
     blitz::Array<double,1> const &foceanAOp,
     blitz::Array<double,1> const &foceanAOm,
+    bool scale,
     // ----------- Output vars
     long &offsetE) const
 {
@@ -590,7 +591,7 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_AvE(
     auto wAOp(sum(*eam.EOpvAOp, 1, '+'));
     SparseSetT dimAAm, dimEAm;
     return _compute_AAmvEAm(
-        false,    // scale=false
+        scale,
         specO.eq_rad,
         cast_GridSpec_LonLat(*this->gcmO->agridA.spec).hntr,
         cast_GridSpec_LonLat(*this->agridA.spec).hntr,

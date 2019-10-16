@@ -816,8 +816,9 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
 
     // ---------------- Compute AAmvEAm (requires merged foceanOp, foceanOm)
     long offsetE;  // Offset (in sparse E space) added to base EC indices
-    linear::Weighted_Tuple AAmvEAm(gcmA->global_unscaled_AvE(
-        emI_lands, emI_ices, reshape1(foceanOp), reshape1(foceanOm), offsetE));
+    linear::Weighted_Tuple AAmvEAm(gcmA->global_AvE(
+        emI_lands, emI_ices, reshape1(foceanOp), reshape1(foceanOm),
+        true, offsetE));    // scale=true
 
     // ---------------- Compute wAEm_base (weight of JUST base-ice ECs)
     // Base ice ECs are distinguished because they've been offsetted ("stacked")
@@ -860,7 +861,6 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
     topoa.a3.at("underice").allocate(true, shape3);
     auto &underice(topoa.a3.array("underice"));
     underice = underice_i;
-    
 
     // ------------------ Pack TOPOA stuff into output variables
     {
@@ -885,7 +885,7 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         std::vector<double> val(gcm_ivalsA_s.nvar);
         for (int j=0; j<hspecA.jm; ++j) {
         for (int i=0; i<hspecA.im; ++i) {
-            for (int k=0; k<gcm_ivalsA_s.size(); ++k) {
+            for (int k=0; k<gcm_ivalsA_s.nvar; ++k) {
                 val[k] = (*iarrays[k])(j,i);
             }
             auto ij = indexingA.tuple_to_index(std::array<int,2>{i,j});
@@ -917,13 +917,15 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         for (int ihc=0; ihc<nhc; ++ihc) {
         for (int j=0; j<hspecA.jm; ++j) {
         for (int i=0; i<hspecA.im; ++i) {
-            for (int k=0; k<gcm_ivalsE_s.size(); ++k) {
+            for (int k=0; k<gcm_ivalsE_s.nvar; ++k) {
                 val[k] = (*iarrays[k])(ihc,j,i);
             }
             auto ij = indexingE.tuple_to_index(std::array<int,3>{i,j,ihc});
             gcm_ivalsE_s.add(ij, val);
         }}}
     }
+printf("BB9\n");
+
 }
 
 // ----------------------------------------------------------------------
