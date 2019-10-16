@@ -427,7 +427,7 @@ std::unique_ptr<GCMRegridder_Standard> new_gcmA_standard(
     // Create IceRegridder for I and add to gcmA
     auto ice(new_ice_regridder(IceRegridder::Type::L0));
     auto agridI(make_abbr_grid("Ice", specI, std::move(_dimI)));
-    ice->init("globalI", gcmA->agridA, nullptr,
+    ice->init("globalI", *gcmA->agridA, nullptr,
         std::move(agridI), std::move(aexgrid),
         InterpStyle::Z_INTERP);    // You can use different InterpStyle if you like.
 
@@ -483,7 +483,7 @@ std::unique_ptr<GCMRegridder> new_gcmA_mismatched(
                     std::shared_ptr<GCMRegridder_Standard>(gcmO.release())))));
 
 
-    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
+    HntrSpec const &hspecA(cast_GridSpec_LonLat(*gcmA->agridA->spec).hntr);
 
     // Load the fractional ocean mask (based purely on ice extent)
     {auto fname(files.locate(args.topoo_fname));
@@ -531,7 +531,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
     dimI2.set_sparse_extent(hspecI2.size());
 
     HntrSpec hspecA(cast_GridSpec_LonLat(
-        *gcmA.agridA.spec).hntr);
+        *gcmA.agridA->spec).hntr);
     HntrSpec hspecI(cast_GridSpec_LonLat(
         *gcmA.ice_regridders()[0]->agridI.spec).hntr);
 
@@ -547,7 +547,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         {HntrGrid hgridI2(hspecI2);
             meta.indexingI2 = hgridI2.indexing;
         }
-        meta.indexingA = gcmA.agridA.indexing;
+        meta.indexingA = gcmA.agridA->indexing;
         meta.indexingHC = gcmA.indexingHC;
         meta.indexingE = gcmA.indexingE;
         meta.hcdefs = gcmA._hcdefs;

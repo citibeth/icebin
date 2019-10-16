@@ -54,6 +54,14 @@ ibmisc::Indexing const &indexingHC)    // iA,iHC
     return ibmisc::Indexing(std::move(dims), std::move(indices));
 }
 // -------------------------------------------------------------
+GCMRegridder_Standard::GCMRegridder_Standard() :
+    mem_ice_regridders(mem_sheets_index)
+{
+    _ice_regridders = &mem_ice_regridders;
+    mem_agridA.reset(new AbbrGrid);
+    agridA = &*mem_agridA;
+}
+// -------------------------------------------------------------
 void GCMRegridder_Standard::init(
     AbbrGrid &&_agridA,
 //    std::unique_ptr<Grid> &&_gridA,
@@ -62,7 +70,8 @@ void GCMRegridder_Standard::init(
     ibmisc::Indexing &&_indexingHC,
     bool _correctA)
 {
-    agridA = std::move(_agridA);
+    mem_agridA.reset(new AbbrGrid(std::move(_agridA)));
+    agridA = &*mem_agridA;
 //    fgridA = std::move(_gridA);
 //    agridA = AbbrGrid(*fgridA);
 //  domainA = std::move(_domainA);
@@ -73,7 +82,7 @@ void GCMRegridder_Standard::init(
     if (indexingHC.rank() != 2) (*icebin_error)(-1,
         "indexingHC has rank %d, it must have rank=2", indexingHC.rank());
 
-    indexingE = derive_indexingE(agridA.indexing, indexingHC);
+    indexingE = derive_indexingE(agridA->indexing, indexingHC);
 }
 // -------------------------------------------------------------
 
@@ -86,7 +95,7 @@ void GCMRegridder::ncio(ibmisc::NcIO &ncio, std::string const &vname)
 // ==============================================================
 void GCMRegridder_Standard::clear()
 {
-    agridA.clear();
+    agridA->clear();
     _hcdefs.clear();
     ice_regridders().index.clear();
     ice_regridders().clear();
@@ -101,7 +110,10 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
     }
 
     // Read/Write gridA and other global stuff
-    agridA.ncio(ncio, vname + ".agridA");
+    mem_agridA.reset(new AbbrGrid);
+    agridA = &*mem_agridA;
+
+    agridA->ncio(ncio, vname + ".agridA");
     indexingHC.ncio(ncio, vname + ".indexingHC");
     ncio_vector(ncio, _hcdefs, true, vname + ".hcdefs", "double",
         get_or_add_dims(ncio, {vname + ".nhc"}, {_hcdefs.size()} ));
@@ -129,7 +141,7 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
     }
 
 
-    indexingE = derive_indexingE(agridA.indexing, indexingHC);
+    indexingE = derive_indexingE(agridA->indexing, indexingHC);
 
 }
 // -------------------------------------------------------------
@@ -144,13 +156,13 @@ void GCMRegridder_Standard::filter_cellsA(std::function<bool(long)> const &keepA
         (*ice_regridder)->filter_cellsA(keepA);
     }
 
-    agridA.filter_cells(keepA);
+    agridA->filter_cells(keepA);
 }
 
 void GCMRegridder_Standard::filter_cellsA(ibmisc::Domain const &domainA)
 {
     filter_cellsA(std::bind(&ibmisc::in_domain,
-        &domainA, &agridA.indexing, _1));
+        &domainA, &agridA->indexing, _1));
 }
 
 // ---------------------------------------------------------------------

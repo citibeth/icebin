@@ -142,13 +142,13 @@ public:
     unsigned long nE() const { return gcmO->nE() / 4; }
 
     HntrSpec const &hspecO() const
-        { return cast_GridSpec_LonLat(*gcmO->agridA.spec).hntr; }
+        { return cast_GridSpec_LonLat(*gcmO->agridA->spec).hntr; }
     HntrSpec const &hspecA() const
-        { return cast_GridSpec_LonLat(*agridA.spec).hntr; }
+        { return cast_GridSpec_LonLat(*agridA->spec).hntr; }
     GridSpec_LonLat const &specO() const
-        { return cast_GridSpec_LonLat(*gcmO->agridA.spec); }
+        { return cast_GridSpec_LonLat(*gcmO->agridA->spec); }
     GridSpec_LonLat const &specA() const
-        { return cast_GridSpec_LonLat(*agridA.spec); }
+        { return cast_GridSpec_LonLat(*agridA->spec); }
 
 // TODO: get rid of eq_rad in metaO
 

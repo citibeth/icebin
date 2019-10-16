@@ -149,7 +149,7 @@ std::vector<std::string> &errors)
 
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
                 auto const iO_s = sheet.dimO.to_sparse(iO_d);
-                da_zicetopO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA.native_area(gcmO->agridA.dim.to_dense(iO_s)); //sheet.wO(iO_d);
+                da_zicetopO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA->native_area(gcmO->agridA->dim.to_dense(iO_s)); //sheet.wO(iO_d);
             }
         }
 
@@ -168,7 +168,7 @@ std::vector<std::string> &errors)
 
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
                 auto iO_s = sheet.dimO.to_sparse(iO_d);
-                da_zatmoO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA.native_area(gcmO->agridA.dim.to_dense(iO_s)); //sheet.wO(iO_d);
+                da_zatmoO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA->native_area(gcmO->agridA->dim.to_dense(iO_s)); //sheet.wO(iO_d);
             }
         }
 
@@ -189,7 +189,7 @@ std::vector<std::string> &errors)
         if (da_contO(iO) == 0.) continue;
 
         // Adjust foceanOp, etc. based on how much land we're adding
-        double const by_areaO = 1. / gcmO->agridA.native_area(gcmO->agridA.dim.to_dense(iO));
+        double const by_areaO = 1. / gcmO->agridA->native_area(gcmO->agridA->dim.to_dense(iO));
 
         double  const fgiceOp0 = fgiceOp(iO);
         double const diff_fgiceOp = da_giceO(iO) * by_areaO;
@@ -215,8 +215,8 @@ std::vector<std::string> &errors)
     }
 
     // Remove single-cell oceans in foceanOm (turn more stuff to land)
-    long const IM = gcmO->agridA.indexing[0].extent;
-    long const JM = gcmO->agridA.indexing[1].extent;
+    long const IM = gcmO->agridA->indexing[0].extent;
+    long const JM = gcmO->agridA->indexing[1].extent;
     blitz::TinyVector<int,2> shape2(JM, IM);   // C-style indexing
 
     for (int j=0; j<JM; ++j) {
@@ -231,7 +231,7 @@ std::vector<std::string> &errors)
             && foceanOm2(j,i+1) == 0.
             && foceanOm2(j,i) == 1. && foceanOp2(j,i) != 1.)
         {
-            long const iO(gcmO->agridA.indexing.tuple_to_index(std::array<long,2>{i,j}));    // Always use alphabetical order
+            long const iO(gcmO->agridA->indexing.tuple_to_index(std::array<long,2>{i,j}));    // Always use alphabetical order
 
             // Repeated block from above
             double const denom = 1. - foceanOp(iO);

@@ -517,7 +517,7 @@ bool run_ice)    // if false, only initialize
     VectorMultivec gcm_ovalsE_s(self->gcm_outputsE.size());
     std::vector<double> val(self->gcm_outputsE.size());    // Temporary
 
-    auto const &indexingA(self->gcm_regridder->agridA.indexing);
+    auto const &indexingA(self->gcm_regridder->agridA->indexing);
     auto const &indexingE(self->gcm_regridder->indexingE);
 
     // domain uses alphabetical order, 0-based indexing...
@@ -755,7 +755,7 @@ std::vector<blitz::Array<double,1>> const &emI_ices,
 GCMInput &out,
 TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
 {
-    auto const &indexingA(gcm_regridder->agridA.indexing);
+    auto const &indexingA(gcm_regridder->agridA->indexing);
     auto const &indexingE(gcm_regridder->indexingE);
 
     GCMRegridder_WrapE *gcmW(
@@ -857,9 +857,9 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
     auto &hspecA(gcmA->hspecA());
     auto const nhc(gcmA->nhc());
     std::array<int,3> shape3 {nhc, hspecA.jm, hspecA.im};
-    topoa.a3.add("underice", {});
-    topoa.a3.at("underice").allocate(true, shape3);
-    auto &underice(topoa.a3.array("underice"));
+    topoa.a3.add("underice_d", {});
+    topoa.a3.at("underice_d").allocate(true, shape3);
+    auto &underice(topoa.a3.array("underice_d"));
     underice = underice_i;
 
     // ------------------ Pack TOPOA stuff into output variables
@@ -924,7 +924,6 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
             gcm_ivalsE_s.add(ij, val);
         }}}
     }
-printf("BB9\n");
 
 }
 
@@ -1009,15 +1008,20 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
             dimE0s.push_back(&cout.dimE0);
         }
 
-        out.E1vE0_unscaled = gcmA->global_unscaled_E1vE0(
-            E1vIs_unscaled, IvE0s, dimE0s);
+         // Don't do this on the first round, since we don't yet have an IvE0
+        if (run_ice) {
+            out.E1vE0_unscaled = gcmA->global_unscaled_E1vE0(
+                E1vIs_unscaled, IvE0s, dimE0s);
+        }
     }
 
     // Add identity I matrix to E1vE0_unscaled for base ice
     // This will keep all the legacy ice ECs in place
-    for (auto ii=wEAm_base.begin(); ii != wEAm_base.end(); ++ii) {
-        auto iE(ii->index(0));
-        out.E1vE0_unscaled.M.add({iE,iE}, ii->value());
+    if (run_ice) {
+        for (auto ii=wEAm_base.begin(); ii != wEAm_base.end(); ++ii) {
+            auto iE(ii->index(0));
+            out.E1vE0_unscaled.M.add({iE,iE}, ii->value());
+        }
     }
     wEAm_base.clear();
 

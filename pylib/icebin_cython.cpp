@@ -115,7 +115,7 @@ PyObject *GCMRegridder_wA(
     double fill)
 {
     PyObject *wA_py = ibmisc::cython::new_pyarray<double,1>(
-        std::array<int,1>{gcm_regridder->agridA.dim.sparse_extent()});
+        std::array<int,1>{gcm_regridder->agridA->dim.sparse_extent()});
     auto wA(np_to_blitz<double,1>(wA_py, "wA", {-1}));
     wA = fill;
 
@@ -147,7 +147,7 @@ void GCMRegridder_add_sheet(GCMRegridder *cself,
 
     auto sheet(new_ice_regridder(fgridI->parameterization));
     sheet->init(
-        name, cself->agridA, &fgridA,
+        name, *cself->agridA, &fgridA,
         AbbrGrid(*fgridI), ExchangeGrid(*fexgrid),
         interp_style);
 

@@ -626,13 +626,12 @@ blitz::Array<int16_t,3> &underice3)
         }
     }}
 
-
     // ==================================================
     // Sanity Check the Result
     std::vector<std::string> errors;
     sanity_check_land_fractions(foceanA2, flakeA2, fgrndA2, fgiceA2, errors);
     sanity_check_fhc(fhc3, errors);
- 
+
     return errors;
 }
 

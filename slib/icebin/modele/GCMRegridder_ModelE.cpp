@@ -184,8 +184,8 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
 
     EigenColVectorT wAOm_e(compute_wAOm(foceanAOp, foceanAOm, wAOp, dimAOp, dimAOm));
 
-    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr);
-    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr);
+    HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA->spec).hntr);
+    HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA->spec).hntr);
 
     dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
     dimIp.set_sparse_extent(rmO->ice_regridder->nI());
@@ -431,7 +431,8 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     :  global_ecO(_global_ecO), gcmO(_gcmO)
 {
     // Initialize superclass member
-    agridA = make_agridA(gcmO->agridA);
+    mem_agridA.reset(new AbbrGrid(make_agridA(*gcmO->agridA)));
+    agridA = &*mem_agridA;
 
     _ice_regridders = &gcmO->ice_regridders();
 
@@ -439,9 +440,9 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
     indexingHC = Indexing(
         {"O", "HC"},
         {0L, 0L},
-        {agridA.dim.sparse_extent(), gcmO->indexingHC[1].extent},
+        {agridA->dim.sparse_extent(), gcmO->indexingHC[1].extent},
         {gcmO->indexingHC.indices()[0], gcmO->indexingHC.indices()[1]});
-    indexingE = derive_indexingE(agridA.indexing, indexingHC);
+    indexingE = derive_indexingE(agridA->indexing, indexingHC);
 
     // Read number of global EC's out of global EC matrix file.
     if (global_ecO == "") {
@@ -593,8 +594,8 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_AvE(
     return _compute_AAmvEAm(
         scale,
         specO.eq_rad,
-        cast_GridSpec_LonLat(*this->gcmO->agridA.spec).hntr,
-        cast_GridSpec_LonLat(*this->agridA.spec).hntr,
+        cast_GridSpec_LonLat(*this->gcmO->agridA->spec).hntr,
+        cast_GridSpec_LonLat(*this->agridA->spec).hntr,
         this->gcmO->indexingHC,
         this->indexingHC,
         foceanAOp,
@@ -671,7 +672,7 @@ void GCMRegridder_WrapE::_init(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA)
     _ice_regridders = &gcmA->ice_regridders();
 
     // Copy assorted stuff over
-    // agridA = gcmA->agridA;    // hopefully we don't have to copy this
+    agridA = gcmA->agridA;    // pointer copy
     correctA = gcmA->correctA;
     indexingHC = gcmA->indexingHC;
     indexingE = gcmA->indexingE;

@@ -40,10 +40,10 @@ IceRegridder::~IceRegridder() {}
 NOTE: wAvAp == sApvA */
 void IceRegridder::sApvA(MakeDenseEigenT::AccumT &&w) const
 {
-printf("BEGIN sApvA(%d)\n", gcm->agridA.dim.dense_extent());
-    for (int id=0; id < gcm->agridA.dim.dense_extent(); ++id) {
-        auto index = gcm->agridA.dim.to_sparse(id);
-        w.add({index, index}, gcm->agridA.native_area(id) / gridA_proj_area(id));
+printf("BEGIN sApvA(%d)\n", gcm->agridA->dim.dense_extent());
+    for (int id=0; id < gcm->agridA->dim.dense_extent(); ++id) {
+        auto index = gcm->agridA->dim.to_sparse(id);
+        w.add({index, index}, gcm->agridA->native_area(id) / gridA_proj_area(id));
     }
 }
 
@@ -51,15 +51,15 @@ printf("BEGIN sApvA(%d)\n", gcm->agridA.dim.dense_extent());
 NOTE: wAvAp == sApvA */
 void IceRegridder::sEpvE(MakeDenseEigenT::AccumT &&w) const
 {
-    for (int id=0; id < gcm->agridA.dim.dense_extent(); ++id) {
-        auto index = gcm->agridA.dim.to_sparse(id);
+    for (int id=0; id < gcm->agridA->dim.dense_extent(); ++id) {
+        auto index = gcm->agridA->dim.to_sparse(id);
 
         long nhc = gcm->nhc(index);
         long tuple[2] = {index, 0};
         long &ihp(tuple[1]);
         for (ihp=0; ihp<nhc; ++ihp) {
             long indexE = gcm->indexingHC.tuple_to_index(tuple);
-            w.add({indexE, indexE}, gcm->agridA.native_area(id) / gridA_proj_area(id));
+            w.add({indexE, indexE}, gcm->agridA->native_area(id) / gridA_proj_area(id));
         }
     }
 }

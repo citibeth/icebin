@@ -212,7 +212,8 @@ public:
     This field is not stored or loaded with ncio(). */
 //    std::unique_ptr<Grid> fgridA;
 
-    AbbrGrid agridA;
+    AbbrGrid *agridA;
+    std::unique_ptr<AbbrGrid> mem_agridA;
 
 //  ibmisc::Domain domainA;                // What's in our MPI halo?
 
@@ -241,7 +242,7 @@ public:
     /** Selection function so aid when A/E stuff uses the same code,
         indexed by GridAE::A or ::E. */
     ibmisc::Indexing const &indexing(int iAE) const
-        { return (iAE == GridAE::A ? agridA.indexing : indexingE); }
+        { return (iAE == GridAE::A ? agridA->indexing : indexingE); }
 
 protected:
     /** Ice sheets stored by index defined in sheets_index */
@@ -268,7 +269,7 @@ public:
     virtual unsigned int nhc(int i1) const { return (unsigned int)_hcdefs.size(); }
     virtual unsigned int nhc() const { return nhc(-1); }
 
-    virtual unsigned long nA() const { return agridA.dim.sparse_extent(); }
+    virtual unsigned long nA() const { return agridA->dim.sparse_extent(); }
     virtual unsigned long nE() const { return GCMRegridder::nA() * nhc(-1); }
     size_t nI(int sheet_index) const { return ice_regridders()[sheet_index]->nI(); }
 
@@ -303,9 +304,9 @@ void GCMRegridder::wA(AccumT &&accum, std::string const &ice_sheet_name, bool na
 {
     IceRegridder *ice = &*ice_regridders().at(ice_sheet_name);
 
-    auto &areas(native ? agridA.native_area : ice->gridA_proj_area);
-    for (int id=0; id<agridA.dim.dense_extent(); ++id) {
-        auto index = agridA.dim.to_sparse(id);
+    auto &areas(native ? agridA->native_area : ice->gridA_proj_area);
+    for (int id=0; id<agridA->dim.dense_extent(); ++id) {
+        auto index = agridA->dim.to_sparse(id);
         accum.add({index}, areas(id));
     }
 }
@@ -325,11 +326,7 @@ public:
 
     /** Constructs a blank GCMRegridder.  Typically one will use
         ncio() afterwards to read from a file. */
-    GCMRegridder_Standard() :
-        mem_ice_regridders(mem_sheets_index)
-    {
-        _ice_regridders = &mem_ice_regridders;
-    }
+    GCMRegridder_Standard();
 
     void clear();
 

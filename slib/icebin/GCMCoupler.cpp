@@ -193,6 +193,7 @@ static void ncwrite_dense_VectorMultivec(
     std::string const &vname_base)
 {
 printf("BEGIN ncwrite_dense_VectorMultivec()\n");
+
     // im,jm,ihc  0-based
     long nE = indexing->extent();
     blitz::Array<double,1> denseE(nE);    // All dims
@@ -215,7 +216,7 @@ printf("BEGIN ncwrite_dense_VectorMultivec()\n");
         for (unsigned int i=0; i<vecs->index.size(); ++i) {
             auto iE(vecs->index[i]);
             if (iE >= nE) (*icebin_error)(-1,
-                "Index out of range: %ls vs. %ld", (long)iE, (long)nE);
+                "Index out of range: %ld vs. %ld", (long)iE, (long)nE);
             denseE(iE) = vecs->vals[i*nvar + ivar];
         }
 
@@ -238,6 +239,9 @@ static void ncio_dense(
 printf("BEGIN ncio_dense1('%s')\n", ncio.fname.c_str());
     if (ncio.rw != 'w') (*icebin_error)(-1,
         "ncio_dense(VectorMultivec) only writes, no read.");
+
+    if (indexing.extent() == 0) (*icebin_error)(-1,
+        "indexing.extent() == 0");
 
     // Create the variables
     NcDimSpec dim_spec({"time"}, {1});
@@ -318,14 +322,31 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     ibmisc::ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
 
     for (int iAE=0; iAE<(int)IndexAE::COUNT; ++iAE) {
+        ibmisc::Indexing const *indexing;
+        switch(iAE) {
+            case (int)IndexAE::A:
+            case (int)IndexAE::ATOPO:
+                indexing = &gcm_regridder->indexing(GridAE::A);
+            break;
+            case (int)IndexAE::E:
+            case (int)IndexAE::ETOPO:
+                indexing = &gcm_regridder->indexing(GridAE::E);
+            break;
+            default:
+                (*icebin_error)(-1, "Unknown iAE=%d; this switch statement needs to be expanded?", iAE);
+            break;
+        }
+
+printf("indexing extent1 = %ld\n", indexing->extent());
+
         ncio_dense(ncio, out.gcm_ivalss_s[iAE], gcm_inputs[iAE],
-            gcm_regridder->indexing(iAE), vname_base);
+            *indexing, vname_base);
 
         auto dims(get_or_add_dims(ncio,
             {"gcm_ivalss_weight_"+IndexAE_labels[iAE]+"_len"},
             {out.gcm_ivalss_weight_s[iAE].size()}));
         ncio_vector(ncio, out.gcm_ivalss_weight_s[iAE], false,
-            "gcm_ivalss_weight_s", "double", dims);
+            "gcm_ivalss_weight_"+IndexAE_labels[iAE]+"_s", "double", dims);
     }
 
 //    ncio_spsparse(ncio, out.E1vE0_unscaled, false, vname_base+"E1vE0_unscaled");
