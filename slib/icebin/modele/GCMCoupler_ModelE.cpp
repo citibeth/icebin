@@ -24,6 +24,7 @@
 #include <ibmisc/string.hpp>
 #include <ibmisc/f90blitz.hpp>
 #include <ibmisc/math.hpp>
+#include <ibmisc/iostream.hpp>
 #include <icebin/modele/GCMCoupler_ModelE.hpp>
 #include <icebin/modele/grids.hpp>
 #include <icebin/contracts/contracts.hpp>
@@ -323,6 +324,10 @@ char const *long_name_f, int long_name_len)
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
+
+    if (var_f.base == NULL) (*icebin_error)(-1,
+        "gcmce_add_gcm_inputa() trying to add unallocated variable %s",
+        field_name.c_str());
     std::unique_ptr<blitz::Array<double,2>> var(
         new blitz::Array<double,2>(f_to_c(var_f.to_blitz())));
 
@@ -353,6 +358,10 @@ char const *long_name_f, int long_name_len)
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
     std::string long_name(long_name_f, long_name_len);
+
+    if (var_f.base == NULL) (*icebin_error)(-1,
+        "gcmce_add_gcm_inputa() trying to add unallocated variable %s",
+        field_name.c_str());
     std::unique_ptr<blitz::Array<double,3>> var(
         new blitz::Array<double,3>(f_to_c(var_f.to_blitz())));
 
@@ -438,7 +447,7 @@ std::vector<GCMInput> split_by_domain(
     for (int iAE=0; iAE != (int)IndexAE::COUNT; ++iAE) {
         auto &gcm_ivalsX(out.gcm_ivalss_s[iAE]);
         DomainDecomposer_ModelE const &domainsX(*domainsAE[iAE]);
-                                                                                                                                                                                                                                                                                                                    
+
         for (size_t i=0; i<out.gcm_ivalss_s[iAE].index.size(); ++i) {
             // Convert from index to tuple
             long const iA(gcm_ivalsX.index[i]);
@@ -452,7 +461,8 @@ std::vector<GCMInput> split_by_domain(
     }
 
     // Split E1vE0, while scaling also
-    {
+    // (E1vE0 is not set the first time around; in that case, shape = (-1,-1)
+    if (out.E1vE0_unscaled.shape()[0] != -1) {
         auto shape(out.E1vE0_unscaled.shape());
 
         // Create scale array by merging weights in the tuples, then
@@ -645,7 +655,10 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                 "gcm_ivalsA is wrong size: %ld vs. %ld", gcm_ivalsA.size(), gcm_inputs[index_ae].size());
 
             // Clear output: because non-present elements in sparse gcm_ivalsA are 0
-            for (auto &gcm_ivalA : gcm_ivalsA) gcm_ivalA = 0;
+            for (std::unique_ptr<blitz::Array<double,2>> &pp : gcm_ivalsA) {
+                blitz::Array<double,2> &gcm_ivalA(*pp);
+                gcm_ivalA = 0;
+            }
 
             // Create summed weights
             blitz::Array<double,1> sA_s(gcm_regridder->nA());
