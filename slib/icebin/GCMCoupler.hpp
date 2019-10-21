@@ -45,6 +45,7 @@ BOOST_ENUM_VALUES( IndexAE, int,
 #else
 enum class IndexAE { A, E, ATOPO, ETOPO, COUNT};
 static std::array<std::string, (unsigned)IndexAE::COUNT> const IndexAE_labels {"A", "E", "ATOPO", "ETOPO"};
+static std::vector<char> indexae_grid {'A','E','A','E'};
 #endif
 
 template<int RANK>

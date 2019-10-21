@@ -108,7 +108,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
 
 
     // Set up gcm_inputs array   (see IndexAE:  enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;)
-    gcm_inputs_grid = std::vector<char> {'A','E','A','E'};
+    gcm_inputs_grid = std::vector<char>(indexae_grid);
     for (int i=0; i<(int)IndexAE::COUNT; ++i) {
         gcm_inputs.push_back(VarSet());
         gcm_ivalssA.push_back({});
@@ -360,7 +360,7 @@ char const *long_name_f, int long_name_len)
     std::string long_name(long_name_f, long_name_len);
 
     if (var_f.base == NULL) (*icebin_error)(-1,
-        "gcmce_add_gcm_inputa() trying to add unallocated variable %s",
+        "gcmce_add_gcm_inpute() trying to add unallocated variable %s",
         field_name.c_str());
     std::unique_ptr<blitz::Array<double,3>> var(
         new blitz::Array<double,3>(f_to_c(var_f.to_blitz())));
@@ -695,10 +695,10 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
             // Update gcm_ivalE variables...
             // Read from here...
             if (gcm_ivalsE.size() != gcm_inputs[index_ae].size()) (*icebin_error)(-1,
-                "gcm_ivalsE is wrong size: %ld vs. %ld", gcm_ivalsE.size(), gcm_inputs[index_ae].size());
+                "gcm_ivalsE is wrong size: %ld vs. %ld (index_ae = %d)", gcm_ivalsE.size(), gcm_inputs[index_ae].size(), index_ae);
 
             // Clear output: because non-present elements in sparse gcm_ivalsA are 0
-            for (auto &gcm_ivalE : gcm_ivalsE) gcm_ivalE = 0;
+            for (auto &gcm_ivalE : gcm_ivalsE) *gcm_ivalE = 0;
 
             // Create summed weights
             blitz::Array<double,1> sE_s(gcm_regridder->nE());
