@@ -1028,6 +1028,9 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         }
     }
 
+// This is not needed because everything in the C++ portion of
+// the coupler works just on elevation class range [0,nhc_ice)
+#if 0
     // Add identity I matrix to E1vE0_unscaled for base ice
     // This will keep all the legacy ice ECs in place
     if (run_ice) {
@@ -1037,6 +1040,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         }
     }
     wEAm_base.clear();
+#endif
 
     // Log the results
     if (gcm_params.icebin_logging) {
