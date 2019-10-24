@@ -674,8 +674,7 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                     // Original Fortran (partial) arrays have been converted to
                     // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
                     (*gcm_ivalsA[ivar])(j,i) +=
-                        gcm_ivalsA_s.vals[i*nvar + ivar] * sA_s(iA);
-                }
+                        gcm_ivalsA_s.vals[ix*nvar + ivar] * sA_s(iA);
             }
         } break;
         case 'E' : {
@@ -717,7 +716,7 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                     // Original Fortran (partial) arrays have been converted to
                     // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
                     (*gcm_ivalsE[ivar])(ihc_gcm,j,i) +=
-                        gcm_ivalsE_s.vals[i*gcm_inputs[index_ae].size() + ivar] * sE_s(iE);
+                        gcm_ivalsE_s.vals[ix*gcm_inputs[index_ae].size() + ivar] * sE_s(iE);
                 }
             }
         } break;
