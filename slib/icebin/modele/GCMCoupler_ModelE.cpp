@@ -595,9 +595,7 @@ printf("END gcm_ovalsE_s\n");
 #endif
 
         // Couple on root!
-        GCMInput out(
-            self->couple(time_s,
-                gcm_ovalsE_s, run_ice));
+        out = self->couple(time_s, gcm_ovalsE_s, run_ice);  // move semantics
 
         // Add new TOPO file to out
         
