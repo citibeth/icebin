@@ -243,7 +243,6 @@ double time_s,
 VectorMultivec const &gcm_ovalsE_s,
 // ------- Output Variables (Uses IndexAE::A and IndexAE::E in them)
 std::vector<VectorMultivec> &gcm_ivalss_s,                // (accumulate over many ice sheets)
-std::vector<std::vector<double>> &gcm_ivalss_weight_s,    // (accumulate over many ice sheets)
 // ------- Flags
 bool run_ice)
 {
@@ -426,8 +425,8 @@ bool run_ice)
             for (; nn < gcm_ivalsX.cols(); ++nn) {
                 vals[nn] = gcm_ivalsX(jj,nn);
             }
-            gcm_ivalss_s[iAE].add(jj_s, vals);
-            gcm_ivalss_weight_s[iAE].push_back(AE1vIs[iAE]->wM(jj));   // Add weight as separate vector
+            gcm_ivalss_s[iAE].add(jj_s, vals, AE1vIs[iAE]->wM(jj));
+
         }
     }        // iAE
     // Compute IvE (for next timestep)

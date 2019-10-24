@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <ibmisc/blitz.hpp>
 
 namespace boost {
 namespace serialization {
@@ -22,13 +23,15 @@ public:
     // Stores a bunch of parallel sparse vectors
     // Index of each element in the parallel vectors
     std::vector<long> index;
+    // Weight (eg grid cell size) corresponding to each index
+    std::vector<double> weights;
     // Values of for each element in the vectors.  
     std::vector<double> vals;
     // Number of _vals element per _ix element
     int nvar;
 
     // Needed by boost::mpi::gather() [GCMCoupler_ModelE.cpp]
-    VectorMultivec() : nvar(-1) {}
+    VectorMultivec() :  nvar(-1) {}
 
     VectorMultivec(int _nvar) : nvar(_nvar) {}
 
@@ -38,18 +41,30 @@ public:
     template<typename ArchiveT>
     void serialize(ArchiveT& ar, const unsigned version) {
         ar & index;
+        ar & weights;
         ar & vals;
         ar & nvar;
     }
 
     /** Adds a new element to all the sparse vectors */
-    void add(long ix, double const *val);
+    void add(long ix, double const *val, double weight);
 
-    void add(long ix, std::vector<double> &val)
-        { add(ix, &val[0]); }
+    void add(long ix, std::vector<double> &val, double weight)
+        { add(ix, &val[0], weight); }
 
     double val(int varix, long ix) const
         { return vals[ix*nvar + varix]; }
+
+
+    void to_dense_scale(blitz::Array<double,1> &scaleE) const;
+
+    /** @param scaleE Multiply by this.
+    @param denseE Pre-allocated array to put it in */
+    void to_dense(
+        int ivar,
+        blitz::Array<double,1> const &scaleE,
+        double fill,
+        blitz::Array<double,1> &denseE) const;
 
 };
 

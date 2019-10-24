@@ -456,7 +456,8 @@ std::vector<GCMInput> split_by_domain(
             int idomain = domainsX.get_domain(iA);
 
             // Add our values to the appropriate MPI domain
-            outs[idomain].gcm_ivalss_s[iAE].add(iA, &gcm_ivalsX.vals[i*nvar[iAE]]);
+            outs[idomain].gcm_ivalss_s[iAE].add(
+                iA, &gcm_ivalsX.vals[i*nvar[iAE]], gcm_ivalsX.weights[i]);
         }
     }
 
@@ -561,7 +562,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
                 val[ivar] = (*self->gcm_ovalsE[ivar])(ihc,j,i);
             }
 
-            gcm_ovalsE_s.add({iE_s}, &val[0]);
+            gcm_ovalsE_s.add({iE_s}, &val[0], 1.0);
         }}
     }
 
@@ -660,16 +661,9 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                 gcm_ivalA = 0;
             }
 
-            // Create summed weights
+            // Create (inverse of) summed weights
             blitz::Array<double,1> sA_s(gcm_regridder->nA());
-            sA_s = 0;
-            for (int iA_d=0; iA_d<gcm_ivalsA_s.size(); ++iA_d) {
-                auto iA_s(gcm_ivalsA_s.index[iA_d]);
-                sA_s(iA_s) += gcm_ivalsA_s.vals[iA_d];
-            }
-            for (int iA_s=0; iA_s<sA_s.extent(0); ++iA_s) {
-                sA_s(iA_s) = 1. / sA_s(iA_s);    // Will create NaNs but we dont care...
-            }
+            gcm_ivalsA_s.to_dense_scale(sA_s);
 
             // Copy sparse arrays to output
             int const nvar = gcm_inputs[index_ae].size();
@@ -902,7 +896,7 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
                 val[k] = (*iarrays[k])(j,i);
             }
             auto ij = indexingA.tuple_to_index(std::array<int,2>{i,j});
-            gcm_ivalsA_s.add(ij, val);
+            gcm_ivalsA_s.add(ij, val, 1.0);
         }}
     }
 
@@ -934,7 +928,7 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
                 val[k] = (*iarrays[k])(ihc,j,i);
             }
             auto ij = indexingE.tuple_to_index(std::array<int,3>{i,j,ihc});
-            gcm_ivalsE_s.add(ij, val);
+            gcm_ivalsE_s.add(ij, val, 1.0);
         }}}
     }
 
@@ -955,7 +949,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         GCMInput out({0,0,0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);
-            ice_coupler->couple(time_s, gcm_ovalsE, out.gcm_ivalss_s, out.gcm_ivalss_weight_s, run_ice);
+            ice_coupler->couple(time_s, gcm_ovalsE, out.gcm_ivalss_s, run_ice);
         }
         return out;
     }
@@ -988,7 +982,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_ptr;
         IceCoupler::CoupleOut cout(ice_coupler->couple(
             time_s, gcm_ovalsE,
-            out.gcm_ivalss_s, out.gcm_ivalss_weight_s, run_ice));
+            out.gcm_ivalss_s, run_ice));
         couts.push_back(std::move(cout));
     }
 

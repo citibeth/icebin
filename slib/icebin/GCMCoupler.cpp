@@ -56,9 +56,8 @@ GCMParams::GCMParams(MPI_Comm _gcm_comm, int _gcm_root) :
 // ==========================================================
 /** @param nvar Array specifying number of variables for each segment. */
 GCMInput::GCMInput(std::vector<int> const &nvar) {
-    for (int nv : nvar) {
-        gcm_ivalss_s.push_back(VectorMultivec(nv));
-        gcm_ivalss_weight_s.push_back(std::vector<double>());
+    for (size_t ix=0; ix<nvar.size(); ++ix) {
+        gcm_ivalss_s.push_back(VectorMultivec(nvar[ix]));
     }
 }
 
@@ -196,6 +195,7 @@ printf("BEGIN ncwrite_dense_VectorMultivec()\n");
 
     // im,jm,ihc  0-based
     long nE = indexing->extent();
+    blitz::Array<double,1> scaleE(nE);
     blitz::Array<double,1> denseE(nE);    // All dims
 
     // NetCDF needs dimensions in stride-descending order
@@ -208,17 +208,12 @@ printf("BEGIN ncwrite_dense_VectorMultivec()\n");
         countp.push_back((*indexing)[dimi].extent);
     }
 
+    vecs->to_dense_scale(scaleE);
+
     // Go through each variable...
     unsigned int nvar = vecs->nvar;
     for (unsigned int ivar=0; ivar < nvar; ++ivar) {
-        // Fill our dense var
-        denseE = nan;
-        for (unsigned int i=0; i<vecs->index.size(); ++i) {
-            auto iE(vecs->index[i]);
-            if (iE >= nE) (*icebin_error)(-1,
-                "Index out of range: %ld vs. %ld", (long)iE, (long)nE);
-            denseE(iE) = vecs->vals[i*nvar + ivar];
-        }
+        vecs->to_dense(ivar, scaleE, nan, denseE);
 
         // Store in the netCDF variable
         NcVar ncvar(nc->getVar(vname_base + (*contract)[ivar].name));
@@ -337,16 +332,10 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
             break;
         }
 
-printf("indexing extent1 = %ld\n", indexing->extent());
-
+        // The indexing is used from gcm_regridder.  This will result in nhc_ice
         ncio_dense(ncio, out.gcm_ivalss_s[iAE], gcm_inputs[iAE],
             *indexing, vname_base);
 
-        auto dims(get_or_add_dims(ncio,
-            {"gcm_ivalss_weight_"+IndexAE_labels[iAE]+"_len"},
-            {out.gcm_ivalss_weight_s[iAE].size()}));
-        ncio_vector(ncio, out.gcm_ivalss_weight_s[iAE], false,
-            "gcm_ivalss_weight_"+IndexAE_labels[iAE]+"_s", "double", dims);
     }
 
 //    ncio_spsparse(ncio, out.E1vE0_unscaled, false, vname_base+"E1vE0_unscaled");

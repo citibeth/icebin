@@ -167,7 +167,6 @@ public:
         VectorMultivec const &gcm_ovalsE_s,
         // ------- Output Variables (Uses IndexAE::A and IndexAE::E in them)
         std::vector<VectorMultivec> &gcm_ivalss_s,                // (accumulate over many ice sheets)
-        std::vector<std::vector<double>> &gcm_ivalss_weight_s,    // (accumulate over many ice sheets)
         // ------- Flags
         bool run_ice);
 

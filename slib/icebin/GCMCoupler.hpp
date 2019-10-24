@@ -59,7 +59,6 @@ struct GCMInput {
     // _s = sparse indexing
     /** Contract inputs for the GCM on the A and E grid (See IndexAE) */
     std::vector<VectorMultivec> gcm_ivalss_s;
-    std::vector<std::vector<double>> gcm_ivalss_weight_s;
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
