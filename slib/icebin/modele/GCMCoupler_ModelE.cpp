@@ -710,7 +710,7 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                 int const i = ijk[0];
                 int const j = ijk[1];
                 int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
-                int const ihc_gcm = gcm_params.icebin_base_hc + ihc_ice;
+                int const ihc_gcm = ihc_ice;
 
                 for (int ivar=0; ivar<nvar; ++ivar) {
                     // Original Fortran (partial) arrays have been converted to
