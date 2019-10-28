@@ -632,6 +632,7 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
 {
     printf("BEGIN GCMCoupler_ModelE::apply_gcm_ivals\n");
     auto nvar(out.nvar());    // A and E
+    const auto nhc_ice(this->gcm_regridder->nhc());
 
     // Write to here...
     for (int iAE=0; iAE<GridAE::count; ++iAE) {
@@ -689,7 +690,11 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                 "gcm_ivalsE is wrong size: %ld vs. %ld (index_ae = %d)", gcm_ivalsE.size(), gcm_inputs[index_ae].size(), index_ae);
 
             // Clear output: because non-present elements in sparse gcm_ivalsA are 0
-            for (auto &gcm_ivalE : gcm_ivalsE) *gcm_ivalE = 0;
+            for (std::unique_ptr<blitz::Array<double,3>> &pp : gcm_ivalsE) {
+                blitz::Array<double,3> &gcm_ivalE(*pp);
+                // Stuff coming from coupler only deals with local ice ECs.
+                gcm_ivalE(blitz::Range(0,nhc_ice-1),blitz::Range::all(),blitz::Range::all()) = 0;
+            }
 
             // Create (inverse of) summed weights
             blitz::Array<double,1> sE_s(gcm_regridder->nE());
