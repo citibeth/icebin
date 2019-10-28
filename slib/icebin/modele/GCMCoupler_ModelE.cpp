@@ -691,16 +691,9 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
             // Clear output: because non-present elements in sparse gcm_ivalsA are 0
             for (auto &gcm_ivalE : gcm_ivalsE) *gcm_ivalE = 0;
 
-            // Create summed weights
+            // Create (inverse of) summed weights
             blitz::Array<double,1> sE_s(gcm_regridder->nE());
-            sE_s = 0;
-            for (int iE_d=0; iE_d<gcm_ivalsE_s.size(); ++iE_d) {
-                auto iE_s(gcm_ivalsE_s.index[iE_d]);
-                sE_s(iE_s) += gcm_ivalsE_s.vals[iE_d];
-            }
-            for (int iE_s=0; iE_s<sE_s.extent(0); ++iE_s) {
-                sE_s(iE_s) = 1. / sE_s(iE_s);    // Will create NaNs but we dont care...
-            }
+            gcm_ivalsE_s.to_dense_scale(sE_s);
 
             // Copy sparse arrays to output
             int const nvar = gcm_inputs[index_ae].size();
