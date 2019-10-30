@@ -92,6 +92,66 @@ rank_of_j(endj[endj.size()-1], blitz::fortranArray)    // Allocate for 1-based i
 
 // ======================================================================
 // ======================================================================
+// Useful debugging printout functions; to be enabled if used.
+#if 0
+static void print_stuffE(GCMCoupler_ModelE const *self,
+    VectorMultivec const &gcm_ivalsE_s,
+    VarSet const &gcm_inputsE)
+{
+    printf("gcm_ivalsE_s.index.size() = %ld\n", gcm_ivalsE_s.index.size());
+    printf("gcm_ivalsE_s.weights.size() = %ld\n", gcm_ivalsE_s.weights.size());
+    int n=0;
+    for (size_t i=0; i<gcm_ivalsE_s.size(); ++i) {
+        long iE = gcm_ivalsE_s.index[i];
+        auto ijk(self->gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));    // zero-based, alphabetical order
+        if (ijk[0] == 0) {
+            double const *vals = &gcm_ivalsE_s.vals[i*gcm_ivalsE_s.nvar];
+            if (std::isnan(vals[1])) continue;
+            printf("    %ld j=%d ihc=%d (w=%g):", iE, ijk[1], ijk[2], gcm_ivalsE_s.weights[i]);
+            for (int j=0; j<gcm_ivalsE_s.nvar; ++j) printf(" %g", vals[j]);
+            printf("\n");
+            if (++n >= 10) return;
+        }
+    }
+}
+
+static void print_stuffE(GCMCoupler_ModelE const *self, GCMInput const &out)
+{
+    VectorMultivec const &gcm_ivalsE_s(out.gcm_ivalss_s[(int)IndexAE::ETOPO]);
+    VarSet const &gcm_inputsE(self->gcm_inputs[(int)IndexAE::ETOPO]);
+    print_stuffE(self, gcm_ivalsE_s, gcm_inputsE);
+}
+
+
+
+static void print_stuffA(GCMCoupler_ModelE const *self,
+    VectorMultivec const &gcm_ivalsA_s,
+    VarSet const &gcm_inputsA)
+{
+    printf("gcm_ivalsA_s.index.size() = %ld\n", gcm_ivalsA_s.index.size());
+    printf("gcm_ivalsA_s.weights.size() = %ld\n", gcm_ivalsA_s.weights.size());
+    int n=0;
+    for (size_t i=0; i<gcm_ivalsA_s.size(); ++i) {
+        long iA = gcm_ivalsA_s.index[i];
+        auto ij(self->gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
+        if (ij[0] == 0) {
+            double const *vals = &gcm_ivalsA_s.vals[i*gcm_ivalsA_s.nvar];
+            printf("    %ld j=%d (w=%g):", iA, ij[1], gcm_ivalsA_s.weights[i]);
+            for (int j=0; j<gcm_ivalsA_s.nvar; ++j) printf(" %g", vals[j]);
+            printf("\n");
+            if (++n >= 10) return;
+        }
+    }
+}
+
+static void print_stuffA(GCMCoupler_ModelE const *self, GCMInput const &out)
+{
+
+    VectorMultivec const &gcm_ivalsA_s(out.gcm_ivalss_s[(int)IndexAE::ATOPO]);
+    VarSet const &gcm_inputsA(self->gcm_inputs[(int)IndexAE::ATOPO]);
+    print_stuffA(self, gcm_ivalsA_s, gcm_inputsA);
+}
+#endif
 // ======================================================================
 // Called from LISnow::allocate()
 GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
@@ -582,17 +642,6 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
 
         // Concatenate coupler inputs
         VectorMultivec gcm_ovalsE_s(concatenate(every_gcm_ovalsE_s));
-#if 0
-printf("BEGIN gcm_ovalsE_s nvar=%d\n", gcm_ovalsE_s.nvar);
-for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
-    auto &iE_s(gcm_ovalsE_s.index[i]);
-    double *vals(&gcm_ovalsE_s.vals[i*gcm_ovalsE_s.nvar]);
-    printf("gcm_ovalsE_s[iE_s=%ld] =", iE_s);
-    for (int j=0; j<gcm_ovalsE_s.nvar; ++j) printf(" %g", vals[j]);
-    printf("\n");
-}
-printf("END gcm_ovalsE_s\n");
-#endif
 
         // Couple on root!
         out = self->couple(time_s, gcm_ovalsE_s, run_ice);  // move semantics
@@ -676,6 +725,7 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                     // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
                     (*gcm_ivalsA[ivar])(j,i) +=
                         gcm_ivalsA_s.vals[ix*nvar + ivar] * sA_s(iA);
+                }
             }
         } break;
         case 'E' : {
