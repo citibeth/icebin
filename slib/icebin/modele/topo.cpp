@@ -514,6 +514,20 @@ void TopoABundles::ncio(NcIO &ncio, std::vector<netCDF::NcDim> const &ncdims)
 }
 
 // ------------------------------------------------------------------------
+static void merge_poles(blitz::Array<double,2> &var)
+{
+    std::array<int,2> const jix {var.lbound(0), var.ubound(0)};
+    for (int j : jix) {
+        double sum = 0;
+        for (int i=var.lbound(1); i <= var.ubound(1); ++i)
+            sum += var(j,i);
+        double const mean = sum / (double)(var.ubound(1)-var.lbound(1)+1);
+
+        for (int i=var.lbound(1); i <= var.ubound(1); ++i)
+            var(j,i) = mean;
+    }
+}
+// ------------------------------------------------------------------------
 std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
@@ -558,11 +572,23 @@ blitz::Array<int16_t,3> &underice3)
     hntr_AvO.regrid(WTO, zlakeOm2, zlakeA2);
     hntr_AvO.regrid(fgiceOm2, zicetopOm2, zicetopA2);
 
+    merge_poles(foceanA2);
+    merge_poles(flakeA2);
+    merge_poles(fgrndA2);
+    merge_poles(fgiceA2);
+    merge_poles(zatmoA2);
+    merge_poles(zlakeA2);
+    merge_poles(zicetopA2);
+
+
+
+#if 0    // not needed
     auto foceanOm(reshape1(foceanOm2));
     auto flakeOm(reshape1(flakeOm2));
     auto fgiceOm(reshape1(fgiceOm2));
     auto zatmoOm(reshape1(zatmoOm2));
     auto zicetopO(reshape1(zicetopOm2));
+#endif
 
     auto foceanA(reshape1(foceanA2));
     auto flakeA(reshape1(flakeA2));
@@ -613,6 +639,16 @@ blitz::Array<int16_t,3> &underice3)
         undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
     }
 
+    // Merge grid cells on south pole
+    // (there is no ice on north pole, so fhc==0 alrady there)
+    for (int ihc=0; ihc<nhc_icebin; ++ihc) {
+        double fhc_sum = 0;
+        for (int i=0; i<hspecA.im; ++i) fhc_sum += fhc3(ihc,0,i);
+        double const fhc_mean = fhc_sum / (double)hspecA.im;
+        for (int i=0; i<hspecA.im; ++i) fhc3(ihc,0,i) = fhc_mean;
+    }
+
+    // Set EC levels and EC halos
     for (int j=0; j<hspecA.jm; ++j) {
     for (int i=0; i<hspecA.im; ++i) {
         int minhc=10000;
