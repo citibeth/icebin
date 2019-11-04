@@ -480,8 +480,12 @@ int const nhc_gcm)
             d.meta.sdims,
             std::vector<std::pair<std::string, std::string>>(d.meta.attr)));
     }
-    this->a.allocate(std::array<int,2>{hspecA.jm, hspecA.im}, {"jm","im"}, false);    // check=false
+    this->a_i.add("mergemask", {
+        "description", "1 where TOPO generator has merged from local ice sheets"
+    });
 
+    this->a.allocate(std::array<int,2>{hspecA.jm, hspecA.im}, {"jm","im"}, false);    // check=false
+    this->a_i.allocate(std::array<int,2>{hspecA.jm, hspecA.im}, {"jm","im"}, false);    // check=false
 
     // --------------- Allocate 3D arrays to go in TOPOA file
     auto &fhc(this->a3.add("fhc", {
@@ -509,6 +513,7 @@ void TopoABundles::ncio(NcIO &ncio, std::vector<netCDF::NcDim> const &ncdims)
     auto &im(ncdims[2]);
 
     this->a.ncio(ncio, {}, "", "double", {jm, im});
+    this->a_i.ncio(ncio, {}, "", "short", {jm,im});  // Must be short for NetCDF3
     this->a3.ncio(ncio, {}, "", "double", ncdims);
     this->a3_i.ncio(ncio, {}, "", "short", ncdims);  // Must be short for NetCDF3
 }
@@ -538,6 +543,7 @@ blitz::Array<double,2> const &fgiceOm2,
 blitz::Array<double,2> const &zatmoOm2,
 blitz::Array<double,2> const &zlakeOm2,
 blitz::Array<double,2> const &zicetopOm2,
+blitz::Array<int16_t,2> const &mergemaskOm2,
 //
 // Things obtained from gcmA
 HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
@@ -555,6 +561,7 @@ blitz::Array<double,2> &fgiceA2,
 blitz::Array<double,2> &zatmoA2,
 blitz::Array<double,2> &zlakeA2,
 blitz::Array<double,2> &zicetopA2,
+blitz::Array<int16_t,2> &mergemaskA2,
 //
 blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,
@@ -571,6 +578,15 @@ blitz::Array<int16_t,3> &underice3)
     hntr_AvO.regrid(WTO, zatmoOm2, zatmoA2);
     hntr_AvO.regrid(WTO, zlakeOm2, zlakeA2);
     hntr_AvO.regrid(fgiceOm2, zicetopOm2, zicetopA2);
+
+    // Regrid mergemask (mask, not a double)
+    blitz::Array<double, 2> mergemaskA2_d(hspecA.jm,hspecA.im);
+    hntr_AvO.regrid(WTO, mergemaskOm2, mergemaskA2_d);
+    merge_poles(mergemaskA2_d);
+    for (int j=0; j<hspecA.jm; ++j) {
+    for (int i=0; i<hspecA.im; ++i) {
+        mergemaskA2(j,i) = (mergemaskA2_d(j,i) == 0 ? 0 : 1);
+    }}
 
     merge_poles(foceanA2);
     merge_poles(flakeA2);

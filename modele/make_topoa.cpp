@@ -141,6 +141,11 @@ int main(int argc, char **argv)
     // Read input file, and allocate output arrays, ready to save to output file.
     auto topoo(topoo_bundle(BundleOType::MAKEA, args.topoo_fname));
     TopoABundles topoa(topoo, hspecA, nhc_gcm);
+    blitz::Array<int16_t,2> mergemaskOm(hspecO.jm, hspecO.im);
+    {NcIO ncio(args.topoo_fname, 'r');
+        ncio_blitz(ncio, mergemaskOm, "MERGEMASK", "short", {});
+    }
+
 
     // --------- Fetch just-allocated arrays
     auto &foceanOm(topoo.array("FOCEAN"));
@@ -159,12 +164,12 @@ int main(int argc, char **argv)
     auto &zatmoA(topoa.a.array("zatmo"));
     auto &hlakeA(topoa.a.array("hlake"));
     auto &zicetopA(topoa.a.array("zicetop"));
+    auto &mergemaskA(topoa.a_i.array("mergemask"));
 
     auto &fhc(topoa.a3.array("fhc"));
     auto &elevE(topoa.a3.array("elevE"));
 
     auto &underice(topoa.a3_i.array("underice"));
-
 
     // ------------------- Create AAmvEAm, needed for TOPOA
     std::unique_ptr<ConstUniverseT> const_dimAOp(
@@ -183,10 +188,10 @@ int main(int argc, char **argv)
 
     // ---------------- Create TOPOA in memory
     std::vector<std::string> errors(make_topoA(
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm, mergemaskOm,
         hspecO, hspecA, indexingHCA, hcdefs, underice_hc,
         AAmvEAm,
-        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA, mergemaskA,
         fhc, elevE, underice));
 
     // Print sanity check errors to STDERR

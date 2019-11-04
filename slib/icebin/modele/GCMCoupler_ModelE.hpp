@@ -152,6 +152,9 @@ public:
     blitz::Array<double,1> _foceanAOm;
 
 
+    /** Merge mask from last timestep */
+    blitz::Array<int16_t,2> mergemaskA0;
+
 public:
     virtual ~GCMCoupler_ModelE() {}
 

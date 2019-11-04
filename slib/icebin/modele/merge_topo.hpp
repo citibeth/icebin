@@ -48,6 +48,7 @@ blitz::Array<double,2> &fgiceOm2,
 blitz::Array<double,2> &zatmoOm2,
 // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
+blitz::Array<int16_t,2> &mergemaskOm2,   // OUT only.  Indicates where merging of local into global ice took place.  Only update these gridcells.
 // ------ Local ice to merge in...
 GCMRegridder_Standard *gcmO,
 RegridParams const &paramsA,

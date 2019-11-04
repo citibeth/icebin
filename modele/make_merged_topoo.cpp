@@ -185,6 +185,9 @@ int main(int argc, char **argv)
     auto &zlakeOm(topoo.array("ZLAKE"));
     auto &zicetopO(topoo.array("ZICETOP"));
 
+    // This is created in the merge.
+    blitz::Array<int16_t,2> mergemaskO(hspecO.jm,hspecO.im);
+
     // Read the GCMRegridder
     GCMRegridder_Standard gcmO;
     {NcIO gcmO_nc(args.gcmO_fname, 'r');
@@ -207,7 +210,7 @@ int main(int argc, char **argv)
     // We need correctA=true here to get FOCEANF, etc.
     merge_topoO(
         foceanOp, fgiceOp, zatmoOp,
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, &gcmO,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, mergemaskO, &gcmO,
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, args.eq_rad, errors);
 
@@ -277,6 +280,9 @@ int main(int argc, char **argv)
             ncvar.putAtt("description", "Depth of Ocean");
             ncvar.putAtt("units", zsgloO_units);
             ncvar.putAtt("sources", zsgloO_sources);
+        auto ncvar2(ncio_blitz(ncio, mergemaskO, "MERGEMASK", "short", dims));
+            ncvar.putAtt("description", "Identifies where merging changed the background fields");
+
     }
 
     if (errors.size() > 0) return -1;

@@ -142,6 +142,7 @@ std::string const &topoO_fname = "");
 struct TopoABundles {
     /** 2-D variables on A (atmosphere) grid (eg: focean, flake, etc) */
     ibmisc::ArrayBundle<double,2> a;
+    ibmisc::ArrayBundle<int16_t,2> a_i;
 
     /** 3-d variables on elevation grid associated with A (atmosphere)
     grid.  Eg: fhc */
@@ -183,6 +184,8 @@ blitz::Array<double,2> const &fgiceOm2,
 blitz::Array<double,2> const &zatmoOm2,
 blitz::Array<double,2> const &zlakeOm2,
 blitz::Array<double,2> const &zicetopOm2,
+blitz::Array<int16_t,2> const &mergemaskOm2,
+
 //
 // Things obtained from gcmA
 HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec).hntr
@@ -200,6 +203,7 @@ blitz::Array<double,2> &fgiceA2,
 blitz::Array<double,2> &zatmoA2,
 blitz::Array<double,2> &zlakeA2,
 blitz::Array<double,2> &zicetopA2,
+blitz::Array<int16_t,2> &mergemaskA2,
 //
 blitz::Array<double,3> &fhc3,
 blitz::Array<double,3> &elevE3,

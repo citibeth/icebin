@@ -3,6 +3,7 @@
 #include <icebin/modele/grids.hpp>
 #include <icebin/eigen_types.hpp>
 #include <ibmisc/linear/compressed.hpp>
+#include <ibmisc/const.hpp>
 
 using namespace blitz;
 using namespace ibmisc;
@@ -90,6 +91,7 @@ blitz::Array<double,2> &fgiceOm2,
 blitz::Array<double,2> &zatmoOm2,
 // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
+blitz::Array<int16_t,2> &mergemaskOm2,   // OUT only.  Indicates where merging of local into global ice took place.  Only update these gridcells.
 // ------ Local ice sheets to merge in...
 GCMRegridder_Standard *gcmO,    // Multiple IceRegridders
 RegridParams const &paramsA,
@@ -98,6 +100,38 @@ std::vector<blitz::Array<double,1>> const &emI_ices,
 double const eq_rad,    // Radius of the earth
 std::vector<std::string> &errors)
 {
+
+#if 0
+// Log inputs for debugging
+{
+    auto &indexing(gcmO->ice_regridders()[0]->agridI.indexing);
+    blitz::TinyVector<int,2> shapeI(indexing[1].extent, indexing[0].extent);
+    auto emI_land2(unconst(reshape<double,1,2>(emI_lands[0], shapeI)));
+    auto emI_ice2(unconst(reshape<double,1,2>(emI_ices[0], shapeI)));
+
+
+    NcIO ncio("merge_topoO-in.nc", 'w');
+
+    auto dims(get_or_add_dims(ncio, {"jmO", "imO"}, {foceanOp2.extent(0), foceanOp2.extent(1)}));
+    ncio_blitz(ncio, foceanOp2, "foceanO", "double", dims);
+    ncio_blitz(ncio, fgiceOp2, "fgiceO", "double", dims);
+    ncio_blitz(ncio, zatmoOp2, "zatmoO", "double", dims);
+    ncio_blitz(ncio, foceanOp2, "foceanO", "double", dims);
+    ncio_blitz(ncio, flakeOm2, "flakeO", "double", dims);
+    ncio_blitz(ncio, fgrndOm2, "fgrndO", "double", dims);
+    ncio_blitz(ncio, fgiceOm2, "fgiceO", "double", dims);
+    ncio_blitz(ncio, zatmoOm2, "zatmoO", "double", dims);
+    ncio_blitz(ncio, zicetopO2, "zicetopO", "double", dims);
+    //paramsA.ncio(ncio, "paramsA");
+
+    auto dimsI(get_or_add_dims(ncio, {"jI", "iI"}, {shapeI(0), shapeI(1)}));
+    ncio_blitz(ncio, emI_land2, "emI_land", "double", dimsI);
+    ncio_blitz(ncio, emI_ice2, "emI_ice", "double", dimsI);
+    ncio.flush();
+}
+#endif
+
+    mergemaskOm2 = 0;
 
     auto foceanOp(reshape1(foceanOp2));
     auto fgiceOp(reshape1(fgiceOp2));
@@ -108,6 +142,7 @@ std::vector<std::string> &errors)
     auto fgiceOm(reshape1(fgiceOm2));
     auto zatmoOm(reshape1(zatmoOm2));
     auto zicetopO(reshape1(zicetopO2));
+    auto mergemaskOm(reshape1(mergemaskOm2));
 
     // Sanity check inputs
     sanity_nonan("foceanOp2-0", foceanOp2, errors);
@@ -150,6 +185,7 @@ std::vector<std::string> &errors)
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
                 auto const iO_s = sheet.dimO.to_sparse(iO_d);
                 da_zicetopO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA->native_area(gcmO->agridA->dim.to_dense(iO_s)); //sheet.wO(iO_d);
+                mergemaskOm(iO_s) = 1;
             }
         }
 
@@ -193,6 +229,7 @@ std::vector<std::string> &errors)
 
         double  const fgiceOp0 = fgiceOp(iO);
         double const diff_fgiceOp = da_giceO(iO) * by_areaO;
+        if (diff_fgiceOp != 0) mergemaskOm(iO) = 1;
         fgiceOp(iO) = fgiceOp(iO) + diff_fgiceOp;
         foceanOp(iO) = foceanOp(iO) - da_contO(iO)*by_areaO;
         zatmoOp(iO) += da_zatmoO(iO) * by_areaO;
@@ -209,6 +246,7 @@ std::vector<std::string> &errors)
             double const fact = 1. / (1. - foceanOp(iO));
             foceanOm(iO) = 0.0;
             fgiceOm(iO) = fgiceOp(iO) * fact;
+            mergemaskOm(iO) = 1;
             fgrndOm(iO) = 1.0 - fgiceOm(iO) - flakeOm(iO);
             zatmoOm(iO) = zatmoOp(iO) * fact;
         }
@@ -254,6 +292,28 @@ std::vector<std::string> &errors)
     sanity_nonan("zatmoOm2", zatmoOm2, errors);
     sanity_nonan("zicetopO2", zicetopO2, errors);
     sanity_check_land_fractions(foceanOm2, flakeOm2, fgrndOm2, fgiceOm2, errors);
+
+#if 0
+// Log outputs for debugging
+{
+    NcIO ncio("merge_topoO-out.nc", 'w');
+
+    auto dims(get_or_add_dims(ncio, {"jmO", "imO"}, {foceanOp2.extent(0), foceanOp2.extent(1)}));
+    ncio_blitz(ncio, foceanOp2, "focean", "double", dims);
+    ncio_blitz(ncio, fgiceOp2, "fgice", "double", dims);
+    ncio_blitz(ncio, zatmoOp2, "zatmo", "double", dims);
+    ncio_blitz(ncio, foceanOp2, "focean", "double", dims);
+    ncio_blitz(ncio, flakeOm2, "flake", "double", dims);
+    ncio_blitz(ncio, fgrndOm2, "fgrnd", "double", dims);
+    ncio_blitz(ncio, fgiceOm2, "fgice", "double", dims);
+    ncio_blitz(ncio, zatmoOm2, "zatmo", "double", dims);
+    ncio_blitz(ncio, zicetopO2, "zicetop", "double", dims);
+    ncio_blitz(ncio, mergemaskOm2, "mergemask", "short", dims);
+
+    ncio.flush();
+}
+#endif
+
 }
 
 /** Creates a new indexingHC (1-D Atm. grid indexing plus nhc)

@@ -826,6 +826,7 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         auto &zatmoOm(topoo.array("ZATMO"));
         auto &zlakeOm(topoo.array("ZLAKE"));
         auto &zicetopO(topoo.array("ZICETOP"));
+        blitz::Array<int16_t,2> mergemaskO(zicetopO.extent());
 
     // Allocate space for TOPOA output variables (variables in TOPOA file)
     TopoABundles topoa(topoo, gcmA->hspecA(), nhc_gcm());
@@ -836,6 +837,8 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         auto &zatmoA(topoa.a.array("zatmo"));
         auto &hlakeA(topoa.a.array("hlake"));
         auto &zicetopA(topoa.a.array("zicetop"));
+        auto &mergemaskA(topoa.a_i.array("mergemask"));
+        if (!run_ice) mergemaskA0.reference(mergemaskA);  // no mergemask on initialization
 
         auto &fhc(topoa.a3.array("fhc"));
         auto &elevE(topoa.a3.array("elevE"));
@@ -849,7 +852,7 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
     // merge_topoO() merges PISM ice sheets (emI_ices, etc) into foceanOp / foceanOm
     merge_topoO(
         foceanOp, fgiceOp, zatmoOp,  // Our own bundle
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, &*gcmA->gcmO,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, mergemaskO, &*gcmA->gcmO,
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, gcmA->specO().eq_rad, errors);
 
@@ -887,10 +890,10 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
     for (int ihc=0; ihc<gcmA->nhc(); ++ihc) underice_hc.push_back(gcmA->underice(ihc));
 
     std::vector<std::string> errors2(make_topoA(
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopO,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopO, mergemaskO,
         gcmA->hspecO(), gcmA->hspecA(), gcmA->indexingHC, gcmA->hcdefs(), underice_hc,
         AAmvEAm,
-        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA, mergemaskA,
         fhc, elevE, underice_i));
 
     // Print sanity check errors to STDERR
@@ -937,6 +940,8 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         std::vector<double> val(gcm_ivalsA_s.nvar);
         for (int j=0; j<hspecA.jm; ++j) {
         for (int i=0; i<hspecA.im; ++i) {
+            if (mergemaskA(j,i) == 0 && mergemaskA0(j,i) == 0) continue;
+
             for (int k=0; k<gcm_ivalsA_s.nvar; ++k) {
                 val[k] = (*iarrays[k])(j,i);
             }
@@ -969,6 +974,8 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         for (int ihc=0; ihc<nhc; ++ihc) {
         for (int j=0; j<hspecA.jm; ++j) {
         for (int i=0; i<hspecA.im; ++i) {
+            if (mergemaskA(j,i) == 0 && mergemaskA0(j,i) == 0) continue;
+
             for (int k=0; k<gcm_ivalsE_s.nvar; ++k) {
                 val[k] = (*iarrays[k])(ihc,j,i);
             }
@@ -977,6 +984,8 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         }}}
     }
 
+    // Store this timestep's mergemask for next coupling time
+    mergemaskA0.reference(mergemaskA);
 }
 
 // ----------------------------------------------------------------------
