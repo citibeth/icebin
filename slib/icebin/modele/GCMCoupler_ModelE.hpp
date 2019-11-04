@@ -242,6 +242,7 @@ GCMCoupler_ModelE *self,
 ibmisc::F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+double mm, double bb,
 char const *long_name_f, int long_name_len);
 
 /** @para var_nhc Number of elevation points for this variable.
@@ -254,6 +255,7 @@ int index_ae,
 ibmisc::F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+double mm, double bb,
 bool initial,    // bool
 char const *long_name_f, int long_name_len);
 
@@ -264,6 +266,7 @@ int index_ae,
 ibmisc::F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+double mm, double bb,
 int initial,    // bool
 char const *long_name_f, int long_name_len);
 

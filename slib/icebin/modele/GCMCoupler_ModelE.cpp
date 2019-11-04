@@ -164,7 +164,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
     // can be computed at or before contract initialization time can
     // be placed directly into the VarTransformer.
 
-    scalars.add("by_dt", nan, "s-1", 1., "Inverse of coupling timestep");
+    scalars.add("by_dt", nan, "s-1", 0, "Inverse of coupling timestep");
 
 
     // Set up gcm_inputs array   (see IndexAE:  enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;)
@@ -347,6 +347,7 @@ GCMCoupler_ModelE *self,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+double mm, double bb,
 char const *long_name_f, int long_name_len)
 {
     std::string field_name(field_name_f, field_name_len);
@@ -359,7 +360,7 @@ char const *long_name_f, int long_name_len)
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
     self->gcm_outputsE.add(
-        field_name, xnan, units, flags, long_name);
+        field_name, xnan, units, mm, bb, flags, long_name);
 
     self->gcm_ovalsE.push_back(std::move(var));
 }
@@ -374,6 +375,7 @@ int index_ae,
 F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+double mm, double bb,
 bool initial,    // bool
 char const *long_name_f, int long_name_len)
 {
@@ -396,7 +398,7 @@ char const *long_name_f, int long_name_len)
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
     self->gcm_inputs[index_ae].add(
-        field_name, xnan, units, flags, long_name);
+        field_name, xnan, units, mm, bb, flags, long_name);
 
     self->gcm_ivalssA[index_ae].push_back(std::move(var));
 }
@@ -408,6 +410,7 @@ int index_ae,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+double mm, double bb,
 int initial,    // bool
 char const *long_name_f, int long_name_len)
 {
@@ -430,7 +433,7 @@ char const *long_name_f, int long_name_len)
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
     self->gcm_inputs[index_ae].add(
-        field_name, xnan, units, flags, long_name);
+        field_name, xnan, units, mm, bb, flags, long_name);
 
     self->gcm_ivalssE[index_ae].push_back(std::move(var));
 }
@@ -703,10 +706,16 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
             if (gcm_ivalsA.size() != gcm_inputs[index_ae].size()) (*icebin_error)(-1,
                 "gcm_ivalsA is wrong size: %ld vs. %ld", gcm_ivalsA.size(), gcm_inputs[index_ae].size());
 
-            // Clear output: because non-present elements in sparse gcm_ivalsA are 0
-            for (std::unique_ptr<blitz::Array<double,2>> &pp : gcm_ivalsA) {
-                blitz::Array<double,2> &gcm_ivalA(*pp);
-                gcm_ivalA = 0;
+            // Clear output; but only for gridcells we want to touch
+            int const nvar = gcm_inputs[index_ae].size();
+            for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
+                long const iA = gcm_ivalsA_s.index[ix];
+                auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
+                int const i = ij[0];
+                int const j = ij[1];
+                for (int ivar=0; ivar<nvar; ++ivar) {
+                    (*gcm_ivalsA[ivar])(j,i) = 0;
+                }
             }
 
             // Create (inverse of) summed weights
@@ -714,7 +723,6 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
             gcm_ivalsA_s.to_dense_scale(sA_s);
 
             // Copy sparse arrays to output
-            int const nvar = gcm_inputs[index_ae].size();
             for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
                 long const iA = gcm_ivalsA_s.index[ix];
                 auto ij(gcm_regridder->indexing(GridAE::A).index_to_tuple<int,2>(iA));    // zero-based, alphabetical order
@@ -740,10 +748,20 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
                 "gcm_ivalsE is wrong size: %ld vs. %ld (index_ae = %d)", gcm_ivalsE.size(), gcm_inputs[index_ae].size(), index_ae);
 
             // Clear output: because non-present elements in sparse gcm_ivalsA are 0
-            for (std::unique_ptr<blitz::Array<double,3>> &pp : gcm_ivalsE) {
-                blitz::Array<double,3> &gcm_ivalE(*pp);
-                // Stuff coming from coupler only deals with local ice ECs.
-                gcm_ivalE(blitz::Range(0,nhc_ice-1),blitz::Range::all(),blitz::Range::all()) = 0;
+            int const nvar = gcm_inputs[index_ae].size();
+            for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
+                long const iE = gcm_ivalsE_s.index[ix];
+                auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
+                int const i = ijk[0];
+                int const j = ijk[1];
+                int const ihc_ice = ijk[2];    // zero-based, just EC's known by ice model
+                int const ihc_gcm = ihc_ice;
+
+                for (int ivar=0; ivar<nvar; ++ivar) {
+                    // Original Fortran (partial) arrays have been converted to
+                    // C++ order and 0-based indexing; see gcmce_add_gcm_inputa()
+                    (*gcm_ivalsE[ivar])(blitz::Range(0,nhc_ice-1),j,i) = 0;
+                }
             }
 
             // Create (inverse of) summed weights
@@ -751,7 +769,6 @@ void GCMCoupler_ModelE::apply_gcm_ivals(GCMInput const &out)
             gcm_ivalsE_s.to_dense_scale(sE_s);
 
             // Copy sparse arrays to output
-            int const nvar = gcm_inputs[index_ae].size();
             for (size_t ix=0; ix<gcm_ivalsE_s.size(); ++ix) {
                 long const iE = gcm_ivalsE_s.index[ix];
                 auto ijk(gcm_regridder->indexing(GridAE::E).index_to_tuple<int,3>(iE));
@@ -1100,6 +1117,25 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         ncio_gcm_input(ncio, out, timespan, time_unit, "");
         ncio();
     }
+
+    // ---------- Apply scaling originally set in gcmce_add_xxx()
+    // (More trouble-free to do this here, rather than in
+    // IceCoupler::couple() and update_topo() )
+    for (size_t index_ae=0; index_ae < gcm_inputs.size(); ++index_ae) {
+        VarSet const &gcm_inputsA(gcm_inputs[index_ae]);
+        int const nvar = gcm_inputsA.size();
+        VectorMultivec &gcm_ivalsA_s(out.gcm_ivalss_s[index_ae]);
+
+        for (size_t ix=0; ix<gcm_ivalsA_s.size(); ++ix) {    // Iterate through elements of parallel arrays
+            for (int ivar=0; ivar<nvar; ++ivar) {
+                double &val(gcm_ivalsA_s.vals[ix*nvar + ivar]);
+                VarMeta const &gcm_input(gcm_inputsA.data[ivar]);
+                val = val * gcm_input.mm + gcm_input.bb;
+            }
+        }
+    }
+
+
 
 printf("END GCMCoupler::couple()\n");
     return out;

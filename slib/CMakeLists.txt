@@ -42,6 +42,7 @@ set(icebin_SOURCES
     icebin/IceRegridder_L0.cpp
     icebin/RegridMatrices_Dynamic.cpp
     icebin/eigen_types.cpp
+    icebin/VarSet.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/f90blitz_f.f90
 )
 

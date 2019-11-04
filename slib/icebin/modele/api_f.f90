@@ -92,6 +92,7 @@ INTERFACE
         api, var_f, &
         field_f, field_len, &
         units_f, units_len, &
+        mm, bb, &
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
     use icebin_f90blitz
@@ -101,6 +102,7 @@ INTERFACE
         integer(c_int), value :: field_len
         character(c_char) :: units_f(*)
         integer(c_int), value :: units_len
+        real(c_double), value :: mm, bb
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: long_name_len
     end subroutine gcmce_add_gcm_outputE
@@ -110,6 +112,7 @@ INTERFACE
         api, index_ae, var_f, &
         field_f, field_len, &
         units_f, units_len, &
+        mm, bb, &
         initial, &
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
@@ -121,6 +124,7 @@ INTERFACE
         integer(c_int), value :: field_len
         character(c_char) :: units_f(*)
         integer(c_int), value :: units_len
+        real(c_double), value :: mm, bb
         character(c_char) :: long_name_f(*)
         logical(c_bool), value :: initial
         integer(c_int), value :: long_name_len
@@ -131,6 +135,7 @@ INTERFACE
         api, index_ae, var_f, &
         field_f, field_len, &
         units_f, units_len, &
+        mm, bb, &
         initial, &
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
@@ -142,6 +147,7 @@ INTERFACE
         integer(c_int), value :: field_len
         character(c_char) :: units_f(*)
         integer(c_int), value :: units_len
+        real(c_double), value :: mm, bb
         logical(c_bool), value :: initial
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: long_name_len

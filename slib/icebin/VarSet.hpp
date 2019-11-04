@@ -22,6 +22,14 @@
 #include <ibmisc/IndexSet.hpp>
 #include <ibmisc/VarTransformer.hpp>
 
+namespace netCDF {
+    class NcVar;
+    class NcDim;
+}
+namespace ibmisc {
+    class NcIO;
+}
+
 namespace icebin {
 
 
@@ -34,6 +42,9 @@ struct VarMeta {
     unsigned flags;         //!< Allows arbitrary subsets
     /** A textual description of the variable, also called the "long name" */
     std::string description;
+    /** Rescaling factors... used in apply_gcm_inputs().  result = mm*source + bb */
+    double mm = 1;
+    double bb = 0;
 
     double default_value;
 };
@@ -51,20 +62,15 @@ public:
     int add(
         std::string const &name,
         double default_value, std::string const &units,
+        double mm, double bb,
         unsigned flags = 0,
-        std::string const &description = "<no description>")
-    {
-        size_t ix = index.insert(name);
+        std::string const &description = "<no description>");
 
-        VarMeta datum;
-        datum.name = name;
-        datum.default_value = default_value;
-        datum.units = units;
-        datum.flags = flags;
-        datum.description = description;
-        data.push_back(std::move(datum));
-        return ix;
-    }
+    int add(
+        std::string const &name,
+        double default_value, std::string const &units,
+        unsigned flags = 0,
+        std::string const &description = "<no description>");
 
     size_t size() const { return index.size(); }
 
@@ -77,15 +83,7 @@ public:
     /** Defines each variable in the DimSet, according to a set of dimensions. */
     netCDF::NcVar ncdefine(ibmisc::NcIO &ncio,
         std::vector<netCDF::NcDim> const &dims,
-        std::string vname_base) const
-    {
-        for (size_t i=0; i<size(); ++i) {
-            VarMeta const &var((*this)[i]);
-            auto ncvar(get_or_add_var(ncio, vname_base+var.name, "double", dims));
-            ncvar.putAtt("units", var.units);
-            ncvar.putAtt("description", var.description);
-        }
-    }
+        std::string vname_base) const;
 
 };
 
