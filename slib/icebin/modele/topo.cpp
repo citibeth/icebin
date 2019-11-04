@@ -611,8 +611,33 @@ blitz::Array<int16_t,3> &underice3)
         int const _ihc = ihc;    // Get around bug in Blitz++
         fhcE2(ihc,iA) += ii->value();
         undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
-        elevE2(ihc, iA) = hcdefs[ihc];
     }
+
+    for (int j=0; j<hspecA.jm; ++j) {
+    for (int i=0; i<hspecA.im; ++i) {
+        int minhc=10000;
+        int maxhc=-1;
+        for (int ihc=0; ihc<nhc_icebin; ++ihc) {
+            // Set elevE everywhere.  This is required by ModelE
+            // See downscale_temperature_li(), which doesn't
+            // look at fhc.
+            elevE3(ihc,j,i) = hcdefs[ihc];
+
+            // Determine min and max EC for
+            if (fhc3(ihc,j,i) != 0) {
+                minhc = std::min(minhc,ihc);
+                maxhc = std::max(maxhc,ihc);
+            }
+        }
+
+        // Create an EC "halo" in fhc, for ECs that might be used
+        // in the future.  This is NECESSARY for two-way coupling;
+        // and it should not affect results in the uncoupled case.
+        if (maxhc >= 0) {
+        for (int ihc=std::max(0,minhc-2); ihc<=std::max(maxhc+2,nhc_icebin); ++ihc) {
+            if (fhc3(ihc,j,i)==0) fhc3(ihc,j,i) = 1.e-30;
+        }}
+    }}
 
     // ------------ Segment 1: land part of sealand
     printf("Segment 1: seaLAND\n");
