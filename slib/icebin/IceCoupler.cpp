@@ -312,13 +312,13 @@ bool run_ice)
 
         // ========= Step the ice model forward
         if (writer[INPUT].get()) {
-printf("writing icemodel-in\n");
+            // writing icemodel-in
             writer[INPUT]->write(time_s, ice_ivalsI);
         }
         ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
         if (writer[OUTPUT].get()) {
-printf("writing icemodel-out\n");
+            // writing icemodel-out
             writer[OUTPUT]->write(time_s, ice_ovalsI);
         }
     }
@@ -443,7 +443,7 @@ printf("dimE1 extents 1: %p %ld %ld\n", &*dimE1, (long)dimE1->sparse_extent(), (
     // Compute IvE (for next timestep)
     std::unique_ptr<linear::Weighted_Eigen> IvE1(
         rm->matrix_d("IvE", {&dimI, &*dimE1},
-        RegridParams(true, true, {0,0,0}))); // scale=t, correctA=t
+        RegridParams(true, true, sigma))); // scale=t, correctA=t
 
     // wIvE0.reference(IvE1->wM);
 
@@ -464,11 +464,13 @@ printf("dimE1 extents 1: %p %ld %ld\n", &*dimE1, (long)dimE1->sparse_extent(), (
         IvE1->ncio(ncio, "IvE", {"dimI", "dimE"});
     }
 
-    // Save stuff for next time around
+    // ---------- Save stuff for next time around
     if (run_ice) {    // But not if first time
+        // Pass back stuff from last timestep
         ret.dimE0 = std::move(this->dimE0);
         ret.IvE0 = std::move(IvE0->M);
     }
+    // Store stuff from this timestep for next time around
     this->dimE0 = std::move(dimE1);
     this->IvE0 = std::move(IvE1);
 
