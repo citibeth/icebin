@@ -122,7 +122,7 @@ void IceCoupler::cold_start(
         for (int io=0; io<2; ++io) {    // INPUT / OUTPUT
             auto fname(
                 boost::filesystem::path(output_dir) /
-                (std::string("icemodel") + (io == 0 ? "-in.nc" : "-out.nc")));
+                (io == 0 ? "icemodel-in.nc" : "icemodel-out.nc"));
             this->writer[io].reset(new IceWriter(
                 this, &contract[io], fname.string()));
         }
@@ -190,6 +190,7 @@ std::vector<std::pair<std::string, double>> const &scalars,
 double dt,
 ibmisc::TmpAlloc &tmp)
 {
+printf("BEGIN construct_ice_ivalsI(dt=%g)\n", dt);
     auto nE0(gcm_ovalsE0.extent(0));
 
     // ------------- Form ice_ivalsI
@@ -226,9 +227,11 @@ ibmisc::TmpAlloc &tmp)
         blitz::shape(ice_ivalsI_e.cols(), ice_ivalsI_e.rows()),
         blitz::neverDeleteData);
 
+printf("AA6\n");
     // Continue construction in a contract-specific manner
     reconstruct_ice_ivalsI(ice_ivalsI, dt);
 
+printf("END construct_ice_ivalsI()\n", dt);
     return ice_ivalsI;
 }
 // -----------------------------------------------------------
@@ -307,10 +310,16 @@ bool run_ice)
             blitz::Array<double,2>(contract[INPUT].size(), nI()));
 
         // ========= Step the ice model forward
-        if (writer[INPUT].get()) writer[INPUT]->write(time_s, ice_ivalsI);
+        if (writer[INPUT].get()) {
+printf("writing icemodel-in\n");
+            writer[INPUT]->write(time_s, ice_ivalsI);
+        }
         ice_ovalsI = 0;
         run_timestep(time_s, ice_ivalsI, ice_ovalsI, run_ice);
-        if (writer[OUTPUT].get()) writer[OUTPUT]->write(time_s, ice_ovalsI);
+        if (writer[OUTPUT].get()) {
+printf("writing icemodel-out\n");
+            writer[OUTPUT]->write(time_s, ice_ovalsI);
+        }
     }
 
     // ========== Update regridding matrices
