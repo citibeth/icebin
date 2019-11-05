@@ -79,15 +79,15 @@ void smoothing_matrix(TupleListT<2> &ret_d,
         auto iX_s(agridX.dim.to_sparse(id));
         if (!dimX.in_sparse(iX_s)) continue;    // TODO: dimX and agridX.dim are probably the same
 
+        // Ignore masked-out gridcells (in case dimX (dimI) includes all ice gridcells)
+        double elev(elev_s(iX_s));
+        if (std::isnan(elev)) continue;
+
         auto iX_d(dimX.to_dense(iX_s));
 
         double area(area_d(iX_d));
         if (area == 0.) (*icebin_error)(-1,
             "Area of cell %ld must be non-zero\n", iX_s);
-
-        double elev(elev_s(iX_s));
-        if (std::isnan(elev)) (*icebin_error)(-1,
-            "Grid cell %ld cannot be masked out\n", iX_s);
 
         tuples.push_back(
             Smoother::Tuple(iX_d,

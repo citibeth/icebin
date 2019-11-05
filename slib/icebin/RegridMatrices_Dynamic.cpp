@@ -212,6 +212,7 @@ std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
 
     // Smooth the result on I, if needed
     if (params.smooth()) {
+for (int i=0; i<ret->wM.extent(0); ++i) printf("   wM[%d] = %g\n", i, ret->wM(i));
 
         // Obtain the smoothing matrix (smoother.hpp)
         TupleListT<2> smoothI_t({dimI->dense_extent(), dimI->dense_extent()});
