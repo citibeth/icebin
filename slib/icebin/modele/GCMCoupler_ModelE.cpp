@@ -1049,8 +1049,6 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
 
-//        ibmisc::linear::Weighted_Eigen *E1vI_nc;
-        std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_ptr;
         IceCoupler::CoupleOut cout(ice_coupler->couple(
             time_s, gcm_ovalsE,
             out.gcm_ivalss_s, run_ice));
@@ -1080,10 +1078,10 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         std::vector<EigenSparseMatrixT *> IvE0s;
         std::vector<SparseSetT *> dimE0s;
 
-        for (auto &cout : couts)  {
+        for (IceCoupler::CoupleOut &cout : couts)  {
             E1vIs_unscaled.push_back(&*cout.E1vI_unscaled_nc);
             IvE0s.push_back(&*cout.IvE0);
-            dimE0s.push_back(&cout.dimE0);
+            dimE0s.push_back(&*cout.dimE0);
         }
 
          // Don't do this on the first round, since we don't yet have an IvE0

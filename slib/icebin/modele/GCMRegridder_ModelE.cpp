@@ -642,6 +642,10 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_unscaled_E1vE0(
 
         // Don't do this on the first round, since we don't yet have an IvE0
         EigenSparseMatrixT E1vE0(*E1vI_unscaled.M * IvE0);    // UNSCALED
+
+{auto &dimE1(*E1vI_unscaled.dims[0]);
+printf("dimE1 extents 2: %p %ld %ld\n", &dimE1, (long)dimE1.sparse_extent(), (long)dimE1.dense_extent());
+}
         spcopy(
             accum::to_sparse(make_array(E1vI_unscaled.dims[0]),
             accum::ref(E1vE0_g.wM)),    // Output

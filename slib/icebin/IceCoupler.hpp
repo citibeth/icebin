@@ -52,7 +52,7 @@ public:
     // Used to interpret GCM output
     std::unique_ptr<ibmisc::linear::Weighted_Eigen> IvE0;   // SCALED
     // DenseArrayT<1> wIvE0;    // Provides the mask for I; for debugging only.
-    SparseSetT dimE0;
+    std::unique_ptr<SparseSetT> dimE0;
 
     // Output of ice model from the last time we coupled.
     // Some of these values are needed for computation of ice_ivalsI
@@ -150,9 +150,10 @@ public:
 
     struct CoupleOut {
         // Moved from IceCoupler before they were replaced w/ updated versions
-        SparseSetT dimE0;
+        std::unique_ptr<SparseSetT> dimE0;
         std::unique_ptr<EigenSparseMatrixT> IvE0;    // SCALED
         // Additional stuff from coupling
+        SparseSetT dimE1;
         std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_unscaled_nc;    // UNSCALED
     };
 
