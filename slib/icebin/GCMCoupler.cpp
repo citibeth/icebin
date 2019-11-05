@@ -191,7 +191,7 @@ static void ncwrite_dense_VectorMultivec(
     ibmisc::Indexing const *indexing,
     std::string const &vname_base)
 {
-printf("BEGIN ncwrite_dense_VectorMultivec()\n");
+printf("BEGIN ncwrite_dense_VectorMultivec(nnz=%ld)\n", vecs->index.size());
 
     // im,jm,ihc  0-based
     long nE = indexing->extent();
@@ -220,7 +220,7 @@ printf("BEGIN ncwrite_dense_VectorMultivec()\n");
         ncvar.putVar(startp, countp, denseE.data());
     }
 
-printf("END ncwrite_dense()\n");
+printf("END ncwrite_dense_VectorMultivec()\n");
 }
 
 /** Densifies the sparse vectors, and then writes them out to netCDF */

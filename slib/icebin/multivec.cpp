@@ -3,6 +3,8 @@
 
 namespace icebin {
 
+static double const nan = std::numeric_limits<double>::quiet_NaN();
+
 void VectorMultivec::add(long ix, double const *val, double weight)
 {
     index.push_back(ix);
@@ -59,13 +61,23 @@ void VectorMultivec::to_dense(
     int nE(denseE.extent(0));
 
     // Fill our dense var
-    denseE = fill;
+    denseE = nan;
     for (unsigned int i=0; i<this->index.size(); ++i) {
         auto iE(this->index[i]);
+//if (i < 10) printf("   (%d %ld): %g %g\n", i, (long)iE, this->val(ivar, i), scaleE(iE));
         if (iE >= nE) (*icebin_error)(-1,
             "Index out of range: %ld vs. %ld", (long)iE, (long)nE);
-        denseE(iE) = this->val(ivar, i) * scaleE(iE);
+        if (std::isnan(denseE(iE))) {
+            denseE(iE) = this->val(ivar, i) * scaleE(iE);
+        } else {
+            denseE(iE) += this->val(ivar, i) * scaleE(iE);
+        }
     }
+
+    for (int iE=0; iE<denseE.extent(0); ++iE) {
+        if (std::isnan(denseE(iE))) denseE(iE) = fill;
+    }
+
 }
 
 }
