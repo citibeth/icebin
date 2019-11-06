@@ -569,7 +569,7 @@ void IceWriter::init_file()
     for (size_t i=0; i < contract->size(); ++i) {
         VarMeta const &cf = (*contract)[i];
         NcVar var = get_or_add_var(ncio, cf.name, ibmisc::get_nc_type<double>(), dims);
-        var.putAtt("units", cf.units);
+        var.putAtt("units", cf.final_nc_units());
         var.putAtt("description", cf.description);
     }
 
@@ -627,10 +627,11 @@ void IceWriter::write(double time_s,
         "Illegal count to write: %ld vs %ld", all_count, nI);
 
     for (int ivar=0; ivar < contract->size(); ++ivar) {
+        double factor = (*contract)[ivar].nc_factor(ice_coupler->gcm_coupler->ut_system);
         VarMeta const &cf = (*contract)[ivar];
 
         NcVar ncvar = ncio.nc->getVar(cf.name.c_str());
-        for (int i=0; i<valsI.extent(1); ++i) valI_tmp(i) = valsI(ivar, i);
+        for (int i=0; i<valsI.extent(1); ++i) valI_tmp(i) = valsI(ivar, i) * factor;
         ncvar.putVar(cur, counts, valI_tmp.data());
     }
 

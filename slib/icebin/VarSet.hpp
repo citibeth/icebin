@@ -21,6 +21,7 @@
 #include <string>
 #include <ibmisc/IndexSet.hpp>
 #include <ibmisc/VarTransformer.hpp>
+#include <ibmisc/udunits2.hpp>
 
 namespace netCDF {
     class NcVar;
@@ -36,17 +37,29 @@ namespace icebin {
 struct VarMeta {
     /** The "short" name of the variable */
     std::string name;
-    /** The units of the variable, in UDUNITS format. */
+    /** The units of the variable, in UDUNITS format.
+    NOTE: This is the units BEFORE rescaling and sending to the GCM. */
     std::string units;          //!< UDUnits-compatible string
+    /** The units to convert to when writing NetCDF (BEFORE rescaling) */
+    std::string ncunits;
     /** The flags the variable resides on; see contracts.hpp for values */
     unsigned flags;         //!< Allows arbitrary subsets
     /** A textual description of the variable, also called the "long name" */
     std::string description;
-    /** Rescaling factors... used in apply_gcm_inputs().  result = mm*source + bb */
+    /** Rescaling factors... used in apply_gcm_inputs().  result =
+        mm*source + bb */
     double mm = 1;
     double bb = 0;
 
     double default_value;
+
+    /** Units to use in NetCDF file */
+    std::string const &final_nc_units() const
+        { return ncunits.size() == 0 ? units : ncunits; }
+
+    /** Computes the conversion factor from units -> ncunits */
+    double nc_factor(ibmisc::UTSystem const &ut_system) const;
+
 };
 
 class VarSet
@@ -61,14 +74,16 @@ public:
 
     int add(
         std::string const &name,
-        double default_value, std::string const &units,
+        double default_value,
+        std::string const &units, std::string const &ncunits,
         double mm, double bb,
         unsigned flags = 0,
         std::string const &description = "<no description>");
 
     int add(
         std::string const &name,
-        double default_value, std::string const &units,
+        double default_value,
+        std::string const &units, std::string const &ncunits,
         unsigned flags = 0,
         std::string const &description = "<no description>");
 

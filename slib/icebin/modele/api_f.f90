@@ -92,6 +92,7 @@ INTERFACE
         api, var_f, &
         field_f, field_len, &
         units_f, units_len, &
+        ncunits_f, ncunits_len, &
         mm, bb, &
         long_name_f, long_name_len) bind(c)
     use iso_c_binding
@@ -100,8 +101,8 @@ INTERFACE
         type(arr_spec_3) :: var_f
         character(c_char) :: field_f(*)
         integer(c_int), value :: field_len
-        character(c_char) :: units_f(*)
-        integer(c_int), value :: units_len
+        character(c_char) :: units_f(*), ncunits_f(*)
+        integer(c_int), value :: units_len, ncunits_len
         real(c_double), value :: mm, bb
         character(c_char) :: long_name_f(*)
         integer(c_int), value :: long_name_len
@@ -112,6 +113,7 @@ INTERFACE
         api, index_ae, var_f, &
         field_f, field_len, &
         units_f, units_len, &
+        ncunits_f, ncunits_len, &
         mm, bb, &
         initial, &
         long_name_f, long_name_len) bind(c)
@@ -122,8 +124,8 @@ INTERFACE
         type(arr_spec_2) :: var_f
         character(c_char) :: field_f(*)
         integer(c_int), value :: field_len
-        character(c_char) :: units_f(*)
-        integer(c_int), value :: units_len
+        character(c_char) :: units_f(*), ncunits_f(*)
+        integer(c_int), value :: units_len, ncunits_len
         real(c_double), value :: mm, bb
         character(c_char) :: long_name_f(*)
         logical(c_bool), value :: initial
@@ -135,6 +137,7 @@ INTERFACE
         api, index_ae, var_f, &
         field_f, field_len, &
         units_f, units_len, &
+        ncunits_f, ncunits_len, &
         mm, bb, &
         initial, &
         long_name_f, long_name_len) bind(c)
@@ -145,8 +148,8 @@ INTERFACE
         type(arr_spec_3) :: var_f
         character(c_char) :: field_f(*)
         integer(c_int), value :: field_len
-        character(c_char) :: units_f(*)
-        integer(c_int), value :: units_len
+        character(c_char) :: units_f(*), ncunits_f(*)
+        integer(c_int), value :: units_len, ncunits_len
         real(c_double), value :: mm, bb
         logical(c_bool), value :: initial
         character(c_char) :: long_name_f(*)

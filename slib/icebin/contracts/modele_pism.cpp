@@ -185,18 +185,18 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     VarSet &ice_input(ice_coupler->contract[IceCoupler::INPUT]);
 
     // ------ Decide on the coupling contract for this ice sheet
-    ice_input.add("massxfer", 0., "kg m-2 s-1", 0,
+    ice_input.add("massxfer", 0., "kg m-2 s-1", "kg m-2 day-1", 0,
         "Mass of ice being transferred Stieglitz --> Icebin");
-    ice_input.add("enthxfer", 0., "W m-2", 0,
+    ice_input.add("enthxfer", 0., "W m-2", "", 0,
         "Enthalpy of ice being transferred Stieglitz --> Icebin");
-    ice_input.add("deltah", 0., "W m-2", contracts::PRIVATE,
+    ice_input.add("deltah", 0., "W m-2", "", contracts::PRIVATE,
         "Change of enthalpy to apply to top layer in PISM");
 
     // These variables are the actual boundary condition provided to PISM.
     // They are computed based on the above, plus OUTPUT::ice_top_bc_senth.
-    ice_input.add("ice_top_bc_temp", 0., "K", 0,
+    ice_input.add("ice_top_bc_temp", 0., "K", "", 0,
         "Temperature of the Dirichlet B.C.");
-    ice_input.add("ice_top_bc_wc", 0., "1", 0,
+    ice_input.add("ice_top_bc_wc", 0., "1", "", 0,
         "Water content of the Dirichlet B.C.");
 
 
@@ -244,53 +244,57 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // coupling can count on, regardless of specifics of this ice model.
     // Example of use:
     //    standard_names["elevmask_land"] =
-    //    ice_output.add("ice_top_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
+    //    ice_output.add("ice_top_elevation", nan, "m", "", contracts::INITIAL, "ice upper surface elevation");
     auto &standard_names(ice_coupler->standard_names[IceCoupler::OUTPUT]);
 
     // All these outputs are on the ICE grid.
     // Icebin requires that all ice models return elev2, so that it can regrid in the vertical.
 
-    ice_output.add("ice_top_elevation", nan, "m", contracts::INITIAL, "ice upper surface elevation");
-    ice_output.add("ice_thickness", nan, "m", contracts::INITIAL, "thickness of ice");
-    ice_output.add("bed_topography", nan, "m", contracts::INITIAL, "topography of bedrock");
+    ice_output.add("ice_top_elevation", nan, "m", "", contracts::INITIAL, "ice upper surface elevation");
+    ice_output.add("ice_thickness", nan, "m", "", contracts::INITIAL, "thickness of ice");
+    ice_output.add("bed_topography", nan, "m", "", contracts::INITIAL, "topography of bedrock");
 
-    ice_output.add("mask", nan, "", contracts::INITIAL, "PISM land surface type");
+    ice_output.add("mask", nan, "", "", contracts::INITIAL, "PISM land surface type");
 
     standard_names["elevmask_ice"] =
-    ice_output.add("elevmask_ice", nan, "", contracts::INITIAL | contracts::ALLOW_NAN,
+    ice_output.add("elevmask_ice", nan, "", "", contracts::INITIAL | contracts::ALLOW_NAN,
         "Elevation of ice sheet; nan for grid cells off ice sheet.");
 
     standard_names["elevmask_land"] =
-    ice_output.add("elevmask_land", nan, "", contracts::INITIAL | contracts::ALLOW_NAN,
+    ice_output.add("elevmask_land", nan, "", "", contracts::INITIAL | contracts::ALLOW_NAN,
         "Elevation of bare land+ice; nan for grid cells off land or ice (eg ocean).");
 
-    ice_output.add("ice_top_senth", nan, "J kg-1", contracts::INITIAL, "");
+    ice_output.add("ice_top_senth", nan, "J kg-1", "", contracts::INITIAL, "");
 
-    ice_output.add("basal_frictional_heating", nan, "W m-2", 0, "");
-    ice_output.add("strain_heating", nan, "W m-2", 0, "");
-    ice_output.add("geothermal_flux", nan, "W m-2", 0, "");
-    ice_output.add("upward_geothermal_flux", nan, "W m-2", 0, "");
+    ice_output.add("basal_frictional_heating", nan, "W m-2", "", 0, "");
+    ice_output.add("strain_heating", nan, "W m-2", "", 0, "");
+    ice_output.add("geothermal_flux", nan, "W m-2", "", 0, "");
+    ice_output.add("upward_geothermal_flux", nan, "W m-2", "", 0, "");
 
-    ice_output.add("calving.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("calving.enth", nan, "W m-2", 0, "");
+    ice_output.add("calving.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0, "");
+    ice_output.add("calving.enth", nan, "W m-2", "", 0, "");
     // Pass-through from input.  But because we compute with it,
     // let's store it in output so we can see it.
-    ice_output.add("smb.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("smb.enth", nan, "W m-2", 0, "");
+    ice_output.add("smb.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0,
+        "pass-through SMB from input")
+    ice_output.add("smb.enth", nan, "W m-2", "", 0,
+        "pass-through SMB from input")
     // Computed while running PISM; should be the same
-    ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("pism_smb.enth", nan, "W m-2", 0, "");
+    ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0,
+        "SMB computed while running PISM; should be the same as smb");
+    ice_output.add("pism_smb.enth", nan, "W m-2", "", 0,
+        "SMB computed while running PISM; should be the same as smb");
 
     // basal_runoff (GCM input) = melt_grounded + melt_floatig (PISM outputs)
-    ice_output.add("melt_grounded.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("melt_grounded.enth", nan, "W m-2", 0, "");
-    ice_output.add("melt_floating.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("melt_floating.enth", nan, "W m-2", 0, "");
+    ice_output.add("melt_grounded.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0, "");
+    ice_output.add("melt_grounded.enth", nan, "W m-2", "", 0, "");
+    ice_output.add("melt_floating.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0, "");
+    ice_output.add("melt_floating.enth", nan, "W m-2", "", 0, "");
 
-    ice_output.add("internal_advection.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("internal_advection.enth", nan, "W m-2", 0, "");
-    ice_output.add("epsilon.mass", nan, "kg m-2 s-1", 0, "");
-    ice_output.add("epsilon.enth", nan, "W m-2", 0, "");
+    ice_output.add("internal_advection.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0, "");
+    ice_output.add("internal_advection.enth", nan, "W m-2", "", 0, "");
+    ice_output.add("epsilon.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0, "");
+    ice_output.add("epsilon.enth", nan, "W m-2", "", 0, "");
 
     std::cout << "========= Ice Model Outputs (" << ice_coupler->name() << ") modele_pism.cpp:" << std::endl;
     std::cout << ice_output << std::endl;
