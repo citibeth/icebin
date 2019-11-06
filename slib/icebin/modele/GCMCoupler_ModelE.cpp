@@ -164,7 +164,7 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
     // can be computed at or before contract initialization time can
     // be placed directly into the VarTransformer.
 
-    scalars.add("by_dt", nan, "s-1", 0, "Inverse of coupling timestep");
+    scalars.add("by_dt", nan, "s-1", "", 0, "Inverse of coupling timestep");
 
 
     // Set up gcm_inputs array   (see IndexAE:  enum class { A, E, ATOPO, ETOPO, COUNT} IndexAE;)
@@ -347,11 +347,13 @@ GCMCoupler_ModelE *self,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+char const *ncunits_f, int ncunits_len,
 double mm, double bb,
 char const *long_name_f, int long_name_len)
 {
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
+    std::string ncunits(ncunits_f, ncunits_len);
     std::string long_name(long_name_f, long_name_len);
     std::unique_ptr<blitz::Array<double,3>> var(
         new blitz::Array<double,3>(f_to_c(var_f.to_blitz())));
@@ -360,7 +362,7 @@ char const *long_name_f, int long_name_len)
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
     self->gcm_outputsE.add(
-        field_name, xnan, units, mm, bb, flags, long_name);
+        field_name, xnan, units, ncunits, mm, bb, flags, long_name);
 
     self->gcm_ovalsE.push_back(std::move(var));
 }
@@ -375,6 +377,7 @@ int index_ae,
 F90Array<double, 2> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+char const *ncunits_f, int ncunits_len,
 double mm, double bb,
 bool initial,    // bool
 char const *long_name_f, int long_name_len)
@@ -385,6 +388,7 @@ char const *long_name_f, int long_name_len)
 
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
+    std::string ncunits(ncunits_f, ncunits_len);
     std::string long_name(long_name_f, long_name_len);
 
     if (var_f.base == NULL) (*icebin_error)(-1,
@@ -398,7 +402,7 @@ char const *long_name_f, int long_name_len)
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
     self->gcm_inputs[index_ae].add(
-        field_name, xnan, units, mm, bb, flags, long_name);
+        field_name, xnan, units, ncunits, mm, bb, flags, long_name);
 
     self->gcm_ivalssA[index_ae].push_back(std::move(var));
 }
@@ -410,6 +414,7 @@ int index_ae,
 F90Array<double, 3> &var_f,
 char const *field_name_f, int field_name_len,
 char const *units_f, int units_len,
+char const *ncunits_f, int ncunits_len,
 double mm, double bb,
 int initial,    // bool
 char const *long_name_f, int long_name_len)
@@ -420,6 +425,7 @@ char const *long_name_f, int long_name_len)
 
     std::string field_name(field_name_f, field_name_len);
     std::string units(units_f, units_len);
+    std::string ncunits(ncunits_f, ncunits_len);
     std::string long_name(long_name_f, long_name_len);
 
     if (var_f.base == NULL) (*icebin_error)(-1,
@@ -433,7 +439,7 @@ char const *long_name_f, int long_name_len)
 
     static double const xnan = std::numeric_limits<double>::quiet_NaN();
     self->gcm_inputs[index_ae].add(
-        field_name, xnan, units, mm, bb, flags, long_name);
+        field_name, xnan, units, ncunits, mm, bb, flags, long_name);
 
     self->gcm_ivalssE[index_ae].push_back(std::move(var));
 }

@@ -189,8 +189,11 @@ static void ncwrite_dense_VectorMultivec(
     VectorMultivec const *vecs,
     VarSet const *contract,
     ibmisc::Indexing const *indexing,
+    ibmisc::UTSystem const *ut_system,
     std::string const &vname_base)
 {
+    // NOTE: This code is in E (elevation grid); but it works just as
+    // well for A (atmosphere grid)
 printf("BEGIN ncwrite_dense_VectorMultivec(nnz=%ld)\n", vecs->index.size());
 
     // im,jm,ihc  0-based
@@ -215,6 +218,9 @@ printf("BEGIN ncwrite_dense_VectorMultivec(nnz=%ld)\n", vecs->index.size());
     for (unsigned int ivar=0; ivar < nvar; ++ivar) {
         vecs->to_dense(ivar, scaleE, nan, denseE);
 
+        // Convert to NC units for output file
+        denseE *= (*contract)[ivar].nc_factor(*ut_system);
+
         // Store in the netCDF variable
         NcVar ncvar(nc->getVar(vname_base + (*contract)[ivar].name));
         ncvar.putVar(startp, countp, denseE.data());
@@ -229,6 +235,7 @@ static void ncio_dense(
     VectorMultivec const &vecs,    
     VarSet const &contract,
     ibmisc::Indexing const &indexing,
+    UTSystem const &ut_system,
     std::string const &vname_base = "")
 {
 printf("BEGIN ncio_dense1('%s')\n", ncio.fname.c_str());
@@ -244,7 +251,7 @@ printf("BEGIN ncio_dense1('%s')\n", ncio.fname.c_str());
     contract.ncdefine(ncio, dim_spec.to_dims(ncio), vname_base);
 
     ncio.add("ncio_dense::" + vname_base, std::bind(ncwrite_dense_VectorMultivec,
-        ncio.nc, &vecs, &contract, &indexing, vname_base));
+        ncio.nc, &vecs, &contract, &indexing, &ut_system, vname_base));
 
 printf("END ncio_dense()\n");
 }
@@ -289,6 +296,7 @@ static void ncio_dense(
     NcIO &ncio,
     TupleListLT<1> const &E_s,
     ibmisc::Indexing const &indexing,
+    ibmisc::UTSystem const &ut_system,
     std::string const &vname)
 {
 printf("BEGIN ncio_dense2('%s')\n", ncio.fname.c_str());
@@ -301,7 +309,7 @@ printf("BEGIN ncio_dense2('%s')\n", ncio.fname.c_str());
     get_or_add_var(ncio, vname, "double", dim_spec.to_dims(ncio));
 
     ncio.add("ncio_dense::" + vname, std::bind(ncwrite_dense_TupleList1,
-        ncio.nc, &E_s, &indexing, vname));
+        ncio.nc, &E_s, &indexing, &ut_system, vname));
 
 printf("END ncio_dense()\n");
 }
@@ -334,7 +342,7 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
 
         // The indexing is used from gcm_regridder.  This will result in nhc_ice
         ncio_dense(ncio, out.gcm_ivalss_s[iAE], gcm_inputs[iAE],
-            *indexing, vname_base);
+            *indexing, ut_system, vname_base);
 
     }
 
@@ -352,7 +360,7 @@ void GCMCoupler::ncio_gcm_output(NcIO &ncio,
 printf("BEGIN GCMCoupler::ncio_gcm_output('%s' '%s')\n", ncio.fname.c_str(), vname_base.c_str());
     ncio_timespan(ncio, timespan, time_unit, vname_base + "timespan");
     ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
-        gcm_regridder->indexingE, vname_base);
+        gcm_regridder->indexingE, ut_system, vname_base);
 printf("END GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
 }
 // ------------------------------------------------------------
