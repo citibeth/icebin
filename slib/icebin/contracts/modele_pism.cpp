@@ -276,9 +276,9 @@ void setup_modele_pism(GCMCoupler const *_gcm_coupler, IceCoupler *_ice_coupler)
     // Pass-through from input.  But because we compute with it,
     // let's store it in output so we can see it.
     ice_output.add("smb.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0,
-        "pass-through SMB from input")
+        "pass-through SMB from input");
     ice_output.add("smb.enth", nan, "W m-2", "", 0,
-        "pass-through SMB from input")
+        "pass-through SMB from input");
     // Computed while running PISM; should be the same
     ice_output.add("pism_smb.mass", nan, "kg m-2 s-1", "kg m-2 day-1", 0,
         "SMB computed while running PISM; should be the same as smb");
