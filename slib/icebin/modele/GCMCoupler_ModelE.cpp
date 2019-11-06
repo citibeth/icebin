@@ -1049,8 +1049,6 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
 
-//        ibmisc::linear::Weighted_Eigen *E1vI_nc;
-        std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_ptr;
         IceCoupler::CoupleOut cout(ice_coupler->couple(
             time_s, gcm_ovalsE,
             out.gcm_ivalss_s, run_ice));
