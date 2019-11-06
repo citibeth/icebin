@@ -62,9 +62,8 @@ struct GCMInput {
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    ibmisc::linear::Weighted_Tuple E1vE0_unscaled;    // Sparse indexing
-
-    ibmisc::linear::Weighted_Tuple::TupleListLT<2> E1vE0_scaled;    // domain-split version
+    spsparse::TupleList<long,double,2> E1vE0_scaled_g;
+    spsparse::TupleList<long,double,2> E1vE0_scaled;    // domain-split version
 
     /** @param nvar Array specifying number of variables for each segment (A,E,ATOPO,ETOPO). */
     GCMInput(std::vector<int> const &nvar);

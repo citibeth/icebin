@@ -530,26 +530,19 @@ std::vector<GCMInput> split_by_domain(
         }
     }
 
-    // Split E1vE0, while scaling also
+    // Split E1vE0
     // (E1vE0 is not set the first time around; in that case, shape = (-1,-1)
-    if (out.E1vE0_unscaled.shape()[0] != -1) {
-        auto shape(out.E1vE0_unscaled.shape());
-
-        // Create scale array by merging weights in the tuples, then
-        // inverting to scale factors
-        blitz::Array<double,1> sM(shape[0]);
-        sM = 0;
-        for (auto &tp : out.E1vE0_unscaled.wM.tuples) sM(tp.index(0)) += tp.value();
-        for (int i=0; i<sM.extent(0); ++i) sM(i) = 1. / sM(i);    // Will produce Inf where unused
+    if (out.E1vE0_scaled_g.shape()[0] != -1) {
+        auto shape(out.E1vE0_scaled_g.shape());
 
         // Initialize output matrices
         for (size_t i=0; i<outs.size(); ++i) outs[i].E1vE0_scaled.set_shape(shape);
 
-        // Copy the main matrix, scaling!
+        // Copy the main matrix
         // Works for matrix in A or E
-        for (auto &tp : out.E1vE0_unscaled.M.tuples) {
+        for (auto &tp : out.E1vE0_scaled_g.tuples) {
             int const domain = domainsE.get_domain(tp.index(0));
-            outs[domain].E1vE0_scaled.add(tp.index(), tp.value() * sM(tp.index(0)));
+            outs[domain].E1vE0_scaled.add(tp.index(), tp.value());
         }
     }
     return outs;
@@ -1092,7 +1085,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
 
          // Don't do this on the first round, since we don't yet have an IvE0
         if (run_ice) {
-            out.E1vE0_unscaled = gcmA->global_unscaled_E1vE0(
+            out.E1vE0_scaled_g = gcmA->global_scaled_E1vE0(
                 E1vIs_unscaled, IvE0s, dimE0s);
         }
     }
@@ -1105,7 +1098,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     if (run_ice) {
         for (auto ii=wEAm_base.begin(); ii != wEAm_base.end(); ++ii) {
             auto iE(ii->index(0));
-            out.E1vE0_unscaled.M.add({iE,iE}, ii->value());
+            out.E1vE0_scaled_g.add({iE,iE}, 1.0);
         }
     }
     wEAm_base.clear();

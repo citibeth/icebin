@@ -200,8 +200,8 @@ public:
         // ----------- Output vars
         long &offsetE) const;
 
-    ibmisc::linear::Weighted_Tuple global_unscaled_E1vE0(
-        std::vector<ibmisc::linear::Weighted_Eigen *> const &E1vIs, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) SCALED matrix
+    spsparse::TupleList<long,double,2> global_scaled_E1vE0(
+        std::vector<linear::Weighted_Eigen *> const &E1vIs_unscaled, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) UNSCALED matrix
         std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
         std::vector<SparseSetT *> const &dimE0s) const;    // dimE0 accompanying IvE0
 
