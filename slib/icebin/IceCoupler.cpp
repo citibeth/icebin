@@ -274,9 +274,10 @@ bool run_ice)
 
     // ------------- Compute dimE0 transformation, if this is the first round
     if (!run_ice) {
+        dimE0.reset(new SparseSetT);
         for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
             long iE_s(gcm_ovalsE_s.index[i]);
-            dimE0.add_dense(iE_s);
+            dimE0->add_dense(iE_s);
         }
     }
 
@@ -284,11 +285,11 @@ bool run_ice)
     // Densify gcm_ovalsE_s --> gcm_ovalsE
     // This should ONLY involve iE already mentioned in IvE0;
     // if not, ibmisc_error() will be called inside to_dense()
-    blitz::Array<double,2> gcm_ovalsE0(gcm_coupler->gcm_outputsE.size(), dimE0.dense_extent());
+    blitz::Array<double,2> gcm_ovalsE0(gcm_coupler->gcm_outputsE.size(), dimE0->dense_extent());
     gcm_ovalsE0 = 0;
     for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
         long iE_s(gcm_ovalsE_s.index[i]);
-        int iE0(dimE0.to_dense(iE_s));   // Can raise error if iE_s not found
+        int iE0(dimE0->to_dense(iE_s));   // Can raise error if iE_s not found
         for (int ivar=0; ivar<gcm_ovalsE_s.nvar; ++ivar) {
             gcm_ovalsE0(ivar, iE0) += gcm_ovalsE_s.val(ivar, i);
         }
@@ -348,8 +349,8 @@ printf("writing icemodel-out\n");
 
     // _nc means "No Correct" for changes in area due to projections
     // See commit d038e5cb for deeper explanation
-    SparseSetT dimE1;
-    ret.E1vI_unscaled_nc = rm->matrix_d("EvI", {&dimE1, &dimI},
+    std::unique_ptr<SparseSetT> dimE1(new SparseSetT);
+    ret.E1vI_unscaled_nc = rm->matrix_d("EvI", {&*dimE1, &dimI},
         RegridParams(false, false, {0,0,0}));    // scale=f, correctA=f
 
     // ========= Compute gcm_ivalsE
@@ -440,7 +441,7 @@ printf("writing icemodel-out\n");
     }        // iAE
     // Compute IvE (for next timestep)
     std::unique_ptr<linear::Weighted_Eigen> IvE1(
-        rm->matrix_d("IvE", {&dimI, &dimE1},
+        rm->matrix_d("IvE", {&dimI, &*dimE1},
         RegridParams(true, true, {0,0,0}))); // scale=t, correctA=t
 
     // wIvE0.reference(IvE1->wM);
@@ -455,20 +456,22 @@ printf("writing icemodel-out\n");
         // Write matrices as their dense subspace versions, not the sparsified versions.
         dimI.ncio(ncio, "dimI");
         dimA1.ncio(ncio, "dimA");
-        dimE1.ncio(ncio, "dimE");
+        dimE1->ncio(ncio, "dimE");
 
         AE1vIs[GridAE::E]->ncio(ncio, "EvI_unscaled_nc", {"dimE", "dimI"});
         AE1vIs[GridAE::A]->ncio(ncio, "AvI_unscaled", {"dimA", "dimI"});
         IvE1->ncio(ncio, "IvE", {"dimI", "dimE"});
     }
 
-    // Save stuff for next time around
+    // ---------- Save stuff for next time around
     if (run_ice) {    // But not if first time
-        ret.dimE0 = std::move(dimE0);
+        // Pass back stuff from last timestep
+        ret.dimE0 = std::move(this->dimE0);
         ret.IvE0 = std::move(IvE0->M);
     }
-    dimE0 = std::move(dimE1);
-    IvE0 = std::move(IvE1);
+    // Store stuff from this timestep for next time around
+    this->dimE0 = std::move(dimE1);
+    this->IvE0 = std::move(IvE1);
 
     printf("END IceCoupler::couple(%s)\n", name().c_str());
     return ret;
