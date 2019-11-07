@@ -52,8 +52,12 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AEvI(
     std::array<SparseSetT *,2> dims,
     RegridParams const &params,
     blitz::Array<double,1> const *elevmaskI,
+    char Igrid,        // Identity of I in "AEvI": 'I' or 'G'
     UrAE const &AE)
 {
+    // if Igrid=='G', then references to I in this
+    // function are actually G.  (and dimG, etc. is an unused variable)
+
 printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correctA);
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, true));
     SparseSetT * const dimA(ret->dims[0]);
@@ -62,28 +66,34 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
     SparseSetT * const dimG(&_dimG);
 
     if (dimA) dimA->set_sparse_extent(AE.nfull);
-    if (dimI) dimI->set_sparse_extent(regridder->nI());
+    if (dimI) dimI->set_sparse_extent(
+        Igrid=='I' ? regridder->nI() : regridder->nG());
     dimG->set_sparse_extent(regridder->nG());
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
-    MakeDenseEigenT GvI_m(
-        // Only includes ice model grid cells with ice in them.
-        std::bind(&IceRegridder::GvI, regridder, _1, elevmaskI),
-        {SparsifyTransform::ADD_DENSE},
-        {dimG, dimI}, '.');
-    MakeDenseEigenT ApvG_m(        // _m ==> type MakeDenseEigenT
+    std::unique_ptr<EigenSparseMatrixT> ApvG(new EigenSparseMatrixT(
         // Only includes ice model grid cells with ice in them.
         AE.GvAp,
         {SparsifyTransform::ADD_DENSE},
-        {dimG, dimA}, 'T');
+        {Igrid=='I' ? dimG : dimI, dimA}, 'T').to_eigen());
 
     // ----- Convert to Eigen and multiply
-    auto ApvG(ApvG_m.to_eigen());
-    auto GvI(GvI_m.to_eigen());
-    auto sGvI(sum(GvI, 0, '-'));
+    std::unique_ptr<EigenSparseMatrixT> ApvI;
+    if (Igrid == 'I') {
+        EigenSparseMatrixT GvI(
+            // Only includes ice model grid cells with ice in them.
+            std::bind(&IceRegridder::GvI, regridder, _1, elevmaskI),
+            {SparsifyTransform::ADD_DENSE},
+            {dimG, dimI}, '.').to_eigen());
+        auto sGvI(sum(GvI, 0, '-'));
 
-    std::unique_ptr<EigenSparseMatrixT> ApvI(
-        new EigenSparseMatrixT(ApvG * map_eigen_diagonal(sGvI) * GvI));
+        ApvI.reset(new EigenSparseMatrixT(
+            *ApvG * map_eigen_diagonal(sGvI) * GvI));
+        ApvG.release();
+    } else {
+        ApvI = std::move(ApvG);
+    }
+
     ret->Mw.reference(sum(*ApvI, 1, '+'));    // Area of I cells
 
     // ----- Apply final scaling, and convert back to sparse dimension
@@ -143,8 +153,12 @@ std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
     std::array<SparseSetT *,2> dims,
     RegridParams const &params,
     blitz::Array<double,1> const *elevmaskI,
+    char Igrid,        // Identity of I in "AEvI": 'I' or 'G'
     UrAE const &AE)
 {
+    // if Igrid=='G', then references to I in this
+    // function are actually G.  (and dimG, etc. is an unused variable)
+
 //printf("BEGIN compute_IvAE\n");
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, !params.smooth()));
     SparseSetT * const dimA(ret->dims[1]);    SparseSetT * const dimI(ret->dims[0]);
@@ -152,27 +166,30 @@ std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
     SparseSetT * const dimG(&_dimG);
 
     if (dimA) dimA->set_sparse_extent(AE.nfull);
-    if (dimI) dimI->set_sparse_extent(regridder->nI());
+    if (dimI) dimI->set_sparse_extent(
+        Igrid=='I' ? regridder->nI() : regridder->nG());
     dimG->set_sparse_extent(regridder->nG());
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
-    MakeDenseEigenT GvAp_m(
+    std::unique_ptr<EigenSparseMatrixT> GvAp(new EigenSparseMatrixT(
         AE.GvAp,
         {SparsifyTransform::ADD_DENSE},
-        {dimG, dimA}, '.');
-    MakeDenseEigenT IvG_m(
-        std::bind(&IceRegridder::GvI, regridder, _1, elevmaskI),
-        {SparsifyTransform::ADD_DENSE},
-        {dimG, dimI}, 'T');
+        {dimG, dimA}, '.').to_eigen());
 
-    // ----- Convert to Eigen
-    auto GvAp(GvAp_m.to_eigen());
-    auto IvG(IvG_m.to_eigen());
-    auto sGvAp(sum(GvAp, 0, '-'));
+    std::unique_ptr<EigenSparseMatrixT> IvAp;
+    if (Igrid == 'I') {
+        EigenSparseMatrixT IvG(
+            std::bind(&IceRegridder::GvI, regridder, _1, elevmaskI),
+            {SparsifyTransform::ADD_DENSE},
+            {dimG, dimI}, 'T').to_eigen());
 
-    // Unscaled matrix
-    std::unique_ptr<EigenSparseMatrixT> IvAp(
-        new EigenSparseMatrixT(IvG * map_eigen_diagonal(sGvAp) * GvAp));
+        auto sGvAp(sum(*GvAp, 0, '-'));
+        IvAp.reset(new EigenSparseMatrixT(
+            IvG * map_eigen_diagonal(sGvAp) * *GvAp)
+    } else {
+        IvAp = std::move(GvAp);
+    }
+
 
     // Get weight vector from IvAp_e
     ret->wM.reference(sum(*IvAp, 0, '+'));
@@ -344,9 +361,15 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
 
     // ------- EvI, IvE
     rm->add_regrid("EvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, urE));
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'I', urE));
     rm->add_regrid("IvE",
-        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, urE));
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'I', urE));
+
+    // ------- EvG, GvE
+    rm->add_regrid("EvG",
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'G', urE));
+    rm->add_regrid("GvE",
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'G', urE));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, regridder, _1, _2, urE, urA) ));
     rm->add_regrid("EvA",
