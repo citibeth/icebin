@@ -72,15 +72,17 @@ printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correct
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     std::unique_ptr<EigenSparseMatrixT> ApvG(new EigenSparseMatrixT(
+    MakeDenseEigenT(
         // Only includes ice model grid cells with ice in them.
         AE.GvAp,
         {SparsifyTransform::ADD_DENSE},
-        {Igrid=='I' ? dimG : dimI, dimA}, 'T').to_eigen());
+        std::array<SparseSetT *,2>{Igrid=='I' ? dimG : dimI, dimA},
+        'T').to_eigen()));
 
     // ----- Convert to Eigen and multiply
     std::unique_ptr<EigenSparseMatrixT> ApvI;
     if (Igrid == 'I') {
-        EigenSparseMatrixT GvI(
+        EigenSparseMatrixT GvI(MakeDenseEigenT(
             // Only includes ice model grid cells with ice in them.
             std::bind(&IceRegridder::GvI, regridder, _1, elevmaskI),
             {SparsifyTransform::ADD_DENSE},
@@ -172,20 +174,21 @@ std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
 
     // ----- Get the Ur matrices (which determines our dense dimensions)
     std::unique_ptr<EigenSparseMatrixT> GvAp(new EigenSparseMatrixT(
+    MakeDenseEigenT(
         AE.GvAp,
         {SparsifyTransform::ADD_DENSE},
-        {dimG, dimA}, '.').to_eigen());
+        {dimG, dimA}, '.').to_eigen()));
 
     std::unique_ptr<EigenSparseMatrixT> IvAp;
     if (Igrid == 'I') {
-        EigenSparseMatrixT IvG(
+        EigenSparseMatrixT IvG(MakeDenseEigenT(
             std::bind(&IceRegridder::GvI, regridder, _1, elevmaskI),
             {SparsifyTransform::ADD_DENSE},
             {dimG, dimI}, 'T').to_eigen());
 
         auto sGvAp(sum(*GvAp, 0, '-'));
         IvAp.reset(new EigenSparseMatrixT(
-            IvG * map_eigen_diagonal(sGvAp) * *GvAp)
+            IvG * map_eigen_diagonal(sGvAp) * *GvAp));
     } else {
         IvAp = std::move(GvAp);
     }
@@ -355,9 +358,9 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
 
     // ------- AvI, IvA
     rm->add_regrid("AvI",
-        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, urA));
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'I', urA));
     rm->add_regrid("IvA",
-        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, urA));
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'I', urA));
 
     // ------- EvI, IvE
     rm->add_regrid("EvI",
