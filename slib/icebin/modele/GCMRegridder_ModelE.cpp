@@ -648,7 +648,7 @@ spsparse::TupleList<long,double,2> GCMRegridder_ModelE::global_scaled_E1vE0(
         EigenSparseMatrixT E1vE0(*E1vI_unscaled.M * IvE0);    // UNSCALED
         spcopy(
             accum::to_sparse(make_array(E1vI_unscaled.dims[0]),
-            accum::blitz_existing(sM),    // Output
+            accum::blitz_existing(sM)),    // Output
             E1vI_unscaled.wM);   // Input
 
         spcopy(
@@ -659,10 +659,10 @@ spsparse::TupleList<long,double,2> GCMRegridder_ModelE::global_scaled_E1vE0(
     E1vE0_g.set_shape(std::array<long,2>{nE(), nE()});
 
     // Convert weights to scales
-    for (int i=0; i<ne(); ++i) sM(i) = 1. / sM(i);    // Will produce Inf where unused
+    for (int i=0; i<nE(); ++i) sM(i) = 1. / sM(i);    // Will produce Inf where unused
 
     // Scale the matrix
-    for (auto &tp : out.E1vE0_g.tuples) tp.value() *= sM(tp.index(0));
+    for (auto &tp : E1vE0_g.tuples) tp.value() *= sM(tp.index(0));
 
     return E1vE0_g;
 }

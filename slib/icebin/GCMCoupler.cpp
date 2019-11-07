@@ -347,7 +347,7 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     }
 
 //    ncio_spsparse(ncio, out.E1vE0_unscaled, false, vname_base+"E1vE0_unscaled");
-    out.E1vE0_unscaled.ncio(ncio, vname_base+"E1vE0_unscaled");
+    out.E1vE0_scaled_g.ncio(ncio, vname_base+"E1vE0");
 }
 
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */

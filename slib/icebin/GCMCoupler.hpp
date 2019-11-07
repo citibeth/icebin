@@ -74,7 +74,7 @@ struct GCMInput {
     void serialize(ArchiveT &ar, const unsigned int file_version)
     {
         ar & gcm_ivalss_s;
-        ar & E1vE0_unscaled;
+        ar & E1vE0_scaled_g;
     }
 };
 // =============================================================================
