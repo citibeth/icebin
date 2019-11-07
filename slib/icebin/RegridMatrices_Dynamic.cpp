@@ -177,7 +177,8 @@ std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
     MakeDenseEigenT(
         AE.GvAp,
         {SparsifyTransform::ADD_DENSE},
-        {dimG, dimA}, '.').to_eigen()));
+        std::array<SparseSetT *,2>{Igrid=='I' ? dimG : dimI, dimA},
+        '.').to_eigen()));
 
     std::unique_ptr<EigenSparseMatrixT> IvAp;
     if (Igrid == 'I') {
@@ -361,6 +362,12 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
         std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'I', urA));
     rm->add_regrid("IvA",
         std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'I', urA));
+
+    // ------- AvG, GvA
+    rm->add_regrid("AvG",
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'G', urA));
+    rm->add_regrid("GvA",
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'G', urA));
 
     // ------- EvI, IvE
     rm->add_regrid("EvI",
