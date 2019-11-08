@@ -16,7 +16,10 @@
 
 import netCDF4
 import giss.proj
-import giss.basemap
+try:
+    import giss.basemap
+except ImportError:
+    use_basemap = False
 import numpy as np
 import pyproj
 import functools
@@ -167,6 +170,8 @@ class Grid(object):
             basemap: Map on which to plot
             **kwargs: Any options passed through to Matplotlib plotting
         """
+        if not use_basemap:
+            raise ImportError('matplotlib.basemap must be imported for this to work')
 
         npoly = len(self.cells)
         npoints = len(self.vertices)
@@ -212,6 +217,9 @@ class Grid(object):
         **kwargs:
             Other options passed through to Matplotlib plotting
         """
+
+        if not use_basemap:
+            raise ImportError('matplotlib.basemap must be imported for this to work')
 
         # Plot entire grid, if user didn't specify
         if cells is None:
@@ -264,12 +272,18 @@ class Grid(object):
 
 class Grid_XY(Grid):
     def plotter(self):
+        if not use_basemap:
+            raise ImportError('matplotlib.basemap must be imported for this to work')
+
         return giss.plot.ProjXYPlotter(
             self.x_boundaries, self.y_boundaries,
             self.projection, transpose=(indexing.indices[0] == 0))
 
 class Grid_LonLat(Grid):
     def plotter(self):
+        if not use_basemap:
+            raise ImportError('matplotlib.basemap must be imported for this to work')
+
         return giss.plot.LonLatPlotter(
             self.lon_boundaries, self.lat_boundaries,
             boundaries=True, transpose=(indexing.indices[0] == 0))
