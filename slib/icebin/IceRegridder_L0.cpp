@@ -89,11 +89,11 @@ extern void linterp_1d_b(
 @param ret Put the regrid matrix here. */
 void IceRegridder_L0::GvEp(
     MakeDenseEigenT::AccumT &&ret,
+    char gridG,    // Interpolation grid to use for G: 'I' (ice) or 'G' (exchange)
     blitz::Array<double,1> const *_elevmaskI) const
 {
 printf("BEGIN IceRegridder_L0::GvEp()\n");
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
-    IceExch dest = interp_grid;
 
     if (gcm->hcdefs().size() == 0) (*icebin_error)(-1,
         "IceRegridder_L0::GvEp(): hcdefs is zero-length!");
@@ -106,7 +106,7 @@ printf("BEGIN IceRegridder_L0::GvEp()\n");
         long const iA = aexgrid.ijk(id,0);        // GCM Atmosphere grid
         long const iI = aexgrid.ijk(id,1);        // Ice Grid
         long const iX = aexgrid.to_sparse(id);    // X=Exchange Grid
-        long const iG = (dest == IceExch::ICE ? iI : iX);   // G=Interpolation Grid
+        long const iG = (gridG == 'I' ? iI : iX);   // G=Interpolation Grid
 
         if (!std::isnan(elevmaskI(iI))) {
             // This cell not masked: look up elevation point as usual
@@ -146,10 +146,11 @@ printf("END IceRegridder_L0::GvEp()\n");
 // --------------------------------------------------------
 void IceRegridder_L0::GvI(
     MakeDenseEigenT::AccumT &&ret,
+    char gridG,    // Interpolation grid to use for G: 'I' (ice) or 'G' (exchange)
     blitz::Array<double,1> const *_elevmaskI) const
 {
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
-    if (interp_grid == IceExch::ICE) {
+    if (gridG == 'I') {
         // Ice <- Ice = Indentity Matrix (scaled)
         // But we need this unscaled... so we use the weight of
         // each grid cell.
@@ -180,12 +181,13 @@ void IceRegridder_L0::GvI(
 // --------------------------------------------------------
 void IceRegridder_L0::GvAp(
     MakeDenseEigenT::AccumT &&ret,
+    char gridG,    // Interpolation grid to use for G: 'I' (ice) or 'G' (exchange)
     blitz::Array<double,1> const *_elevmaskI) const
 {
 printf("BEGIN IceRegridder_L0::GvAp()\n");
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
     for (int id=0; id<aexgrid.dense_extent(); ++id) {
-        long const iG = (interp_grid == IceExch::ICE ?
+        long const iG = (gridG == 'I' ?
             aexgrid.ijk(id,1) : aexgrid.to_sparse(id));
         long const iA = aexgrid.ijk(id,0);
         long const iI = aexgrid.ijk(id,1);
@@ -205,7 +207,6 @@ void IceRegridder_L0::ncio(NcIO &ncio, std::string const &vname)
 {
     IceRegridder::ncio(ncio, vname);
     auto info_v = get_or_add_var(ncio, vname + ".info", "int", {});
-    get_or_put_att_enum(info_v, ncio.rw, "interp_grid", interp_grid);
 }
 
 }   // namespace icebin

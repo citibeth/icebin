@@ -22,36 +22,29 @@
 
 namespace icebin {
 
-BOOST_ENUM_VALUES( IceExch, int,
-    (ICE)   (0)
-    (EXCH)  (1)
-)
-
 class IceRegridder_L0 : public IceRegridder
 {       // For ice model with level-value grid cells
 public:
-    /** The grid we use at the interpolation grid (exchange or ice) */
-    IceExch interp_grid;
-
     /** Number of grid cells in the ice grid */
     size_t nI() const
         { return agridI.dim.sparse_extent(); }
 
     /** Number of grid cells in the interpolation grid */
-    size_t nG() const {
-        if (interp_grid == IceExch::ICE) return agridI.dim.sparse_extent();
-        return aexgrid.sparse_extent();
-    }
+    size_t nX() const
+        { return aexgrid.sparse_extent(); }
 
     IceRegridder_L0() : interp_grid(IceExch::EXCH) {}
 
 public:
     // Implementations of virtual functions
     void GvEp(MakeDenseEigenT::AccumT &&ret,
+        char gridG,    // Identity of G: 'I' (ice) or 'G' (exchange)
         blitz::Array<double,1> const *elevmaskI) const;
     void GvI(MakeDenseEigenT::AccumT &&ret,
+        char gridG,    // Identity of G: 'I' (ice) or 'G' (exchange)
         blitz::Array<double,1> const *elevmaskI) const;
     void GvAp(MakeDenseEigenT::AccumT &&ret,
+        char gridG,    // Identity of G: 'I' (ice) or 'G' (exchange)
         blitz::Array<double,1> const *elevmaskI) const;
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };

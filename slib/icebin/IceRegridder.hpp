@@ -91,11 +91,11 @@ public:
         InterpStyle _interp_style);
 
     // ------------------------------------------------
-    /** Number of dimensions of ice vector space */
+    /** Number of dimensions of ice grid */
     virtual size_t nI() const = 0;
 
-    /** Number of dimensions of interpolation grid vector space. */
-    virtual size_t nG() const = 0;
+    /** Number of dimensions of exchange grid */
+    virtual size_t nX() const = 0;
 
     // ------------------------------------------------
     // Matrix production subroutines here store their output in
@@ -115,14 +115,17 @@ public:
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Elevation] */
     virtual void GvEp(MakeDenseEigenT::AccumT &&ret,
+        char gridG,
         blitz::Array<double,1> const *elevmaskI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Ice] */
     virtual void GvI(MakeDenseEigenT::AccumT &&ret,
+        char gridG,
         blitz::Array<double,1> const *elevmaskI) const = 0;
 
     /** Produces the unscaled matrix [Interpolation or Ice] <-- [Projected Atmosphere] */
     virtual void GvAp(MakeDenseEigenT::AccumT &&ret,
+        char gridG,
         blitz::Array<double,1> const *elevmaskI) const = 0;
 
     /** Define, read or write this data structure inside a NetCDF file.
