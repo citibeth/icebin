@@ -52,11 +52,12 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AEvI(
     std::array<SparseSetT *,2> dims,
     RegridParams const &params,
     blitz::Array<double,1> const *elevmaskI,
-    char Igrid,        // Identity of I in "AEvI": 'I' or 'G'
+    char Igrid,        // Identity of I in "AEvI": 'I' or 'X'
     UrAE const &AE)
 {
-    // if Igrid=='G', then references to I in this
-    // function are actually G.  (and dimG, etc. is an unused variable)
+    // if Igrid=='X', then references to I in this
+    // function are actually X (exchdnage grid).
+    // (and dimG, etc. is an unused variable)
 
 printf("BEGIN compute_AEvI scale=%d correctA=%d\n", params.scale, params.correctA);
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, true));
@@ -155,11 +156,12 @@ std::unique_ptr<linear::Weighted_Eigen> compute_IvAE(
     std::array<SparseSetT *,2> dims,
     RegridParams const &params,
     blitz::Array<double,1> const *elevmaskI,
-    char Igrid,        // Identity of I in "AEvI": 'I' or 'G'
+    char Igrid,        // Identity of I in "AEvI": 'I' or 'X'
     UrAE const &AE)
 {
-    // if Igrid=='G', then references to I in this
-    // function are actually G.  (and dimG, etc. is an unused variable)
+    // if Igrid=='X', then references to I in this
+    // function are actually X (exchdnage grid).
+    // (and dimG, etc. is an unused variable)
 
 //printf("BEGIN compute_IvAE\n");
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, !params.smooth()));
@@ -364,10 +366,10 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
         std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'I', urA));
 
     // ------- AvG, GvA
-    rm->add_regrid("AvG",
-        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'G', urA));
-    rm->add_regrid("GvA",
-        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'G', urA));
+    rm->add_regrid("AvX",
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'X', urA));
+    rm->add_regrid("XvA",
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'X', urA));
 
     // ------- EvI, IvE
     rm->add_regrid("EvI",
@@ -376,10 +378,10 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_Standard::regrid_matrices(
         std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'I', urE));
 
     // ------- EvG, GvE
-    rm->add_regrid("EvG",
-        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'G', urE));
-    rm->add_regrid("GvE",
-        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'G', urE));
+    rm->add_regrid("EvX",
+        std::bind(&compute_AEvI, regridder, _1, _2, &elevmaskI, 'X', urE));
+    rm->add_regrid("XvE",
+        std::bind(&compute_IvAE, regridder, _1, _2, &elevmaskI, 'X', urE));
 
     // ------- EvA, AvE regrids.insert(make_pair("EvA", std::bind(&compute_EvA, regridder, _1, _2, urE, urA) ));
     rm->add_regrid("EvA",
