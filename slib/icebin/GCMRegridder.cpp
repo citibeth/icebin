@@ -109,12 +109,16 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
         clear();
     }
 
-    // Read/Write gridA and other global stuff
-    mem_agridA.reset(new AbbrGrid);
-    agridA = &*mem_agridA;
+    // Allocate agridA if we're reading
+    if (ncio.rw == 'r') {
+        mem_agridA.reset(new AbbrGrid);
+        agridA = &*mem_agridA;
+    }
 
+    // Read/Write gridA and other global stuff
     agridA->ncio(ncio, vname + ".agridA");
     indexingHC.ncio(ncio, vname + ".indexingHC");
+    indexingE.ncio(ncio, vname + ".indexingE");
     ncio_vector(ncio, _hcdefs, true, vname + ".hcdefs", "double",
         get_or_add_dims(ncio, {vname + ".nhc"}, {_hcdefs.size()} ));
 //  domainA.ncio(ncio, ncInt, vname + ".domainA");
