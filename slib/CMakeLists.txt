@@ -50,6 +50,7 @@ if (BUILD_COUPLER)
     list(APPEND icebin_SOURCES
         # Coupler...
         icebin/multivec.cpp
+        icebin/e1ve0.cpp
         icebin/GCMCoupler.cpp
         icebin/IceCoupler.cpp
         icebin/contracts/contracts.cpp

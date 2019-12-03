@@ -31,6 +31,7 @@
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/VarSet.hpp>
 #include <icebin/multivec.hpp>
+#include <icebin/e1ve0.hpp>
 
 namespace icebin {
 
@@ -62,7 +63,7 @@ struct GCMInput {
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    spsparse::TupleList<long,double,2> E1vE0_scaled_g;
+    spsparse::TupleList<long,double,2> E1vE0_scaled_g;   // Original version, all ice sheets
     spsparse::TupleList<long,double,2> E1vE0_scaled;    // domain-split version
 
     /** @param nvar Array specifying number of variables for each segment (A,E,ATOPO,ETOPO). */
@@ -137,10 +138,6 @@ public:
     ibmisc::TimeUnit time_unit;    // Equiv. to CF-compliant time unit string
     double time_start_s;        // Start of simulation, as far as ice model is concerned (seconds since time_base).
 
-
-    // Last time this coupler was called
-    double last_time_s;
-
     /** Filename this coupler (including grid) was read from. */
     std::string icebin_in;
 
@@ -158,6 +155,21 @@ public:
     through to the ice model.  These parameters cannot be specific to
     either the ice model or the GCM. */
     GCMParams gcm_params;
+
+    // -------------- Info about the combined exchange grid (across all ice sheets)
+    // This info is static.
+    /** In combined exchange grid vector space: index of the start of
+    each single-ice-sheet subspace. */
+    std::vector<long> basesX;
+    /** In combined exchange grid vector space: area of each cell */
+    std::vector<double> areaX;
+
+
+    // ------------ State that carries over across timesteps
+    // Time period covered by the last time the coupler was called
+    std::array<double,2> timespan{last_time_s, time_s};
+    // Elevation basis functions, derived from XvE
+    e1ve0::BasisFnMap bfn0;
 
     /** Number of elevation classes the GCM sees */
     int _nhc_gcm = -1;
@@ -202,6 +214,13 @@ public:
     std::string sdate(double time_s) const;
 
     bool am_i_root() const { return gcm_params.am_i_root(); }
+
+    /** Run the coupling procedure for all ice sheets.
+    @return All output from copuling to pass back to the GCM */
+    virtual GCMInput couple(
+        double time_s,        // Simulation time [s]
+        VectorMultivec const &gcm_ovalsE,
+        bool run_ice);    // if false, only initialize
 
 protected:
     virtual void _ncread(

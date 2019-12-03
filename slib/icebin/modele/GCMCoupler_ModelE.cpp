@@ -648,9 +648,6 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
         // Couple on root!
         out = self->couple(time_s, gcm_ovalsE_s, run_ice);  // move semantics
 
-        // Add new TOPO file to out
-        
-
         // Split up the output (and 
         std::vector<GCMInput> every_outs(
             split_by_domain(out, *self->domains, *self->domains));
@@ -1010,49 +1007,11 @@ double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
 bool run_ice)    // if false, only initialize
 {
-    GCMRegridder_ModelE const *gcmA(
-        dynamic_cast<GCMRegridder_WrapE *>(&*gcm_regridder)->gcmA.get());
+    // Call superclass coupling for starters
+    GCMInput out(this->GCMCoupler::couple(time_s, gcm_ovalsE, run_ice));
 
-printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
-    // ------------------------ Most MPI Nodes
-    if (!gcm_params.am_i_root()) {
-        GCMInput out({0,0,0,0});
-        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
-            auto &ice_coupler(ice_couplers[sheetix]);
-            ice_coupler->couple(time_s, gcm_ovalsE, out.gcm_ivalss_s, run_ice);
-        }
-        return out;
-    }
-
-    // ----------------------- Root MPI Node
-    std::array<double,2> timespan{last_time_s, time_s};
-
-    // Figure out our calendar day to format filenames
-    auto sdate(this->sdate(time_s));
-    std::string log_dir = "icebin";
-
-    if (gcm_params.icebin_logging) {
-        std::string fname = "gcm-out-" + sdate + ".nc";
-        NcIO ncio(fname, 'w');
-        ncio_gcm_output(ncio, gcm_ovalsE, timespan,
-            time_unit, "");
-        ncio();
-    }
-
-    // Initialize output: A and E
-    std::vector<int> nvars;
-    for (auto &gcmi : gcm_inputs) nvars.push_back(gcmi.size());
-    GCMInput out(nvars);
-
-    std::vector<IceCoupler::CoupleOut> couts;
-    for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
-        auto &ice_coupler(ice_couplers[sheetix]);
-
-        IceCoupler::CoupleOut cout(ice_coupler->couple(
-            time_s, gcm_ovalsE,
-            out.gcm_ivalss_s, run_ice));
-        couts.push_back(std::move(cout));
-    }
+    // Nothing more to do unless we're root
+    if (!gcm_params.am_i_root()) return out;
 
     // Run update_topo()
     TupleListLT<1> wEAm_base;  // set by update_topo()
@@ -1070,39 +1029,6 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         update_topo(time_s, run_ice, emI_lands, emI_ices, out, wEAm_base);
     }
 
-    // Compute E1vE0, to allow for updating elevation classes
-    // NOTE: ECs in the nullspace of E0 and E1 will NOT be touched.
-    {
-        std::vector<linear::Weighted_Eigen *> E1vIs_unscaled;
-        std::vector<EigenSparseMatrixT *> IvE0s;
-        std::vector<SparseSetT *> dimE0s;
-
-        for (IceCoupler::CoupleOut &cout : couts)  {
-            E1vIs_unscaled.push_back(&*cout.E1vI_unscaled_nc);
-            IvE0s.push_back(&*cout.IvE0);
-            dimE0s.push_back(&*cout.dimE0);
-        }
-
-         // Don't do this on the first round, since we don't yet have an IvE0
-        if (run_ice) {
-            out.E1vE0_scaled_g = gcmA->global_scaled_E1vE0(
-                E1vIs_unscaled, IvE0s, dimE0s);
-        }
-    }
-
-// This is not needed because everything in the C++ portion of
-// the coupler works just on elevation class range [0,nhc_ice)
-#if 0
-    // Add identity I matrix to E1vE0_unscaled for base ice
-    // This will keep all the legacy ice ECs in place
-    if (run_ice) {
-        for (auto ii=wEAm_base.begin(); ii != wEAm_base.end(); ++ii) {
-            auto iE(ii->index(0));
-            out.E1vE0_scaled_g.add({iE,iE}, 1.0);
-        }
-    }
-    wEAm_base.clear();
-#endif
 
     // Log the results
     if (gcm_params.icebin_logging) {
@@ -1115,9 +1041,12 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         ncio();
     }
 
-    // ---------- Apply scaling originally set in gcmce_add_xxx()
-    // (More trouble-free to do this here, rather than in
-    // IceCoupler::couple() and update_topo() )
+    // ---------- Apply scaling to gcm_ivalsA_s, originally set in gcmce_add_xxx()
+
+    // This converts (for example) ZATMO [m] (as needs to go into TOPO
+    //     file) to ZATMO [m^2 s-2] (as ModelE wants to see internally)
+    // It is more trouble-free to do this here, rather than in
+    //     IceCoupler::couple() and update_topo()
     for (size_t index_ae=0; index_ae < gcm_inputs.size(); ++index_ae) {
         VarSet const &gcm_inputsA(gcm_inputs[index_ae]);
         int const nvar = gcm_inputsA.size();

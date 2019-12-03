@@ -50,8 +50,7 @@ public:
 
     // Densified regridding matrix, and dimension, from previous call
     // Used to interpret GCM output
-    std::unique_ptr<ibmisc::linear::Weighted_Eigen> IvE0;   // SCALED
-    // DenseArrayT<1> wIvE0;    // Provides the mask for I; for debugging only.
+    std::unique_ptr<EigenSparseMatrixT> IvE0;   // SCALED
     std::unique_ptr<SparseSetT> dimE0;
 
     // Output of ice model from the last time we coupled.
@@ -149,12 +148,9 @@ public:
     std::function<void(blitz::Array<double,2> &, double)> reconstruct_ice_ivalsI;
 
     struct CoupleOut {
-        // Moved from IceCoupler before they were replaced w/ updated versions
-        std::unique_ptr<SparseSetT> dimE0;
-        std::unique_ptr<EigenSparseMatrixT> IvE0;    // SCALED
-        // Additional stuff from coupling
-        SparseSetT dimE1;
-        std::unique_ptr<ibmisc::linear::Weighted_Eigen> E1vI_unscaled_nc;    // UNSCALED
+        /** X=exchange grid; E=elevation grid; XvE used to compute E1vE0 */
+        std::unique_ptr<EigenSparseMatrixT> XvE;    // SCALED
+        SparseSetT *dimE;   // Used to interpret XvE
     };
 
     /** (4) Run the ice model for one coupling timestep.
