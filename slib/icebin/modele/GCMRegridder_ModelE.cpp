@@ -636,46 +636,6 @@ linear::Weighted_Tuple GCMRegridder_ModelE::global_AvE(
 
 }
 
-spsparse::TupleList<long,double,2> GCMRegridder_ModelE::global_scaled_E1vE0(
-    std::vector<linear::Weighted_Eigen *> const &E1vIs_unscaled, // State var set in IceCoupler::couple(); _nc = no correctA (RegridParam) UNSCALED matrix
-    std::vector<EigenSparseMatrixT *> const &IvE0s, // State var set in IceCoupler::couple()  SCALED matrix
-    std::vector<SparseSetT *> const &dimE0s) const    // dimE0 accompanying IvE0
-{
-    spsparse::TupleList<long,double,2> E1vE0_g;    // _g = global
-
-    // Scaling factor for each gridcell (starts life as weighting factor)
-    blitz::Array<double,1> sM(nE());
-    sM = 0;
-
-    // ---------- Compute each E1vE0 and merge...
-    for (size_t sheet_index=0; sheet_index < ice_regridders().size(); ++sheet_index) {
-        auto &E1vI_unscaled(*E1vIs_unscaled[sheet_index]);
-        EigenSparseMatrixT &IvE0(*IvE0s[sheet_index]);
-        auto &dimE0(*dimE0s[sheet_index]);
-
-        // Don't do this on the first round, since we don't yet have an IvE0
-        EigenSparseMatrixT E1vE0(*E1vI_unscaled.M * IvE0);    // UNSCALED
-        spcopy(
-            accum::to_sparse(make_array(E1vI_unscaled.dims[0]),
-            accum::blitz_existing(sM)),    // Output
-            E1vI_unscaled.wM);   // Input
-
-        spcopy(
-            accum::to_sparse(make_array(E1vI_unscaled.dims[0], &dimE0),
-            accum::ref(E1vE0_g)),
-            E1vE0);
-    }    // Flush accumulators
-    E1vE0_g.set_shape(std::array<long,2>{nE(), nE()});
-
-    // Convert weights to scales
-    for (int i=0; i<nE(); ++i) sM(i) = 1. / sM(i);    // Will produce Inf where unused
-
-    // Scale the matrix
-    for (auto &tp : E1vE0_g.tuples) tp.value() *= sM(tp.index(0));
-
-    return E1vE0_g;
-}
-
 // ==============================================================
 
 void GCMRegridder_WrapE::_init(std::unique_ptr<GCMRegridder_ModelE> &&_gcmA)
