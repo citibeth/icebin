@@ -425,6 +425,7 @@ std::unique_ptr<linear::Weighted_Eigen> RegridMatrices_Dynamic::matrix_d(
 std::unique_ptr<ibmisc::linear::Weighted> RegridMatrices_Dynamic::matrix(
     std::string const &spec_name) const
 {
+    // Allocate dimensions right here
     TmpAlloc tmp;
     auto &dims(tmp.make<std::array<SparseSetT,2>>());
 
