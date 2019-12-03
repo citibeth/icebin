@@ -33,6 +33,10 @@ public:
     size_t nX() const
         { return aexgrid.sparse_extent(); }
 
+    /** Number of grid cells in the Ice (I) or Exchange (X) grids.
+    @param gridG Either 'I' or 'X' */
+    size_t nG(char gridG) const;
+
     IceRegridder_L0() : interp_grid(IceExch::EXCH) {}
 
 public:

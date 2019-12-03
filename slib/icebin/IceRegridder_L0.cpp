@@ -26,6 +26,16 @@ namespace icebin {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
+/** Number of grid cells in the Ice (I) or Exchange (X) grids.
+@param gridG Either 'I' or 'X' */
+size_t IceRegridder_L0::nG(char gridG) const
+{
+    switch(gridG) {
+        case 'I' : return nI();
+        case 'X' : return nX();
+        default : (*icebin_error)(-1, "Illegal gridG='%c'", gridG);
+     }
+}
 // --------------------------------------------------------
 /** Does elevation-class-style interpolation on height points.  Assumes
 elevation class boundaries midway between height points.

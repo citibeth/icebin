@@ -97,6 +97,10 @@ public:
     /** Number of dimensions of exchange grid */
     virtual size_t nX() const = 0;
 
+    /** Number of dimensions of ice or exchange grid
+    @param gridG 'I' or 'X' or maybe something else. */
+    virtual size_t nG(char gridG) const = 0;
+
     // ------------------------------------------------
     // Matrix production subroutines here store their output in
     // spsparse accumulators (Anything that accepts a series of

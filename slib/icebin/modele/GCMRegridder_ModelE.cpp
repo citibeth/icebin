@@ -124,8 +124,10 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_AOmvAAm(
 // ========================================================================
 // ------------------------------------------------------
 /** Computes some intermediate values used by more than one top-level
-    regrid generator */
-struct ComputeXAmvIp_Helper {
+    regrid generator.
+        X = A (atmosphere) or E (elevation) grid
+        G = I (ice) or X (exchange) grid*/
+struct ComputeXAmvGp_Helper {
 
     /** Allocated stuff that must remain allocated for the duration of
     the temporary values.  This should be transferred to a
@@ -147,25 +149,30 @@ struct ComputeXAmvIp_Helper {
 
     blitz::Array<double,1> XAmvXOms;
 
-    /** Parameters come from top-level regridding subroutine */
-    ComputeXAmvIp_Helper(
+    /** Parameters come from top-level regridding subroutine
+    @param gridX Identity of grid X: Either 'A' or 'E', determines the destination grid
+    @param gridG Identity of grid G: Either 'I' or 'X', determines the ice/exchange grid
+    */
+    ComputeXAmvGp_Helper(
         std::array<SparseSetT *,2> dims,
         RegridParams const &paramsA,
         GCMRegridder_ModelE const *gcmA,
         blitz::Array<double,1> const &foceanAOp,
         blitz::Array<double,1> const &foceanAOm,
-        char X,    // Either 'A' or 'E', determines the destination matrix.
+        char gridX,    // Either 'A' or 'E', determines the destination grid.
+        char gridG,    // Either 'I' or 'X', determines the ice/exchange grid
         double const eq_rad,    // Radius of the earth
         RegridMatrices_Dynamic const *rmO);
-};    // class ComputeXAmvIp_Helper
+};    // class ComputeXAmvGp_Helper
 
-ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
+ComputeXAmvGp_Helper::ComputeXAmvGp_Helper(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> const &foceanAOp,
     blitz::Array<double,1> const &foceanAOm,
-    char X,    // Either 'A' or 'E', determines the destination matrix.
+    char gridX,    // Either 'A' or 'E', determines the destination grid.
+    char gridG,    // Either 'I' or 'X', determines the ice/exchange grid
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
@@ -187,13 +194,13 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
     HntrSpec const &hntrA(cast_GridSpec_LonLat(*gcmA->agridA->spec).hntr);
     HntrSpec const &hntrO(cast_GridSpec_LonLat(*gcmA->gcmO->agridA->spec).hntr);
 
-    dimXAm.set_sparse_extent(X == 'A' ? gcmA->nA() : gcmA->nE());
-    dimIp.set_sparse_extent(rmO->ice_regridder->nI());
+    dimXAm.set_sparse_extent(gcmA->nAE(gridX));
+    dimIp.set_sparse_extent(rmO->ice_regridder->nG(gridG));
 
     // Ensure that operations don't change universes.  Sanity check.
     std::unique_ptr<ConstUniverseT> const_universe;
 
-    if (X == 'E') {
+    if (gridX == 'E') {
         RegridParams paramsO(paramsA);
         paramsO.scale = false;
         paramsO.correctA = false;
@@ -232,7 +239,7 @@ ComputeXAmvIp_Helper::ComputeXAmvIp_Helper(
                 gcmA->nhc(), gcmA->gcmO->indexingHC, gcmA->indexingHC),
             {SparsifyTransform::TO_DENSE_IGNORE_MISSING, SparsifyTransform::ADD_DENSE},
             {&dimEOm, &dimEAm}, 'T').to_eigen());
-    } else {    // X == 'A'
+    } else {    // gridX == 'A'
         RegridParams paramsO(paramsA);
         paramsO.scale = false;
         paramsO.correctA = false;
@@ -306,13 +313,14 @@ static EigenSparseMatrixT crop_mvp(
 @param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
        NOTE: rmO knows these grids as (A, E, I).
 */
-static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
+static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvGp(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
     blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
-    char X,    // Either 'A' or 'E', determines the destination matrix.
+    char gridAE,    // identify of grid X: 'A' or 'E'
+    char gridG,    // idnetity of grid Ip: 'I' or 'X'
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
@@ -320,14 +328,14 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
-    ComputeXAmvIp_Helper hh(dims, paramsA, gcmA, foceanAOp, foceanAOm, X, eq_rad, rmO);
+    ComputeXAmvGp_Helper hh(dims, paramsA, gcmA, foceanAOp, foceanAOm, gridAE, gridG, eq_rad, rmO);
     ret->tmp = std::move(hh.tmp);
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
 
-    auto &dimXOm(X=='E' ? hh.dimEOm : hh.dimAOm);
-    auto &dimXOp(X=='E' ? hh.dimEOp : hh.dimAOp);
+    auto &dimXOm(gridAE=='E' ? hh.dimEOm : hh.dimAOm);
+    auto &dimXOp(gridAE=='E' ? hh.dimEOp : hh.dimAOp);
 
 //printf("XOpvIp: %ld\n", (long)(XOpvIp->M->nonZeros()));
 //printf("XAmvXOm: %ld\n", (long)(XAmvXOm->nonZeros()));
@@ -366,13 +374,14 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvIp(
 @param rmO Regrid matrix generator that can regrid between (AOp, EOp, Ip).
        NOTE: rmO knows these grids as (A, E, I).
 */
-static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
+static std::unique_ptr<linear::Weighted_Eigen> compute_GpvXAm(
     std::array<SparseSetT *,2> dims,
     RegridParams const &paramsA,
     GCMRegridder_ModelE const *gcmA,
     blitz::Array<double,1> const &foceanAOp,    // gcmA->foceanAOp
     blitz::Array<double,1> const &foceanAOm,    // gcmA->foceanAOm
-    char X,    // Either 'A' or 'E', determines the destination matrix.
+    char gridG,     // Identity of grid G: either 'I' (ice) or 'X' (exchange)
+    char gridAE,    // Either 'A' or 'E', determines the destination matrix.
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
@@ -380,15 +389,15 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_IpvXAm(
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
-    ComputeXAmvIp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, foceanAOp, foceanAOm, X, eq_rad, rmO);
+    ComputeXAmvGp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, foceanAOp, foceanAOm, X, eq_rad, rmO);
     ret->tmp = std::move(hh.tmp);
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
     auto &XAmvXOm(hh.XAmvXOm);
-    auto &dimXOm(X=='E' ? hh.dimEOm : hh.dimAOm);
-    auto &dimXOp(X=='E' ? hh.dimEOp : hh.dimAOp);
+    auto &dimXOm(gridAE=='E' ? hh.dimEOm : hh.dimAOm);
+    auto &dimXOp(gridAE=='E' ? hh.dimEOp : hh.dimAOp);
 
-    std::string const &matname(X=='A' ? "IvA" : "IvE");
+    std::string const &matname(strprintf("%cv%c", gridG, gridAE));
     SparseSetT *dimIp(dims[0]);
     RegridParams paramsO(paramsA);
         paramsO.scale = false;
@@ -496,10 +505,10 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
         gcmO->regrid_matrices(sheet_index, elevmaskI, params));
     auto &rmO(rm->tmp.take(std::move(*_rmO)));
 
-    rm->add_regrid("EAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("EAmvIp", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
         'E', specO.eq_rad, &rmO));
-    rm->add_regrid("AAmvIp", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("AAmvIp", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
         'A', specO.eq_rad, &rmO));
 
@@ -508,19 +517,19 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 //        this, specO.eq_rad, &rmO));
 
 
-    rm->add_regrid("IpvEAm", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IpvEAm", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
         'E', specO.eq_rad, &rmO));
-    rm->add_regrid("IpvAAm", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IpvAAm", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
         'A', specO.eq_rad, &rmO));
 
 
     // --------------- Simply-named aliases
-    rm->add_regrid("EvI", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("EvI", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
         'E', specO.eq_rad, &rmO));
-    rm->add_regrid("AvI", std::bind(&compute_XAmvIp, _1, _2,
+    rm->add_regrid("AvI", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
         'A', specO.eq_rad, &rmO));
 
@@ -529,10 +538,10 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 //        this, specO.eq_rad, &rmO));
 
 
-    rm->add_regrid("IvE", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IvE", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
         'E', specO.eq_rad, &rmO));
-    rm->add_regrid("IvA", std::bind(&compute_IpvXAm, _1, _2,
+    rm->add_regrid("IvA", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
         'A', specO.eq_rad, &rmO));
 
