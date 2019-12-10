@@ -31,7 +31,7 @@ std::vector<fortran::Shape<2>> stdshapes {
     fortran::Shape<2>({"imh", "jmh"}, {IMH, JMH}),
     fortran::Shape<2>({"im1", "jm1"}, {IM1, JM1}),
     fortran::Shape<2>({"im", "jm"}, {IM, JM}),
-    fortran::Shape<2>({"im5m", "jm5m"}, {IM5m, JM5m)
+    fortran::Shape<2>({"im5m", "jm5m"}, {IM5m, JM5m})
 };
 
 // ----------------------------------------------------------------------
