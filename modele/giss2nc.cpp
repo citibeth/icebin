@@ -35,6 +35,7 @@ std::vector<fortran::Shape<2>> stdshapes {
 };
 
 // ----------------------------------------------------------------------
+// "name:description(units)  source"
 static const boost::regex
     titleiRE("(.*?):(.*?)(\\((.*?)\\))?(\\s\\s(.*))?");
 
