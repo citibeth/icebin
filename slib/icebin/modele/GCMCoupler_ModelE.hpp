@@ -166,7 +166,7 @@ public:
         The core coupling/regridding computation only runs on root.
         But other MPI ranks need to go along for the ride, assuming that
         the ice model uses MPI. */
-    GCMInput couple(
+    GCMInput couple(    /* OVERRIDES VIRTUAL METHOD */
         double time_s,        // Simulation time [s]
         VectorMultivec const &gcm_ovalsE,
         bool run_ice);    // if false, only initialize

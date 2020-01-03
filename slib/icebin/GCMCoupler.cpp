@@ -28,6 +28,7 @@
 #include <icebin/GCMCoupler.hpp>
 #include <icebin/GCMRegridder.hpp>
 #include <icebin/contracts/contracts.hpp>
+#include <icebin/e1ve0.hpp>
 #include <spsparse/netcdf.hpp>
 
 #ifdef USE_PISM
@@ -142,16 +143,23 @@ void GCMCoupler::_ncread(
         std::cout << gcm_inputs_grid[i] << ':' << gcm_inputs[i];
     }
 
+    // Compute static info about combined exchange grids
+    size_t const nsheet = gcm_regridder->ice_regridders().size();
     ice_couplers.clear();
-    for (size_t i=0; i < gcm_regridder->ice_regridders().size(); ++i) {
-        std::string const &sheet_name(gcm_regridder->ice_regridders()[i]->name());
-
+    basesX = std::vector<long>{0};  // Base of first exchange grid is 0
+    areaX.clear();
+    for (auto &ice_regridder : gcm_regridder->ice_regridders()) {
         // Create an IceCoupler corresponding to this IceSheet.
-        std::unique_ptr<IceCoupler> ice_coupler(new_ice_coupler(ncio_config, vname, sheet_name, this));
+        ice_couplers.push_back(new_ice_coupler(
+            ncio_config, vname, ice_regridder->name(), this));
 
-        ice_couplers.push_back(std::move(ice_coupler));
+        // Add to basesX and areaX (X = combined exchange grid for all ice sheets)
+        auto const &aexgrid(ice_regridder->aexgrid);    // Exchange grid
+        basesX.push_back(bases.back() + aexgrid.sparse_extent());
+        for (int iXd=0; iXd<aexgrid.dense_extent(); ++iXd) {
+            areaX.push_back(aexgrid.native_area(iXd));
+        }
     }
-
 
     printf("END GCMCoupler::ncread(%s)\n", grid_fname.c_str()); fflush(stdout);
 }
@@ -166,7 +174,7 @@ void GCMCoupler::cold_start(
     time_base = _time_base;
     time_start_s = _time_start_s;
     time_unit = TimeUnit(&cal365, time_base, TimeUnit::SECOND);
-    last_time_s = time_start_s;
+    timespan = std::array<double,2>{-1,time_start_s};
 
     for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
         auto &ice_coupler(ice_couplers[sheetix]);
@@ -176,7 +184,6 @@ void GCMCoupler::cold_start(
 
         // Dynamic ice model is instantiated here...
         ice_coupler->cold_start(time_base, time_start_s);
-
         ice_coupler->print_contracts();
     }
 
@@ -362,6 +369,85 @@ printf("BEGIN GCMCoupler::ncio_gcm_output('%s' '%s')\n", ncio.fname.c_str(), vna
     ncio_dense(ncio, gcm_ovalsE, gcm_outputsE,
         gcm_regridder->indexingE, ut_system, vname_base);
 printf("END GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
+}
+// ------------------------------------------------------------
+GCMInput GCMCoupler::couple(
+double time_s,        // Simulation time [s]
+VectorMultivec const &gcm_ovalsE,
+bool run_ice)    // if false, only initialize
+{
+    timespan = std::array<double,2>{timespan[1], time_s};
+
+printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
+    // ------------------------ Most MPI Nodes
+    if (!gcm_params.am_i_root()) {
+        GCMInput out({0,0,0,0});
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);
+            ice_coupler->couple(time_s, gcm_ovalsE, out.gcm_ivalss_s, run_ice);
+        }
+        return out;
+    }
+
+    // ----------------------- Root MPI Node
+
+    // -------- Figure out our calendar day to format filenames
+    if (gcm_params.icebin_logging) {
+        std::string fname = "gcm-out-" + this->sdate(time_s) + ".nc";
+        NcIO ncio(fname, 'w');
+        ncio_gcm_output(ncio, gcm_ovalsE, timespan,
+            time_unit, "");
+        ncio();
+    }
+
+    // ---------- Initialize output: A,E,Atopo,Etopo
+    std::vector<int> nvars;
+    for (auto &gcmi : gcm_inputs) nvars.push_back(gcmi.size());
+    GCMInput out(nvars);
+
+    // ---------- Run per-ice-sheet couplers
+    {
+        std::vector<SparseSetT const *> dimE1s;
+        std::vector<EigenSparseMatrixT *> XvE1s;
+        std::vector<std::unique_ptr<EigenSparseMatrixT>> XvE1s_mem;
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            auto &ice_coupler(ice_couplers[sheetix]);    // IceCoupler
+            IceRegridder const *ice_regridder = ice_coupler->ice_regridder;
+
+            CoupleOut out(ice_coupler->couple(
+                time_s, gcm_ovalsE, out.gcm_ivalss_s, run_ice));
+            dimE1s.push_back(out.dimE);
+            XvE1s_mem.push_back(std::move(out.XvE));
+            XvE1s.push_back(&**XvE1s_mem.back());
+        }
+
+        // --------- Compute E1vE0
+        e1ve0::BasisFnMap bfn1(e1ve0::extract_basis_fns(dimE1s, XvE1s, basesX));
+        XvE1s_mem.clear();    // Free memory
+        if (run_ice) {
+            out.E1vE0_scaled_g = e1ve0::compute_E1vE0_scaled(bfn1, gcm_regirdder->nE(), bfn0, areaX);
+        }
+        bfn0 = std::move(bfn1);    // save state between timesteps
+    }
+
+
+// This is not needed because everything in the C++ portion of
+// the coupler works just on elevation class range [0,nhc_ice)
+#if 0
+    // Add identity I matrix to E1vE0_unscaled for base ice
+    // This will keep all the legacy ice ECs in place
+    if (run_ice) {
+        for (auto ii=wEAm_base.begin(); ii != wEAm_base.end(); ++ii) {
+            auto iE(ii->index(0));
+            out.E1vE0_scaled_g.add({iE,iE}, 1.0);
+        }
+    }
+    wEAm_base.clear();
+#endif
+
+
+    return out;
+
 }
 // ------------------------------------------------------------
 // ======================================================================

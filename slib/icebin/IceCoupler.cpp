@@ -218,7 +218,7 @@ printf("BEGIN construct_ice_ivalsI(dt=%g)\n", dt);
 
     // Ice inputs calculated as the result of a matrix multiplication
     // ice_ivalsI_e is |i| x |k|
-    ice_ivalsI_e = (*IvE0->M) * (
+    ice_ivalsI_e = (*IvE0) * (
         gcm_ovalsE0_e * icei_v_gcmo_T.M + icei_v_gcmo_T.b.replicate(nE0,1) );
 
     // Alias the Eigen matrix to blitz array
@@ -349,9 +349,9 @@ bool run_ice)
 
     // _nc means "No Correct" for changes in area due to projections
     // See commit d038e5cb for deeper explanation
-    std::unique_ptr<SparseSetT> dimE1(new SparseSetT);
-    ret.E1vI_unscaled_nc = rm->matrix_d("EvI", {&*dimE1, &dimI},
-        RegridParams(false, false, {0,0,0}));    // scale=f, correctA=f
+    std::unique_ptr<SparseSetT> dimE1(new SparseSetT(nE()));
+    auto E1vI_unscaled_nc(rm->matrix_d("EvI", {&*dimE1, &dimI},
+        RegridParams(false, false, {0,0,0})));    // scale=f, correctA=f
 
     // ========= Compute gcm_ivalsE
     SparseSetT dimA1;
@@ -361,7 +361,7 @@ bool run_ice)
     // Do it once for _E variables and once for _A variables.
     std::vector<linear::Weighted_Eigen *> AE1vIs(gcm_ivalss_s.size());
         AE1vIs[(int)IndexAE::A] = &*A1vI_unscaled;
-        AE1vIs[(int)IndexAE::E] = &*ret.E1vI_unscaled_nc;
+        AE1vIs[(int)IndexAE::E] = &*E1vI_unscaled_nc;
 
     for (int iAE=(int)IndexAE::A; iAE <= (int)IndexAE::E; ++iAE) {
 
@@ -439,12 +439,16 @@ bool run_ice)
 
         }
     }        // iAE
-    // Compute IvE (for next timestep)
-    std::unique_ptr<linear::Weighted_Eigen> IvE1(
+    // Compute IvE (for use interpreting stuffE at beginning of next timestep)
+    std::unique_ptr<EigenSparseMatrixT> IvE1(
         rm->matrix_d("IvE", {&dimI, &*dimE1},
-        RegridParams(true, true, sigma))); // scale=t, correctA=t
+        RegridParams(true, true, sigma))->M); // scale=t, correctA=t
 
-    // wIvE0.reference(IvE1->wM);
+    // Compute XvE, for use computing E1vE0
+    SparseSetT dimX(id_sparse_set<SparseSetT>(nX()));
+    ret.XvE = rm->matrix_d("XvE", {&dimX, &*dimE},
+        RegridParams(true, true, std::array<double,3>{0,0,0})->M);
+    ret.dimE = &*dimE1;   // Saved down below in "this->dimE0 = ..."
 
 
     // Record our matrices for posterity
@@ -455,20 +459,17 @@ bool run_ice)
 
         // Write matrices as their dense subspace versions, not the sparsified versions.
         dimI.ncio(ncio, "dimI");
+        dimX.ncio(ncio, "dimX");
         dimA1.ncio(ncio, "dimA");
         dimE1->ncio(ncio, "dimE");
 
         AE1vIs[GridAE::E]->ncio(ncio, "EvI_unscaled_nc", {"dimE", "dimI"});
         AE1vIs[GridAE::A]->ncio(ncio, "AvI_unscaled", {"dimA", "dimI"});
         IvE1->ncio(ncio, "IvE", {"dimI", "dimE"});
+        XvE1->ncio(ncio, "XvE", {"dimX", "dimE"});
     }
 
     // ---------- Save stuff for next time around
-    if (run_ice) {    // But not if first time
-        // Pass back stuff from last timestep
-        ret.dimE0 = std::move(this->dimE0);
-        ret.IvE0 = std::move(IvE0->M);
-    }
     // Store stuff from this timestep for next time around
     this->dimE0 = std::move(dimE1);
     this->IvE0 = std::move(IvE1);
