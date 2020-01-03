@@ -155,7 +155,7 @@ void GCMCoupler::_ncread(
 
         // Add to basesX and areaX (X = combined exchange grid for all ice sheets)
         auto const &aexgrid(ice_regridder->aexgrid);    // Exchange grid
-        basesX.push_back(bases.back() + aexgrid.sparse_extent());
+        basesX.push_back(basesX.back() + aexgrid.sparse_extent());
         for (int iXd=0; iXd<aexgrid.dense_extent(); ++iXd) {
             areaX.push_back(aexgrid.native_area(iXd));
         }
@@ -354,7 +354,7 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     }
 
 //    ncio_spsparse(ncio, out.E1vE0_unscaled, false, vname_base+"E1vE0_unscaled");
-    out.E1vE0_scaled_g.ncio(ncio, vname_base+"E1vE0");
+    out.E1vE0c.ncio(ncio, vname_base+"E1vE0c");
 }
 
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */
@@ -371,6 +371,59 @@ printf("BEGIN GCMCoupler::ncio_gcm_output('%s' '%s')\n", ncio.fname.c_str(), vna
 printf("END GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
 }
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// TODO: Add to linear/eigen.hpp
+/** Converts a linear::Weighted_Eigen to sparse indexing
+@param dims set to E.dims to sparsify all dimensions; or set one to nullptr if no sparsify needed there. */
+std::unique_ptr<linear::Weighted_Eigen> sparsify(
+    linear::Weighted_Eigen const &E,
+    std::array<SparsifyTransform,2> const &transforms = {SparsifyTransform::TO_SPARSE, SparsifyTransform::TO_SPARSE},
+//    std::array<SparseSetT *,2> const &dims,    // Determines what to sparsify; E.dims or nullptr in each slot
+    std::array<int,2> extent = std::array<int,2>{-1,-1})            // Extent of resulting matrix (can be taken from E.dims if available)
+{
+    for (int i=0; i<2; ++i) if (extent[i] < 0) extent[i] = E.dims[i]->sparse_extent();
+    std::unique_ptr<linear::Weighted_Eigen> S(
+        new linear::Weighted_Eigen(E.dims, E.conservative));
+
+    // Sparsify the matrix
+    {
+        TupleListT<2> SM_t;    // Matrix in sparse indexing, tuples
+        spcopy(
+            accum::sparsify(transforms, accum::in_index_type<int>(), E.dims,
+            accum::ref(SM_t)),
+            *E.M);
+
+        S->M.reset(new EigenSparseMatrixT(
+            extent[0], extent[1]));
+        S->M->setFromTriplets(SM_t.begin(), SM_t.end());
+    }
+
+    // Sparsify the weights
+    if (transforms[0] == SparsifyTransform::ID) {
+        S->wM.reference(E.wM);
+    } else {
+        spcopy(
+            accum::to_sparse(std::array<SparseSetT*,1>{E.dims[0]},
+            accum::blitz_new(S->wM)),
+            E.wM);
+    }
+
+    if (transforms[1] == SparsifyTransform::ID) {
+        S->Mw.reference(E.Mw);
+    } else {
+        spcopy(
+            accum::to_sparse(std::array<SparseSetT*,1>{E.dims[1]},
+            accum::blitz_new(S->Mw)),
+            E.Mw);
+    }
+
+    // Clear dims, which may not be saved...
+    S->dims[0] = nullptr;
+    S->dims[1] = nullptr;
+
+    return S;
+}
+// -------------------------------------------------
 GCMInput GCMCoupler::couple(
 double time_s,        // Simulation time [s]
 VectorMultivec const &gcm_ovalsE,
@@ -384,7 +437,7 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
         GCMInput out({0,0,0,0});
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);
-            ice_coupler->couple(time_s, gcm_ovalsE, out.gcm_ivalss_s, run_ice);
+            ice_coupler->couple(timespan, gcm_ovalsE, out.gcm_ivalss_s, run_ice);
         }
         return out;
     }
@@ -408,43 +461,30 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
     // ---------- Run per-ice-sheet couplers
     {
         std::vector<SparseSetT const *> dimE1s;
-        std::vector<EigenSparseMatrixT *> XvE1s;
-        std::vector<std::unique_ptr<EigenSparseMatrixT>> XvE1s_mem;
+        std::vector<std::unique_ptr<linear::Weighted_Eigen>> XuE1s;
         for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
             auto &ice_coupler(ice_couplers[sheetix]);    // IceCoupler
             IceRegridder const *ice_regridder = ice_coupler->ice_regridder;
 
-            CoupleOut out(ice_coupler->couple(
-                time_s, gcm_ovalsE, out.gcm_ivalss_s, run_ice));
-            dimE1s.push_back(out.dimE);
-            XvE1s_mem.push_back(std::move(out.XvE));
-            XvE1s.push_back(&**XvE1s_mem.back());
+            IceCoupler::CoupleOut iout(ice_coupler->couple(
+                timespan, gcm_ovalsE, out.gcm_ivalss_s, run_ice));
+            dimE1s.push_back(iout.dimE);
+            XuE1s.push_back(sparsify(*iout.XuE,
+                std::array<SparsifyTransform,2>{
+                    SparsifyTransform::ID,
+                    SparsifyTransform::TO_SPARSE},
+                std::array<int,2>{ice_regridder->nX(), -1}));
+
         }
 
         // --------- Compute E1vE0
-        e1ve0::BasisFnMap bfn1(e1ve0::extract_basis_fns(dimE1s, XvE1s, basesX));
-        XvE1s_mem.clear();    // Free memory
         if (run_ice) {
-            out.E1vE0_scaled_g = e1ve0::compute_E1vE0_scaled(bfn1, gcm_regirdder->nE(), bfn0, areaX);
+            out.E1vE0c = e1ve0::compute_E1vE0c(
+                XuE1s, XuE0s,
+                gcm_regridder->nE(), areaX);
         }
-        bfn0 = std::move(bfn1);    // save state between timesteps
+        XuE0s = std::move(XuE1s);    // save state between timesteps
     }
-
-
-// This is not needed because everything in the C++ portion of
-// the coupler works just on elevation class range [0,nhc_ice)
-#if 0
-    // Add identity I matrix to E1vE0_unscaled for base ice
-    // This will keep all the legacy ice ECs in place
-    if (run_ice) {
-        for (auto ii=wEAm_base.begin(); ii != wEAm_base.end(); ++ii) {
-            auto iE(ii->index(0));
-            out.E1vE0_scaled_g.add({iE,iE}, 1.0);
-        }
-    }
-    wEAm_base.clear();
-#endif
-
 
     return out;
 

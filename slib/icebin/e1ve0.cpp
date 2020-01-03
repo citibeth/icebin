@@ -3,158 +3,106 @@
 #include <set>
 #include <icebin/e1ve0.hpp>
 
+using namespace ibmisc;
+using namespace spsparse;
+
 namespace icebin {
 namespace e1ve0 {
 
-/** Computes innerproduct of two basis functions, as extracted from the matrix.
-This is done based on the innerproduct of their common gridcells in I.
-@param bfn0 List of (iI,value) of basis function.  Sorted and consolidated.
-@param bfn1 List of (iI,value) of basis function.  Sorted and consolidated.
-@param areaX Area of (concatenated) exchange grid */
-static double innerproduct0(
-BasisFn const &bfn0,    // std::vector<spsparse::Tuple<long,double,1>>
-BasisFn const &bfn1,    // std::vector<spsparse::Tuple<long,double,1>>
-std::vector<double> const &areaX)
+
+// ==================================================================
+// --------------- Compute E1vE0 based on correction concept
+
+// If you just forgot about the changing basis for vector x, then what
+// error would you introduce (on I grid) from that?  The error would
+// be:
+//         IvE1*x - IvE0*x = [IvE1 - IvE0] x
+// We can correct this by adding back the negative.  When converted to
+// E1 grid, we get the correction:
+//         [E1vI * (IvE0 - IvE1)] x
+// Add that to the original value to get corrected value for x (in E space):
+//       x + [E1vI * (IvE0 - IvE1)] x
+// Remove the x vector to get:
+//       E1vE0 = I + [E1vI * (IvE0 - IvE1)]
+//
+// This will guarantee that E1vE0 is close to I; and E1vE0==I if E1==E0
+
+/** Sort a vector of Tuples by index, and sum entries with same index.
+TODO: Move to tuplelist.hpp */
+template<class IndexT, class ValT, int RANK>
+void consolidate(std::vector<spsparse::Tuple<IndexT,ValT,RANK>> &M)
 {
-    double innerproduct = 0;
+    // Must be at least 2 elements for this to make sense...
+    if (M.size() < 2) return;
 
-    auto ii0(bfn0.begin());
-    auto ii1(bfn1.begin());
+    // Sort by iX
+    std::sort(M.begin(), M.end());
 
-    while (true) {
-        while (ii0->index(0) < ii1->index(0)) {
-            ++ii0; if (ii0 == bfn0.end()) goto end_loop;
-        }
-        while (ii1->index(0) < ii0->index(0)) {
-            ++ii1; if (ii1 == bfn1.end()) goto end_loop;
-        }
-
-        // Elements where we match!
-        // Assumes: only one element of each index
-        while (ii0->index(0) == ii1->index(0)) {
-            long const iX = ii0->index(0);
-
-            innerproduct += areaX[iX] * ii0->value() * ii1->value();
-
-            ++ii0; if (ii0 == bfn0.end()) goto end_loop;
-            ++ii1; if (ii1 == bfn1.end()) goto end_loop;
+    // Eliminate duplicates
+    size_t j=0;
+    for (size_t i=1; i<M.size(); ++i) {
+        if (M[j].index() == M[i].index()) {
+            M[j].value() += M[i].value();
+        } else {
+            ++j;
+            M[j] = M[i];
         }
     }
-
-end_loop:
-    return innerproduct;
+    M.resize(j+1);
 }
 
 
-/** Computes innerproduct area of basis functions within a single A gridcell.
-It does this by trying the Cartesian products of all basis functions.
-@param areaX Area of (concatenated) exchange grid
-@param innerproducts OUT: Store inner products between basis functions here. */
-static void innerproductEs(
-BasisFunctionMap::iterator const &ii0a,
-BasisFunctionMap::iterator const &ii0b,
-blitz::Array<double,1> &wE0,
-BasisFunctionMap::iterator const &ii1a,
-BasisFunctionMap::iterator const &ii1b,
-std::vector<double> const &areaX,
-TupleListT<2> &innerproducts)
-{
-    for (auto ii0(ii0a); ii0!=ii0b; ++ii0) {
-        for (auto ii1(ii1a); ii1!=ii1b; ++ii1) {
-            double const val = innerproduct0(bfn(ii0), bfn(ii1), areaX);
-            if (val > 0) {
-                innerproducts.add(
-                    std::array<long,2>{iE(ii0)), iE(ii1)}, val);
-                wE0(iE(ii0)) += val;
-            }
-        }
-    }
-}
-
-/** Computes innerproduct area basis functions, A gridcell by A gridcell.
-@param E0vIs Original E0vIs matrices, converted to basis function form
-@param areaX Area of (concatenated) exchange grid
-@return List of ovlerap of each pair: (iE0, iE0, value) */
-spsparse::TupleList<long,double,2> compute_E1vE0_scaled(
-BasisFunctionMap const &bfn1s,
-BasisFunctionMap const &bfn0s,
+spsparse::TupleList<int,double,2> compute_E1vE0c(
+std::vector<std::unique_ptr<ibmisc::linear::Weighted_Eigen>> const &XuE1s,  // sparsified
+std::vector<std::unique_ptr<ibmisc::linear::Weighted_Eigen>> const &XuE0s,  // sparsified
 unsigned long nE,            // Size of (sparse) E vector space, never changes
 std::vector<double> const &areaX)
 {
-    TupleListT E1vE0(std::array<long,2>{nE,nE});
+    spsparse::TupleList<int,double,2> E1vE0c;
+    blitz::Array<double,1> sE1(nE);
+    sE1 = 0;
 
-    // Initialize weights array
-    blitz::Array<double,0> wE1(nE);
-    wE1 = 0;
+    // 1. Compute UNSCALED correction matrix, per ice sheet
+    // 2. Concatenate per-ice-sheet correction matrix into overall correction matrix
+    // correct_unscaled = sum_{ice sheet}[ E1uX * (XvE0 - XvE1) ]
+    for (size_t i=0; i<XuE1s.size(); ++i) {
+        // -------- 1. Compute UNSCALED correction matrix, per ice sheet
+        linear::Weighted_Eigen const *XuE1 = &*XuE1s[i];
+        linear::Weighted_Eigen const *XuE0 = &*XuE0s[i];
 
-    // Innerproduct sets of basis functions, by each A gridcell
-    BasisFnMap::iterator ii1b(bfn1s.begin());
-    for (auto ii1a(ii1b); ii1b != bfn1s.end(); ii1a=ii1b) {
-        // Find end of the current chunk of (iA,*)
-        // NOTE: ii->second.first is iA
-        for (auto ii1b=ii1a+1;
-            ii1b != bfn1s.end() && iA(ii1b) == iA(ii1a); ++ii1b);
+        blitz::Array<double,1> sXuE0(1. / XuE0->wM);
+        blitz::Array<double,1> sXuE1(1. / XuE1->wM);
 
-        BasisFnMap::iterator ii0b(bfn0s.begin());
+        // blitz::Array<double,1> XuE1s(1. / XuE1->Mw);
+        // auto E1vX(map_eigen_diagonal(XuE1s) * XuE1->M->transpose())
+        auto E1uX(XuE1->M->transpose());
+        auto XvE1(map_eigen_diagonal(sXuE1) * *XuE1->M);
+        auto XvE0(map_eigen_diagonal(sXuE0) * *XuE0->M);
 
-        // Do Cartesian product of all basis functions in this array
-        for (auto ii0a(ii0b); ii0b != bfn0s.end(); ii0a=ii0b) {
-            // Find end of the current chunk of (iA,*)
-            for (auto ii0b=ii0a+1;
-                ii0b != bfn0s.end() && iA(ii0b) == iA(ii0a); ++ii0b);
+        // -------- 2. Concatenate per-ice-sheet correction matrices
+        // Assemble the correction matrix, and sparsify its indexing.
+        // EigenSparseMatrixT correct_unscaled(E1uX*XvE0 - E1uX*XvE1);
+        EigenSparseMatrixT E1vE0c_local(E1uX*(XvE0 - XvE1));
+        spcopy(
+            accum::ref(E1vE0c),
+            E1vE0c_local);
 
-            // Do Cartesian inner products
-            innerproductEs(ii1a,ii1b,wE1,  ii0a,ii0b, areaX, E1vE0);
-        }
+        for (int i=0; i<XuE1->Mw.extent(0); ++i) sE1(i) += XuE1->Mw(i);
     }
 
-    // Convert weights to scale, and apply to result
-    for (size_t i=0; i<nE; ++i) wE1(i) = 1. / wE1(i);
-    for (auto ii=E1vE0.begin(); ii != E1vE0.end(); ++ii)
-        ii->val() *= wE1(ii->index(0));
+    // Convert merged weights to scale factor
+    for (int i=0; i<sE1.extent(0); ++i) sE1(i) = 1. / sE1(i);
 
-    return E1vE0;
-}
-
-/** Extracts basis functions from a set of EvX matrices.
-@param XvEs XvE matrix for each ice sheet (X = exchange grid)
-@param basesI Offset to add to iX (local) to convert to iX (global).
-*/
-BasisFnMap extract_basis_fns(
-std::vector<SparseSetT const *> const &dimEs,
-std::vector<EigenSparseMatrixT const *> const &XvEs,
-std::vector<long> const &basesX)
-{
-    BasisFnMap ret;
-
-    // Combine all matrices into one set of basis functions...
-    for (size_t iM=0; iM < XvEs.size(); ++iM) {
-        // Dig through the matrix, separating it into basis functions.
-        long last_iE = -1;    // TODO: This caching will only be effective if XvEs are sorted in that way
-        BasisFnMap::iterator iiE;
-        for (ii=begin(*XvEs[iM]); ii != ent(*XvEs[iM]); ++ii) {
-            long const iX = ii->index(0) + basesX[iM];
-            long const iEd = ii->index(1);
-            auto iE = dimEs[iM].to_sparse(iEd);
-
-            // Look up basis function (iiE) corresponding to iE
-            if (iE != last_iE) {
-                auto const tup(indexingHC.index_to_tuple(iE));
-                    long const iA = tup[0];
-                    long const ihc = tup[1];
-
-                iiE = ret.find(iE);
-                if (iiE == ret.end()) {
-                    auto xx(ret.insert(std::make_pair(iA, BasisFn())));
-                    iiE = xx.first;    // insert() returns iterator to inserted item
-                }
-                last_iE = iE;
-            }
-
-            // Add element to the basis function
-            bfn(iiE).push_back(spsparse::Tuple<long,double,1>(std::array<long,1>{iX}, ii->value()));
-        }
+    // E1vE0c = sE1 * E1vE0c_unscaled
+    for (auto ii(E1vE0c.begin()); ii != E1vE0c.end(); ++ii) {
+        long const iE1(ii->index(0));
+        ii->value() *= sE1(iE1);
     }
+
+    // Tidy up by consolidating
+    consolidate(E1vE0c.tuples);
+
+    return E1vE0c;
 }
 
 }}

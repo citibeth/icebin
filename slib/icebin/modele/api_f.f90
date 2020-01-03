@@ -36,6 +36,18 @@ type, bind(c) :: ModelEParams_t
 end type ModelEParams_t
 
 
+! Similar to C++ class VectorSparse
+! Represents a sparse matrix as a set of vectors
+type :: VectorSparse_t
+    ! indices of row and col in whatever form is desired for a particular purpose
+    ! There could be 2 or more indices per value
+    integer(c_int), pointer :: indices(:)
+    ! Value of non-zero elements
+    real(c_double), pointer :: values(:)
+contains
+    procedure :: from_c
+end type VectorSparse_t
+! ---------------------------------------------------------
 
 ! ================================================
 ! Stuff from icebin_modele.cpp
@@ -175,12 +187,15 @@ INTERFACE
     end subroutine gcmce_io_rsf
 
     subroutine gcmce_couple_native(api, itime, &
-        run_ice) bind(c)
+        run_ice, E1vE0c_indices, E1vE0c_values, E1vE0c_nele) bind(c)
     use iso_c_binding
     use icebin_f90blitz
         type(c_ptr), value :: api
         integer(c_int), value :: itime
         logical(c_bool), value :: run_ice
+        type(c_ptr) :: E1vE0c_indices
+        type(c_ptr) :: E1vE0c_values
+        integer :: E1vE0c_nele
     end subroutine
 
     subroutine gcmce_cold_start(api, yeari, itimei, dtsrc) bind(c)
@@ -193,5 +208,19 @@ INTERFACE
 
 
 END INTERFACE
+
+CONTAINS
+
+! Extract arrays from C pointers returned by C function
+subroutine from_c(self, indices_c, values_c, nnz)
+    class(VectorSparse_t) :: self
+    type(c_ptr), value :: indices_c, values_c
+    integer, value :: nnz
+
+    ! Convert E1vE0 matrix, returned by gcmce_couple_native(), to
+    ! Fortran arrays.
+    call c_f_pointer(indices_c, self%indices, [nnz*4])
+    call c_f_pointer(values_c, self%values, [nnz])
+end subroutine
 
 end module

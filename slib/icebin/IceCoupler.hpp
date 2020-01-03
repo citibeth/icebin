@@ -148,9 +148,9 @@ public:
     std::function<void(blitz::Array<double,2> &, double)> reconstruct_ice_ivalsI;
 
     struct CoupleOut {
-        /** X=exchange grid; E=elevation grid; XvE used to compute E1vE0 */
-        std::unique_ptr<EigenSparseMatrixT> XvE;    // SCALED
-        SparseSetT *dimE;   // Used to interpret XvE
+        /** X=exchange grid; E=elevation grid; XuE used to compute E1vE0 */
+        std::unique_ptr<ibmisc::linear::Weighted_Eigen> XuE;    // UNSCALED
+        SparseSetT *dimE;   // Used to interpret XuE
     };
 
     /** (4) Run the ice model for one coupling timestep.
@@ -159,7 +159,7 @@ public:
     @param run_ice Set to false to get initial conditions of ice sheet (in out)
     */
     CoupleOut couple(
-        double time_s,
+        std::array<double,2> timespan, // {last_time_s, time_s}
         // Values from GCM, passed GCM -> Ice
         VectorMultivec const &gcm_ovalsE_s,
         // ------- Output Variables (Uses IndexAE::A and IndexAE::E in them)

@@ -241,7 +241,7 @@ printf("END construct_ice_ivalsI()\n", dt);
        Accumulates here from many ice shets. _s = sparse indexing
 */
 IceCoupler::CoupleOut IceCoupler::couple(
-double time_s,
+std::array<double,2> timespan, // {last_time_s, time_s}
 // Values from GCM, passed GCM -> Ice
 VectorMultivec const &gcm_ovalsE_s,
 // ------- Output Variables (Uses IndexAE::A and IndexAE::E in them)
@@ -249,6 +249,8 @@ std::vector<VectorMultivec> &gcm_ivalss_s,                // (accumulate over ma
 // ------- Flags
 bool run_ice)
 {
+    double const time_s = timespan[1];
+
     IceCoupler::CoupleOut ret;
 
     if (!gcm_coupler->am_i_root()) {
@@ -272,7 +274,7 @@ bool run_ice)
     // All matrices and vectors assumed w/ densified indexing
     // Except _s ending means they use sparse indexing.
 
-    // ------------- Compute dimE0 transformation, if this is the first round
+    // ------------- Compute dimE transformation, if this is the first round
     if (!run_ice) {
         dimE0.reset(new SparseSetT);
         for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
@@ -281,17 +283,17 @@ bool run_ice)
         }
     }
 
-    // ------------- Form gcm_ovalsE0
+    // ------------- Create gcm_ovalsE
     // Densify gcm_ovalsE_s --> gcm_ovalsE
     // This should ONLY involve iE already mentioned in IvE0;
     // if not, ibmisc_error() will be called inside to_dense()
-    blitz::Array<double,2> gcm_ovalsE0(gcm_coupler->gcm_outputsE.size(), dimE0->dense_extent());
-    gcm_ovalsE0 = 0;
+    blitz::Array<double,2> gcm_ovalsE(gcm_coupler->gcm_outputsE.size(), dimE0->dense_extent());
+    gcm_ovalsE = 0;
     for (size_t i=0; i<gcm_ovalsE_s.size(); ++i) {
         long iE_s(gcm_ovalsE_s.index[i]);
         int iE0(dimE0->to_dense(iE_s));   // Can raise error if iE_s not found
         for (int ivar=0; ivar<gcm_ovalsE_s.nvar; ++ivar) {
-            gcm_ovalsE0(ivar, iE0) += gcm_ovalsE_s.val(ivar, i);
+            gcm_ovalsE(ivar, iE0) += gcm_ovalsE_s.val(ivar, i);
         }
     }
 
@@ -300,14 +302,14 @@ bool run_ice)
     // NOTE: by_dt=inf on the first call (run_ice=false)
     //       Should be OK because output variables that depend on by_dt
     //       are not needed on the first call.
-    double const dt = (time_s - gcm_coupler->last_time_s);
+    double const dt = timespan[1] - timespan[0];
     std::vector<std::pair<std::string, double>> scalars({
         std::make_pair("by_dt", 1.0 / dt)});
 
     {
         TmpAlloc tmp;    // Allocate variables for the duration of this function
         blitz::Array<double,2> ice_ivalsI(run_ice ?
-            construct_ice_ivalsI(gcm_ovalsE0, scalars, dt, tmp) :
+            construct_ice_ivalsI(gcm_ovalsE, scalars, dt, tmp) :
             blitz::Array<double,2>(contract[INPUT].size(), nI()));
 
         // ========= Step the ice model forward
@@ -349,7 +351,7 @@ bool run_ice)
 
     // _nc means "No Correct" for changes in area due to projections
     // See commit d038e5cb for deeper explanation
-    std::unique_ptr<SparseSetT> dimE1(new SparseSetT(nE()));
+    std::unique_ptr<SparseSetT> dimE1(new SparseSetT(gcmr->nE()));
     auto E1vI_unscaled_nc(rm->matrix_d("EvI", {&*dimE1, &dimI},
         RegridParams(false, false, {0,0,0})));    // scale=f, correctA=f
 
@@ -441,14 +443,14 @@ bool run_ice)
     }        // iAE
     // Compute IvE (for use interpreting stuffE at beginning of next timestep)
     std::unique_ptr<EigenSparseMatrixT> IvE1(
-        rm->matrix_d("IvE", {&dimI, &*dimE1},
-        RegridParams(true, true, sigma))->M); // scale=t, correctA=t
+        std::move(rm->matrix_d("IvE", {&dimI, &*dimE1},
+        RegridParams(true, true, sigma))->M)); // scale=t, correctA=t
 
-    // Compute XvE, for use computing E1vE0
-    SparseSetT dimX(id_sparse_set<SparseSetT>(nX()));
-    ret.XvE = rm->matrix_d("XvE", {&dimX, &*dimE},
-        RegridParams(true, true, std::array<double,3>{0,0,0})->M);
-    ret.dimE = &*dimE1;   // Saved down below in "this->dimE0 = ..."
+    // Compute XuE
+    SparseSetT dimX(id_sparse_set<SparseSetT>(ice_regridder->nX()));
+    ret.XuE = rm->matrix_d("XvE", {&dimX, &*dimE1},
+        RegridParams(false, true, std::array<double,3>{0,0,0}));
+    ret.dimE = &*dimE1;   // reference, not moving it
 
 
     // Record our matrices for posterity
@@ -465,8 +467,8 @@ bool run_ice)
 
         AE1vIs[GridAE::E]->ncio(ncio, "EvI_unscaled_nc", {"dimE", "dimI"});
         AE1vIs[GridAE::A]->ncio(ncio, "AvI_unscaled", {"dimA", "dimI"});
-        IvE1->ncio(ncio, "IvE", {"dimI", "dimE"});
-        XvE1->ncio(ncio, "XvE", {"dimX", "dimE"});
+        ncio_eigen(ncio, *IvE1, "IvE");
+        ret.XuE->ncio(ncio, "XuE", {"dimX", "dimE"});
     }
 
     // ---------- Save stuff for next time around

@@ -22,6 +22,7 @@
 #include <ibmisc/f90blitz.hpp>
 #include <icebin/GCMCoupler.hpp>
 #include <icebin/modele/GCMRegridder_ModelE.hpp>
+#include <icebin/vectorsparse.hpp>
 
 namespace icebin {
 namespace modele {
@@ -151,9 +152,11 @@ public:
     mid-run. */
     blitz::Array<double,1> _foceanAOm;
 
-
     /** Merge mask from last timestep */
     blitz::Array<int16_t,2> mergemaskA0;
+
+    /** E1vE0 in a form Fortran can digest */
+    VectorSparse<int,double,2> E1vE0c;
 
 public:
     virtual ~GCMCoupler_ModelE() {}
@@ -295,7 +298,12 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
 extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,
 int itime,
-bool run_ice);    // if false, only initialize
+bool run_ice,    // if false, only initialize
+// https://stackoverflow.com/questions/30152073/how-to-pass-c-pointer-to-fortran
+// Return the E1vE0 matrix here
+int **E1vE0c_indices_p,
+double **E1vE0c_values_p,
+int *E1vE0c_nele);
 
 
 

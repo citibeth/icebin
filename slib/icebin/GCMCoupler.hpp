@@ -63,19 +63,24 @@ struct GCMInput {
 
     // Regrid matrix to go from last step's elevation classes to this
     // step's elevation classes.
-    spsparse::TupleList<long,double,2> E1vE0_scaled_g;   // Original version, all ice sheets
-    spsparse::TupleList<long,double,2> E1vE0_scaled;    // domain-split version
+    // NOTE: Actual regrid matrix = I + E1vE0c
+    spsparse::TupleList<int,double,2> E1vE0c;
 
     /** @param nvar Array specifying number of variables for each segment (A,E,ATOPO,ETOPO). */
     GCMInput(std::vector<int> const &nvar);
     /** @return Number of variables for each segment. */
     std::vector<int> nvar() const;
 
+    void clear() {
+        gcm_ivalss_s.clear();
+        E1vE0c.clear();
+    }
+
     template<class ArchiveT>
     void serialize(ArchiveT &ar, const unsigned int file_version)
     {
         ar & gcm_ivalss_s;
-        ar & E1vE0_scaled_g;
+        ar & E1vE0c;
     }
 };
 // =============================================================================
@@ -167,9 +172,7 @@ public:
 
     // ------------ State that carries over across timesteps
     // Time period covered by the last time the coupler was called
-    std::array<double,2> timespan{last_time_s, time_s};
-    // Elevation basis functions, derived from XvE
-    e1ve0::BasisFnMap bfn0;
+    std::array<double,2> timespan; // {last_time_s, time_s}
 
     /** Number of elevation classes the GCM sees */
     int _nhc_gcm = -1;
@@ -204,6 +207,9 @@ public:
     Used for ice_input and gcm_inputs.
     Scalars could be (eg) a timestep dt that is not known until runtime. */
     VarSet scalars;
+
+    /** XuE matrices from last timestep, used to compute E1vE0 */
+    std::vector<std::unique_ptr<ibmisc::linear::Weighted_Eigen>> XuE0s;
 
     // Fields we read from the config file...
 

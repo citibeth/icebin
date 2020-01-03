@@ -484,7 +484,8 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
     //    self->update_topo(time_s);    // initial_timestep=true
 
     // d) Sync with dynamic ice model
-    gcmce_couple_native(self, itimei, false);    // run_ice=false
+    gcmce_couple_native(self, itimei, false,    // run_ice=false
+        nullptr, nullptr, nullptr);    // !run_ice ==> no E1vE0c to return
 
     printf("END gcmce_cold_start()\n");
 }
@@ -532,17 +533,17 @@ std::vector<GCMInput> split_by_domain(
 
     // Split E1vE0
     // (E1vE0 is not set the first time around; in that case, shape = (-1,-1)
-    if (out.E1vE0_scaled_g.shape()[0] != -1) {
-        auto shape(out.E1vE0_scaled_g.shape());
+    if (out.E1vE0c.shape()[0] != -1) {
+        auto shape(out.E1vE0c.shape());
 
         // Initialize output matrices
-        for (size_t i=0; i<outs.size(); ++i) outs[i].E1vE0_scaled.set_shape(shape);
+        for (size_t i=0; i<outs.size(); ++i) outs[i].E1vE0c.set_shape(shape);
 
         // Copy the main matrix
         // Works for matrix in A or E
-        for (auto &tp : out.E1vE0_scaled_g.tuples) {
+        for (auto &tp : out.E1vE0c.tuples) {
             int const domain = domainsE.get_domain(tp.index(0));
-            outs[domain].E1vE0_scaled.add(tp.index(), tp.value());
+            outs[domain].E1vE0c.add(tp.index(), tp.value());
         }
     }
     return outs;
@@ -582,7 +583,12 @@ Put elsewhere in the Fortran code:
 extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,
 int itime,
-bool run_ice)    // if false, only initialize
+bool run_ice,    // if false, only initialize
+// https://stackoverflow.com/questions/30152073/how-to-pass-c-pointer-to-fortran
+// Return the E1vE0 matrix here
+int **E1vE0c_indices_p,
+double **E1vE0c_values_p,
+int *E1vE0c_nele)
 {
     double time_s = itime * self->dtsrc;
 
@@ -610,6 +616,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
         if (ihc_ice < 0) (*icebin_error)(-1,
             "ihc_ice cannot be <0: %d = %d - %d - 1\n", ihc_ice, ihc, base_hc);
 
+        // Iterate over just this MPI rank's chunk
         for (int j=domainA[1].begin; j < domainA[1].end; ++j) {
         for (int i=domainA[0].begin; i < domainA[0].end; ++i) {
             // i,j are 0-based indexes.
@@ -646,6 +653,7 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
         VectorMultivec gcm_ovalsE_s(concatenate(every_gcm_ovalsE_s));
 
         // Couple on root!
+        // out contains GLOBAL output for all MPI ranks
         out = self->couple(time_s, gcm_ovalsE_s, run_ice);  // move semantics
 
         // Split up the output (and 
@@ -671,6 +679,41 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
 
     // 1. Copies values back into modele.gcm_ivals from scatterd MPI stuff
     self->apply_gcm_ivals(out);
+
+    auto const &indexingHC(self->gcm_regridder->indexingHC);
+    // Copy E1vE0 matrix back to Fortran
+    self->E1vE0c.clear();
+    if (run_ice) {
+        for (auto ii(out.E1vE0c.begin()); ii != out.E1vE0c.end(); ++ii) {
+            long const iE1(ii->index(0));
+            long const iE0(ii->index(1));
+            
+            auto ijk0(indexingHC.index_to_tuple<int,2>(iE0));
+            auto ijk1(indexingHC.index_to_tuple<int,2>(iE1));
+            if (ijk0[0] != ijk1[0]) (*icebin_error)(-1,
+                "ijk0 (%d) and ijk1 (%d) must match (%g)",
+                ijk0[0], ijk1[0], ii->value());
+            auto ij(indexingA.index_to_tuple<int,2>(ijk0[0]));
+
+            int const ihc0 = ijk0[1];
+            int const ihc1 = ijk1[1];
+
+            self->E1vE0c.indices.push_back(ij[0]);
+            self->E1vE0c.indices.push_back(ij[1]);
+            self->E1vE0c.indices.push_back(ihc1);
+            self->E1vE0c.indices.push_back(ihc0);
+            self->E1vE0c.values.push_back(ii->value());
+        }
+
+        // Send E1vE0 back to ModelE in Fortran
+        // See https://stackoverflow.com/questions/30152073/how-to-pass-c-pointer-to-fortran
+        // self->E1vE0c.export_matrix(*E1vE0c_indices_p, *E1vE0c_values_p, *E1vE0c_nele);
+        *E1vE0c_nele = self->E1vE0c.values.size();
+        *E1vE0c_indices_p = &self->E1vE0c.indices[0];
+        *E1vE0c_values_p = &self->E1vE0c.values[0];
+
+
+    }
 }
 // =======================================================
 
@@ -1032,7 +1075,7 @@ bool run_ice)    // if false, only initialize
 
     // Log the results
     if (gcm_params.icebin_logging) {
-        std::string fname = "gcm-in-" + sdate + ".nc";
+        std::string fname = "gcm-in-" + sdate(time_s) + ".nc";
         NcIO ncio(fname, 'w');
         auto one_dims(get_or_add_dims(ncio, {"one"}, {1}));
         NcVar info_var = get_or_add_var(ncio, "info", ibmisc::get_nc_type<double>(), one_dims);
