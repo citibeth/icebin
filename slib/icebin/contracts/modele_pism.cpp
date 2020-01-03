@@ -56,7 +56,6 @@ printf("BEGIN modele_pism.cpp::_reconstruct_icevalsI()\n");
         ice_coupler->contract[INPUT].index.at("deltah"),
         blitz::Range::all()));
 
-printf("BB1\n");
     // --------- Outputs of this Computation
     blitz::Array<double,1> ice_top_bc_temp(ice_ivalsI(
         ice_coupler->contract[INPUT].index.at("ice_top_bc_temp"),
@@ -65,8 +64,6 @@ printf("BB1\n");
         ice_coupler->contract[INPUT].index.at("ice_top_bc_wc"),
         blitz::Range::all()));
 
-printf("BB2\n");
-
     // kappa: see modelE/model/landice/lisnowsubs.F90
     // Layer 0 = ice borrowed from GCM
     // Layer 1 = top layer of PISM
@@ -74,7 +71,6 @@ printf("BB2\n");
     double const SHI = gcm_coupler->gcm_constants.get_as("constant::shi", "J kg-1 K-1");
     double const TF = gcm_coupler->gcm_constants.get_as("constant::tf", "K");
     double const STIEGLITZ_8B = gcm_coupler->gcm_constants.get_as("constant::stieglitz_8b", "kg-1 m^7 s-3");
-printf("BB6\n");
 
     // PISM will "see" a layer of PISM-style ice, with a certain enthalpy.
     // Make sure that this layer produces ~deltah of heat flux
