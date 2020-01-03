@@ -271,7 +271,7 @@ public:
 
     virtual unsigned long nA() const { return agridA->dim.sparse_extent(); }
     virtual unsigned long nE() const { return GCMRegridder::nA() * nhc(-1); }
-    void unsigned long nAE(char gridAE) const
+    unsigned long nAE(char gridAE) const
         { return gridAE == 'A' ? nA() : nE(); }
     size_t nI(int sheet_index) const { return ice_regridders()[sheet_index]->nI(); }
 

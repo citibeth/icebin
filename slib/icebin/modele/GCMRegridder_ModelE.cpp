@@ -186,7 +186,7 @@ ComputeXAmvGp_Helper::ComputeXAmvGp_Helper(
 
     // We need AOpvIp for wAOP; used below.
     std::unique_ptr<linear::Weighted_Eigen> AOpvIp_corrected(rmO->matrix_d(
-        "AvI", {&dimAOp, &dimIp}, paramsO));
+        strprintf("Av%c",gridG), {&dimAOp, &dimIp}, paramsO));
     blitz::Array<double,1> const &wAOp(AOpvIp_corrected->wM);
 
     EigenColVectorT wAOm_e(compute_wAOm(foceanAOp, foceanAOm, wAOp, dimAOp, dimAOm));
@@ -200,6 +200,7 @@ ComputeXAmvGp_Helper::ComputeXAmvGp_Helper(
     // Ensure that operations don't change universes.  Sanity check.
     std::unique_ptr<ConstUniverseT> const_universe;
 
+    std::string XvG_label(strprintf("%cv%c", gridX, gridG));
     if (gridX == 'E') {
         RegridParams paramsO(paramsA);
         paramsO.scale = false;
@@ -207,7 +208,8 @@ ComputeXAmvGp_Helper::ComputeXAmvGp_Helper(
 
         // Get the universe for EOp / EOm
         const_universe.reset(new ConstUniverseT({"dimIp"}, {&dimIp}));
-        linear::Weighted_Eigen &EOpvIp(tmp.take(rmO->matrix_d("EvI", {&dimEOp, &dimIp}, paramsO)));
+        linear::Weighted_Eigen &EOpvIp(tmp.take(rmO->matrix_d(
+            XvG_label, {&dimEOp, &dimIp}, paramsO)));
 
         XOpvIp = &EOpvIp;
 
@@ -245,7 +247,7 @@ ComputeXAmvGp_Helper::ComputeXAmvGp_Helper(
         paramsO.correctA = false;
 
         auto &AOpvIp(tmp.take<std::unique_ptr<linear::Weighted_Eigen>>(
-            rmO->matrix_d("AvI", {&dimAOp, &dimIp}, paramsO)));
+            rmO->matrix_d(XvG_label, {&dimAOp, &dimIp}, paramsO)));
 
         XOpvIp = &*AOpvIp;
         wXOm_e = &wAOm_e;
@@ -324,7 +326,7 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_XAmvGp(
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
-    std::string dimXA(strprintf("dim%cA", X));
+    std::string dimXA(strprintf("dim%cA", gridAE));
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
@@ -385,11 +387,11 @@ static std::unique_ptr<linear::Weighted_Eigen> compute_GpvXAm(
     double const eq_rad,    // Radius of the earth
     RegridMatrices_Dynamic const *rmO)
 {
-    std::string dimXA(strprintf("dim%cA", X));
+    std::string dimXA(strprintf("dim%cA", gridAE));
     std::unique_ptr<linear::Weighted_Eigen> ret(new linear::Weighted_Eigen(dims, false));    // not conservative
 
     // Do the legwork, and fish out things from the results that we need
-    ComputeXAmvGp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, foceanAOp, foceanAOm, X, eq_rad, rmO);
+    ComputeXAmvGp_Helper hh({dims[1], dims[0]}, paramsA, gcmA, foceanAOp, foceanAOm, gridAE, gridG, eq_rad, rmO);
     ret->tmp = std::move(hh.tmp);
     auto &XOpvIp(hh.XOpvIp);
     auto &wXAm_e(*hh.wXAm_e);
@@ -507,10 +509,10 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 
     rm->add_regrid("EAmvIp", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
-        'E', specO.eq_rad, &rmO));
+        'E', 'I', specO.eq_rad, &rmO));
     rm->add_regrid("AAmvIp", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
-        'A', specO.eq_rad, &rmO));
+        'A', 'I', specO.eq_rad, &rmO));
 
 // We never need this.
 //    rm->add_regrid("AAmvEAm", std::bind(&compute_AAmvEAm_rmO, _1, _2,
@@ -519,19 +521,26 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 
     rm->add_regrid("IpvEAm", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
-        'E', specO.eq_rad, &rmO));
+        'I', 'E', specO.eq_rad, &rmO));
     rm->add_regrid("IpvAAm", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
-        'A', specO.eq_rad, &rmO));
+        'I', 'A', specO.eq_rad, &rmO));
 
 
     // --------------- Simply-named aliases
     rm->add_regrid("EvI", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
-        'E', specO.eq_rad, &rmO));
+        'E', 'I', specO.eq_rad, &rmO));
+    rm->add_regrid("EvX", std::bind(&compute_XAmvGp, _1, _2,
+        this, foceanAOp, foceanAOm,
+        'E', 'X', specO.eq_rad, &rmO));
+
     rm->add_regrid("AvI", std::bind(&compute_XAmvGp, _1, _2,
         this, foceanAOp, foceanAOm,
-        'A', specO.eq_rad, &rmO));
+        'A', 'I', specO.eq_rad, &rmO));
+    rm->add_regrid("AvX", std::bind(&compute_XAmvGp, _1, _2,
+        this, foceanAOp, foceanAOm,
+        'A', 'X', specO.eq_rad, &rmO));
 
 
 //    rm->add_regrid("AvE", std::bind(&compute_AAmvEAm_rmO, _1, _2,
@@ -540,10 +549,17 @@ std::unique_ptr<RegridMatrices_Dynamic> GCMRegridder_ModelE::regrid_matrices(
 
     rm->add_regrid("IvE", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
-        'E', specO.eq_rad, &rmO));
+        'I', 'E', specO.eq_rad, &rmO));
+    rm->add_regrid("XvE", std::bind(&compute_GpvXAm, _1, _2,
+        this, foceanAOp, foceanAOm,
+        'X', 'E', specO.eq_rad, &rmO));
+
     rm->add_regrid("IvA", std::bind(&compute_GpvXAm, _1, _2,
         this, foceanAOp, foceanAOm,
-        'A', specO.eq_rad, &rmO));
+        'I', 'A', specO.eq_rad, &rmO));
+    rm->add_regrid("XvA", std::bind(&compute_GpvXAm, _1, _2,
+        this, foceanAOp, foceanAOm,
+        'X', 'A', specO.eq_rad, &rmO));
 
     // For testing
     rm->add_regrid("AOmvAAm", std::bind(&compute_AOmvAAm, _1, _2,

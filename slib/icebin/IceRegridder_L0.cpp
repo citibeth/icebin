@@ -156,7 +156,7 @@ printf("END IceRegridder_L0::GvEp()\n");
 // --------------------------------------------------------
 void IceRegridder_L0::GvI(
     MakeDenseEigenT::AccumT &&ret,
-    char gridG,    // Interpolation grid to use for G: 'I' (ice) or 'G' (exchange)
+    char gridG,    // Interpolation grid to use for G: 'I' (ice) or 'X' (exchange)
     blitz::Array<double,1> const *_elevmaskI) const
 {
     blitz::Array<double,1> const &elevmaskI(*_elevmaskI);
@@ -191,7 +191,7 @@ void IceRegridder_L0::GvI(
 // --------------------------------------------------------
 void IceRegridder_L0::GvAp(
     MakeDenseEigenT::AccumT &&ret,
-    char gridG,    // Interpolation grid to use for G: 'I' (ice) or 'G' (exchange)
+    char gridG,    // Interpolation grid to use for G: 'I' (ice) or 'X' (exchange)
     blitz::Array<double,1> const *_elevmaskI) const
 {
 printf("BEGIN IceRegridder_L0::GvAp()\n");

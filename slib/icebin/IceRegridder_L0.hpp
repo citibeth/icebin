@@ -37,18 +37,16 @@ public:
     @param gridG Either 'I' or 'X' */
     size_t nG(char gridG) const;
 
-    IceRegridder_L0() : interp_grid(IceExch::EXCH) {}
-
 public:
     // Implementations of virtual functions
     void GvEp(MakeDenseEigenT::AccumT &&ret,
-        char gridG,    // Identity of G: 'I' (ice) or 'G' (exchange)
+        char gridG,    // Identity of G: 'I' (ice) or 'X' (exchange)
         blitz::Array<double,1> const *elevmaskI) const;
     void GvI(MakeDenseEigenT::AccumT &&ret,
-        char gridG,    // Identity of G: 'I' (ice) or 'G' (exchange)
+        char gridG,    // Identity of G: 'I' (ice) or 'X' (exchange)
         blitz::Array<double,1> const *elevmaskI) const;
     void GvAp(MakeDenseEigenT::AccumT &&ret,
-        char gridG,    // Identity of G: 'I' (ice) or 'G' (exchange)
+        char gridG,    // Identity of G: 'I' (ice) or 'X' (exchange)
         blitz::Array<double,1> const *elevmaskI) const;
     void ncio(ibmisc::NcIO &ncio, std::string const &vname);
 };
