@@ -682,6 +682,7 @@ blitz::Array<int16_t,3> &underice3)
             }
         }
 
+        // Make phantom / ghost points in the elevation grid
         // Create an EC "halo" in fhc, for ECs that might be used
         // in the future.  This is NECESSARY for two-way coupling;
         // and it should not affect results in the uncoupled case.
@@ -689,6 +690,34 @@ blitz::Array<int16_t,3> &underice3)
         for (int ihc=std::max(0,minhc-2); ihc<=std::max(maxhc+2,nhc_icebin); ++ihc) {
             if (fhc3(ihc,j,i)==0) fhc3(ihc,j,i) = 1.e-30;
         }}
+    }}
+
+
+    // Add additional phantom/ghost/halo points based on horizontal nearby cells
+    // In case the ice sheet grows horizontally into new atmosphere cells
+    std::vector<std::array<int,2>> const nearby {
+    	// Ghost diagonal points as well as adjacen in X and Y
+    	// This might be needed, in case an ice sheet boundary spreads
+    	// out through a corner.
+        {-1,-1}, {-1,0}, {-1,1},
+        {0,-1}, {0,1},
+        {1,-1}, {1,0}, {1,1}};
+//        {-1,0}, {1,0}, {0,-1}, {0,1}};
+    std::vector<std::array
+    for (int j=1; j<hspecA.jm-1; ++j) {   // No need to go to the wrap-around boundaries
+    for (int i=1; i<hspecA.im-1; ++i) {
+        for (int ihc=0; ihc<nhc_icebin; ++ihc) {
+            if (fhc3(ihc,j,i)==0) {
+                for (auto const &ix : nearby) {
+                    double const fhc_near = fhc3(ihc, j+ix[0], i+ix[1]);
+                    if (abs(fhc_near) > 1e-20) {
+                        fhc3(ihc,j,i) = 1.e-30;
+printf("Horizontal phantom point: %d,%d,%d\n", ihc,j,i);
+                        break;
+                    }
+                }
+            }
+        }
     }}
 
     // ------------ Segment 1: land part of sealand
