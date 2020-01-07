@@ -703,7 +703,6 @@ blitz::Array<int16_t,3> &underice3)
         {0,-1}, {0,1},
         {1,-1}, {1,0}, {1,1}};
 //        {-1,0}, {1,0}, {0,-1}, {0,1}};
-    std::vector<std::array
     for (int j=1; j<hspecA.jm-1; ++j) {   // No need to go to the wrap-around boundaries
     for (int i=1; i<hspecA.im-1; ++i) {
         for (int ihc=0; ihc<nhc_icebin; ++ihc) {
