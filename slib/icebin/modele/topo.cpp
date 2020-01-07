@@ -705,17 +705,23 @@ blitz::Array<int16_t,3> &underice3)
 //        {-1,0}, {1,0}, {0,-1}, {0,1}};
     for (int j=1; j<hspecA.jm-1; ++j) {   // No need to go to the wrap-around boundaries
     for (int i=1; i<hspecA.im-1; ++i) {
+        int nghost = 0;    // Number of ghost elevation classes we've added in this gridcell
         for (int ihc=0; ihc<nhc_icebin; ++ihc) {
             if (fhc3(ihc,j,i)==0) {
                 for (auto const &ix : nearby) {
                     double const fhc_near = fhc3(ihc, j+ix[0], i+ix[1]);
                     if (abs(fhc_near) > 1e-20) {
                         fhc3(ihc,j,i) = 1.e-30;
+                        nghost += 1;
 printf("Horizontal phantom point: %d,%d,%d\n", ihc,j,i);
                         break;
                     }
                 }
             }
+            // Only add lower-elevation ghost EC's.  Higher-elevation
+            // ice will not be able to make it into this gridcell
+            // until lower elevation ice is established.
+            if (nghost >= 2) break;
         }
     }}
 
