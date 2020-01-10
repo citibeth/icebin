@@ -550,6 +550,7 @@ HntrSpec const &hspecO,        // cast_GridSpec_LonLat(*gcmA->gcmO->agridA.spec)
 HntrSpec const &hspecA,        // cast_GridSpec_LonLat(*gcmA->agridA.spec).hntr
 ibmisc::Indexing const indexingHCA,    // gcmA->indexingHC
 std::vector<double> const &hcdefs,        // gcmA->hcdefs()
+//int const nhc_icesheet,                         // gcmA->gcmO->hcdefs()Just EC's related to dynamic ice sheets
 std::vector<int16_t> const &underice_hc,    // gcmA->underice
 //
 linear::Weighted_Tuple const &AAmvEAm,
@@ -613,7 +614,7 @@ blitz::Array<int16_t,3> &underice3)
     auto zatmoA(reshape1(zatmoA2));
 
     // ================= Create fhc, elevE and underice
-    int const nhc_icebin = hcdefs.size();
+    int const nhc_icebin = hcdefs.size();   // local + global EC's
     int const nhc_gcm = get_nhc_gcm(nhc_icebin);
     auto const nA = indexingHCA[0].extent;
     blitz::TinyVector<int,2> shapeE2(nhc_gcm, nA);
@@ -664,7 +665,7 @@ blitz::Array<int16_t,3> &underice3)
         for (int i=0; i<hspecA.im; ++i) fhc3(ihc,0,i) = fhc_mean;
     }
 
-    // Set EC levels and EC halos
+    // Set EC levels and EC halos (ghost ECs)
     for (int j=0; j<hspecA.jm; ++j) {
     for (int i=0; i<hspecA.im; ++i) {
         int minhc=10000;
@@ -686,7 +687,8 @@ blitz::Array<int16_t,3> &underice3)
         // Create an EC "halo" in fhc, for ECs that might be used
         // in the future.  This is NECESSARY for two-way coupling;
         // and it should not affect results in the uncoupled case.
-        if (maxhc >= 0) {
+        // UI_ICEBIN: Only make ghost points for dynamic ice ECs
+        if (maxhc >= 0 && underice_hc[ihc] == UI_ICEBIN) {
         for (int ihc=std::max(0,minhc-2); ihc<=std::max(maxhc+2,nhc_icebin); ++ihc) {
             if (fhc3(ihc,j,i)==0) fhc3(ihc,j,i) = 1.e-30;
         }}
@@ -707,13 +709,16 @@ blitz::Array<int16_t,3> &underice3)
     for (int i=1; i<hspecA.im-1; ++i) {
         int nghost = 0;    // Number of ghost elevation classes we've added in this gridcell
         for (int ihc=0; ihc<nhc_icebin; ++ihc) {
+            // Only make ghost points for dynamic ice ECs
+            if (underice_hc[ihc] != UI_ICEBIN) continue;
+
             if (fhc3(ihc,j,i)==0) {
                 for (auto const &ix : nearby) {
                     double const fhc_near = fhc3(ihc, j+ix[0], i+ix[1]);
                     if (abs(fhc_near) > 1e-20) {
                         fhc3(ihc,j,i) = 1.e-30;
                         nghost += 1;
-printf("Horizontal phantom point: %d,%d,%d\n", ihc,j,i);
+printf("Horizontal ghost point: %d,%d,%d\n", ihc,j,i);
                         break;
                     }
                 }
