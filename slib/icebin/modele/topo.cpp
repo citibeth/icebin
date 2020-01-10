@@ -554,7 +554,7 @@ std::vector<double> const &hcdefs,        // gcmA->hcdefs()
 std::vector<int16_t> const &underice_hc,    // gcmA->underice
 //
 linear::Weighted_Tuple const &AAmvEAm,
-// ----- Outputs
+// ----- Outputs; Native NetCDF indexing (j,i) zero-based
 blitz::Array<double,2> &foceanA2,    // Rounded FOCEAN
 blitz::Array<double,2> &flakeA2,
 blitz::Array<double,2> &fgrndA2,
@@ -708,6 +708,11 @@ blitz::Array<int16_t,3> &underice3)
     for (int j=1; j<hspecA.jm-1; ++j) {   // No need to go to the wrap-around boundaries
     for (int i=1; i<hspecA.im-1; ++i) {
         int nghost = 0;    // Number of ghost elevation classes we've added in this gridcell
+
+        // Only make ghost points on land.  Lynch-Stieglitz model will
+        // NEVER be able to grow into the ocean.
+        if (foceanA2(j,i) == 1) continue;
+
         for (int ihc=0; ihc<nhc_icebin; ++ihc) {
             // Only make ghost points for dynamic ice ECs
             if (underice_hc[ihc] != UI_ICEBIN) continue;
