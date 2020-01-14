@@ -690,10 +690,7 @@ blitz::Array<int16_t,3> &underice3)
         // UI_ICEBIN: Only make ghost points for dynamic ice ECs
         if (maxhc >= 0 && underice_hc[ihc] == UI_ICEBIN) {
         for (int ihc=std::max(0,minhc-2); ihc<=std::max(maxhc+2,nhc_icebin); ++ihc) {
-            if (fhc3(ihc,j,i)==0) {
-                fhc3(ihc,j,i) = 1.e-30;
-                underice3(ihc,j,i) = underice_hc[ihc];
-            }
+            if (fhc3(ihc,j,i)==0) fhc3(ihc,j,i) = 1.e-30;
         }}
     }}
 
@@ -725,7 +722,6 @@ blitz::Array<int16_t,3> &underice3)
                     double const fhc_near = fhc3(ihc, j+ix[0], i+ix[1]);
                     if (abs(fhc_near) > 1e-20) {
                         fhc3(ihc,j,i) = 1.e-30;
-                        underice3(ihc,j,i) = underice_hc[ihc];
                         nghost += 1;
 printf("Horizontal ghost point: %d,%d,%d\n", ihc,j,i);
                         break;
