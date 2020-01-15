@@ -698,10 +698,11 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
             int const ihc0 = ijk0[1];
             int const ihc1 = ijk1[1];
 
-            self->E1vE0c.indices.push_back(ij[0]);
-            self->E1vE0c.indices.push_back(ij[1]);
-            self->E1vE0c.indices.push_back(ihc1);
-            self->E1vE0c.indices.push_back(ihc0);
+            // +1: Convert to Fortran 1-based Indexing
+            self->E1vE0c.indices.push_back(ij[0]+1);
+            self->E1vE0c.indices.push_back(ij[1]+1);
+            self->E1vE0c.indices.push_back(ihc1+1);
+            self->E1vE0c.indices.push_back(ihc0+1);
             self->E1vE0c.values.push_back(ii->value());
         }
 
