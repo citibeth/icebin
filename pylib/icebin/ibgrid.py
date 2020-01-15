@@ -27,11 +27,10 @@ import operator
 
 # -------------------------------------------------------
 class Indexing(object):
-    def __init__(self, nc, vname):
-        ncvar = nc.variables[vname]
-        self.base = ncvar.base
-        self.extent = ncvar.extent
-        self.indices = ncvar.indices
+    def __init__(self, base, extent, indices):
+        self.base = np.array(base)
+        self.extent = np.array(extent)
+        self.indices = np.array(indices)
 
         # Turn it all into Numpy arrays
         if not isinstance(self.base, np.ndarray):
@@ -86,7 +85,13 @@ class Indexing(object):
 
         tpl[self.indices[self.rank-1]] = ix
         return tuple(tpl)
-
+# -------------------------------------------------------
+def read_nc_indexing(nc, vname):
+    ncvar = nc.variables[vname]
+    base = ncvar.base
+    extent = ncvar.extent
+    indices = ncvar.indices
+    return Indexing(base,extent,indices)
 
 # -------------------------------------------------------
 class Vertex(object):
