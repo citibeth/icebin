@@ -615,6 +615,12 @@ blitz::Array<int16_t,3> &underice3)
 
     // ================= Create fhc, elevE and underice
     int const nhc_icebin = hcdefs.size();   // local + global EC's
+    int nhc_local;    // Number of ECs devoted to local ice sheets (not global ice)
+    for (nhc_local=0; nhc_local<nhc_icebin; ++nhc_local) {
+        // underice_hc contains UI_ICEBIN for local ice; and UI_NOTHING for global ice.
+        // See merge_topo.cpp for how underice_hc is constructed.
+        if underice_hc[nhc_local] != UI_ICEBIN continue;
+    }
     int const nhc_gcm = get_nhc_gcm(nhc_icebin);
     auto const nA = indexingHCA[0].extent;
     blitz::TinyVector<int,2> shapeE2(nhc_gcm, nA);
@@ -713,9 +719,17 @@ blitz::Array<int16_t,3> &underice3)
         // NEVER be able to grow into the ocean.
         if (foceanA2(j,i) == 1) continue;
 
-        for (int ihc=0; ihc<nhc_icebin; ++ihc) {
-            // Only make ghost points for dynamic ice ECs
-            if (underice_hc[ihc] != UI_ICEBIN) continue;
+        // Only make horizontal ghost points if:
+        //  1. There is not yet any ice in this gridcell
+        //  2. There is ice in an adjacent gridcell
+
+        // Make sure no other ECs in this gridcell
+        for (int ihc=0; ihc<nhc_local; ++ihc) {
+            if (underice3(ihc,j,i) == UI_ICEBIN) goto next_gridcellA;    // continue
+        }
+
+        // Now look for ice in nearby gridcells
+        for (int ihc=0; ihc<nhc_local; ++ihc) {
 
             if (fhc3(ihc,j,i)==0) {
                 for (auto const &ix : nearby) {
@@ -733,6 +747,7 @@ printf("Horizontal ghost point: %d,%d,%d\n", ihc,j,i);
             // until lower elevation ice is established.
             if (nghost >= 2) break;
         }
+next_gridcellA:
     }}
 
     // ------------ Segment 1: land part of sealand
