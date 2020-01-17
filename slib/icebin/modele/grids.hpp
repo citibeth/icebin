@@ -42,8 +42,11 @@ const double EQ_RAD = 6.371e6; /// Radius of the Earth (same as in ModelE)
 
 // See LIGrid.F90
 const int UI_UNUSED = 0;
-const int UI_ICEBIN = 1;
-const int UI_NOTHING= 2;
+const int UI_LOCALICE = 1;     // Formerly UI_ICEBIN; FHC ~= 1
+const int UI_GLOBALICE = 2;    // Formerly UI_ICEBIN; FHC ~= 1
+const int UI_VGHOST = 3;    // Ghost because of nearby ECs Formerly UI_NOTHING; FHC < 1e-29
+const int UI_HGHOST = 4;    // Ghost because of adjacent cells Formerly UI_NOTHING; FHC < 1e-29
+const int UI_SEALAND = 5;    // Formerly UI_NOTHING; FHC < 1e-29
 
 
 }}    // namespace icebin::modele

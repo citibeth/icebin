@@ -85,8 +85,8 @@ matrix is all based on un-rounded ("raw") verions of TOPO fields.
 @param hcdefs_base Levels of elevation classes [m] in base EOpvAOp
 @param hcdefs OUT: ELevation levels for merged EOpvAOp
 @param underice_hc OUT: Expected model underneath the ice of each elevation class
-    UI_NOTHING for base ice
-    UI_ICEBIN for local ice
+    UI_GLOBALICE for base ice
+    UI_LOCALICE for local ice
 @param paramsA Regrid parmaeters that are used by command line programs (known to work)
 @return Merged EOpvAOp matrix.  Dense indexing, using dimension maps from dims.
 */

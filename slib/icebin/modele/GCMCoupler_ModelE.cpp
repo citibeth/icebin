@@ -608,6 +608,7 @@ int *E1vE0c_nele)
     blitz::Array<double,3> &underice(*self->gcm_ivalssE[(int)IndexAE::ETOPO][i_underice]);
     
 
+    // Get values to send to IceBin
     auto &domainA(self->domainA);
 printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc, nhc_ice);
 
@@ -620,18 +621,20 @@ printf("domainA size=%ld base_hc=%d  nhc_ice=%d\n", domainA.data.size(), base_hc
         for (int j=domainA[1].begin; j < domainA[1].end; ++j) {
         for (int i=domainA[0].begin; i < domainA[0].end; ++i) {
             // i,j are 0-based indexes.
-            if (underice(ihc,j,i) != UI_ICEBIN) continue;
-            long iE_s = indexingE.tuple_to_index(
-                make_array(i, j, ihc_ice));
+            if (underice(ihc,j,i) == UI_LOCALICE || underice(ihc,j,i) == UI_GLOBALICE) {
 
-            if (iE_s < 0) (*ibmisc_error)(-1,
-                "iE_s=%ld (from %d %d %d), it should not be negative\n", iE_s, i, j, ihc_ice);
+                long iE_s = indexingE.tuple_to_index(
+                    make_array(i, j, ihc_ice));
 
-            for (unsigned int ivar=0; ivar<self->gcm_outputsE.size(); ++ivar) {
-                val[ivar] = (*self->gcm_ovalsE[ivar])(ihc,j,i);
-            }
+                if (iE_s < 0) (*ibmisc_error)(-1,
+                    "iE_s=%ld (from %d %d %d), it should not be negative\n", iE_s, i, j, ihc_ice);
 
-            gcm_ovalsE_s.add({iE_s}, &val[0], 1.0);
+                for (unsigned int ivar=0; ivar<self->gcm_outputsE.size(); ++ivar) {
+                    val[ivar] = (*self->gcm_ovalsE[ivar])(ihc,j,i);
+                }
+
+                gcm_ovalsE_s.add({iE_s}, &val[0], 1.0);
+            }    // if UI_LOCALICE or UI_GLOBALICE
         }}
     }
 

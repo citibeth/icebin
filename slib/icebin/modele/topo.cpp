@@ -497,7 +497,7 @@ int const nhc_gcm)
         "units", "1"
     }));
     auto &underice(this->a3_i.add("underice", {
-        "description", "Model below the show/firn (UI_UNUSED=0, UI_ICEBIN=1, UI_NOTHING=2)"
+        "description", "Model below the show/firn (UI_UNUSED=0, UI_LOCALICE=1, UI_GLOBALICE=2, UI_GHOST=3, UI_SEALAND=4)"
     }));
 
     std::array<int,3> shape3 {nhc_gcm, hspecA.jm, hspecA.im};
@@ -619,7 +619,7 @@ blitz::Array<int16_t,3> &underice3)
     for (nhc_local=0; nhc_local<nhc_icebin; ++nhc_local) {
         // underice_hc contains UI_ICEBIN for local ice; and UI_NOTHING for global ice.
         // See merge_topo.cpp for how underice_hc is constructed.
-        if underice_hc[nhc_local] != UI_ICEBIN continue;
+        if (underice_hc[nhc_local] != UI_LOCALICE) break;
     }
     int const nhc_gcm = get_nhc_gcm(nhc_icebin);
     auto const nA = indexingHCA[0].extent;
@@ -682,6 +682,8 @@ blitz::Array<int16_t,3> &underice3)
             // look at fhc.
             elevE3(ihc,j,i) = hcdefs[ihc];
 
+        }
+        for (int ihc=0; ihc<nhc_local; ++ihc) {
             // Determine min and max EC for
             if (fhc3(ihc,j,i) != 0) {
                 minhc = std::min(minhc,ihc);
@@ -694,9 +696,12 @@ blitz::Array<int16_t,3> &underice3)
         // in the future.  This is NECESSARY for two-way coupling;
         // and it should not affect results in the uncoupled case.
         // UI_ICEBIN: Only make ghost points for dynamic ice ECs
-        if (maxhc >= 0 && underice_hc[ihc] == UI_ICEBIN) {
-        for (int ihc=std::max(0,minhc-2); ihc<=std::max(maxhc+2,nhc_icebin); ++ihc) {
-            if (fhc3(ihc,j,i)==0) fhc3(ihc,j,i) = 1.e-30;
+        if (maxhc >= 0 && underice_hc[ihc] == UI_LOCALICE) {
+        for (int ihc=std::max(0,minhc-2); ihc<=std::min(maxhc+2,nhc_local-1); ++ihc) {
+            if (fhc3(ihc,j,i)==0) {
+                fhc3(ihc,j,i) = 1.e-30;
+                underice3(ihc,j,i) = UI_VGHOST;
+            }
         }}
     }}
 
@@ -725,7 +730,7 @@ blitz::Array<int16_t,3> &underice3)
 
         // Make sure no other ECs in this gridcell
         for (int ihc=0; ihc<nhc_local; ++ihc) {
-            if (underice3(ihc,j,i) == UI_ICEBIN) goto next_gridcellA;    // continue
+            if (underice3(ihc,j,i) == UI_LOCALICE) goto next_gridcellA;    // continue
         }
 
         // Now look for ice in nearby gridcells
@@ -736,6 +741,7 @@ blitz::Array<int16_t,3> &underice3)
                     double const fhc_near = fhc3(ihc, j+ix[0], i+ix[1]);
                     if (abs(fhc_near) > 1e-20) {
                         fhc3(ihc,j,i) = 1.e-30;
+                        underice3(ihc,j,i) = UI_HGHOST;
                         nghost += 1;
 printf("Horizontal ghost point: %d,%d,%d\n", ihc,j,i);
                         break;
@@ -747,7 +753,7 @@ printf("Horizontal ghost point: %d,%d,%d\n", ihc,j,i);
             // until lower elevation ice is established.
             if (nghost >= 2) break;
         }
-next_gridcellA:
+next_gridcellA: ;
     }}
 
     // ------------ Segment 1: land part of sealand
@@ -758,7 +764,7 @@ next_gridcellA:
         if (fgiceA(j,i) > 0) {
             fhc3(ec_base, j,i) = (fgiceA2(j,i) == 0 ? 0 : 1e-30);
             elevE3(ec_base, j,i) = zicetopA2(j,i);
-            underice3(ec_base, j,i) = UI_NOTHING;
+            underice3(ec_base, j,i) = UI_SEALAND;
         }
     }}
 

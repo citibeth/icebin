@@ -155,7 +155,7 @@ public:
     /** Determines whether an elevation class is handled by IceBin or
     ModelE push-down */
     int16_t underice(int ihc) const
-        { return (ihc < gcmO->nhc() ? UI_ICEBIN : UI_NOTHING); }
+        { return (ihc < gcmO->nhc() ? UI_LOCALICE : UI_GLOBALICE); }
 
     // ------------------------------------------------------------
     // Override virtual functions

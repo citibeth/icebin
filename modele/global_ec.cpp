@@ -552,7 +552,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
         meta.indexingE = gcmA.indexingE;
         meta.hcdefs = gcmA._hcdefs;
         for (size_t i=0; i<meta.hcdefs.size(); ++i)
-            meta.underice_hc.push_back(UI_NOTHING);
+            meta.underice_hc.push_back(UI_GLOBALICE);
         printf("---- Saving metadata\n");
         meta.ncio(ncio);
         ncio.close();   // Ensure meta lasts longer than ncio

@@ -382,9 +382,10 @@ std::vector<std::string> &errors)
 
         ret.hcdefs.insert(ret.hcdefs.end(), gcmO->hcdefs().begin(), gcmO->hcdefs().end());
         for (size_t i=0; i<gcmO->hcdefs().size(); ++i)
-            ret.underice_hc.push_back(UI_ICEBIN);
+            ret.underice_hc.push_back(UI_LOCALICE);
     }
 
+    // Merge in global matrix
     std::array<long,2> EOpvAOp_base_shape {0,0};
     if (use_global_ice) {
         ret.offsetE = gcmO->indexingE.extent();
@@ -402,7 +403,7 @@ std::vector<std::string> &errors)
         }
         ret.hcdefs.insert(ret.hcdefs.end(), hcdefs_base.begin(), hcdefs_base.end());
         for (size_t i=0; i<hcdefs_base.size(); ++i)
-            ret.underice_hc.push_back(UI_NOTHING);
+            ret.underice_hc.push_back(UI_GLOBALICE);
     }
 
 
@@ -442,7 +443,7 @@ Indexing const &indexingHC0)
     std::map<double,int> hcdefs_map;
     for (int i=0; i<nhc; ++i) {
         hcdefs_map.insert(std::make_pair(ret.hcdefs[i], i));
-        ret.underice_hc.push_back(UI_NOTHING);
+        ret.underice_hc.push_back(UI_GLOBALICE);
     }
 
     // Define to_new[] such that: ihc_new == to_new[ihc_old]
