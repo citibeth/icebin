@@ -617,7 +617,7 @@ blitz::Array<int16_t,3> &underice3)
     int const nhc_icebin = hcdefs.size();   // local + global EC's
     int nhc_local;    // Number of ECs devoted to local ice sheets (not global ice)
     for (nhc_local=0; nhc_local<nhc_icebin; ++nhc_local) {
-        // underice_hc contains UI_ICEBIN for local ice; and UI_NOTHING for global ice.
+        // underice_hc contains UI_LOCALICE for local ice; and UI_GLOBALICE for global ice.
         // See merge_topo.cpp for how underice_hc is constructed.
         if (underice_hc[nhc_local] != UI_LOCALICE) break;
     }
@@ -628,7 +628,7 @@ blitz::Array<int16_t,3> &underice3)
     // Initialize
     fhc3 = 0;
     elevE3 = NaN;
-    underice3 = 0;    // Elevation grid cell unused
+    underice3 = UI_UNUSED;    // Elevation grid cell unused
 
     // ------------ Segment 0: Elevation Classes
     printf("Segment 0: Elevation Classes\n");
@@ -761,7 +761,7 @@ next_gridcellA: ;
     int ec_base = nhc_icebin;    
     for (int j=0; j<hspecA.jm; ++j) {
     for (int i=0; i<hspecA.im; ++i) {
-        if (fgiceA(j,i) > 0) {
+        if (fgiceA2(j,i) > 0) {
             fhc3(ec_base, j,i) = (fgiceA2(j,i) == 0 ? 0 : 1e-30);
             elevE3(ec_base, j,i) = zicetopA2(j,i);
             underice3(ec_base, j,i) = UI_SEALAND;
