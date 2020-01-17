@@ -497,7 +497,7 @@ int const nhc_gcm)
         "units", "1"
     }));
     auto &underice(this->a3_i.add("underice", {
-        "description", "Model below the show/firn (UI_UNUSED=0, UI_LOCALICE=1, UI_GLOBALICE=2, UI_GHOST=3, UI_SEALAND=4)"
+        "description", "Model below the show/firn (UI_UNUSED=0, UI_LOCALICE=1, UI_GLOBALICE=2, UI_VGHOST=3, UI_HGHOST=4, UI_SEALAND=4)"
     }));
 
     std::array<int,3> shape3 {nhc_gcm, hspecA.jm, hspecA.im};
