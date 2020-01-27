@@ -92,8 +92,8 @@ blitz::Array<double,2> &fgiceOm2,
 blitz::Array<double,2> &zatmoOm2,
 // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
-blitz::Array<double,2> &zicetop_minO2,
-blitz::Array<double,2> &zicetop_maxO2,
+blitz::Array<double,2> &zland_minO2,
+blitz::Array<double,2> &zland_maxO2,
 blitz::Array<int16_t,2> &mergemaskOm2,   // OUT only.  Indicates where merging of local into global ice took place.  Only update these gridcells.
 // ------ Local ice sheets to merge in...
 GCMRegridder_Standard *gcmO,    // Multiple IceRegridders
@@ -145,8 +145,8 @@ std::vector<std::string> &errors)
     auto fgiceOm(reshape1(fgiceOm2));
     auto zatmoOm(reshape1(zatmoOm2));
     auto zicetopO(reshape1(zicetopO2));
-    auto zicetop_minO(reshape1(zicetop_minO2));
-    auto zicetop_maxO(reshape1(zicetopO_max2));
+    auto zland_minO(reshape1(zland_minO2));
+    auto zland_maxO(reshape1(zicetopO_max2));
     auto mergemaskOm(reshape1(mergemaskOm2));
 
     // Sanity check inputs
@@ -172,8 +172,8 @@ std::vector<std::string> &errors)
     da_contO = 0.;
     blitz::Array<double,1> da_zatmoO(nO);    // increase in area of continent * elevation [m^3]
     da_zatmoO = 0.;
-    zicetop_maxO = std::numeric_limits<double>::min();
-    zicetop_minO = std::numeric_limits<double>::max();
+    zland_maxO = std::numeric_limits<double>::min();
+    zland_minO = std::numeric_limits<double>::max();
 
     RegridParams paramsO_rawA(paramsA);
         paramsO_rawA.scale = true;
@@ -196,11 +196,6 @@ std::vector<std::string> &errors)
                 double const elev = sheet.elev_areaO(iO_d);
                 da_zicetopO(iO_s) += elev * native_area;
                 mergemaskOm(iO_s) = 1;
-
-                // ZICETOP min and max are only tracked for local ice,
-                // so no need for a da_ variable and then merging below.
-                zicetop_minO(iO_s) = std::min(da_zicetopO(iO_s), elev);
-                zicetop_maxO(iO_s) = std::max(da_zicetopO(iO_s), elev);
             }
         }
 
@@ -218,8 +213,15 @@ std::vector<std::string> &errors)
             gcmO, paramsO_rawA, sheet_index, emI_lands[sheet_index]));
 
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
+                double const elev = sheet.elev_areaO(iO_d);
                 auto iO_s = sheet.dimO.to_sparse(iO_d);
                 da_zatmoO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA->native_area(gcmO->agridA->dim.to_dense(iO_s)); //sheet.wO(iO_d);
+
+                // ZLAND min and max are only tracked for local ice
+                // (and land) so no need for a da_ variable and then
+                // merging below.
+                zland_minO(iO_s) = std::min(da_zicetopO(iO_s), elev);
+                zland_maxO(iO_s) = std::max(da_zicetopO(iO_s), elev);
             }
         }
 
@@ -308,11 +310,11 @@ std::vector<std::string> &errors)
     sanity_nonan("zicetopO2", zicetopO2, errors);
     sanity_check_land_fractions(foceanOm2, flakeOm2, fgrndOm2, fgiceOm2, errors);
 
-    // Convert unset zicetop_min and zicetop_max to NaN
+    // Convert unset zland_min and zland_max to NaN
     for (int iO=0; iO<nO; ++iO) {
         if (!mergemaskOm(iO)) {
-            zicetop_minO(iO) = NaN;
-            zicetop_maxO(iO) = NaN;
+            zland_minO(iO) = NaN;
+            zland_maxO(iO) = NaN;
         }
     }
 
@@ -330,8 +332,8 @@ std::vector<std::string> &errors)
     ncio_blitz(ncio, fgrndOm2, "fgrnd", "double", dims);
     ncio_blitz(ncio, fgiceOm2, "fgice", "double", dims);
     ncio_blitz(ncio, zatmoOm2, "zatmo", "double", dims);
-    ncio_blitz(ncio, zicetop_minO2, "zicetop_min", "double", dims);
-    ncio_blitz(ncio, zicetop_maxO2, "zicetop_max", "double", dims);
+    ncio_blitz(ncio, zland_minO2, "zland_min", "double", dims);
+    ncio_blitz(ncio, zland_maxO2, "zland_max", "double", dims);
     ncio_blitz(ncio, mergemaskOm2, "mergemask", "short", dims);
 
     ncio.flush();

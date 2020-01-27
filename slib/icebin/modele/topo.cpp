@@ -547,8 +547,8 @@ blitz::Array<double,2> const &fgiceOm2,
 blitz::Array<double,2> const &zatmoOm2,
 blitz::Array<double,2> const &zlakeOm2,
 blitz::Array<double,2> const &zicetopOm2,
-blitz::Array<double,2> const &zicetop_minOm2,
-blitz::Array<double,2> const &zicetop_maxOm2,
+blitz::Array<double,2> const &zland_minOm2,
+blitz::Array<double,2> const &zland_maxOm2,
 blitz::Array<int16_t,2> const &mergemaskOm2,
 //
 // Things obtained from gcmA
@@ -568,8 +568,8 @@ blitz::Array<double,2> &fgiceA2,
 blitz::Array<double,2> &zatmoA2,
 blitz::Array<double,2> &zlakeA2,
 blitz::Array<double,2> &zicetopA2,
-blitz::Array<double,2> &zicetop_minA2,
-blitz::Array<double,2> &zicetop_maxA2,
+blitz::Array<double,2> &zland_minA2,
+blitz::Array<double,2> &zland_maxA2,
 blitz::Array<int16_t,2> &mergemaskA2,
 //
 blitz::Array<double,3> &fhc3,
@@ -590,13 +590,13 @@ blitz::Array<int16_t,3> &underice3)
 
     // -------------------------
     // Regrid mergemask (mask, not a double)
-    // Also set zicetop_min and zicetop_max
+    // Also set zland_min and zland_max
 
     // This is an spsparse accumulator, gets called on every
     // matrix element by hntr_AvO.scaled_regrid_matrix() below.
     struct RegridMinMax {
-        blitz::Array<double,1> zicetop_minO, zicetop_maxO;
-        blitz::Array<double,1> zicetop_minA, zicetop_maxA;
+        blitz::Array<double,1> zland_minO, zland_maxO;
+        blitz::Array<double,1> zland_minA, zland_maxA;
         blitz::Array<int16_t,1> mergemaskO, mergemaskA;
 
         void add(std::array<int,2> const &index, double val)
@@ -608,18 +608,18 @@ blitz::Array<int16_t,3> &underice3)
             if (mergemaskO(iO)) mergemaskA(iA) = 1;
 
             // minA = min(all minO)
-            zicetop_minA(iA) = std::min(zicetop_minA(iA), zicetop_minO(iO));
-            zicetop_maxA(iA) = std::max(zicetop_maxA(iA), zicetop_maxO(iO));
+            zland_minA(iA) = std::min(zland_minA(iA), zland_minO(iO));
+            zland_maxA(iA) = std::max(zland_maxA(iA), zland_maxO(iO));
         }
     };
 
     mergemaskA2 = 0;
     RegridMinmax rmm;
     {
-        rmm.zicetop_minO.reference(reshape1(zicetop_minOm2));
-        rmm.zicetop_maxO.reference(reshape1(zicetop_maxOm2));
-        rmm.zicetop_minA.reference(reshape1(zicetop_minA2));
-        rmm.zicetop_maxA.reference(reshape1(zicetop_maxA2));
+        rmm.zland_minO.reference(reshape1(zland_minOm2));
+        rmm.zland_maxO.reference(reshape1(zland_maxOm2));
+        rmm.zland_minA.reference(reshape1(zland_minA2));
+        rmm.zland_maxA.reference(reshape1(zland_maxA2));
         rmm.mergemaskO.reference(reshape1(mergemaskOm2));
         rmm.mergemaskA.reference(reshape1(mergemaskA2));
 
@@ -634,8 +634,8 @@ blitz::Array<int16_t,3> &underice3)
     merge_poles(zatmoA2);
     merge_poles(zlakeA2);
     merge_poles(zicetopA2);
-    merge_poles(zicetop_minA2);
-    merge_poles(zicetop_maxA2);
+    merge_poles(zland_minA2);
+    merge_poles(zland_maxA2);
 
 
 #if 0    // not needed
@@ -722,10 +722,10 @@ blitz::Array<int16_t,3> &underice3)
             // look at fhc.
             elevE3(ihc,j,i) = hcdefs[ihc];
 
-            // zicetop_minhc will end up being the largest EC level < zicetop_min
-            if (elevE3(ihc,j,i) < zicetop_minA2(j,i)) zicetop_minhc = ihc;
-            // zicetop_maxhc will end up being the largest EC level <= zicetop_max
-            if (elevE3(ihc,j,i) <= zicetop_maxA2(j,i)) zicetop_maxhc = ihc;
+            // zland_minhc will end up being the largest EC level < zland_min
+            if (elevE3(ihc,j,i) < zland_minA2(j,i)) zland_minhc = ihc;
+            // zland_maxhc will end up being the largest EC level <= zland_max
+            if (elevE3(ihc,j,i) <= zland_maxA2(j,i)) zland_maxhc = ihc;
 
             // Determine min and max EC for this Atmosphere gridcell
             if (fhc3(ihc,j,i) != 0) {
@@ -739,16 +739,16 @@ blitz::Array<int16_t,3> &underice3)
         if (mergemaskA2(j,i)) {
 
             int minghost, maxghost;
-            if (maxhc < 0) {
+//            if (maxhc < 0) {
                 // If the gridcell has no ice in it, set up ghost points at
                 // elevations that MIGHT see ice.  (Assume Z interpolation in
                 // IceBin).
-                minghost = std::max(0, zicetop_minhc-1);
-                maxghost = std::min(zicetop_maxhc+2, nhc_local-1);
-            } else {
-                minghost = std::max(0,minhc-2);
-                maxghost = std::min(maxhc+2,nhc_local-1);
-            }
+                minghost = std::max(0, zland_minhc-1);
+                maxghost = std::min(zland_maxhc+2, nhc_local-1);
+//            } else {
+//                minghost = std::max(0,minhc-2);
+//                maxghost = std::min(maxhc+2,nhc_local-1);
+//            }
 
             for (int ihc=minghost; ihc<=maxghost; ++ihc) {
                 if (fhc3(ihc,j,i)==0) {
