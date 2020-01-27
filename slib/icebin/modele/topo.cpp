@@ -535,6 +535,8 @@ static void merge_poles(blitz::Array<double,2> &var)
     }
 }
 // ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
+// ------------------------------------------------------------------------
 std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
 // or it's the output of compute_AAmvEAm_merged (for merged global+local ice)
@@ -545,6 +547,8 @@ blitz::Array<double,2> const &fgiceOm2,
 blitz::Array<double,2> const &zatmoOm2,
 blitz::Array<double,2> const &zlakeOm2,
 blitz::Array<double,2> const &zicetopOm2,
+blitz::Array<double,2> const &zicetop_minOm2,
+blitz::Array<double,2> const &zicetop_maxOm2,
 blitz::Array<int16_t,2> const &mergemaskOm2,
 //
 // Things obtained from gcmA
@@ -564,6 +568,8 @@ blitz::Array<double,2> &fgiceA2,
 blitz::Array<double,2> &zatmoA2,
 blitz::Array<double,2> &zlakeA2,
 blitz::Array<double,2> &zicetopA2,
+blitz::Array<double,2> &zicetop_minA2,
+blitz::Array<double,2> &zicetop_maxA2,
 blitz::Array<int16_t,2> &mergemaskA2,
 //
 blitz::Array<double,3> &fhc3,
@@ -582,14 +588,44 @@ blitz::Array<int16_t,3> &underice3)
     hntr_AvO.regrid(WTO, zlakeOm2, zlakeA2);
     hntr_AvO.regrid(fgiceOm2, zicetopOm2, zicetopA2);
 
+    // -------------------------
     // Regrid mergemask (mask, not a double)
-    blitz::Array<double, 2> mergemaskA2_d(hspecA.jm,hspecA.im);
-    hntr_AvO.regrid(WTO, mergemaskOm2, mergemaskA2_d);
-    merge_poles(mergemaskA2_d);
-    for (int j=0; j<hspecA.jm; ++j) {
-    for (int i=0; i<hspecA.im; ++i) {
-        mergemaskA2(j,i) = (mergemaskA2_d(j,i) == 0 ? 0 : 1);
-    }}
+    // Also set zicetop_min and zicetop_max
+
+    // This is an spsparse accumulator, gets called on every
+    // matrix element by hntr_AvO.scaled_regrid_matrix() below.
+    struct RegridMinMax {
+        blitz::Array<double,1> zicetop_minO, zicetop_maxO;
+        blitz::Array<double,1> zicetop_minA, zicetop_maxA;
+        blitz::Array<int16_t,1> mergemaskO, mergemaskA;
+
+        void add(std::array<int,2> const &index, double val)
+        {
+            int const iA = index[0];
+            int const iO = index[1];
+
+            // mergemaskA=1 if any of associated mergemaskO is 1
+            if (mergemaskO(iO)) mergemaskA(iA) = 1;
+
+            // minA = min(all minO)
+            zicetop_minA(iA) = std::min(zicetop_minA(iA), zicetop_minO(iO));
+            zicetop_maxA(iA) = std::max(zicetop_maxA(iA), zicetop_maxO(iO));
+        }
+    };
+
+    mergemaskA2 = 0;
+    RegridMinmax rmm;
+    {
+        rmm.zicetop_minO.reference(reshape1(zicetop_minOm2));
+        rmm.zicetop_maxO.reference(reshape1(zicetop_maxOm2));
+        rmm.zicetop_minA.reference(reshape1(zicetop_minA2));
+        rmm.zicetop_maxA.reference(reshape1(zicetop_maxA2));
+        rmm.mergemaskO.reference(reshape1(mergemaskOm2));
+        rmm.mergemaskA.reference(reshape1(mergemaskA2));
+
+        hntr_AvO.scaled_regrid_matrix(accum::ref(rmm));
+    }
+    // -------------------------
 
     merge_poles(foceanA2);
     merge_poles(flakeA2);
@@ -598,7 +634,8 @@ blitz::Array<int16_t,3> &underice3)
     merge_poles(zatmoA2);
     merge_poles(zlakeA2);
     merge_poles(zicetopA2);
-
+    merge_poles(zicetop_minA2);
+    merge_poles(zicetop_maxA2);
 
 
 #if 0    // not needed
@@ -638,30 +675,31 @@ blitz::Array<int16_t,3> &underice3)
     auto elevE2(reshape<double,3,2>(elevE3, shapeE2));
     auto undericeE2(reshape<int16_t,3,2>(underice3, shapeE2));
 
-    std::array<int,2> iTuple;
+    {std::array<int,2> iTuple;
         int &iA2(iTuple[0]);
         int &ihc(iTuple[1]);
 
-    for (auto ii=begin(AAmvEAm.M); ii != end(AAmvEAm.M); ++ii) {
-        int const iA = ii->index(0);
-        int const iE = ii->index(1);
+        for (auto ii=begin(AAmvEAm.M); ii != end(AAmvEAm.M); ++ii) {
+            int const iA = ii->index(0);
+            int const iE = ii->index(1);
 
-        indexingHCA.index_to_tuple(&iTuple[0], iE);
+            indexingHCA.index_to_tuple(&iTuple[0], iE);
 
-        // iE must be contained within cell iA (local propety of matrix)
-        if (iA2 != iA) (*icebin_error)(-1,
-            "Matrix is non-local: iA=%ld, iE=%ld, iA2=%ld",
-            (long)iA, (long)iE, (long)iA2);
+            // iE must be contained within cell iA (local propety of matrix)
+            if (iA2 != iA) (*icebin_error)(-1,
+                "Matrix is non-local: iA=%ld, iE=%ld, iA2=%ld",
+                (long)iA, (long)iE, (long)iA2);
 
-        if (ihc < 0 || ihc >= nhc_icebin) (*icebin_error)(-1,
-            "ihc out of range [0,%d): %d", nhc_icebin, ihc);
+            if (ihc < 0 || ihc >= nhc_icebin) (*icebin_error)(-1,
+                "ihc out of range [0,%d): %d", nhc_icebin, ihc);
 
-        if (iA < 0 || iA >= shapeE2(1)) (*icebin_error)(-1,
-            "iA out of range [0,%d): %d", shapeE2(1), iA);
+            if (iA < 0 || iA >= shapeE2(1)) (*icebin_error)(-1,
+                "iA out of range [0,%d): %d", shapeE2(1), iA);
 
-        int const _ihc = ihc;    // Get around bug in Blitz++
-        fhcE2(ihc,iA) += ii->value();
-        undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
+            int const _ihc = ihc;    // Get around bug in Blitz++
+            fhcE2(ihc,iA) += ii->value();
+            undericeE2(ihc,iA) = underice_hc[ihc];    // No IceBin coupling here
+        }
     }
 
     // Merge grid cells on south pole
@@ -676,87 +714,51 @@ blitz::Array<int16_t,3> &underice3)
     // Set EC levels and EC halos (ghost ECs)
     for (int j=0; j<hspecA.jm; ++j) {
     for (int i=0; i<hspecA.im; ++i) {
-        int minhc=10000;
-        int maxhc=-1;
+        int minhc=std::numeric_limits<int>::max();
+        int maxhc=std::numeric_limits<int>::min();
         for (int ihc=0; ihc<nhc_icebin; ++ihc) {
             // Set elevE everywhere.  This is required by ModelE
             // See downscale_temperature_li(), which doesn't
             // look at fhc.
             elevE3(ihc,j,i) = hcdefs[ihc];
 
-        }
-        for (int ihc=0; ihc<nhc_local; ++ihc) {
-            // Determine min and max EC for
+            // zicetop_minhc will end up being the largest EC level < zicetop_min
+            if (elevE3(ihc,j,i) < zicetop_minA2(j,i)) zicetop_minhc = ihc;
+            // zicetop_maxhc will end up being the largest EC level <= zicetop_max
+            if (elevE3(ihc,j,i) <= zicetop_maxA2(j,i)) zicetop_maxhc = ihc;
+
+            // Determine min and max EC for this Atmosphere gridcell
             if (fhc3(ihc,j,i) != 0) {
                 minhc = std::min(minhc,ihc);
                 maxhc = std::max(maxhc,ihc);
             }
         }
 
-        // Make phantom / ghost points in the elevation grid
-        // Create an EC "halo" in fhc, for ECs that might be used
-        // in the future.  This is NECESSARY for two-way coupling;
-        // and it should not affect results in the uncoupled case.
-        // UI_ICEBIN: Only make ghost points for dynamic ice ECs
-        if (maxhc >= 0 && underice_hc[ihc] == UI_LOCALICE) {
-        for (int ihc=std::max(0,minhc-2); ihc<=std::min(maxhc+2,nhc_local-1); ++ihc) {
-            if (fhc3(ihc,j,i)==0) {
-                fhc3(ihc,j,i) = 1.e-30;
-                underice3(ihc,j,i) = UI_VGHOST;
+        // Make ghost points on cells that MIGHT have ice someday,
+        // because they are intersected by a local ice grid.
+        if (mergemaskA2(j,i)) {
+
+            int minghost, maxghost;
+            if (maxhc < 0) {
+                // If the gridcell has no ice in it, set up ghost points at
+                // elevations that MIGHT see ice.  (Assume Z interpolation in
+                // IceBin).
+                minghost = std::max(0, zicetop_minhc-1);
+                maxghost = std::min(zicetop_maxhc+2, nhc_local-1);
+            } else {
+                minghost = std::max(0,minhc-2);
+                maxghost = std::min(maxhc+2,nhc_local-1);
             }
-        }}
-    }}
 
-
-    // Add additional phantom/ghost/halo points based on horizontal nearby cells
-    // In case the ice sheet grows horizontally into new atmosphere cells
-    std::vector<std::array<int,2>> const nearby {
-    	// Ghost diagonal points as well as adjacen in X and Y
-    	// This might be needed, in case an ice sheet boundary spreads
-    	// out through a corner.
-        {-1,-1}, {-1,0}, {-1,1},
-        {0,-1}, {0,1},
-        {1,-1}, {1,0}, {1,1}};
-//        {-1,0}, {1,0}, {0,-1}, {0,1}};
-    for (int j=1; j<hspecA.jm-1; ++j) {   // No need to go to the wrap-around boundaries
-    for (int i=1; i<hspecA.im-1; ++i) {
-        int nghost = 0;    // Number of ghost elevation classes we've added in this gridcell
-
-        // Only make ghost points on land.  Lynch-Stieglitz model will
-        // NEVER be able to grow into the ocean.
-        if (foceanA2(j,i) == 1) continue;
-
-        // Only make horizontal ghost points if:
-        //  1. There is not yet any ice in this gridcell
-        //  2. There is ice in an adjacent gridcell
-
-        // Make sure no other ECs in this gridcell
-        for (int ihc=0; ihc<nhc_local; ++ihc) {
-            if (underice3(ihc,j,i) == UI_LOCALICE) goto next_gridcellA;    // continue
-        }
-
-        // Now look for ice in nearby gridcells
-        for (int ihc=0; ihc<nhc_local; ++ihc) {
-
-            if (fhc3(ihc,j,i)==0) {
-                for (auto const &ix : nearby) {
-                    double const fhc_near = fhc3(ihc, j+ix[0], i+ix[1]);
-                    if (abs(fhc_near) > 1e-20) {
-                        fhc3(ihc,j,i) = 1.e-30;
-                        underice3(ihc,j,i) = UI_HGHOST;
-                        nghost += 1;
-printf("Horizontal ghost point: %d,%d,%d\n", ihc,j,i);
-                        break;
-                    }
+            for (int ihc=minghost; ihc<=maxghost; ++ihc) {
+                if (fhc3(ihc,j,i)==0) {
+                    fhc3(ihc,j,i) = 1.e-30;
+                    underice3(ihc,j,i) = UI_VGHOST;
                 }
             }
-            // Only add lower-elevation ghost EC's.  Higher-elevation
-            // ice will not be able to make it into this gridcell
-            // until lower elevation ice is established.
-            if (nghost >= 2) break;
         }
-next_gridcellA: ;
     }}
+
 
     // ------------ Segment 1: land part of sealand
     printf("Segment 1: seaLAND\n");
