@@ -536,6 +536,31 @@ static void merge_poles(blitz::Array<double,2> &var)
 }
 // ------------------------------------------------------------------------
 // ------------------------------------------------------------------------
+// This is an spsparse accumulator, gets called on every
+// matrix element by hntr_AvO.scaled_regrid_matrix() below.
+struct _RegridMinMax {
+    // See spsparse/spsparse.hpp AccumTraits
+    static int const rank = 2;
+    typedef int index_type;
+    typedef double val_type;
+
+    blitz::Array<double,1> zland_minO, zland_maxO;
+    blitz::Array<double,1> zland_minA, zland_maxA;
+    blitz::Array<int16_t,1> mergemaskO, mergemaskA;
+
+    void add(std::array<int,2> const &index, double val)
+    {
+        int const iA = index[0];
+        int const iO = index[1];
+
+        // mergemaskA=1 if any of associated mergemaskO is 1
+        if (mergemaskO(iO)) mergemaskA(iA) = 1;
+
+        // minA = min(all minO)
+        zland_minA(iA) = std::min(zland_minA(iA), zland_minO(iO));
+        zland_maxA(iA) = std::max(zland_maxA(iA), zland_maxO(iO));
+    }
+};
 // ------------------------------------------------------------------------
 std::vector<std::string> make_topoA(
 // AAmvEAM is either read from output of global_ec (for just global ice);
@@ -592,29 +617,8 @@ blitz::Array<int16_t,3> &underice3)
     // Regrid mergemask (mask, not a double)
     // Also set zland_min and zland_max
 
-    // This is an spsparse accumulator, gets called on every
-    // matrix element by hntr_AvO.scaled_regrid_matrix() below.
-    struct RegridMinMax {
-        blitz::Array<double,1> zland_minO, zland_maxO;
-        blitz::Array<double,1> zland_minA, zland_maxA;
-        blitz::Array<int16_t,1> mergemaskO, mergemaskA;
-
-        void add(std::array<int,2> const &index, double val)
-        {
-            int const iA = index[0];
-            int const iO = index[1];
-
-            // mergemaskA=1 if any of associated mergemaskO is 1
-            if (mergemaskO(iO)) mergemaskA(iA) = 1;
-
-            // minA = min(all minO)
-            zland_minA(iA) = std::min(zland_minA(iA), zland_minO(iO));
-            zland_maxA(iA) = std::max(zland_maxA(iA), zland_maxO(iO));
-        }
-    };
-
     mergemaskA2 = 0;
-    RegridMinMax rmm;
+    _RegridMinMax rmm;
     {
         rmm.zland_minO.reference(reshape1(zland_minOm2));
         rmm.zland_maxO.reference(reshape1(zland_maxOm2));
@@ -716,6 +720,8 @@ blitz::Array<int16_t,3> &underice3)
     for (int i=0; i<hspecA.im; ++i) {
         int minhc=std::numeric_limits<int>::max();
         int maxhc=std::numeric_limits<int>::min();
+        int zland_minhc=std::numeric_limits<int>::max();
+        int zland_maxhc=std::numeric_limits<int>::min();
         for (int ihc=0; ihc<nhc_icebin; ++ihc) {
             // Set elevE everywhere.  This is required by ModelE
             // See downscale_temperature_li(), which doesn't

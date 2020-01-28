@@ -146,7 +146,7 @@ std::vector<std::string> &errors)
     auto zatmoOm(reshape1(zatmoOm2));
     auto zicetopO(reshape1(zicetopO2));
     auto zland_minO(reshape1(zland_minO2));
-    auto zland_maxO(reshape1(zicetopO_max2));
+    auto zland_maxO(reshape1(zland_maxO2));
     auto mergemaskOm(reshape1(mergemaskOm2));
 
     // Sanity check inputs
