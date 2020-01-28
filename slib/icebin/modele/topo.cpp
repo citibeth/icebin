@@ -614,7 +614,7 @@ blitz::Array<int16_t,3> &underice3)
     };
 
     mergemaskA2 = 0;
-    RegridMinmax rmm;
+    RegridMinMax rmm;
     {
         rmm.zland_minO.reference(reshape1(zland_minOm2));
         rmm.zland_maxO.reference(reshape1(zland_maxOm2));
