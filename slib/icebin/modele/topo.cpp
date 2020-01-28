@@ -98,14 +98,14 @@ EigenColVectorT compute_wAOm(
     }
 
     // OmvOp
-    EigenSparseMatrixT scaled_AOmvAOp(MakeDenseEigenT(
+    EigenSparseMatrixT sc_AOmvAOp(MakeDenseEigenT(
         std::bind(&scaled_AOmvAOp, _1, foceanAOp, foceanAOm, '+'),
         {SparsifyTransform::TO_DENSE_IGNORE_MISSING},
         {&dimAOm, &dimAOp}, '.').to_eigen());
 
     // It would be more correct to write wAOp * AOmvAOp
     // But scaled_AOmvAOp is diagonal, so it doesn't matter here.
-    return scaled_AOmvAOp * map_eigen_colvector(wAOp);
+    return sc_AOmvAOp * map_eigen_colvector(wAOp);
 }
 // -------------------------------------------------------
 // -------------------------------------------------------------
