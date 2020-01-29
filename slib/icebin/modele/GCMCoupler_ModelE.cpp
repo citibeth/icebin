@@ -886,6 +886,8 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         auto &zatmoOm(topoo.array("ZATMO"));
         auto &zlakeOm(topoo.array("ZLAKE"));
         auto &zicetopO(topoo.array("ZICETOP"));
+        auto &zland_minO(topoo.array("ZLAND_MIN"));
+        auto &zland_maxO(topoo.array("ZLAND_MAX"));
         blitz::Array<int16_t,2> mergemaskO(zicetopO.extent());
 
     // Allocate space for TOPOA output variables (variables in TOPOA file)
@@ -897,6 +899,8 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
         auto &zatmoA(topoa.a.array("zatmo"));
         auto &hlakeA(topoa.a.array("hlake"));
         auto &zicetopA(topoa.a.array("zicetop"));
+        auto &zland_minA(topoa.a.array("zland_min"));
+        auto &zland_maxA(topoa.a.array("zland_max"));
         auto &mergemaskA(topoa.a_i.array("mergemask"));
         if (!run_ice) mergemaskA0.reference(mergemaskA);  // no mergemask on initialization
 
@@ -912,7 +916,8 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
     // merge_topoO() merges PISM ice sheets (emI_ices, etc) into foceanOp / foceanOm
     merge_topoO(
         foceanOp, fgiceOp, zatmoOp,  // Our own bundle
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, mergemaskO, &*gcmA->gcmO,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO,
+        zland_minO, zland_maxO, mergemaskO, &*gcmA->gcmO,
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, gcmA->specO().eq_rad, errors);
 
@@ -950,10 +955,12 @@ TupleListLT<1> &wEAm_base)   // Clear; then store wEAm in here
     for (int ihc=0; ihc<gcmA->nhc(); ++ihc) underice_hc.push_back(gcmA->underice(ihc));
 
     std::vector<std::string> errors2(make_topoA(
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopO, mergemaskO,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopO,
+        zland_minO, zland_maxO, mergemaskO,
         gcmA->hspecO(), gcmA->hspecA(), gcmA->indexingHC, gcmA->hcdefs(), underice_hc,
         AAmvEAm,
-        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA, mergemaskA,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA,
+        zland_minA, zland_maxA, mergemaskA,
         fhc, elevE, underice_i));
 
     // Print sanity check errors to STDERR

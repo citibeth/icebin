@@ -184,6 +184,8 @@ blitz::Array<double,2> const &fgiceOm2,
 blitz::Array<double,2> const &zatmoOm2,
 blitz::Array<double,2> const &zlakeOm2,
 blitz::Array<double,2> const &zicetopOm2,
+blitz::Array<double,2> const &zland_minOm2,
+blitz::Array<double,2> const &zland_maxOm2,
 blitz::Array<int16_t,2> const &mergemaskOm2,
 
 //
@@ -203,6 +205,8 @@ blitz::Array<double,2> &fgiceA2,
 blitz::Array<double,2> &zatmoA2,
 blitz::Array<double,2> &zlakeA2,
 blitz::Array<double,2> &zicetopA2,
+blitz::Array<double,2> &zland_minA2,
+blitz::Array<double,2> &zland_maxA2,
 blitz::Array<int16_t,2> &mergemaskA2,
 //
 blitz::Array<double,3> &fhc3,

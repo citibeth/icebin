@@ -155,6 +155,8 @@ int main(int argc, char **argv)
     auto &zatmoOm(topoo.array("ZATMO"));
     auto &zlakeOm(topoo.array("ZLAKE"));
     auto &zicetopOm(topoo.array("ZICETOP"));
+    auto &zland_minOm(topoo.array("ZLAND_MIN"));
+    auto &zland_maxOm(topoo.array("ZLAND_MAX"));
     auto &foceanOp(topoo.array("FOCEANF"));
 
     auto &foceanA(topoa.a.array("focean"));
@@ -164,6 +166,8 @@ int main(int argc, char **argv)
     auto &zatmoA(topoa.a.array("zatmo"));
     auto &hlakeA(topoa.a.array("hlake"));
     auto &zicetopA(topoa.a.array("zicetop"));
+    auto &zland_minA(topoa.a.array("zland_min"));
+    auto &zland_maxA(topoa.a.array("zland_max"));
     auto &mergemaskA(topoa.a_i.array("mergemask"));
 
     auto &fhc(topoa.a3.array("fhc"));
@@ -188,10 +192,12 @@ int main(int argc, char **argv)
 
     // ---------------- Create TOPOA in memory
     std::vector<std::string> errors(make_topoA(
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm, zicetopOm, mergemaskOm,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zlakeOm,
+        zicetopOm, zland_minOm, zland_maxOm, mergemaskOm,
         hspecO, hspecA, indexingHCA, hcdefs, underice_hc,
         AAmvEAm,
-        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA, zicetopA, mergemaskA,
+        foceanA, flakeA, fgrndA, fgiceA, zatmoA, hlakeA,
+        zicetopA, zland_minA, zland_maxA, mergemaskA,
         fhc, elevE, underice));
 
     // Print sanity check errors to STDERR

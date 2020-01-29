@@ -445,6 +445,16 @@ std::string const &topoO_fname)
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
+    auto &zland_minOm(topoo.add("ZLAND_MIN", {
+        "description", "Minimum land/ice topography in this cell",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    auto &zland_maxOm(topoo.add("ZLAND_MAX", {
+        "description", "Maximum land/ice topography in this cell",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
 
     // Read TOPOO input
     if (topoO_fname != "") {
@@ -465,8 +475,8 @@ HntrSpec const &hspecA,
 int const nhc_gcm)
 {
 
-    static std::vector<std::string> const varsO {"FOCEAN", "FLAKE", "FGRND", "FGICE", "ZATMO", "ZLAKE", "ZICETOP"};
-    static std::vector<std::string> const varsA {"focean", "flake", "fgrnd", "fgice", "zatmo", "hlake", "zicetop"};
+    static std::vector<std::string> const varsO {"FOCEAN", "FLAKE", "FGRND", "FGICE", "ZATMO", "ZLAKE", "ZICETOP", "ZLAND_MIN", "ZLAND_MAX"};
+    static std::vector<std::string> const varsA {"focean", "flake", "fgrnd", "fgice", "zatmo", "hlake", "zicetop", "zland_min", "zland_max"};
 
     for (size_t i=0; i<varsO.size(); ++i) {
         std::string const &nameO(varsO[i]);

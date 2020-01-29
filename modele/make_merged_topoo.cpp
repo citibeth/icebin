@@ -184,6 +184,8 @@ int main(int argc, char **argv)
     auto &zatmoOm(topoo.array("ZATMO"));
     auto &zlakeOm(topoo.array("ZLAKE"));
     auto &zicetopO(topoo.array("ZICETOP"));
+    auto &zland_minO(topoo.array("ZLAND_MIN"));
+    auto &zland_maxO(topoo.array("ZLAND_MAX"));
 
     // This is created in the merge.
     blitz::Array<int16_t,2> mergemaskO(hspecO.jm,hspecO.im);
@@ -210,7 +212,9 @@ int main(int argc, char **argv)
     // We need correctA=true here to get FOCEANF, etc.
     merge_topoO(
         foceanOp, fgiceOp, zatmoOp,
-        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO, mergemaskO, &gcmO,
+        foceanOm, flakeOm, fgrndOm, fgiceOm, zatmoOm, zicetopO,
+        zland_minO, zland_maxO,
+        mergemaskO, &gcmO,
         RegridParams(false, true, {0.,0.,0.}),  // (scale, correctA, sigma)
         emI_lands, emI_ices, args.eq_rad, errors);
 
