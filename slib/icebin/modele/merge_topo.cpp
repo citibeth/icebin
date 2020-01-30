@@ -20,10 +20,12 @@ class GetSheetElevO {
 public:
     TmpAlloc _tmp;
     SparseSetT dimO;    // Dense indexing used for wO and elevO
-    blitz::Array<double,1> wO;        // Ice (or land) covered area of each gridcell [m^2]
+    std::unique_ptr<ibmisc::linear::Weighted_Eigen> OvI;
+//    blitz::Array<double,1> wO;        // Ice (or land) covered area of each gridcell [m^2]
     blitz::Array<double,1> elev_areaO;     // Elevation [m] * Ice-covered Cell Area [m^2] = [m^3]
 };
 
+// ------------------------------------------------------------------------
 /** Returns elevation on ocean grid (elevO) for a single local ice sheet.
 @param gcmO GCMRegridder
 @param paramsA Regrid parameters.
@@ -35,7 +37,10 @@ static GetSheetElevO get_sheet_elevO(
 GCMRegridder_Standard *gcmO,
 RegridParams const &paramsO,
 int sheet_index,
-blitz::Array<double,1> const &elevmaskI)
+blitz::Array<double,1> const &elevmaskI,
+// --------- INOUT vars
+blitz::Array<double,1> &zland_minO,
+blitz::Array<double,1> &zland_maxO)
 {
     GetSheetElevO ret;
 
@@ -46,19 +51,22 @@ blitz::Array<double,1> const &elevmaskI)
     SparseSetT dimI;
     std::unique_ptr<RegridMatrices_Dynamic> rmO(
         gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
-   std::unique_ptr<ibmisc::linear::Weighted_Eigen> OvI(
-        rmO->matrix_d("AvI", {&ret.dimO, &dimI}, paramsO));
+    ret.OvI.reset(rmO->matrix_d("AvI", {&ret.dimO, &dimI}, paramsO));
 
 
-    // Construct elevI in dense indexing space
-    blitz::Array<double,1> elevI(dimI.dense_extent());
-    for (size_t iI_d=0; iI_d < dimI.dense_extent(); ++iI_d) {
-        auto iI_s = dimI.to_sparse(iI_d);
-        elevI(iI_d) = elevmaskI(iI_s); //emI.elev(iI_s);
-    }
+//    // Construct elevI in dense indexing space
+//    // TODO: This isn't needed because dimI is never densified
+//    blitz::Array<double,1> elevI(dimI.dense_extent());
+//    for (size_t iI_d=0; iI_d < dimI.dense_extent(); ++iI_d) {
+//        auto iI_s = dimI.to_sparse(iI_d);
+//        elevI(iI_d) = elevmaskI(iI_s); //emI.elev(iI_s);
+//    }
 
-    ret.elev_areaO.reference(OvI->apply(elevI, NaN, false, ret._tmp));    // dense indexing, force_conservation=false
-    ret.wO.reference(OvI->wM);
+    // Dense and sparse are the same for Ice Grid
+
+    // Compute elevO
+    ret.elev_areaO.reference(ret.OvI->apply(elevmaskI, NaN, false, ret._tmp));    // dense indexing, force_conservation=false
+//    ret.wO.reference(OvI->wM);
 
     return ret;
 }
@@ -92,8 +100,8 @@ blitz::Array<double,2> &fgiceOm2,
 blitz::Array<double,2> &zatmoOm2,
 // Not affected by Om; as long as top of ice is maintained even for ocean-rounded cells.
 blitz::Array<double,2> &zicetopO2,
-blitz::Array<double,2> &zland_minO2,
-blitz::Array<double,2> &zland_maxO2,
+blitz::Array<double,2> &zland_minO2,   // OUT only (will get this info from emI_lands)
+blitz::Array<double,2> &zland_maxO2,    // OUT only
 blitz::Array<int16_t,2> &mergemaskOm2,   // OUT only.  Indicates where merging of local into global ice took place.  Only update these gridcells.
 // ------ Local ice sheets to merge in...
 GCMRegridder_Standard *gcmO,    // Multiple IceRegridders
@@ -172,8 +180,8 @@ std::vector<std::string> &errors)
     da_contO = 0.;
     blitz::Array<double,1> da_zatmoO(nO);    // increase in area of continent * elevation [m^3]
     da_zatmoO = 0.;
-    zland_maxO = std::numeric_limits<double>::min();
     zland_minO = std::numeric_limits<double>::max();
+    zland_maxO = std::numeric_limits<double>::min();
 
     RegridParams paramsO_rawA(paramsA);
         paramsO_rawA.scale = true;
@@ -204,7 +212,7 @@ std::vector<std::string> &errors)
 
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
                 auto const iO_s = sheet.dimO.to_sparse(iO_d);
-                da_giceO(iO_s) += sheet.wO(iO_d);
+                da_giceO(iO_s) += sheet.OvI->wM(iO_d);
             }
         }
 
@@ -212,25 +220,32 @@ std::vector<std::string> &errors)
         {GetSheetElevO sheet(get_sheet_elevO(
             gcmO, paramsO_rawA, sheet_index, emI_lands[sheet_index]));
 
+            // ...update ZATMO
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
                 double const elev = sheet.elev_areaO(iO_d);
                 auto iO_s = sheet.dimO.to_sparse(iO_d);
-                da_zatmoO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA->native_area(gcmO->agridA->dim.to_dense(iO_s)); //sheet.wO(iO_d);
+                da_zatmoO(iO_s) += sheet.elev_areaO(iO_d) * gcmO->agridA->native_area(gcmO->agridA->dim.to_dense(iO_s)); //sheet.OvI->wM(iO_d);
+            }
 
-                // ZLAND min and max are only tracked for local ice
-                // (and land) so no need for a da_ variable and then
-                // merging below.
-                zland_minO(iO_s) = std::min(da_zicetopO(iO_s), elev);
-                zland_maxO(iO_s) = std::max(da_zicetopO(iO_s), elev);
+            // ...update ZLAND_MIN / ZLAND_MAX based on OvI
+            for (auto ii(begin(*sheet.OvI->M)); ii != end(*sheet->OvI->M); ++ii) {
+                int const iO_d = ii->index(0);
+                int const iO_s = sheet.dimO->to_sparse(iO_d);
+                // NOTE: Should have iI_d == iI_s
+                int const iI = ii->index(1);
+
+                zland_minO(iO_s) = std::min(zland_minO(iO_s), elevI(iI));
+                zland_maxO(iO_s) = std::max(zland_maxO(iO_s), elevI(iI));
             }
         }
 
+        // Area of continent
         {GetSheetElevO sheet(get_sheet_elevO(
             gcmO, paramsO_correctA, sheet_index, emI_lands[sheet_index]));
 
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
                 auto iO_s = sheet.dimO.to_sparse(iO_d);
-                da_contO(iO_s) += sheet.wO(iO_d);
+                da_contO(iO_s) += sheet.OvI->wM(iO_d);
             }
         }
     }
@@ -313,8 +328,10 @@ std::vector<std::string> &errors)
     // Convert unset zland_min and zland_max to NaN
     for (int iO=0; iO<nO; ++iO) {
         if (!mergemaskOm(iO)) {
-            zland_minO(iO) = NaN;
-            zland_maxO(iO) = NaN;
+//            zland_minO(iO) = NaN;
+//            zland_maxO(iO) = NaN;
+            zland_minO(iO) = 0;
+            zland_maxO(iO) = 0;
         }
     }
 

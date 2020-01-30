@@ -445,16 +445,20 @@ std::string const &topoO_fname)
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
-    auto &zland_minOm(topoo.add("ZLAND_MIN", {
-        "description", "Minimum land/ice topography in this cell",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
-    auto &zland_maxOm(topoo.add("ZLAND_MAX", {
-        "description", "Maximum land/ice topography in this cell",
-        "units", "m",
-        "sources", "ETOPO2 1Qx1",
-    }));
+
+//    // ZLAND_MIN/ZLAND_MAX are not computed for global ice
+//    if (type != BundleOType::MERGEO) {
+        auto &zland_minOm(topoo.add("ZLAND_MIN", {
+            "description", "Minimum land/ice topography in this cell",
+            "units", "m",
+            "sources", "ETOPO2 1Qx1",
+        }));
+        auto &zland_maxOm(topoo.add("ZLAND_MAX", {
+            "description", "Maximum land/ice topography in this cell",
+            "units", "m",
+            "sources", "ETOPO2 1Qx1",
+        }));
+//    }
 
     // Read TOPOO input
     if (topoO_fname != "") {
@@ -628,8 +632,7 @@ blitz::Array<int16_t,3> &underice3)
     // Also set zland_min and zland_max
 
     mergemaskA2 = 0;
-    _RegridMinMax rmm;
-    {
+    {_RegridMinMax rmm;
         rmm.zland_minO.reference(reshape1(zland_minOm2));
         rmm.zland_maxO.reference(reshape1(zland_maxOm2));
         rmm.zland_minA.reference(reshape1(zland_minA2));

@@ -316,6 +316,18 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
         "units", "m",
         "sources", "ETOPO2 1Qx1",
     }));
+    auto &ZLAND_MIN(out.add("ZLAND_MIN", {
+        "description", "Minimum land/ice topography in this cell (not computed)",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    ZLAND_MIN = 0;    // Not used for global ice; but easier to keep the var around anyway
+    auto &ZLAND_MAX(out.add("ZLAND_MAX", {
+        "description", "Maximum land/ice topography in this cell (not computed)",
+        "units", "m",
+        "sources", "ETOPO2 1Qx1",
+    }));
+    ZLAND_MAX = 0;    // Not used for global ice; but easier to keep the var around anyway
     auto &ZSGLO(out.add("ZSGLO", {
         "description", "Lowest Solid Topography",
         "units", "m",
