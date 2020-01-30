@@ -37,10 +37,7 @@ static GetSheetElevO get_sheet_elevO(
 GCMRegridder_Standard *gcmO,
 RegridParams const &paramsO,
 int sheet_index,
-blitz::Array<double,1> const &elevmaskI,
-// --------- INOUT vars
-blitz::Array<double,1> &zland_minO,
-blitz::Array<double,1> &zland_maxO)
+blitz::Array<double,1> const &elevmaskI)
 {
     GetSheetElevO ret;
 
@@ -48,10 +45,10 @@ blitz::Array<double,1> &zland_maxO)
     size_t const nO = gcmO->nA();
 
     // Obtain the OvI matrix
-    SparseSetT dimI;
+    SparseSetT dimI(id_sparse_set<SparseSetT>(nI));    // dimI is same dense and sparse
     std::unique_ptr<RegridMatrices_Dynamic> rmO(
         gcmO->regrid_matrices(sheet_index, elevmaskI, paramsO));
-    ret.OvI.reset(rmO->matrix_d("AvI", {&ret.dimO, &dimI}, paramsO));
+    ret.OvI = rmO->matrix_d("AvI", {&ret.dimO, &dimI}, paramsO);
 
 
 //    // Construct elevI in dense indexing space
@@ -64,7 +61,7 @@ blitz::Array<double,1> &zland_maxO)
 
     // Dense and sparse are the same for Ice Grid
 
-    // Compute elevO
+    // Compute elevO (or elevO * areaO, depending on paramsO.scale)
     ret.elev_areaO.reference(ret.OvI->apply(elevmaskI, NaN, false, ret._tmp));    // dense indexing, force_conservation=false
 //    ret.wO.reference(OvI->wM);
 
@@ -217,8 +214,9 @@ std::vector<std::string> &errors)
         }
 
         // Update from ice+land coverage
-        {GetSheetElevO sheet(get_sheet_elevO(
-            gcmO, paramsO_rawA, sheet_index, emI_lands[sheet_index]));
+        {auto &elevI(emI_lands[sheet_index]);
+        GetSheetElevO sheet(get_sheet_elevO(
+            gcmO, paramsO_rawA, sheet_index, elevI));
 
             // ...update ZATMO
             for (size_t iO_d=0; iO_d < sheet.dimO.dense_extent(); ++iO_d) {
@@ -228,9 +226,9 @@ std::vector<std::string> &errors)
             }
 
             // ...update ZLAND_MIN / ZLAND_MAX based on OvI
-            for (auto ii(begin(*sheet.OvI->M)); ii != end(*sheet->OvI->M); ++ii) {
+            for (auto ii(begin(*sheet.OvI->M)); ii != end(*sheet.OvI->M); ++ii) {
                 int const iO_d = ii->index(0);
-                int const iO_s = sheet.dimO->to_sparse(iO_d);
+                int const iO_s = sheet.dimO.to_sparse(iO_d);
                 // NOTE: Should have iI_d == iI_s
                 int const iI = ii->index(1);
 
@@ -328,10 +326,10 @@ std::vector<std::string> &errors)
     // Convert unset zland_min and zland_max to NaN
     for (int iO=0; iO<nO; ++iO) {
         if (!mergemaskOm(iO)) {
-//            zland_minO(iO) = NaN;
-//            zland_maxO(iO) = NaN;
-            zland_minO(iO) = 0;
-            zland_maxO(iO) = 0;
+            zland_minO(iO) = NaN;
+            zland_maxO(iO) = NaN;
+//            zland_minO(iO) = 0;
+//            zland_maxO(iO) = 0;
         }
     }
 
