@@ -568,11 +568,13 @@ struct _RegridMinMax {
         int const iO = index[1];
 
         // mergemaskA=1 if any of associated mergemaskO is 1
-        if (mergemaskO(iO)) mergemaskA(iA) = 1;
+        if (mergemaskO(iO)) {
+            mergemaskA(iA) = 1;
 
-        // minA = min(all minO)
-        zland_minA(iA) = std::min(zland_minA(iA), zland_minO(iO));
-        zland_maxA(iA) = std::max(zland_maxA(iA), zland_maxO(iO));
+            // minA = min(all minO)
+            zland_minA(iA) = std::min(zland_minA(iA), zland_minO(iO));
+            zland_maxA(iA) = std::max(zland_maxA(iA), zland_maxO(iO));
+        }
     }
 };
 // ------------------------------------------------------------------------
@@ -631,7 +633,11 @@ blitz::Array<int16_t,3> &underice3)
     // Regrid mergemask (mask, not a double)
     // Also set zland_min and zland_max
 
+    // These vars aren't set everywhere in regridding, so they must be
+    // initialized.
     mergemaskA2 = 0;
+    zland_minA2 = std::numeric_limits<double>::max();
+    zland_maxA2 = std::numeric_limits<double>::min();
     {_RegridMinMax rmm;
         rmm.zland_minO.reference(reshape1(zland_minOm2));
         rmm.zland_maxO.reference(reshape1(zland_maxOm2));
@@ -642,6 +648,11 @@ blitz::Array<int16_t,3> &underice3)
 
         hntr_AvO.scaled_regrid_matrix(accum::ref(rmm));
     }
+    for (int j=0; j<hspecA.jm; ++j) {
+    for (int i=0; i<hspecA.im; ++i) {
+        if (zland_minA2(j,i) == std::numeric_limits<double>::max()) zland_minA2(j,i) = NaN;
+        if (zland_maxA2(j,i) == std::numeric_limits<double>::min()) zland_maxA2(j,i) = NaN;
+    }}
     // -------------------------
 
     merge_poles(foceanA2);

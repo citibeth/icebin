@@ -139,11 +139,19 @@ int main(int argc, char **argv)
 
 
     // Read input file, and allocate output arrays, ready to save to output file.
-    auto topoo(topoo_bundle(BundleOType::MAKEA, args.topoo_fname));
+    auto topoo(topoo_bundle(BundleOType::MAKEA, args.topoo_fname));  // Reads from TOPOO file
     TopoABundles topoa(topoo, hspecA, nhc_gcm);
     blitz::Array<int16_t,2> mergemaskOm(hspecO.jm, hspecO.im);
     {NcIO ncio(args.topoo_fname, 'r');
-        ncio_blitz(ncio, mergemaskOm, "MERGEMASK", "short", {});
+        netCDF::NcVar ncvar = ncio.nc->getVar("MERGEMASK");
+        if (ncvar.isNull()) {
+            // MERGEMASK doesn't exist.  This is a TOPOO file without any merging
+            printf("MERGEMASK not found, assuming no merging.\n");
+            mergemaskOm = 0;
+        } else {
+            // MERGEMASK does exist; read it
+            ncio_blitz(ncio, mergemaskOm, "MERGEMASK", "short", {});
+        }
     }
 
 
