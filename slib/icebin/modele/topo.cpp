@@ -739,14 +739,17 @@ blitz::Array<int16_t,3> &underice3)
         for (int i=0; i<hspecA.im; ++i) fhc3(ihc,0,i) = fhc_mean;
     }
 
+printf("nhc_icebin = %d %d\n", nhc_icebin, nhc_local);
     // Set EC levels and EC halos (ghost ECs)
     for (int j=0; j<hspecA.jm; ++j) {
     for (int i=0; i<hspecA.im; ++i) {
-        int minhc=std::numeric_limits<int>::max();
-        int maxhc=std::numeric_limits<int>::min();
+        const int minhc0 = std::numeric_limits<int>::max();
+        const int maxhc0 = std::numeric_limits<int>::min();
+        int minhc = minhc0;
+        int maxhc = maxhc0;
         int zland_minhc=std::numeric_limits<int>::max();
         int zland_maxhc=std::numeric_limits<int>::min();
-        for (int ihc=0; ihc<nhc_icebin; ++ihc) {
+        for (int ihc=0; ihc<nhc_local; ++ihc) {
             // Set elevE everywhere.  This is required by ModelE
             // See downscale_temperature_li(), which doesn't
             // look at fhc.
@@ -764,30 +767,66 @@ blitz::Array<int16_t,3> &underice3)
             }
         }
 
-        // Make ghost points on cells that MIGHT have ice someday,
-        // because they are intersected by a local ice grid.
-        if (mergemaskA2(j,i)) {
+        // Only put ghost points on grid cells containing land.
+        // Ghost points over pure ocean will cause:
+        //      >>  PBL: Ts out of range  <<
+        // in ModelE:PBL_DRV.f
+        if (std::abs(foceanA2(j,i) - 1.0) > 1.e-14) {
+            int minghost = std::max(0, zland_minhc-1);
+            int maxghost = std::min(zland_maxhc+2, nhc_local-1);
 
-            int minghost, maxghost;
-//            if (maxhc < 0) {
-                // If the gridcell has no ice in it, set up ghost points at
-                // elevations that MIGHT see ice.  (Assume Z interpolation in
-                // IceBin).
-                minghost = std::max(0, zland_minhc-1);
-                maxghost = std::min(zland_maxhc+2, nhc_local-1);
-//            } else {
-//                minghost = std::max(0,minhc-2);
-//                maxghost = std::min(maxhc+2,nhc_local-1);
-//            }
+if (!std::isnan(zland_minA2(j,i))) printf("minmax %d,%d (%f %f) (%d %d) (%d %d)\n", j,i, zland_minA2(j,i), zland_maxA2(j,i), zland_minhc, zland_maxhc, minghost, maxghost);
 
-            for (int ihc=minghost; ihc<=maxghost; ++ihc) {
-                if (fhc3(ihc,j,i)==0) {
-                    fhc3(ihc,j,i) = 1.e-30;
-                    underice3(ihc,j,i) = UI_VGHOST;
-                }
-            }
+             for (int ihc=minghost; ihc<=maxghost; ++ihc) {
+                 if (fhc3(ihc,j,i)==0) {
+                     fhc3(ihc,j,i) = 1.e-30;
+                     underice3(ihc,j,i) = UI_VGHOST;
+                 }
+             }
         }
-    }}
+
+        // Set elevE for global ice
+        for (int ihc=nhc_local; ihc<nhc_icebin; ++ihc) {
+            elevE3(ihc,j,i) = hcdefs[ihc];
+        }
+
+
+// #if 0
+//         // If this cell has no ice, set minhc and maxhc based on
+//         // ei_land
+//         if (minhc == minhc0 && !std::isnan(zland_minA2(j,i))) {
+//                 minghost = std::max(0, zland_minhc-1);
+//                 maxghost = std::min(zland_maxhc+2, nhc_local-1);
+// 
+// 
+//         }
+// 
+// 
+//         // Make ghost points on cells that MIGHT have ice someday,
+//         // because they are intersected by a local ice grid.
+// #endif
+// //        if (mergemaskA2(j,i)) {
+// 
+//             int minghost, maxghost;
+// //            if (maxhc < 0) {
+//                 // If the gridcell has no ice in it, set up ghost points at
+//                 // elevations that MIGHT see ice.  (Assume Z interpolation in
+//                 // IceBin).
+//                 minghost = std::max(0, zland_minhc-1);
+//                 maxghost = std::min(zland_maxhc+2, nhc_local-1);
+// //            } else {
+// //                minghost = std::max(0,minhc-2);
+// //                maxghost = std::min(maxhc+2,nhc_local-1);
+// //            }
+// 
+//             for (int ihc=minghost; ihc<=maxghost; ++ihc) {
+//                 if (fhc3(ihc,j,i)==0) {
+//                     fhc3(ihc,j,i) = 1.e-30;
+//                     underice3(ihc,j,i) = UI_VGHOST;
+//                 }
+//             }
+// //        }
+     }}
 
 
     // ------------ Segment 1: land part of sealand
@@ -797,9 +836,13 @@ blitz::Array<int16_t,3> &underice3)
     for (int i=0; i<hspecA.im; ++i) {
         if (fgiceA2(j,i) > 0) {
             fhc3(ec_base, j,i) = (fgiceA2(j,i) == 0 ? 0 : 1e-30);
-            elevE3(ec_base, j,i) = zicetopA2(j,i);
             underice3(ec_base, j,i) = UI_SEALAND;
         }
+
+        // elevE must be non-NaN everywhere, because ModelE
+        // downscales temperature everywhere, for all ECs
+        // See SURFACE_LANDICE.F90:downscale_temperature_li()
+        elevE3(ec_base, j,i) = zatmoA2(j,i);
     }}
 
     // ==================================================
