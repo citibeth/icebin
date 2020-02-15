@@ -175,6 +175,9 @@ public:
         blitz::Array<double,2> &ice_ovalsI,
         bool run_ice) = 0;
 
+    /** Read/write state for researt file */
+    virtual void write_rsf(std::string const &fname) = 0;
+
 };      // class IceCoupler
 // =========================================================
 

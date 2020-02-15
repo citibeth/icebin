@@ -168,6 +168,9 @@ public:
         blitz::Array<double,2> &ice_ovalsI,    // ice_ovalsI(nI, nvar)
         bool run_ice);    // Should we run the ice model?
 
+    /** Read/write state for restart file */
+    virtual void write_rsf(std::string const &fname);
+
 protected:
 
     /** Copies PISM->Icebin output variables from PISM variables to

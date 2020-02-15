@@ -518,6 +518,13 @@ void IceCoupler_PISM::run_timestep(double time_s,
     printf("END IceCoupler_PISM::run_timestep()\n");
 }
 
+/** Write state for restart file */
+void IceCoupler_PISM::write_rsf(std::string const &fname)
+{
+    pism_ice_model->dumpToFile(fname);
+}
+
+
 /** Copies PISM->Icebin output variables from PISM variables to
 the Icebin-supplied variables (on the root node).
 @param mask Only do it for variables where (flags & mask) == mask.  Set to 0 for "all." */

@@ -447,15 +447,34 @@ char const *long_name_f, int long_name_len)
 // ===========================================================
 // Called from LISheetIceBin::io_rsf()   (warm starts)
 
+static std::string remove_extension(const std::string& filename) {
+    size_t lastdot = filename.find_last_of(".");
+    if (lastdot == std::string::npos) return filename;
+    return filename.substr(0, lastdot); 
+}
+
 extern "C"
-void gcmce_io_rsf(GCMCoupler_ModelE *self,
-    char *fname_c, int fname_n)
+void gcmce_write_rsf(GCMCoupler_ModelE *self,
+    char *modele_fname_c, int modele_fname_n)
 {
-    std::string fname(fname_c, fname_n);
-    // TODO: Get ice model to save/restore state
-    // We must figure out how to get an appropriate filename
-    // Must also save/restore state of self->modele_inputs (somewhere; here or in Fortran code)
-    if (self->am_i_root()) {
+    // if (!self.am_i_root()) return;
+
+
+    // modele_fname is filename of main ModelE restart file
+    // We must modify it to produce name(s) of PISM restart file(s)
+    // (one per ice sheet)
+    std::string modele_fname(modele_fname_c, modele_fname_n);
+    std::string modele_root(remove_extension(modele_fname));
+
+    // Save each PISM state...
+    for (size_t sheetix=0; sheetix < self->ice_couplers.size(); ++sheetix) {
+        auto &ice_coupler(self->ice_couplers[sheetix]);
+
+        // Derive name for per-ice sheet PISM restart file
+        std::string fname(strprintf("%s-%s.nc",
+            modele_root.c_str(), ice_coupler->name().c_str()));
+
+        ice_coupler->write_rsf(fname);
     }
 }
 
