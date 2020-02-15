@@ -459,12 +459,12 @@ void gcmce_write_rsf(GCMCoupler_ModelE *self,
 {
     // if (!self.am_i_root()) return;
 
-
     // modele_fname is filename of main ModelE restart file
     // We must modify it to produce name(s) of PISM restart file(s)
     // (one per ice sheet)
     std::string modele_fname(modele_fname_c, modele_fname_n);
-    std::string modele_root(remove_extension(modele_fname));
+    std::string modele_root(modele_fname);    // Already no .nc
+    // std::string modele_root(remove_extension(modele_fname));
 
     // Save each PISM state...
     for (size_t sheetix=0; sheetix < self->ice_couplers.size(); ++sheetix) {
