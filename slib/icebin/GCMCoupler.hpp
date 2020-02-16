@@ -217,7 +217,7 @@ public:
     virtual ~GCMCoupler() {}
 
     /** Create parmaeters for instantion of IceCoupler */
-    virtual IceCoupler::Params make_ice_coupler_params(std::string const &sheet_name)
+    virtual IceCoupler::Params make_ice_coupler_params(std::string const &sheet_name) const
     {
         IceCoupler::Params params;
         return params;

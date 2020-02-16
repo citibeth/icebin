@@ -34,7 +34,7 @@ public:
     );
     const IceCoupler::Type type;
 
-    class Params {
+    struct Params {
         /** Name of per-ice-sheet restart file, if starting from
         anything other than the default start configuration. */
         std::string rsf_fname;
@@ -106,7 +106,7 @@ public:
     //     GCMCoupler_ModelE: gcmce_new()
     //     GCMCoupler::ncread()
     //     IceCoupler.cpp: new_ice_coupler()
-    IceCoupler(IceCoupler::Type _type);
+    IceCoupler(IceCoupler::Type _type, IceCoupler::Params const &_params);
 
     /** (1) Initialize any grid information, etc. from the IceSheet struct.
     @param vname_base Construct variable name from this, out of which to pull parameters from netCDF

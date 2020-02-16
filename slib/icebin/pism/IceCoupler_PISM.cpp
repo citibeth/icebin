@@ -47,7 +47,7 @@ namespace gpism {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-IceCoupler_PISM::IceCoupler_PISM(IceCoupler::Parmas const &_params)
+IceCoupler_PISM::IceCoupler_PISM(IceCoupler::Params const &_params)
     : IceCoupler(IceCoupler::Type::PISM, params),
     write_pism_inputs(true)
 {
@@ -149,7 +149,7 @@ public:
 ArgcArgv::ArgcArgv(std::vector<std::string> const &args)
 {
     argc = (int)args.size();
-    _argv.reserve(args.size())
+    _argv.reserve(args.size());
 
     // Determine total number of characters needed
     size_t nchar = 0;
@@ -159,9 +159,9 @@ ArgcArgv::ArgcArgv(std::vector<std::string> const &args)
     // Concatenate all strings into single string with null separators
     for (int i=0; i<argc; ++i) {
         _argv.push_back(&_all_str[_all_str.size()]);
-        std::string &arg(args[i]);
-        for (unsigned int j=0; j<arg.size(); ++j) all_str.push_back(arg[j]);
-        all_str.push_back('\0');
+        std::string const &arg(args[i]);
+        for (unsigned int j=0; j<arg.size(); ++j) _all_str.push_back(arg[j]);
+        _all_str.push_back('\0');
     }
     argv = &_argv[0];
 

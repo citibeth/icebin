@@ -98,7 +98,7 @@ static void _reconstruct_ice_ivalsI(
     blitz::Array<double,2> &ice_ivalsI,
     double dt) {}
 
-IceCoupler::IceCoupler(IceCoupler::Type _type, IceCoupler::Params _params) :
+IceCoupler::IceCoupler(IceCoupler::Type _type, IceCoupler::Params const &_params) :
     type(_type), params(_params),
     reconstruct_ice_ivalsI(std::bind(
         &_reconstruct_ice_ivalsI, std::placeholders::_1, std::placeholders::_2))

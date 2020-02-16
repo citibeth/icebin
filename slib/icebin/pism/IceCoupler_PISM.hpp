@@ -61,12 +61,12 @@ class PISMArgs {
 
 public:
     // Initialize from IceBin config file
-    void ncread(NcVar const &pism_var);
+    void ncread(netCDF::NcVar const &pism_var);
 
     /** Construct a PISM command line
     @param overrides Override parameters read from config file */
     std::vector<std::string> cmd_line(
-        std::map<std::string, std::string> const &overrides)
+        std::map<std::string, std::string> const &overrides);
 };
 
 class IceCoupler_PISM : public IceCoupler
@@ -145,7 +145,7 @@ public:
        GCMCoupler::ncread()
        IceCoupler.cpp: new_ice_coupler()
     */
-    IceCoupler_PISM(IceCoupler::Parmas const &_params);
+    IceCoupler_PISM(IceCoupler::Params const &_params);
 
     virtual ~IceCoupler_PISM()
         { deallocate(); }

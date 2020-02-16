@@ -193,7 +193,7 @@ static std::string sheet_rsf(
 }
 // -----------------------------------------------------
 IceCoupler::Params GCMCoupler_ModelE::make_ice_coupler_params(
-    std::string const &sheet_name)
+    std::string const &sheet_name) const
 {
     IceCoupler::Params params;
 
@@ -225,11 +225,9 @@ IceCoupler::Params GCMCoupler_ModelE::make_ice_coupler_params(
     // (expected for AIC and fort.4.nc)
     if (boost::filesystem::is_symlink(gcm_rsf))
         gcm_rsf = boost::filesystem::read_symlink(gcm_rsf);
-    }
 
     // Determine ice sheet restart filename
-    params.rsf_fname = strprintf("%s-%s.nc",
-        remove_extension(gcm_rsf.string())
+    params.rsf_fname = strprintf("%s-%s.nc", remove_extension(gcm_rsf.string()).c_str());
 end_rsf:
     // -----------------------
 
@@ -293,8 +291,7 @@ printf("BEGIN gcmce_new()\n");
     std::unique_ptr<GCMCoupler_ModelE> self(
         new GCMCoupler_ModelE(GCMParams(MPI_Comm_f2c(comm_f), root)));
 
-    ModelEParams *&rdparams(self->rdparams);
-    rdparams = &_rdparams;
+    self->rdparams = &_rdparams;
     GCMParams &gcm_params(self->gcm_params);
 
     // Domains and indexing are alphabetical indexes, zero-based, open ranges
