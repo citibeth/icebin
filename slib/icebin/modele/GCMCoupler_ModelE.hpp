@@ -48,10 +48,12 @@ BOOST_ENUM_VALUES( ModelE_CouplingType, int,
 static int const MAX_CHAR_LEN = 128;    // From Dictionary_mod.F90
 struct ModelEParams
 {
+    integer :: istart;
+
 //    char icebin_segments[MAX_CHAR_LEN];
 //    char ice_coupler_type[MAX_CHAR_LEN];    // DISMAL,PISM
 //    double dtsrc;
-    int dummy;    // Avoid zero-size struct
+//    int dummy;    // Avoid zero-size struct
 };
 // ---------------------------------------------
 
@@ -105,7 +107,7 @@ class GCMCoupler_ModelE : public GCMCoupler
 {
 public:
     double dtsrc;
-    ModelEParams rdparams;    // Params straight from the rundeck (came during init)
+    ModelEParams *rdparams;    // Params straight from the rundeck (came during init; memory is from Fortran structure)
 
     /** On root: separate global stuff back into individual domains.
     Works for A and E grids. */
@@ -164,6 +166,12 @@ public:
     // Called from LISnow::allocate()
     GCMCoupler_ModelE(GCMParams &&_params);
 
+    /** Determine (for example) name of per-ice-sheet restart file,
+    based on GCM restart file */
+    IceCoupler::Params make_ice_coupler_params(
+        std::string const &sheet_name);
+
+
     /** @param am_i_root
         Call with true if calling from MPI root; false otherwise.
         The core coupling/regridding computation only runs on root.
@@ -213,7 +221,7 @@ public:
 
 extern "C"
 GCMCoupler_ModelE *gcmce_new(
-    ModelEParams const &_rdparams,
+    ModelEParams &_rdparams,
 
     // Info about the global grid
     int im, int jm,

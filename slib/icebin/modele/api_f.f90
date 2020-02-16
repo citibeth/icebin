@@ -32,7 +32,9 @@ type, bind(c) :: ModelEParams_t
 !    character(MAX_CHAR_LEN, kind=c_char) :: icebin_segments = 'legacy,sealand,ec'
 !    real(c_double) :: dtsrc
 !    integer(c_int) :: yeari
-    integer(c_int) :: dummy
+!    integer(c_int) :: dummy
+
+    integer :: istart
 end type ModelEParams_t
 
 

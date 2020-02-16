@@ -216,6 +216,13 @@ public:
     GCMCoupler(Type _type, GCMParams &&_params);
     virtual ~GCMCoupler() {}
 
+    /** Create parmaeters for instantion of IceCoupler */
+    virtual IceCoupler::Params make_ice_coupler_params(std::string const &sheet_name)
+    {
+        IceCoupler::Params params;
+        return params;
+    }
+
     /** Produces a date string in format YYMMDD */
     std::string sdate(double time_s) const;
 

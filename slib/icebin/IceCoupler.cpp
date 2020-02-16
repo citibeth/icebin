@@ -44,7 +44,8 @@ namespace icebin {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
+std::unique_ptr<IceCoupler> new_ice_coupler(
+    NcIO &ncio,
     std::string const &vname, std::string const &sheet_name,
     GCMCoupler const *_gcm_coupler)
 {
@@ -54,6 +55,7 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
     IceCoupler::Type type;
     get_or_put_att_enum(info_v, ncio.rw, "ice_coupler", type);
 
+    IceCoupler::Params params(_gcm_coupler->make_ice_coupler_params(sheet_name));
     std::unique_ptr<IceCoupler> self;
     switch(type.index()) {
 #if 0
@@ -63,7 +65,7 @@ std::unique_ptr<IceCoupler> new_ice_coupler(NcIO &ncio,
 #endif
 #ifdef USE_PISM
         case IceCoupler::Type::PISM :
-            self.reset(new gpism::IceCoupler_PISM);
+            self.reset(new gpism::IceCoupler_PISM(params));
         break;
 #endif
         default :
@@ -96,8 +98,8 @@ static void _reconstruct_ice_ivalsI(
     blitz::Array<double,2> &ice_ivalsI,
     double dt) {}
 
-IceCoupler::IceCoupler(IceCoupler::Type _type) :
-    type(_type),
+IceCoupler::IceCoupler(IceCoupler::Type _type, IceCoupler::Params _params) :
+    type(_type), params(_params),
     reconstruct_ice_ivalsI(std::bind(
         &_reconstruct_ice_ivalsI, std::placeholders::_1, std::placeholders::_2))
     {}

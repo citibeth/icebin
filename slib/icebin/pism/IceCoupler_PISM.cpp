@@ -47,27 +47,11 @@ namespace gpism {
 
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
-IceCoupler_PISM::IceCoupler_PISM()
-    : IceCoupler(IceCoupler::Type::PISM),
+IceCoupler_PISM::IceCoupler_PISM(IceCoupler::Parmas const &_params)
+    : IceCoupler(IceCoupler::Type::PISM, params),
     write_pism_inputs(true)
 {
 }
-
-#if 0
-// PISM command line arguments that are paths, and thus need pathname
-// resolution.
-// For PISM stable0.5 branch
-// static std::set<std::string> path_args = {"config_override", "i", "o", "surface_given_file", "extra_file", "ts_file"};
-// For dev branch
-static std::map<std::string, std::string> path_args = {
-    {"i", "i"},
-    {"surface_given_file", "i"},
-    {"ocean_kill", "i"},
-    {"ocean_kill_file", "i"},
-    {"o", "o"},
-    {"extra_file", "o"},
-    {"ts_file", "o"}};
-#endif
 
 void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet)
 {
@@ -80,17 +64,36 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname
         dynamic_cast<GridSpec_XY const *>(&*agridI().spec)
         : NULL;
 
-    // General args passed to the ice sheet, regardless of which ice model is being used
+    // General args passed to the ice sheet, regardless of which ice
+    // model is being used
     NcVar info_var(ncio_config.nc->getVar(vname_sheet + ".info"));
-    // PISM parameters, passed to PISM via argv
-    NcVar pism_var(ncio_config.nc->getVar(vname_sheet + ".pism"));
-
-    // Get simple arguments
     get_or_put_att(info_var, 'r', "update_elevation", &update_elevation, 1);
     get_or_put_att(info_var, 'r', "output_dir", output_dir);
 
+    // PISM parameters, passed to PISM via command line
+    NcVar pism_var(ncio_config.nc->getVar(vname_sheet + ".pism"));
+    pism_args.ncread(pism_var);
+
+    printf("END IceCoupler_PISM::ncread()\n");
+}
+// ======================================================================
+void PISMArgs::ncread(NcVar const &pism_var)
+{
     // Create arguments from PISM configuration
-    pism_args.push_back("icebin_pism");
+    cmd0.push_back("icebin_pism");
+
+#if 0
+    // Hard-code these variables because we will always need them
+    cmd0.push_back("-extra_vars");
+    cmd0.push_back("climatic_mass_balance_cumulative,nonneg_flux_cumulative,grounded_basal_flux_cumulative,floating_basal_flux_cumulative,flux_divergence");
+#endif
+
+#if PETSC_VERSION_LT(3,7,0)
+    printf("Doing -no_signal_handler on command line\n");
+    // cmd0.push_back("-no_signal_handler");  // alternate way to do the same thing
+    cmd0.push_back("-signal_handler");
+    cmd0.push_back("off");
+#endif
 
     // Get arguments from IceBin configuration
     std::map<std::string, NcVarAtt> pism_atts(pism_var.getAtts());
@@ -100,16 +103,73 @@ void IceCoupler_PISM::ncread(ibmisc::NcIO &ncio_config, std::string const &vname
         std::string val;
         att.getValues(val);
 
-        pism_args.push_back("-" + name);
-        pism_args.push_back(val);
+        configs.push_back(std::make_pair(name, val));
     }
+}
 
-#if 0
-    // Hard-code these variables because we will always need them
-    pism_args.push_back("-extra_vars");
-    pism_args.push_back("climatic_mass_balance_cumulative,nonneg_flux_cumulative,grounded_basal_flux_cumulative,floating_basal_flux_cumulative,flux_divergence");
-#endif
-    printf("END IceCoupler_PISM::ncread()\n");
+//void PISMArgs::get_args(int &argc, char &**argv)
+std::vector<std::string> PISMArgs::cmd_line(
+    std::map<std::string, std::string> const &overrides)
+{
+    // Start with basic command line
+    std::vector<std::string> cmd = cmd0;
+
+    // Add in arguments from configs
+    // Use overrides as necessary
+    for (auto &xx : configs) {
+        auto &name(xx.first);
+        auto &val(xx.second);
+
+        // Override arguments read out of the config file
+        // This is used to override -i (PISM input file) on restarts
+        cmd.push_back("-" + name);
+        auto ii(overrides.find(name));
+        if (ii != overrides.end()) {
+            cmd.push_back(ii->second);
+        } else {
+            cmd.push_back(val);
+        }
+    }
+}
+
+// ================================================================
+// TODO: Move this to ibmisc
+
+/** Convert a command line to a C-style argc/argv */
+class ArgcArgv {
+    std::vector<char> _all_str;
+    std::vector<char *> _argv;
+public:
+    int argc;
+    char **argv;
+
+    ArgcArgv(std::vector<std::string> const &args);
+};
+
+ArgcArgv::ArgcArgv(std::vector<std::string> const &args)
+{
+    argc = (int)args.size();
+    _argv.reserve(args.size())
+
+    // Determine total number of characters needed
+    size_t nchar = 0;
+    for (auto &arg : args) nchar += (arg.size() + 1);
+    _all_str.reserve(nchar);
+
+    // Concatenate all strings into single string with null separators
+    for (int i=0; i<argc; ++i) {
+        _argv.push_back(&_all_str[_all_str.size()]);
+        std::string &arg(args[i]);
+        for (unsigned int j=0; j<arg.size(); ++j) all_str.push_back(arg[j]);
+        all_str.push_back('\0');
+    }
+    argv = &_argv[0];
+
+printf("*** PISM Args:");
+for (int i=0; i<argc; ++i) {
+    printf(" %s", argv[i]);
+}
+printf("\n");
 }
 // ======================================================================
 void IceCoupler_PISM::_cold_start(
@@ -118,38 +178,10 @@ void IceCoupler_PISM::_cold_start(
 {
     printf("BEGIN IceCouple_PISM::_cold_start()\n");
 
-#if PETSC_VERSION_LT(3,7,0)
-    printf("Doing -no_signal_handler on command line\n");
-    // pism_args.push_back("-no_signal_handler");  // alternate way to do the same thing
-    pism_args.push_back("-signal_handler");
-    pism_args.push_back("off");
-#endif
-
-
-    // ------- Now instantiate PISM!
-    // Convert PISM arguments to old C style
-    int argc = pism_args.size();
-    char *argv_array[argc];
-    std::vector<char> all_str;
-    for (int i=0; i<argc; ++i) {
-        std::string &arg = pism_args[i];
-        for (unsigned int j=0; j<arg.size(); ++j) all_str.push_back(arg[j]);
-        all_str.push_back('\0');
-    }
-    char *pos = &all_str[0];
-    for (int i=0; i<argc; ++i) {
-        std::string &arg = pism_args[i];
-        argv_array[i] = pos;
-        pos +=arg.size() + 1;
-    }
-    char **argv = argv_array;
-
-printf("*** PISM Args:");
-for (int i=0; i<argc; ++i) {
-    printf(" %s", argv[i]);
-}
-printf("\n");
-
+    // Overrides for PISM command line
+    std::map<std::string, std::string> overrides;
+    overrides.insert(make_pair("i", params.rsf_fname));
+    ArgcArgv args(pism_args.cmd_line(overrides));
 
     // Set up communicator for PISM to use
     // Use same group of processes.
@@ -203,7 +235,8 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
     PetscOptionsSetValue(NULL, "-no_signal_handler", "true");
 #endif
 
-    petsc_initializer.reset(new pism::petsc::Initializer(argc, argv, "IceBin GCM Coupler"));
+    petsc_initializer.reset(new pism::petsc::Initializer(
+        args.argc, args.argv, "IceBin GCM Coupler"));
     // ------------------------------------
 
     // verbosityLevelFromOptions();    // https://github.com/pism/pism/commit/3c75fd63

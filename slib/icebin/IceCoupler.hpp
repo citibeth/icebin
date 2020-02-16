@@ -34,6 +34,13 @@ public:
     );
     const IceCoupler::Type type;
 
+    class Params {
+        /** Name of per-ice-sheet restart file, if starting from
+        anything other than the default start configuration. */
+        std::string rsf_fname;
+    };
+    Params const params;
+
     /** Ordered specification of the variables (w/ units)
     to be passed IceBin->IceCoupler and IceCoupler->IceBin */
     enum IO {INPUT, OUTPUT, count};

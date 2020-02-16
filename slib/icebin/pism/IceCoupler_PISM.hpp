@@ -51,6 +51,23 @@ namespace gpism {
 
 // =================================================
 
+/** Class constructs PISM command lines */
+class PISMArgs {
+    // Basic command line
+    std::vector<std::string> cmd0;
+
+    // Name/value pairs picked up from the confg file
+    std::vector<std::pair<std::string, std::string>> configs;
+
+public:
+    // Initialize from IceBin config file
+    void ncread(NcVar const &pism_var);
+
+    /** Construct a PISM command line
+    @param overrides Override parameters read from config file */
+    std::vector<std::string> cmd_line(
+        std::map<std::string, std::string> const &overrides)
+};
 
 class IceCoupler_PISM : public IceCoupler
 {
@@ -65,8 +82,8 @@ public:
     bool am_i_root() const { return _pism_rank == 0; }
 
 private:
-    /** Arguments to be passed to PISM at PISM initialization */
-    std::vector<std::string> pism_args;
+    /** Construct PISM command line */
+    PISMArgs pism_args;
 
     /** Should we write inputs to PISM via PISM's dump() functionality?
     This is (almost certainly) supercede by the IceCoupler_Writer class,
@@ -128,7 +145,7 @@ public:
        GCMCoupler::ncread()
        IceCoupler.cpp: new_ice_coupler()
     */
-    IceCoupler_PISM();
+    IceCoupler_PISM(IceCoupler::Parmas const &_params);
 
     virtual ~IceCoupler_PISM()
         { deallocate(); }

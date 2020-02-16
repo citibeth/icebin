@@ -176,6 +176,66 @@ GCMCoupler_ModelE::GCMCoupler_ModelE(GCMParams &&_params) :
     }
 }
 // -----------------------------------------------------
+static std::string remove_extension(const std::string& filename) {
+    size_t lastdot = filename.find_last_of(".");
+    if (lastdot == std::string::npos) return filename;
+    return filename.substr(0, lastdot); 
+}
+
+/** Returns the name of an ice sheet restart file, based on the (root
+of) the GM restart file, i.e. sans .nc extension */
+static std::string sheet_rsf(
+    std::string const &gcm_rsf_root,
+    std::string const &sheet_name)
+{
+    return strprintf("%s-%s.nc",
+        gcm_rsf_root.c_str(), sheet_name.c_str());
+}
+// -----------------------------------------------------
+IceCoupler::Params GCMCoupler_ModelE::make_ice_coupler_params(
+    std::string const &sheet_name)
+{
+    IceCoupler::Params params;
+
+    // -----------------------
+    // Determine name of the restart file used by ModelE
+    // See MODELE.f for ISTART parameter meanings
+    boost::filesystem::path gcm_rsf;
+    switch (rdparams->istart) {
+        case 2:    // observed start (cold start); no restart file
+            params.rsf_fname = "";
+            goto end_rsf;   // Done!
+        case 8:
+            gcm_rsf = "AIC";
+            break;
+        case 11:    // Restart from checkpoint file
+            gcm_rsf = "fort.1.nc";
+            break;
+        case 12:    // Restart from checkpoint file
+            gcm_rsf = "fort.2.nc";
+            break;
+        case 14:    // Restart from checkpoint file
+            gcm_rsf = "fort.4.nc";
+            break;
+        default:
+            (*icebin_error)(-1, "Unsupported ISTART value: %d", rdparams->istart);
+    }
+
+    // Follow the symlink
+    // (expected for AIC and fort.4.nc)
+    if (boost::filesystem::is_symlink(gcm_rsf))
+        gcm_rsf = boost::filesystem::read_symlink(gcm_rsf);
+    }
+
+    // Determine ice sheet restart filename
+    params.rsf_fname = strprintf("%s-%s.nc",
+        remove_extension(gcm_rsf.string())
+end_rsf:
+    // -----------------------
+
+    return params;
+}
+// -----------------------------------------------------
 void GCMCoupler_ModelE::_ncread(
     ibmisc::NcIO &ncio_config,
     std::string const &vname)        // comes from this->gcm_params
@@ -233,8 +293,8 @@ printf("BEGIN gcmce_new()\n");
     std::unique_ptr<GCMCoupler_ModelE> self(
         new GCMCoupler_ModelE(GCMParams(MPI_Comm_f2c(comm_f), root)));
 
-    ModelEParams &rdparams(self->rdparams);
-    rdparams = _rdparams;
+    ModelEParams *&rdparams(self->rdparams);
+    rdparams = &_rdparams;
     GCMParams &gcm_params(self->gcm_params);
 
     // Domains and indexing are alphabetical indexes, zero-based, open ranges
@@ -447,12 +507,6 @@ char const *long_name_f, int long_name_len)
 // ===========================================================
 // Called from LISheetIceBin::io_rsf()   (warm starts)
 
-static std::string remove_extension(const std::string& filename) {
-    size_t lastdot = filename.find_last_of(".");
-    if (lastdot == std::string::npos) return filename;
-    return filename.substr(0, lastdot); 
-}
-
 extern "C"
 void gcmce_write_rsf(GCMCoupler_ModelE *self,
     char *modele_fname_c, int modele_fname_n)
@@ -471,10 +525,8 @@ void gcmce_write_rsf(GCMCoupler_ModelE *self,
         auto &ice_coupler(self->ice_couplers[sheetix]);
 
         // Derive name for per-ice sheet PISM restart file
-        std::string fname(strprintf("%s-%s.nc",
-            modele_root.c_str(), ice_coupler->name().c_str()));
-
-        ice_coupler->write_rsf(fname);
+        ice_coupler->write_rsf(sheet_rsf(
+            modele_root, ice_coupler->name()));
     }
 }
 
