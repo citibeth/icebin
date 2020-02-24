@@ -132,7 +132,7 @@ void IceCoupler::cold_start(
     }
 
     // Subclass-specific cold start
-    _cold_start(time_base, time_start_s);
+    _cold_start(cold_start, time_base, time_start_s);
 
     // Allocate
     ice_ovalsI.reference(blitz::Array<double,2>(contract[OUTPUT].size(), nI()));

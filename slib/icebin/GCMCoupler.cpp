@@ -167,6 +167,7 @@ void GCMCoupler::_ncread(
 
 
 void GCMCoupler::cold_start(
+    bool cold_start,
     ibmisc::Datetime _time_base,
     double _time_start_s)
 {
@@ -183,7 +184,7 @@ void GCMCoupler::cold_start(
 //        contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
 
         // Dynamic ice model is instantiated here...
-        ice_coupler->cold_start(time_base, time_start_s);
+        ice_coupler->cold_start(cold_start, time_base, time_start_s);
         ice_coupler->print_contracts();
     }
 

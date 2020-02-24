@@ -168,6 +168,7 @@ public:
              <this>
          [calls IceCoupler::cold_start()] */
     virtual void _cold_start(
+        bool cold_start,
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
