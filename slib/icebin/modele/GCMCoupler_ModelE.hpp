@@ -303,7 +303,7 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
     char *fname_c, int fname_n);
 
 extern "C"
-void gcmce_cold_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc);
+void gcmce_model_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc);
 
 extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,

@@ -138,7 +138,7 @@ public:
     );
     Type const type;
 
-    // ------- Set in GCMCoupler::cold_start()
+    // ------- Set in GCMCoupler::model_start()
     ibmisc::Datetime time_base;    // yy,mm,dd,hh,mm,ss
     ibmisc::TimeUnit time_unit;    // Equiv. to CF-compliant time unit string
     double time_start_s;        // Start of simulation, as far as ice model is concerned (seconds since time_base).
@@ -255,8 +255,8 @@ public:
         std::string const &sheet_name,        // eg: greenland
         std::string const &file_name) = 0;        // eg: pism_Greenland_5km_v1.1.nc
 
-    /** Private; called from gcmce_cold_start() */
-    void cold_start(
+    /** Private; called from gcmce_model_start() */
+    void model_start(
         bool cold_start,    // Is this a cold or warm start?
         ibmisc::Datetime _time_base,
         double time_start_s);

@@ -115,7 +115,7 @@ void IceCoupler::ncread(ibmisc::NcIO &ncio_config, std::string const &vname_shee
 IceCoupler::~IceCoupler() {}
 
 // ==============================================================
-void IceCoupler::cold_start(
+void IceCoupler::model_start(
     bool cold_start,
     ibmisc::Datetime const &time_base,
     double time_start_s)
@@ -132,7 +132,7 @@ void IceCoupler::cold_start(
     }
 
     // Subclass-specific cold start
-    _cold_start(cold_start, time_base, time_start_s);
+    _model_start(cold_start, time_base, time_start_s);
 
     // Allocate
     ice_ovalsI.reference(blitz::Array<double,2>(contract[OUTPUT].size(), nI()));

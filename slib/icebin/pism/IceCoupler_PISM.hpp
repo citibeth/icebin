@@ -161,13 +161,13 @@ public:
 
     /* Called by
          LANDICE_DRV.f: init_LI(istart_fixup)
-         lisnow%cold_start()  (if cold start)
-         lisheet%cold_start()  [currently missing...?]
-         gcmce_cold_start()
-         GCMCoupler::cold_start()
+         lisnow%model_start()  (if cold start)
+         lisheet%model_start()  [currently missing...?]
+         gcmce_model_start()
+         GCMCoupler::model_start()
              <this>
-         [calls IceCoupler::cold_start()] */
-    virtual void _cold_start(
+         [calls IceCoupler::model_start()] */
+    virtual void _model_start(
         bool cold_start,
         ibmisc::Datetime const &time_base,
         double time_start_s);
@@ -222,10 +222,10 @@ public:
 
     Called by
         LANDICE_DRV.f: init_LI(istart_fixup)
-        lisnow%cold_start()  (if cold start)
-        lisheet%cold_start()  [currently missing...?]
-        GCMCoupler::cold_start()
-        IceCoupler_PISM::cold_start()
+        lisnow%model_start()  (if cold start)
+        lisheet%model_start()  [currently missing...?]
+        GCMCoupler::model_start()
+        IceCoupler_PISM::model_start()
         contracts/contracts.cpp: contracts::setup()
         contracts/modele_pism.cpp: setup_modele_pism()
     */

@@ -166,12 +166,12 @@ void GCMCoupler::_ncread(
 
 
 
-void GCMCoupler::cold_start(
+void GCMCoupler::model_start(
     bool cold_start,
     ibmisc::Datetime _time_base,
     double _time_start_s)
 {
-    printf("BEGIN GCMCoupler::cold_start() nsheets=%ld\n", ice_couplers.size());
+    printf("BEGIN GCMCoupler::model_start() nsheets=%ld\n", ice_couplers.size());
     time_base = _time_base;
     time_start_s = _time_start_s;
     time_unit = TimeUnit(&cal365, time_base, TimeUnit::SECOND);
@@ -184,11 +184,11 @@ void GCMCoupler::cold_start(
 //        contracts::setup(*this, *ice_coupler);    // where does this go w.r.t ncread() and upate?
 
         // Dynamic ice model is instantiated here...
-        ice_coupler->cold_start(cold_start, time_base, time_start_s);
+        ice_coupler->model_start(cold_start, time_base, time_start_s);
         ice_coupler->print_contracts();
     }
 
-    printf("END GCMCoupler::cold_start()\n");
+    printf("END GCMCoupler::model_start()\n");
 }
 // ------------------------------------------------------------
 

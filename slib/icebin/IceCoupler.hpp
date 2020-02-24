@@ -116,22 +116,22 @@ public:
 
     // ========= Called by
     //     LANDICE_DRV.f: init_LI(istart_fixup)
-    //     lisnow%cold_start()  (if cold start)
-    //     lisheet%cold_start()  [currently missing...?]
-    //     GCMCoupler::cold_start()
+    //     lisnow%model_start()  (if cold start)
+    //     lisheet%model_start()  [currently missing...?]
+    //     GCMCoupler::model_start()
     //         <this>
-    //     [calls IceCoupler::cold_start()]
+    //     [calls IceCoupler::model_start()]
     /** (2) Event handler to let IceCouplers know the start time is (finally) set.
     This method must call where appropriate:
         contracts::setup(*gcm_coupler, *this);
     */
-    void cold_start(
+    void model_start(
         bool cold_start,    // Is this a cold or warm start?
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
-    /** Called by cold_start() */
-    virtual void _cold_start(
+    /** Called by model_start() */
+    virtual void _model_start(
         bool cold_start,    // Is this a cold or warm start?
         ibmisc::Datetime const &time_base,
         double time_start_s) = 0;

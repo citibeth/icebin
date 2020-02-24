@@ -530,19 +530,19 @@ void gcmce_write_rsf(GCMCoupler_ModelE *self,
 
 
 // ===========================================================
-// Called from LISheetIceBin::cold_start()
+// Called from LISheetIceBin::model_start()
 
 extern "C"
-void gcmce_cold_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc)
+void gcmce_model_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc)
 {
-    printf("BEGIN gcmce_cold_start() yeari=%d, itimei=%d, dtsrc=%g\n", yeari, itimei, dtsrc);
+    printf("BEGIN gcmce_model_start() yeari=%d, itimei=%d, dtsrc=%g\n", yeari, itimei, dtsrc);
 
     // This will cold-start initial conditions of the dynamic ice model
     self->dtsrc = dtsrc;
 
-    // Call superclass cold_start()
+    // Call superclass model_start()
     double const time_s = itimei * dtsrc;
-    self->cold_start(cold_start,
+    self->model_start(cold_start,
         ibmisc::Datetime(yeari,1,1), time_s);
 
     // NOTE: Not needed because these things MUST be properly computed
@@ -560,7 +560,7 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int i
             nullptr, nullptr, nullptr);    // !run_ice ==> no E1vE0c to return
     }
 
-    printf("END gcmce_cold_start()\n");
+    printf("END gcmce_model_start()\n");
 }
 
 

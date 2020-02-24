@@ -200,7 +200,7 @@ INTERFACE
         integer :: E1vE0c_nele
     end subroutine
 
-    subroutine gcmce_cold_start(api, cold_start, yeari, itimei, dtsrc) bind(c)
+    subroutine gcmce_model_start(api, cold_start, yeari, itimei, dtsrc) bind(c)
         use iso_c_binding
         type(c_ptr), value :: api
         logical(c_bool), value :: cold_start

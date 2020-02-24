@@ -174,12 +174,12 @@ for (int i=0; i<argc; ++i) {
 printf("\n");
 }
 // ======================================================================
-void IceCoupler_PISM::_cold_start(
+void IceCoupler_PISM::_model_start(
     bool cold_start,
     ibmisc::Datetime const &time_base,
     double time_start_s)
 {
-    printf("BEGIN IceCouple_PISM::_cold_start()\n");
+    printf("BEGIN IceCouple_PISM::_model_start()\n");
 
     // Overrides for PISM command line
     std::map<std::string, std::string> overrides;
@@ -459,7 +459,7 @@ printf("[%d] pism_size = %d\n", pism_rank(), pism_size());
         }
     }
 
-    printf("END IceCoupler_PISM::_cold_start()\n");
+    printf("END IceCoupler_PISM::_model_start()\n");
 }
 
 void IceCoupler_PISM::run_timestep(double time_s,
