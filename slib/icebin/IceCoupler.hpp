@@ -126,11 +126,13 @@ public:
         contracts::setup(*gcm_coupler, *this);
     */
     void cold_start(
+        bool cold_start,    // Is this a cold or warm start?
         ibmisc::Datetime const &time_base,
         double time_start_s);
 
     /** Called by cold_start() */
     virtual void _cold_start(
+        bool cold_start,    // Is this a cold or warm start?
         ibmisc::Datetime const &time_base,
         double time_start_s) = 0;
 

@@ -154,11 +154,13 @@ public:
     mid-run. */
     blitz::Array<double,1> _foceanAOm;
 
+    // ==================  These must be saved in restart files
     /** Merge mask from last timestep */
     blitz::Array<int16_t,2> mergemaskA0;
 
     /** E1vE0 in a form Fortran can digest */
     VectorSparse<int,double,2> E1vE0c;
+    // ========================
 
 public:
     virtual ~GCMCoupler_ModelE() {}
@@ -301,7 +303,7 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
     char *fname_c, int fname_n);
 
 extern "C"
-void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dtsrc);
+void gcmce_cold_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc);
 
 extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,

@@ -533,7 +533,7 @@ void gcmce_write_rsf(GCMCoupler_ModelE *self,
 // Called from LISheetIceBin::cold_start()
 
 extern "C"
-void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dtsrc)
+void gcmce_cold_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc)
 {
     printf("BEGIN gcmce_cold_start() yeari=%d, itimei=%d, dtsrc=%g\n", yeari, itimei, dtsrc);
 
@@ -542,7 +542,7 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
 
     // Call superclass cold_start()
     double const time_s = itimei * dtsrc;
-    self->cold_start(
+    self->cold_start(cold_start,
         ibmisc::Datetime(yeari,1,1), time_s);
 
     // NOTE: Not needed because these things MUST be properly computed
@@ -551,12 +551,18 @@ void gcmce_cold_start(GCMCoupler_ModelE *self, int yeari, int itimei, double dts
     // c) Compute ZATMO, FGICE, etc.
     //    self->update_topo(time_s);    // initial_timestep=true
 
-    // d) Sync with dynamic ice model
-    gcmce_couple_native(self, itimei, false,    // run_ice=false
-        nullptr, nullptr, nullptr);    // !run_ice ==> no E1vE0c to return
+
+    if (cold_start) {
+        // d) Sync with dynamic ice model
+        // This receives info back from ice model
+        // (for warm start, the infor was already saved in a restart file)
+        gcmce_couple_native(self, itimei, false,    // run_ice=false
+            nullptr, nullptr, nullptr);    // !run_ice ==> no E1vE0c to return
+    }
 
     printf("END gcmce_cold_start()\n");
 }
+
 
 /** Helper function: splits a single GCMInput struct into per-domain GCMInput structs */
 std::vector<GCMInput> split_by_domain(

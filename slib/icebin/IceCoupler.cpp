@@ -116,8 +116,9 @@ IceCoupler::~IceCoupler() {}
 
 // ==============================================================
 void IceCoupler::cold_start(
-        ibmisc::Datetime const &time_base,
-        double time_start_s)
+    bool cold_start,
+    ibmisc::Datetime const &time_base,
+    double time_start_s)
 {
     // Set up writers
     if (gcm_coupler->am_i_root()) {

@@ -257,6 +257,7 @@ public:
 
     /** Private; called from gcmce_cold_start() */
     void cold_start(
+        bool cold_start,    // Is this a cold or warm start?
         ibmisc::Datetime _time_base,
         double time_start_s);
 

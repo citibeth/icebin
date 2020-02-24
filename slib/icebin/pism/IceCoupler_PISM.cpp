@@ -150,18 +150,13 @@ public:
 
 ArgcArgv::ArgcArgv(std::vector<std::string> const &args)
 {
-printf("AA1\n");
     argc = (int)args.size();
-printf("argc = %d %ld\n", argc, args.size());
     _argv.reserve(args.size());
 
-printf("AA2\n");
     // Determine total number of characters needed
     size_t nchar = 0;
     for (auto &arg : args) nchar += (arg.size() + 1);
-printf("AA3 %ld\n", nchar);
     _all_str.reserve(nchar);
-printf("AA4\n");
 
     // Concatenate all strings into single string with null separators
     for (int i=0; i<argc; ++i) {
@@ -170,7 +165,6 @@ printf("AA4\n");
         for (unsigned int j=0; j<arg.size(); ++j) _all_str.push_back(arg[j]);
         _all_str.push_back('\0');
     }
-printf("AA5\n");
     argv = &_argv[0];
 
 printf("*** PISM Args:");
@@ -181,6 +175,7 @@ printf("\n");
 }
 // ======================================================================
 void IceCoupler_PISM::_cold_start(
+    bool cold_start,
     ibmisc::Datetime const &time_base,
     double time_start_s)
 {
