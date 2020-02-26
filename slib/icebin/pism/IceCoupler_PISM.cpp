@@ -48,7 +48,7 @@ namespace gpism {
 static double const nan = std::numeric_limits<double>::quiet_NaN();
 
 IceCoupler_PISM::IceCoupler_PISM(IceCoupler::Params const &_params)
-    : IceCoupler(IceCoupler::Type::PISM, params),
+    : IceCoupler(IceCoupler::Type::PISM, _params),
     write_pism_inputs(true)
 {
 }

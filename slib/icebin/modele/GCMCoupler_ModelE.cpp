@@ -227,7 +227,9 @@ IceCoupler::Params GCMCoupler_ModelE::make_ice_coupler_params(
         gcm_rsf = boost::filesystem::read_symlink(gcm_rsf);
 
     // Determine ice sheet restart filename
-    params.rsf_fname = strprintf("%s-%s.nc", remove_extension(gcm_rsf.string()).c_str());
+    params.rsf_fname = strprintf("%s-%s.nc",
+        remove_extension(gcm_rsf.string()).c_str(),
+        sheet_name.c_str());
 end_rsf:
     // -----------------------
 
@@ -535,7 +537,7 @@ void gcmce_write_rsf(GCMCoupler_ModelE *self,
 extern "C"
 void gcmce_model_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc)
 {
-    printf("BEGIN gcmce_model_start() yeari=%d, itimei=%d, dtsrc=%g\n", yeari, itimei, dtsrc);
+    printf("BEGIN gcmce_model_start() cold_start=%d yeari=%d, itimei=%d, dtsrc=%g\n", cold_start, yeari, itimei, dtsrc);
 
     // This will cold-start initial conditions of the dynamic ice model
     self->dtsrc = dtsrc;
