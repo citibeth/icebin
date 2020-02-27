@@ -187,7 +187,7 @@ public:
         bool run_ice);    // Should we run the ice model?
 
     /** Read/write state for restart file */
-    virtual void write_rsf(std::string const &fname);
+    void icemodel_rsf(std::string const &fname, char rw);
 
 protected:
 

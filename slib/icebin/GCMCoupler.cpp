@@ -358,6 +358,31 @@ void GCMCoupler::ncio_gcm_input(NcIO &ncio,
     out.E1vE0c.ncio(ncio, vname_base+"E1vE0c");
 }
 
+
+void GCMCoupler::ncio_rsf(ibmisc::NcIO &ncio)
+{
+
+    // Allocate space to read...
+    if (ncio.rw == 'r') {
+        XuE0s.clear();
+        XuE0s.reserve(ice_couplers.size());
+        for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+            XuE0s.push_back(std::unique_ptr<ibmisc::linear::Weighted_Eigen>());
+        }
+    }
+
+//    for (size_t sheetix=0; sheetix < ice_couplers.size(); ++sheetix) {
+    for (size_t sheetix=0; sheetix < XuE0s.size(); ++sheetix) {
+
+        if (XuE0s[sheetix].get() == nullptr) continue;
+        auto &ice_coupler(ice_couplers[sheetix]);
+
+        XuE0s[sheetix]->ncio(ncio, "GCMCoupler."+ice_coupler->name()+".XuE0",
+            {"dimXs", "dimEs"});
+        ice_coupler->ncio_rsf(ncio);
+    }
+}
+
 /** Top-level ncio() to log input to coupler. (GCM->coupler) */
 void GCMCoupler::ncio_gcm_output(NcIO &ncio,
     VectorMultivec const &gcm_ovalsE,
@@ -373,7 +398,7 @@ printf("END GCMCoupler::ncio_gcm_output(%s)\n", vname_base.c_str());
 }
 // ------------------------------------------------------------
 // ------------------------------------------------------------
-// TODO: Add to linear/eigen.hpp
+// TODO: Add to ibmisc linear/eigen.hpp
 /** Converts a linear::Weighted_Eigen to sparse indexing
 @param dims set to E.dims to sparsify all dimensions; or set one to nullptr if no sparsify needed there. */
 std::unique_ptr<linear::Weighted_Eigen> sparsify(
@@ -467,8 +492,10 @@ printf("BEGIN GCMCoupler::couple(time_s=%g, run_ice=%d)\n", time_s, run_ice);
             auto &ice_coupler(ice_couplers[sheetix]);    // IceCoupler
             IceRegridder const *ice_regridder = ice_coupler->ice_regridder;
 
+printf("AA1\n");
             IceCoupler::CoupleOut iout(ice_coupler->couple(
                 timespan, gcm_ovalsE, out.gcm_ivalss_s, run_ice));
+printf("AA2\n");
             dimE1s.push_back(iout.dimE);
             XuE1s.push_back(sparsify(*iout.XuE,
                 std::array<SparsifyTransform,2>{

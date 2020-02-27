@@ -113,6 +113,13 @@ public:
     @param Opened handle on the IceBin config file (not IceBin grid file). */
     virtual void ncread(ibmisc::NcIO &ncio_config, std::string const &vname_sheet);
 
+    /** Read/write state into IceBin restart file, shared between
+    multiple ice sheets and the IceBin coupler. */
+    virtual void ncio_icebin_rsf(ibmisc::NcIO &ncio);
+
+    /** Read/write state in separate restart file, private to ice
+    sheet model. */
+    virtual void icemodel_rsf(std::string const &fname, char rw) = 0;
 
     // ========= Called by
     //     LANDICE_DRV.f: init_LI(istart_fixup)
@@ -183,9 +190,6 @@ public:
         blitz::Array<double,2> const &ice_ivalsI,
         blitz::Array<double,2> &ice_ovalsI,
         bool run_ice) = 0;
-
-    /** Read/write state for researt file */
-    virtual void write_rsf(std::string const &fname) = 0;
 
 };      // class IceCoupler
 // =========================================================

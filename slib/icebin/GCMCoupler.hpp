@@ -261,6 +261,9 @@ public:
         ibmisc::Datetime _time_base,
         double time_start_s);
 
+    /** Read/write state for GCM restart (rsf) file */
+    virtual void ncio_rsf(ibmisc::NcIO &ncio);
+
     /** Top-level ncio() to log output from coupler. (coupler->GCM) */
     void ncio_gcm_input(ibmisc::NcIO &ncio,
         GCMInput &out,        // All MPI ranks included here

@@ -555,10 +555,14 @@ void IceCoupler_PISM::run_timestep(double time_s,
     printf("END IceCoupler_PISM::run_timestep()\n");
 }
 
-/** Write state for restart file */
-void IceCoupler_PISM::write_rsf(std::string const &fname)
+/** Read/write state for restart file */
+void IceCoupler_PISM::icemodel_rsf(std::string const &fname, char rw)
 {
-    pism_ice_model->dumpToFile(fname);
+    // Only write restart (rsf) files here.  Restart files are read by
+    // putting the right -i option on the PISM command line.
+    if (rw == 'w') {
+        pism_ice_model->dumpToFile(fname);
+    }
 }
 
 

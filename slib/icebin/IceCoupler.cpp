@@ -111,6 +111,19 @@ void IceCoupler::ncread(ibmisc::NcIO &ncio_config, std::string const &vname_shee
     get_or_put_att<NcVar,double>(info_var, 'r', "sigma", "double", &sigma[0], 3);
 }
 
+/** Read/write for IceBin restart file */
+void IceCoupler::ncio_icebin_rsf(ibmisc::NcIO &ncio)
+{
+    // dimE0 and IvE0 are set when gcmce_couple() is called with run_ice=true
+    // The first time this is called to write will be before that time.
+    // In that case, dimE0 and IvE0 will not yet bet set.
+
+    if (ncio.rw == 'r') dimE0.reset(new SparseSetT);
+    if (dimE0.get() != nullptr) dimE0->ncio(ncio, "IceCoupler."+name()+".dimE0");
+
+    if (ncio.rw == 'r') IvE0.reset(new EigenSparseMatrixT);
+    if (IvE0.get() != nullptr) ncio_eigen(ncio, *IvE0, "IceCoupler."+name()+".IvE0");
+}
 
 IceCoupler::~IceCoupler() {}
 
@@ -257,7 +270,7 @@ bool run_ice)
     IceCoupler::CoupleOut ret;
 
     if (!gcm_coupler->am_i_root()) {
-        printf("[noroot] BEGIN IceCoupler::couple(%s)\n", name().c_str());
+        printf("[noroot] BEGIN IceCoupler::couple(%s) run_ice=%d\n", name().c_str(), run_ice);
 
         // Allocate dummy variables, even though they will only be set on root
         blitz::Array<double,2> ice_ivalsI(contract[INPUT].size(), nI());
@@ -468,8 +481,8 @@ bool run_ice)
         dimA1.ncio(ncio, "dimA");
         dimE1->ncio(ncio, "dimE");
 
-        AE1vIs[GridAE::E]->ncio(ncio, "EvI_unscaled_nc", {"dimE", "dimI"});
-        AE1vIs[GridAE::A]->ncio(ncio, "AvI_unscaled", {"dimA", "dimI"});
+        AE1vIs[GridAE::E]->ncio(ncio, "EuI_nc", {"dimE", "dimI"});
+        AE1vIs[GridAE::A]->ncio(ncio, "AuI", {"dimA", "dimI"});
         ncio_eigen(ncio, *IvE1, "IvE");
         ret.XuE->ncio(ncio, "XuE", {"dimX", "dimE"});
     }

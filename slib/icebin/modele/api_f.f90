@@ -180,13 +180,14 @@ INTERFACE
         type(arr_spec_2) :: fland, focean, flake, fgrnd, fgice, zatmo, zlake
     end subroutine gcmce_reference_globals
 
-    subroutine gcmce_write_rsf(api, &
-        modele_fname_f, modele_fname_len) bind(c)
+    subroutine gcmce_io_rsf(api, &
+        modele_fname_f, modele_fname_len, rw) bind(c)
     use iso_c_binding
         type(c_ptr), value :: api
         character(c_char) :: modele_fname_f(*)
         integer(c_int), value :: modele_fname_len
-    end subroutine gcmce_write_rsf
+        character(c_char), value :: rw
+    end subroutine gcmce_io_rsf
 
     subroutine gcmce_couple_native(api, itime, &
         run_ice, E1vE0c_indices, E1vE0c_values, E1vE0c_nele) bind(c)
