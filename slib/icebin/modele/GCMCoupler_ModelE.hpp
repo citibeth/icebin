@@ -220,7 +220,9 @@ public:
 
 // ===============================================================
 // The "gcmce_*" interface used by Fortran ModelE
+// These headers are NOT needed, they are repeated in api_f.f90
 
+#if 0
 extern "C"
 GCMCoupler_ModelE *gcmce_new(
     ModelEParams const &_rdparams,
@@ -300,10 +302,12 @@ void gcmce_reference_globals(
 
 extern "C"
 void gcmce_io_rsf(GCMCoupler_ModelE *self,
-    char *fname_c, int fname_n);
+    char *fname_c, int fname_n, char rw);
 
 extern "C"
 void gcmce_model_start(GCMCoupler_ModelE *self, bool cold_start, int yeari, int itimei, double dtsrc);
+
+#endif
 
 extern "C"
 void gcmce_couple_native(GCMCoupler_ModelE *self,
@@ -314,9 +318,6 @@ bool run_ice,    // if false, only initialize
 int **E1vE0c_indices_p,
 double **E1vE0c_values_p,
 int *E1vE0c_nele);
-
-
-
 
 
 }}

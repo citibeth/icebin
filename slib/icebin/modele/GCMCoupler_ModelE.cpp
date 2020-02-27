@@ -558,7 +558,7 @@ void gcmce_io_rsf(GCMCoupler_ModelE *self,
 
         // Derive name for per-ice sheet PISM restart file
         auto const fname(sheet_rsf(modele_root, ice_coupler->name()));
-        ice_coupler->io_rsf(fname, rw);
+        ice_coupler->icemodel_rsf(fname, rw);
     }
 
     // Read/Write IceBin coupler state

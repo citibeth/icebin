@@ -379,7 +379,7 @@ void GCMCoupler::ncio_rsf(ibmisc::NcIO &ncio)
 
         XuE0s[sheetix]->ncio(ncio, "GCMCoupler."+ice_coupler->name()+".XuE0",
             {"dimXs", "dimEs"});
-        ice_coupler->ncio_rsf(ncio);
+        ice_coupler->ncio_icebin_rsf(ncio);
     }
 }
 
