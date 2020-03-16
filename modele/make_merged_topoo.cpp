@@ -252,12 +252,12 @@ int main(int argc, char **argv)
         metaO.hspecA.ncio(ncio, "hspecO");    // Actually ocean grid
 
         ncio_vector(ncio, lonc, false, "lon", "double",
-            get_or_add_dims(ncio, {"im"}, {lonc.size()}));
+            get_or_add_dims(ncio, {"im"}, {(long)lonc.size()}));
         ncio_vector(ncio, latc, false, "lat", "double",
-            get_or_add_dims(ncio, {"jm"}, {latc.size()}));
+            get_or_add_dims(ncio, {"jm"}, {(long)latc.size()}));
 
         eam.indexingHC.ncio(ncio, "indexingHC");
-        auto xxdims(get_or_add_dims(ncio, {"nhc"}, {eam.hcdefs.size()}));
+        auto xxdims(get_or_add_dims(ncio, {"nhc"}, {(long)eam.hcdefs.size()}));
         ncio_vector(ncio, eam.hcdefs, true, "hcdefs", "double", xxdims);
         ncio_vector(ncio, eam.underice_hc, true, "underice_hc", "short", xxdims);  // Must be short for NetCDF3
 

@@ -247,7 +247,7 @@ printf("AA6\n");
     // Continue construction in a contract-specific manner
     reconstruct_ice_ivalsI(ice_ivalsI, dt);
 
-printf("END construct_ice_ivalsI()\n", dt);
+printf("END construct_ice_ivalsI()\n");
     return ice_ivalsI;
 }
 // -----------------------------------------------------------
@@ -595,7 +595,7 @@ void IceWriter::init_file()
     // Put initial time in it...
     double const &time_start_s(gcm_coupler->time_start_s);
     time0_var.putVar({0}, {1}, &time_start_s);
-    time0_txt.putVar({0}, {iso8601_length},
+    time0_txt.putVar({0}, {(unsigned long)iso8601_length},
         to_iso8601(time_unit.to_datetime(time_start_s)).c_str());
 
     ncio.close();
@@ -632,7 +632,7 @@ void IceWriter::write(double time_s,
     time_var.putVar(cur, counts, &time_s);
 
     NcVar time_txt = ncio.nc->getVar("time.txt");
-    time_txt.putVar({cur[0],0}, {counts[0],iso8601_length},
+    time_txt.putVar({cur[0],0}, {counts[0],(unsigned long)iso8601_length},
         to_iso8601(time_unit.to_datetime(time_s)).c_str());
 
     // Write the other variables

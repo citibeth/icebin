@@ -419,7 +419,7 @@ std::unique_ptr<GCMRegridder_Standard> new_gcmA_standard(
     std::unique_ptr<GCMRegridder_Standard> gcmA(new GCMRegridder_Standard);
     gcmA->init(
         std::move(agridA), std::move(hcdefs),
-        Indexing({"A", "HC"}, {0,0}, {agridA.dim.sparse_extent(), hcdefs.size()}, {1,0}),
+        Indexing({"A", "HC"}, {0,0}, {agridA.dim.sparse_extent(), (long)hcdefs.size()}, {1,0}),
         args.correctA);
 
 
@@ -642,7 +642,7 @@ void global_ec_section(GCMRegridder &gcmA, ParseArgs &args,
 
         ncv = dimE.ncio(ncio, "dimE");
         get_or_put_att(ncv, 'w', "shape", 
-            &std::vector<int>{gcmA.nhc(), hspecA.jm, hspecA.im}[0], 3);
+            &std::vector<int>{(int)gcmA.nhc(), hspecA.jm, hspecA.im}[0], 3);
         ncv.putAtt("description", "Elevation Grid");
 
         ncv = dimI.ncio(ncio, "dimI");

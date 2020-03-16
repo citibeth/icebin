@@ -462,7 +462,7 @@ GCMRegridder_ModelE::GCMRegridder_ModelE(
 printf("Opening global_ecO = %s\n", global_ecO.c_str());
         NcIO ncio(global_ecO, 'r');
         ncio_vector(ncio, global_hcdefs, true, "hcdefs", "double",
-            get_or_add_dims(ncio, {"nhc"}, {_hcdefs.size()} ));
+            get_or_add_dims(ncio, {"nhc"}, {(long)_hcdefs.size()} ));
     }
 
     // Combine local and global hcdefs

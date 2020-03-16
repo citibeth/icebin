@@ -50,7 +50,7 @@ inline void Metadata::ncio(ibmisc::NcIO &ncio)
     indexingHC.ncio(ncio, "indexingHC");
     indexingE.ncio(ncio, "indexingE");
 
-    auto _nhc(get_or_add_dims(ncio, {"nhc"}, {hcdefs.size()}));
+    auto _nhc(get_or_add_dims(ncio, {"nhc"}, {(long)hcdefs.size()}));
     ncio_vector(ncio, hcdefs, true, "hcdefs", "double", _nhc);
     ncio_vector(ncio, underice_hc, true, "underice_hc", "short", _nhc);  // Must be short for NetCDF3
 }

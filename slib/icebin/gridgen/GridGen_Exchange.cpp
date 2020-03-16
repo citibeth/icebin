@@ -278,7 +278,7 @@ Grid make_exchange_grid(
         GridCoordinates::XY,
         sproj,
         GridParameterization::L0,    // Why not?
-        Indexing({"i0"}, {0}, {cells.nfull()}, {0}),    // No n-D indexing available.
+        Indexing({"i0"}, {0}, {(long)cells.nfull()}, {0}),    // No n-D indexing available.
         std::move(vertices), std::move(cells));
 
 }

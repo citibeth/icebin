@@ -120,7 +120,7 @@ void GCMRegridder_Standard::ncio(NcIO &ncio, std::string const &vname)
     indexingHC.ncio(ncio, vname + ".indexingHC");
     indexingE.ncio(ncio, vname + ".indexingE");
     ncio_vector(ncio, _hcdefs, true, vname + ".hcdefs", "double",
-        get_or_add_dims(ncio, {vname + ".nhc"}, {_hcdefs.size()} ));
+        get_or_add_dims(ncio, {vname + ".nhc"}, {(long)_hcdefs.size()} ));
 //  domainA.ncio(ncio, ncInt, vname + ".domainA");
     get_or_put_att(info_v, ncio.rw, "correctA", &correctA, 1);
 

@@ -66,7 +66,7 @@ std::shared_ptr<GCMRegridder_Standard> new_GCMRegridder_Standard(
         AbbrGrid(fgridA),
 //        std::move(fgridA),
         std::move(hcdefs),
-        Indexing({"A", "HC"}, {0,0}, {fgridA.ndata(), nhc}, {1,0}),
+        Indexing({"A", "HC"}, {0,0}, {(long)fgridA.ndata(), nhc}, {1,0}),
         _correctA);
 
     return cself;
