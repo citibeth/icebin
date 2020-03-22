@@ -56,14 +56,17 @@ int main(int argc, char** argv)
     everytrace_init();
     ParseArgs args(argc, argv);
 
-    auto mto(MakeTopoO(EnvSearchPath("MODELE_FILE_PATH"), {
+    MakeTopoO mto(EnvSearchPath("MODELE_FILE_PATH"), {
         "FGICE1m", args.et1mfile, "FGICE1m",
         "ZICETOP1m", args.et1mfile, "ZICETOP1m",
         "ZSOLG1m", args.et1mfile, "ZSOLG1m",
         "FOCEAN1m", args.et1mfile, "FOCEAN1m",
         "FLAKES", "Z10MX10M.nc", "FLAKES"
-    }));
+    });
 
+
+    // Print sanity check errors to STDERR
+    for (std::string const &err : mto.errors) fprintf(stderr, "ERROR: %s\n", err.c_str());
 
 
     printf("============ Writing Output\n");
@@ -82,4 +85,6 @@ int main(int argc, char** argv)
     }
     printf("Done Writing Output\n");
 
+    if (mto.errors.size() > 0) return -1;
+    return 0;
 }

@@ -248,6 +248,17 @@ static const std::vector<ElevPoints> resets
 };
 
 
+static void sanity_nonan(
+std::string const &label,
+blitz::Array<double,2> const &varA2,    // Rounded FOCEAN
+std::vector<std::string> &errors)
+{
+    for (int j=0; j<varA2.extent(0); ++j) {
+    for (int i=0; i<varA2.extent(1); ++i) {
+        if (std::isnan(varA2(j,i))) errors.push_back(
+            ibmisc::strprintf("(%d, %d): %s is NaN", i+1,j+1, label.c_str()));
+    }}
+}
 
 static ibmisc::ArrayBundle<double,2> _make_topoO(
     // -------- 1-minute resolution
@@ -512,6 +523,7 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
             FGICE(i,j) = 0;
         } else {
             double const fact = 1. / (1. - foceanf);
+// if (std::isnan(fact)) printf("***NaN Error: (%d %d)\n", i+1,j+1);
 //if (fact != 1) fprintf(stderr, "FACT (%d, %d): %g %g sum=%g, fact=%g\n", i,j, FGICE(i,j),  FOCEANF(i,j), FGICE(i,j)+FOCEANF(i,j), fact);
             FOCEAN(i,j) = 0.;
             FGICE(i,j) = FGICEF(i,j) * fact;
@@ -579,9 +591,12 @@ static ibmisc::ArrayBundle<double,2> _make_topoO(
         double const fcont = 1. - FOCEAN(i,j);
         double const fcontf = 1. - FOCEANF(i,j);
 
-        FLAKE(i,j) = FLAKE(i,j)*fcont / (fcontf+1e-20);
-        // FLAKE(i,j) = round_mantissa_to(FLAKE(i,j), 8);
-        FLAKE(i,j) = std::round(FLAKE(i,j)*256.) / 256.;
+        if (fcontf != 0.) {    // Avoid divide by 0; adding 1e-20 doesn't do much
+            // This code is from Gary Russell's original Fortran
+            FLAKE(i,j) = FLAKE(i,j)*fcont / (fcontf+1e-20);
+            // FLAKE(i,j) = round_mantissa_to(FLAKE(i,j), 8);
+            FLAKE(i,j) = std::round(FLAKE(i,j)*256.) / 256.;
+        }
     }}
 
     //

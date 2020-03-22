@@ -68,7 +68,7 @@ blitz::Array<double,1> const &elevmaskI)
     return ret;
 }
 
-void sanity_nonan(
+static void sanity_nonan(
 std::string const &label,
 blitz::Array<double,2> const &varA2,    // Rounded FOCEAN
 std::vector<std::string> &errors)
@@ -153,6 +153,7 @@ std::vector<std::string> &errors)
     auto zland_minO(reshape1(zland_minO2));
     auto zland_maxO(reshape1(zland_maxO2));
     auto mergemaskOm(reshape1(mergemaskOm2));
+
 
     // Sanity check inputs
     sanity_nonan("foceanOp2-0", foceanOp2, errors);
@@ -310,6 +311,7 @@ std::vector<std::string> &errors)
             zatmoOm(iO) = zatmoOp(iO) * fact;
         }
     }}
+
 
     // Run sanity checks on output
     sanity_nonan("foceanOp2", foceanOp2, errors);

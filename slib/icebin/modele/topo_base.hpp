@@ -16,6 +16,7 @@ namespace modele {
 struct MakeTopoO {
     HntrSpec hspec;    // Describes the grid the variables use
     ibmisc::ArrayBundle<double,2> bundle;
+    std::vector<std::string> errors;
 
     MakeTopoO(
         ibmisc::FileLocator const &files,
